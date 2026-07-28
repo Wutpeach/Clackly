@@ -47,7 +47,7 @@
 
 - Open DaVinci Resolve with a project and active timeline.
 - Copy or symlink `resolve/Clackly.py` into the Windows Resolve Utility scripts directory.
-- Ensure `RESOLVE_COMMAND_CENTER_ROOT` points to the app root if the deployment is not relative to `Clackly.py`.
+- Ensure `RESOLVE_COMMAND_CENTER_ROOT` points to the app root before launching Resolve, especially when Resolve's Utility script runner does not define `__file__` or when using a symlink.
 - Launch Resolve and confirm Electron starts automatically.
 - Press `Ctrl+Space`, type `marker`, press `Enter`, and confirm a red marker appears at the playhead.
 

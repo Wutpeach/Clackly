@@ -6,8 +6,9 @@ Install this file as Clackly.py in Resolve's Utility scripts directory.
 Windows user Utility script target:
 %APPDATA%\\Blackmagic Design\\DaVinci Resolve\\Support\\Fusion\\Scripts\\Utility\\Clackly.py
 
-If Clackly.py is copied outside the source tree, set RESOLVE_COMMAND_CENTER_ROOT
-to the resolve-command-center app directory before starting Resolve.
+Set RESOLVE_COMMAND_CENTER_ROOT to the resolve-command-center app directory
+before starting Resolve when using Resolve's Utility script runner. Resolve may
+execute Utility scripts without defining __file__, including symlinked scripts.
 """
 
 import os
@@ -18,14 +19,23 @@ import threading
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 
 DEFAULT_PORT = 49371
 
 
 def _port() -> int:
-    return int(os.environ.get("RESOLVE_COMMAND_CENTER_PORT", str(DEFAULT_PORT)))
+    raw_port = os.environ.get("RESOLVE_COMMAND_CENTER_PORT", str(DEFAULT_PORT))
+    try:
+        port = int(raw_port)
+    except ValueError as exc:
+        raise RuntimeError(f"Invalid RESOLVE_COMMAND_CENTER_PORT: {raw_port}") from exc
+
+    if port < 1 or port > 65535:
+        raise RuntimeError(f"RESOLVE_COMMAND_CENTER_PORT out of range: {port}")
+
+    return port
 
 
 def _health_url() -> str:
@@ -44,24 +54,52 @@ def _candidate_roots() -> List[Path]:
     roots = []
     configured_root = os.environ.get("RESOLVE_COMMAND_CENTER_ROOT")
     if configured_root:
-        roots.append(Path(configured_root))
+        roots.append(Path(configured_root).expanduser())
 
-    script_path = Path(__file__).resolve()
-    roots.extend([
-        script_path.parent.parent,
-        script_path.parent
-    ])
+    script_path = _script_path()
+    if script_path:
+        roots.extend([
+            script_path.parent.parent,
+            script_path.parent
+        ])
+    else:
+        try:
+            cwd = Path.cwd()
+        except OSError:
+            cwd = None
+        if cwd:
+            roots.extend([
+                cwd,
+                cwd / "resolve-command-center"
+            ])
     return roots
 
 
+def _script_path() -> Optional[Path]:
+    runtime_file = globals().get("__file__")
+    if not runtime_file:
+        return None
+    return Path(runtime_file).resolve()
+
+
 def find_app_root() -> Path:
-    for root in _candidate_roots():
+    roots = _candidate_roots()
+    for root in roots:
         package_json = root / "package.json"
         bridge_server = root / "bridge" / "server.py"
         if package_json.exists() and bridge_server.exists():
             return root
 
-    candidates = ", ".join(str(root) for root in _candidate_roots())
+    candidates = ", ".join(str(root) for root in roots) or "<none>"
+    if _script_path() is None:
+        raise RuntimeError(
+            "Could not locate resolve-command-center app root. Resolve did not "
+            "provide __file__, so Clackly.py could not infer the app root from "
+            "the Utility script location. Set RESOLVE_COMMAND_CENTER_ROOT to "
+            "the resolve-command-center app root before launching Resolve. "
+            f"Checked: {candidates}"
+        )
+
     raise RuntimeError(
         "Could not locate resolve-command-center app root. "
         "Set RESOLVE_COMMAND_CENTER_ROOT. Checked: "

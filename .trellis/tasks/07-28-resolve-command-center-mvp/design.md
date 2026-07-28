@@ -46,7 +46,7 @@ resolve-command-center/
 ## Data Flow
 
 1. Resolve runs `resolve/Clackly.py` from the Resolve Utility scripts directory.
-2. `Clackly.py` resolves the app root from `RESOLVE_COMMAND_CENTER_ROOT` or from a deployment-relative path.
+2. `Clackly.py` resolves the app root from `RESOLVE_COMMAND_CENTER_ROOT` first, then from deployment-relative paths only when Resolve provides `__file__`.
 3. `Clackly.py` starts the Python bridge in the Resolve scripting context, then launches Electron.
 4. Electron starts hidden and registers `CommandOrControl+Space`.
 5. The main process shows and focuses the palette window when the shortcut fires.
@@ -109,6 +109,7 @@ Bridge error response:
 - The bridge should bind to localhost only.
 - The initial bridge port can default to a fixed development value, but should be configurable through `RESOLVE_COMMAND_CENTER_PORT`.
 - `Clackly.py` should avoid machine-specific absolute paths and should document required environment variables.
+- Resolve's Utility script runner may omit `__file__`, including for symlinked scripts. In that case, `Clackly.py` should try only safe cwd-based fallbacks and otherwise raise a clear error directing the user to set `RESOLVE_COMMAND_CENTER_ROOT`.
 
 ## Tradeoffs
 

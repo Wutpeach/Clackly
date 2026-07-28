@@ -28,7 +28,7 @@ Backend code includes local bridge processes, Resolve scripting integration, sta
 - Bridge binds to `127.0.0.1` only for MVP local IPC.
 - `RESOLVE_COMMAND_CENTER_PORT` controls the bridge port and must parse to `1..65535`.
 - `RESOLVE_COMMAND_CENTER_ALLOWED_ORIGIN` controls CORS for browser-based dev tooling.
-- `RESOLVE_COMMAND_CENTER_ROOT` points startup scripts to the app root; do not hardcode machine-specific absolute paths.
+- `RESOLVE_COMMAND_CENTER_ROOT` points startup scripts to the app root; prefer it for Resolve Utility launches because Resolve may omit `__file__`, and do not hardcode machine-specific absolute paths.
 - Resolve API access is centralized in bridge modules, not Electron code.
 
 ### 4. Validation & Error Matrix
