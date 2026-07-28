@@ -1,4 +1,4 @@
-{"file": ".trellis/spec/backend/index.md", "reason": "Check backend-facing bridge and startup code against project guidance."}
+{"file": ".trellis/spec/backend/index.md", "reason": "Check backend-facing bridge and Resolve launch code against project guidance."}
 {"file": ".trellis/spec/frontend/index.md", "reason": "Check Electron renderer and main-process UI boundaries against project guidance."}
 {"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Verify command payload contracts across renderer, command engine, bridge, and Resolve handlers."}
 {"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Verify registry and executor routing remain extensible instead of command-specific."}

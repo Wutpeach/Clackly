@@ -27,8 +27,8 @@ The user can trigger Resolve actions from a searchable desktop palette without n
 - `R6`: Add the `timeline.addMarker` command with `id`, `name`, `keywords`, and `executor` metadata.
 - `R7`: Build a local Python bridge exposing a minimal HTTP endpoint that accepts command execution requests from Electron.
 - `R8`: Implement `timeline.addMarker` in the Python bridge by using the Resolve Python Script API to add a red marker on the current timeline at the current playhead frame.
-- `R9`: Provide a Resolve `Clackly.py` Utility entrypoint backed by `startup.py` that can start the bridge in Resolve's Python scripting context and launch the Electron app.
-- `R10`: Avoid hardcoded machine-specific absolute paths; startup and bridge configuration must be supplied through environment variables, relative deployment layout, or documented command arguments.
+- `R9`: Provide a single-file Resolve `Clackly.py` Utility entrypoint that can start the bridge in Resolve's Python scripting context and launch the Electron app.
+- `R10`: Avoid hardcoded machine-specific absolute paths; launch and bridge configuration must be supplied through environment variables, relative deployment layout, or documented command arguments.
 - `R11`: Preserve future extension points for plugin scanning without implementing a plugin marketplace, Workflow Plugin UI, AI features, cloud sync, accounts, auto-update, Fusion tooling, or additional Resolve commands.
 
 ## Acceptance Criteria
@@ -42,7 +42,7 @@ The user can trigger Resolve actions from a searchable desktop palette without n
 - [ ] The Python bridge maps `timeline.addMarker` to an `add_marker` Resolve action without Electron importing or invoking Resolve APIs directly.
 - [ ] In a Resolve session with an open timeline, invoking `timeline.addMarker` creates a red timeline marker at the current playhead frame and then hides the palette.
 - [ ] `Clackly.py` documents or implements the installation path for Resolve Utility scripts on Windows and can launch the Electron app without hardcoded user-specific paths.
-- [ ] The repository contains a clear project structure for Electron, command engine, bridge, and Resolve startup code.
+- [ ] The repository contains a clear project structure for Electron, command engine, bridge, and Resolve launch code.
 
 ## Out Of Scope
 
@@ -55,7 +55,7 @@ The user can trigger Resolve actions from a searchable desktop palette without n
 
 ## Risks And Deferred Items
 
-- Resolve scripting path and Python module loading vary by installation. The MVP should document the Windows Utility script copy target and keep startup path lookup configurable.
+- Resolve scripting path and Python module loading vary by installation. The MVP should document the Windows Utility script copy target and keep app-root lookup configurable.
 - The bridge must run where the Resolve Python API is available. Starting a generic system Python server is insufficient unless it can access Resolve's scripting modules.
 - Global shortcuts can conflict with OS or Resolve shortcuts. MVP keeps `CommandOrControl+Space` as requested and may expose the accelerator as a small config later.
 - Resolve API behavior can only be fully verified on a machine with DaVinci Resolve, a project, and an active timeline.
