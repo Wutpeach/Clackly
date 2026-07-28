@@ -59,3 +59,4 @@ The user can trigger Resolve actions from a searchable desktop palette without n
 - The bridge must run where the Resolve Python API is available. Starting a generic system Python server is insufficient unless it can access Resolve's scripting modules.
 - Global shortcuts can conflict with OS or Resolve shortcuts. MVP keeps `CommandOrControl+Space` as requested and may expose the accelerator as a small config later.
 - Resolve API behavior can only be fully verified on a machine with DaVinci Resolve, a project, and an active timeline.
+- Live testing showed Resolve may tear down daemon-thread work after a Utility script finishes. The dev-MVP launcher now keeps the bridge alive by starting it as a detached Python subprocess; that subprocess still owns Resolve API calls, but it needs Resolve scripting modules available through environment configuration because it cannot inherit Resolve's in-process Python globals.

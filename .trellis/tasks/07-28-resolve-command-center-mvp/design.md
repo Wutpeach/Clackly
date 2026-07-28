@@ -47,7 +47,7 @@ resolve-command-center/
 
 1. Resolve runs `resolve/Clackly.py` from the Resolve Utility scripts directory.
 2. `Clackly.py` resolves the app root from `RESOLVE_COMMAND_CENTER_ROOT` first, then from deployment-relative paths only when Resolve provides `__file__`.
-3. `Clackly.py` starts the Python bridge in the Resolve scripting context, then launches Electron.
+3. `Clackly.py` starts the Python bridge as a detached Python subprocess, waits briefly for the bridge health endpoint, then launches Electron.
 4. Electron starts hidden and registers `CommandOrControl+Space`.
 5. The main process shows and focuses the palette window when the shortcut fires.
 6. Renderer loads searchable command metadata through the preload API.
@@ -110,6 +110,7 @@ Bridge error response:
 - The initial bridge port can default to a fixed development value, but should be configurable through `RESOLVE_COMMAND_CENTER_PORT`.
 - `Clackly.py` should avoid machine-specific absolute paths and should document required environment variables.
 - Resolve's Utility script runner may omit `__file__`, including for symlinked scripts. In that case, `Clackly.py` should try only safe cwd-based fallbacks and otherwise raise a clear error directing the user to set `RESOLVE_COMMAND_CENTER_ROOT`.
+- The dev-MVP subprocess bridge does not inherit Resolve's in-process Python globals. It should pass through Resolve scripting environment variables such as `RESOLVE_SCRIPT_API`, `RESOLVE_SCRIPT_LIB`, and `PYTHONPATH` when present, and log a clear caveat when they are missing.
 
 ## Tradeoffs
 
