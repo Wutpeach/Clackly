@@ -1,0 +1,8 @@
+[
+  {
+    "id": "timeline.addMarker",
+    "name": "Add Marker",
+    "keywords": ["marker", "mark", "timeline", "red"],
+    "executor": "resolve"
+  }
+]

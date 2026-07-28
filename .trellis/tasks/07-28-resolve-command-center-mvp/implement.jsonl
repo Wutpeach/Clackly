@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend guidance applies to Python bridge and Resolve startup scripts."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend guidance applies to Electron renderer UI and command palette behavior."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "The feature crosses Electron UI, command engine, local HTTP bridge, and Resolve API boundaries."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "The command registry and executor routing must avoid hardcoded one-off command logic."}
