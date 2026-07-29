@@ -14,6 +14,7 @@ The user can trigger Resolve actions from a searchable desktop palette without n
 - The requested desktop technology is Electron, React, and Node.js.
 - Electron must remain the user experience layer and renderer code must not directly call Resolve APIs.
 - Resolve API calls must be centralized in a Resolve-side integration layer. The preferred MVP layer is a Workflow Integration Plugin using Blackmagic's `WorkflowIntegration.node` JavaScript API; the Python Utility bridge remains a fallback for comparison.
+- The existing `resolve/` directory is the Resolve Adapter layer. Resolve scripting calls, timeline lookup, timecode/frame conversion, drop-frame handling, and marker actions belong there; command-engine and transport layers only route command ids.
 - The MVP command set contains exactly one command: `timeline.addMarker`.
 - Workflow Integration is now part of the MVP because Utility scripts do not provide a clean app lifecycle. The command registry must still not hardcode command-specific UI logic.
 
@@ -23,13 +24,17 @@ The user can trigger Resolve actions from a searchable desktop palette without n
 - `R2`: The command window must be omitted from the taskbar, appear above other windows when opened, focus the search input, and hide on `Escape` or after command execution.
 - `R3`: Build a renderer UI containing only search, command list, selection, and keyboard interaction concerns.
 - `R4`: Build a command engine that loads command metadata from registry data, initially from a JSON command manifest.
-- `R5`: Avoid command-specific conditionals in the UI and command engine such as `if command == "marker"`; route execution through command metadata and executor adapters.
-- `R6`: Add the `timeline.addMarker` command with `id`, `name`, `keywords`, and `executor` metadata.
+- `R5`: Avoid command-specific conditionals in the UI and command engine such as `if command == "marker"`; route intent metadata to dependency-injected capability handlers.
+- `R6`: Add the `timeline.addMarker` command with `id`, `name`, `keywords`, and `capability` metadata.
 - `R7`: Build a Workflow Integration Plugin entrypoint that Resolve Studio can register from `manifest.xml`.
 - `R8`: Implement `timeline.addMarker` through the Workflow Integration JavaScript API by adding a red marker on the current timeline at the current playhead frame.
 - `R9`: Preserve the single-file Resolve `Clackly.py` Utility entrypoint as a development fallback that can start the Python bridge and launch the external Electron app.
 - `R10`: Avoid hardcoded machine-specific absolute paths; launch and bridge configuration must be supplied through environment variables, relative deployment layout, or documented command arguments.
 - `R11`: Preserve future extension points for plugin scanning without implementing a plugin marketplace, Workflow Plugin UI, AI features, cloud sync, accounts, auto-update, Fusion tooling, or additional Resolve commands.
+- `R12`: Centralize all Resolve scripting API calls under `resolve/` adapters for both JavaScript Workflow Integration and Python fallback paths. `command-engine/`, renderer code, Workflow Plugin routing, and HTTP bridge transport must not call Resolve scripting methods directly.
+- `R13`: Convert the current playhead timecode to the timeline-relative frame id required by `Timeline.AddMarker`, including 29.97 and 59.94 drop-frame timecodes.
+- `R14`: Add a marker capability that selects an available backend in priority order: Resolve API, Resolve Script API, Workflow Plugin API, keyboard shortcut, then reserved future UI automation. Fallback occurs only before execution; selected-backend execution errors must propagate.
+- `R15`: Add a shortcut manager with function-name lookup and injected execution interfaces, including `CREATE_FUSION_CLIP: CTRL+ALT+F` and `ADD_MARKER: CTRL+M`, without automatic binding or keyboard/UI automation.
 
 ## Acceptance Criteria
 
@@ -40,6 +45,10 @@ The user can trigger Resolve actions from a searchable desktop palette without n
 - [ ] Typing `marker` matches `timeline.addMarker` through registry search rather than command-specific UI logic.
 - [ ] Pressing `Enter` on `timeline.addMarker` in the Workflow Plugin sends only the command id from the renderer to the main process.
 - [ ] The Workflow Plugin maps `timeline.addMarker` to an `addMarker` Resolve action without renderer code importing or invoking Resolve APIs directly.
+- [ ] `timeline.addMarker` routes through `marker.add`; command-engine code contains no Resolve API, bridge transport, or keyboard implementation details.
+- [ ] Workflow Integration injects the JavaScript Resolve adapter as the Workflow Plugin API backend, while standalone/Utility execution injects the health-checked HTTP bridge as the Resolve Script API backend.
+- [ ] Workflow Plugin and Python bridge routes delegate marker execution to adapters under `resolve/`; Resolve scripting method calls do not appear in command-engine or transport modules.
+- [ ] Adapter tests cover ordinary frame rates and valid/invalid 29.97 and 59.94 drop-frame conversion.
 - [ ] In a Resolve Studio session with an open timeline, invoking `timeline.addMarker` creates a red timeline marker at the current playhead frame and then hides the palette.
 - [ ] The Workflow Plugin calls `InitializePromise`, handles `ResolveQuit`, and calls `CleanUp()` during plugin shutdown.
 - [ ] `Clackly.py` documents or implements the installation path for Resolve Utility scripts on Windows and can launch the Electron app without hardcoded user-specific paths.

@@ -2,20 +2,26 @@
 
 ## Architecture
 
-The MVP now uses five boundaries:
+The MVP now uses eight boundaries:
 
 1. Electron main process: desktop lifecycle, hidden window, global shortcut, IPC.
 2. Electron renderer: search box, command list, keyboard interaction, execution request trigger.
-3. Command engine: command registry, search, executor routing.
-4. Workflow Integration Plugin: Resolve-hosted Electron entrypoint, Resolve lifecycle, and JavaScript Resolve API actions.
-5. Resolve Utility fallback: local HTTP command endpoint and Resolve Python API actions for comparison/debugging.
+3. Command engine: command registry, search, and dependency-injected intent routing.
+4. Capability layer: operation-level backend selection without Resolve or keyboard implementation knowledge.
+5. Execution adapters: host-specific transport or integration adapters, including the standalone HTTP bridge adapter.
+6. Shortcut layer: function-name mappings and an injected future keyboard executor interface; no automatic binding or automation.
+7. Workflow Integration Plugin: Resolve-hosted Electron entrypoint, Workflow Integration lifecycle, and capability injection.
+8. Resolve Adapter and Utility fallback: all JavaScript/Python Resolve scripting API access under `resolve/`, with localhost HTTP transport for fallback execution.
 
-Renderer code is never allowed to import or call Resolve APIs directly. It sends command ids through preload IPC. In the Workflow Plugin path, the plugin main process owns Resolve interaction through Blackmagic's `WorkflowIntegration.node`. In the Utility fallback path, the Python bridge owns Resolve interaction.
+Renderer and command-engine code are never allowed to import Resolve APIs, bridge transport, or keyboard details. Commands carry intent such as `marker.add`. In the Workflow Plugin path, the host injects `resolve/adapter.js` into the marker capability's `workflowPluginApi` slot. In the Utility fallback path, the standalone host injects the health-checked HTTP bridge adapter into `resolveScriptApi`, and the Python bridge delegates to `resolve/adapter.py`.
 
 ## Proposed Source Layout
 
 ```text
 resolve-command-center/
+├── capability/
+│   ├── errors.js
+│   └── marker.js
 ├── bridge/
 │   ├── resolve_bridge.py
 │   └── server.py
@@ -24,6 +30,8 @@ resolve-command-center/
 │   │   └── timeline.json
 │   ├── executor.js
 │   └── registry.js
+├── execution-adapter/
+│   └── bridge.js
 ├── electron/
 │   ├── main/
 │   │   ├── hotkey.js
@@ -36,7 +44,13 @@ resolve-command-center/
 │       ├── main.jsx
 │       └── styles.css
 ├── resolve/
+│   ├── adapter.js
+│   ├── adapter.py
+│   ├── marker-frame.js
 │   └── Clackly.py
+├── shortcut/
+│   ├── ShortcutManager.js
+│   └── shortcuts.json
 ├── workflow-plugin/
 │   └── main.js
 ├── index.html
@@ -57,16 +71,20 @@ resolve-command-center/
 6. Renderer loads searchable command metadata through the preload API.
 7. User types a query and selects `timeline.addMarker`.
 8. Renderer asks the plugin main process to execute the selected command id.
-9. Plugin main validates command metadata, routes to a Resolve handler table, invokes Resolve JavaScript APIs, and returns a JSON result.
-10. Electron hides the palette after successful execution.
-11. During app quit or Resolve quit, the plugin calls `WorkflowIntegration.CleanUp()`.
+9. The generic command executor routes `marker.add` to the injected marker capability.
+10. The capability selects the Workflow Plugin API backend and invokes the JavaScript Resolve Adapter.
+11. The adapter gets the current project and timeline, reads the current and start timecodes and frame rate, converts the playhead to the timeline-relative frame id (including 29.97/59.94 drop-frame), calls `Timeline.AddMarker`, and returns a JSON result.
+12. Electron hides the palette after successful execution.
+13. During app quit or Resolve quit, the plugin calls `WorkflowIntegration.CleanUp()`.
 
 Utility fallback flow:
 
 1. Resolve runs `resolve/Clackly.py` from the Resolve Utility scripts directory.
 2. `Clackly.py` resolves the app root from `RESOLVE_COMMAND_CENTER_ROOT` first, then from deployment-relative paths only when Resolve provides `__file__`.
 3. `Clackly.py` starts the Python bridge as a detached Python subprocess, waits briefly for `/health`, then launches Electron.
-4. The external Electron app executes commands through local HTTP to the Python bridge.
+4. The external Electron app routes `marker.add` through the marker capability.
+5. The capability checks bridge `/health`, selects the Resolve Script API backend, and invokes the bridge execution adapter.
+6. The adapter sends the existing command id over local HTTP; the bridge dispatches to `resolve/adapter.py`, which performs the same timeline-relative marker operation through the Python Resolve API.
 
 ## Contracts
 
@@ -77,7 +95,7 @@ Command manifest entry:
   "id": "timeline.addMarker",
   "name": "Add Marker",
   "keywords": ["marker", "mark"],
-  "executor": "resolve"
+  "capability": "marker.add"
 }
 ```
 
@@ -125,9 +143,11 @@ Workflow Plugin execution stays on the same command id contract:
 
 - Additional commands are added by placing more manifest files under `command-engine/commands/`.
 - The registry should be shaped so later plugin scanning can merge manifests from `plugins/*/commands/`.
-- Executor adapters should be keyed by executor id, not command id. MVP has only `resolve`, but this keeps future workflow or non-Resolve executors possible.
-- Resolve bridge command handlers should be registered in one table such as `COMMAND_HANDLERS`, making new Resolve actions additive.
-- Workflow Plugin Resolve handlers should be registered in one table such as `RESOLVE_COMMAND_HANDLERS`, making new Resolve actions additive.
+- Capability handlers are keyed by operation intent such as `marker.add`; host code injects implementation backends.
+- Marker backend priority is Resolve API, Resolve Script API, Workflow Plugin API, keyboard shortcut, then reserved future UI automation. Only availability checks may fall through; execution errors do not.
+- Shortcut mappings support introspection and future injected execution, but this MVP performs no keyboard automation and binds no command shortcuts automatically.
+- Bridge command handlers should be registered in one table such as `COMMAND_HANDLERS`, making new adapter actions additive without putting Resolve calls in the transport layer.
+- Workflow Plugin and standalone hosts should register capability handlers in the generic command executor and inject their execution backends outside `command-engine/`.
 
 ## Compatibility Notes
 

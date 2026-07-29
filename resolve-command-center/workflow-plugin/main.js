@@ -3,13 +3,12 @@ const { app, dialog, ipcMain } = require("electron");
 const { createPaletteWindow, hidePaletteWindow, showPaletteWindow } = require("../electron/main/window");
 const { getPaletteAccelerator, registerPaletteHotkey } = require("../electron/main/hotkey");
 const { getCommandById, getCommands, searchCommands } = require("../command-engine/registry");
+const { createCommandExecutor } = require("../command-engine/executor");
+const { createMarkerCapability } = require("../capability/marker");
+const { createResolveAdapter } = require("../resolve/adapter");
+const { ShortcutManager } = require("../shortcut/ShortcutManager");
 
 const PLUGIN_ID = "com.wutpeach.clackly";
-const MARKER_COLOR = "Red";
-const MARKER_NAME = "Clackly Marker";
-const MARKER_NOTE = "Added from Clackly";
-const MARKER_DURATION = 1;
-const MARKER_CUSTOM_DATA = "clackly";
 
 let WorkflowIntegration = null;
 let paletteWindow = null;
@@ -82,142 +81,29 @@ async function getResolve() {
   return resolvePromise;
 }
 
-async function callOptional(target, methodName, ...args) {
-  const method = target && target[methodName];
-  if (typeof method !== "function") {
-    return null;
+const resolveAdapter = createResolveAdapter({ getResolve });
+const shortcutManager = new ShortcutManager();
+const markerCapability = createMarkerCapability({
+  workflowPluginApi: {
+    isAvailable: async () => {
+      try {
+        return Boolean(await getResolve());
+      } catch (_error) {
+        return false;
+      }
+    },
+    addMarker: resolveAdapter.addMarker
+  },
+  keyboardShortcut: {
+    isAvailable: () => shortcutManager.canExecute("ADD_MARKER"),
+    addMarker: (context) => shortcutManager.execute("ADD_MARKER", context)
   }
-
-  try {
-    return await Promise.resolve(method.apply(target, args));
-  } catch (_error) {
-    return null;
+});
+const executeCapabilityCommand = createCommandExecutor({
+  capabilityHandlers: {
+    "marker.add": markerCapability.add
   }
-}
-
-async function callRequired(target, methodName, errorMessage, ...args) {
-  const method = target && target[methodName];
-  if (typeof method !== "function") {
-    throw new Error(errorMessage);
-  }
-
-  const value = await Promise.resolve(method.apply(target, args));
-  if (value === null || value === undefined || value === false) {
-    throw new Error(errorMessage);
-  }
-
-  return value;
-}
-
-function parseFrameRate(value) {
-  if (value === null || value === undefined) {
-    return 24;
-  }
-
-  const text = String(value).trim();
-  if (!text) {
-    return 24;
-  }
-
-  if (text.includes("/")) {
-    const [numerator, denominator] = text.split("/", 2).map(Number);
-    return numerator / denominator;
-  }
-
-  return Number(text);
-}
-
-function timecodeToFrames(timecode, frameRate) {
-  const match = String(timecode).trim().match(/^(\d+):(\d+):(\d+)([:;])(\d+)$/);
-  if (!match) {
-    throw new Error(`Unsupported timeline timecode: ${timecode}`);
-  }
-
-  const [, hours, minutes, seconds, , frames] = match;
-  const roundedRate = Math.round(frameRate);
-  return (
-    Number(hours) * 3600 * roundedRate +
-    Number(minutes) * 60 * roundedRate +
-    Number(seconds) * roundedRate +
-    Number(frames)
-  );
-}
-
-async function getProjectAndTimeline() {
-  const resolve = await getResolve();
-  const projectManager = await callRequired(
-    resolve,
-    "GetProjectManager",
-    "Resolve project manager is unavailable"
-  );
-  const project = await callRequired(
-    projectManager,
-    "GetCurrentProject",
-    "No current Resolve project"
-  );
-  const timeline = await callRequired(
-    project,
-    "GetCurrentTimeline",
-    "No current timeline"
-  );
-
-  return { project, timeline };
-}
-
-async function getSetting(target, settingName) {
-  return callOptional(target, "GetSetting", settingName);
-}
-
-async function currentTimelineFrame(project, timeline) {
-  const directFrame = await callOptional(timeline, "GetCurrentFrame");
-  if (directFrame !== null && directFrame !== undefined) {
-    return Number(directFrame);
-  }
-
-  const currentTimecode = await callRequired(
-    timeline,
-    "GetCurrentTimecode",
-    "Could not read the current playhead timecode"
-  );
-  const frameRate = parseFrameRate(
-    (await getSetting(timeline, "timelineFrameRate")) ||
-      (await getSetting(project, "timelineFrameRate"))
-  );
-  const currentFrames = timecodeToFrames(currentTimecode, frameRate);
-
-  const startTimecode = await callOptional(timeline, "GetStartTimecode");
-  const startFrame = await callOptional(timeline, "GetStartFrame");
-  if (startTimecode) {
-    return currentFrames - timecodeToFrames(startTimecode, frameRate) + Number(startFrame || 0);
-  }
-
-  return currentFrames;
-}
-
-async function addMarker() {
-  const { project, timeline } = await getProjectAndTimeline();
-  const frame = await currentTimelineFrame(project, timeline);
-  const added = await callRequired(
-    timeline,
-    "AddMarker",
-    "Resolve refused to add the marker",
-    frame,
-    MARKER_COLOR,
-    MARKER_NAME,
-    MARKER_NOTE,
-    MARKER_DURATION,
-    MARKER_CUSTOM_DATA
-  );
-
-  return {
-    ok: Boolean(added),
-    frame
-  };
-}
-
-const RESOLVE_COMMAND_HANDLERS = {
-  "timeline.addMarker": addMarker
-};
+});
 
 async function executeWorkflowCommand(commandId) {
   const command = getCommandById(commandId);
@@ -225,16 +111,7 @@ async function executeWorkflowCommand(commandId) {
     throw new Error(`Unknown command: ${commandId}`);
   }
 
-  if (command.executor !== "resolve") {
-    throw new Error(`Workflow plugin cannot execute ${command.executor} commands`);
-  }
-
-  const handler = RESOLVE_COMMAND_HANDLERS[command.id];
-  if (!handler) {
-    throw new Error(`No Resolve handler registered for ${command.id}`);
-  }
-
-  const result = await handler();
+  const result = await executeCapabilityCommand(command.id);
   return {
     ok: true,
     command: command.id,

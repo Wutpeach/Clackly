@@ -19,13 +19,14 @@
 - [x] Implement command engine:
   - manifest loading from `command-engine/commands/*.json`
   - query matching against id, name, and keywords
-  - executor adapter routing by executor id
+  - generic routing from command capability metadata to host-injected capability handlers
 - [x] Add `timeline.addMarker` command metadata.
 - [x] Implement Python bridge:
   - localhost HTTP `POST /command`
   - JSON request and response handling
-  - command handler table
-  - Resolve connection helper
+  - command handler table that delegates Resolve actions to `resolve/adapter.py`
+- [x] Implement the Python Resolve Adapter:
+  - Resolve connection helper isolated under `resolve/`
   - `add_marker` action with timeline and playhead validation
 - [x] Implement `resolve/Clackly.py`:
   - single-file Resolve Utility entrypoint
@@ -47,21 +48,27 @@
   - `InitializePromise`
   - `ResolveQuit` callback
   - `CleanUp()` during app shutdown
-- [x] Route Workflow Plugin command execution through command metadata and a Resolve handler table.
+- [x] Route Workflow Plugin command execution through command capability metadata and the injected JavaScript Resolve Adapter.
 - [x] Add a development install script that copies `WorkflowIntegration.node` from Resolve's official examples and registers the plugin under the Workflow Integration Plugins root.
 - [x] Update README and task artifacts to make Workflow Integration the preferred MVP path and Utility scripts a fallback.
 - [x] Run validation commands after the Workflow Plugin pivot.
 - [x] Diagnose post-pivot `commands:execute` bridge error and document that `Resolve scripting API is unavailable; run the bridge inside Resolve` comes from the standalone Electron/Python bridge path, not the Workflow Integration handler.
 - [x] Add a clearer standalone Electron IPC error when the bridge-backed app handles a command that was intended for the Workflow Integration path.
 - [x] Warn and show the Workflow Plugin palette when the global shortcut is already owned by an old dev/Utility Electron process.
+- [x] Isolate all Resolve scripting API access in `resolve/` adapters for both Workflow Integration and Python fallback paths.
+- [x] Add a dependency-injected marker capability with ordered availability selection and non-fallback execution errors.
+- [x] Replace implementation-specific command executor metadata with `capability: marker.add` while preserving the command id and search behavior.
+- [x] Add the ShortcutManager mapping/introspection/execution skeleton without automatic shortcut binding or keyboard/UI automation.
+- [x] Inject the Workflow Plugin JavaScript Resolve adapter as `workflowPluginApi` and the health-checked standalone bridge adapter as `resolveScriptApi`.
+- [x] Add focused capability, shortcut, command-routing, and bridge execution-adapter tests while preserving Resolve adapter/drop-frame tests.
 
 ## Validation Commands
 
 - `npm install` from `resolve-command-center/`
 - `npm run build` from `resolve-command-center/`
-- `node -c resolve-command-center/workflow-plugin/main.js`
+- `node --check resolve-command-center/workflow-plugin/main.js`, `node --check resolve-command-center/resolve/adapter.js`, and `node --check resolve-command-center/resolve/marker-frame.js`
 - `npm run dev` from `resolve-command-center/` for local UI validation
-- `python -m py_compile resolve-command-center/bridge/server.py resolve-command-center/bridge/resolve_bridge.py resolve-command-center/resolve/Clackly.py`
+- `python -m py_compile resolve-command-center/bridge/server.py resolve-command-center/bridge/resolve_bridge.py resolve-command-center/resolve/adapter.py resolve-command-center/resolve/Clackly.py`
 - `powershell -NoProfile -ExecutionPolicy Bypass -File resolve-command-center/scripts/install-workflow-plugin.ps1` on a Resolve Studio development machine
 - Targeted subprocess launcher probe with Electron disabled and `/health` checked on a throwaway local port.
 - Targeted environment probe with `RESOLVE_SCRIPT_API`, `RESOLVE_SCRIPT_LIB`, and `PYTHONPATH` unset to confirm standard Windows auto-detection populates bridge env values and prepends `Modules`.
@@ -91,5 +98,5 @@
 ## Rollback Points
 
 - If Electron UI scaffolding fails, remove `resolve-command-center/` before adding bridge and Resolve integration.
-- If bridge integration fails, keep UI and command engine intact while disabling the Resolve executor during local dev.
+- If bridge integration fails, keep UI and command engine intact while leaving the standalone Resolve Script API capability backend unavailable during local dev.
 - If Resolve Utility script integration fails, retain manual `npm run dev` launch and document the unresolved Resolve launch gap.

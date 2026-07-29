@@ -31,7 +31,7 @@ function normalizeCommand(command, filePath) {
     throw new Error(`Invalid command entry in ${filePath}`);
   }
 
-  const { id, name, keywords = [], executor } = command;
+  const { id, name, keywords = [], capability } = command;
   if (typeof id !== "string" || id.length === 0) {
     throw new Error(`Command in ${filePath} is missing a string id`);
   }
@@ -44,15 +44,15 @@ function normalizeCommand(command, filePath) {
     throw new Error(`Command ${id} in ${filePath} must define string keywords`);
   }
 
-  if (typeof executor !== "string" || executor.length === 0) {
-    throw new Error(`Command ${id} in ${filePath} is missing a string executor`);
+  if (typeof capability !== "string" || capability.length === 0) {
+    throw new Error(`Command ${id} in ${filePath} is missing a string capability`);
   }
 
   return {
     id,
     name,
     keywords,
-    executor
+    capability
   };
 }
 

@@ -23,20 +23,20 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
   - `window.resolveCommandCenter.hidePalette() -> void`
   - `window.resolveCommandCenter.onPaletteShown(callback: () -> void) -> () -> void`
 - Command shape:
-  - `{ id: string, name: string, keywords: string[], executor: string }`
+  - `{ id: string, name: string, keywords: string[], capability: string }`
 
 ### 3. Contracts
 
 - Renderer search uses command metadata only: `id`, `name`, and `keywords`.
 - Renderer execution sends only the selected `commandId`.
-- External Electron main delegates command execution to the command engine and local bridge. Workflow Plugin main may call Resolve through `WorkflowIntegration.node`, but renderer code must still send only command ids through preload IPC.
+- Electron hosts delegate command execution to the command engine, which routes intent to injected capability handlers. External Electron injects the bridge execution adapter; Workflow Plugin injects the Resolve adapter. Renderer code still sends only command ids through preload IPC.
 - Development renderer loading must be explicit, for example `--dev-renderer` or `RESOLVE_COMMAND_CENTER_RENDERER_URL`.
 - Default non-packaged startup should load built renderer files so Resolve-launched Electron does not depend on a Vite dev server.
 
 ### 4. Validation & Error Matrix
 
 - Unknown command id -> command engine rejects with a user-facing error.
-- Missing executor adapter -> command engine rejects with a user-facing error.
+- Missing capability handler -> command engine rejects with a user-facing error.
 - Bridge failure -> renderer keeps the palette open, shows the error, and refocuses search.
 - Successful command -> Electron hides the palette.
 - Global shortcut registration failure -> main process logs a warning.
@@ -44,7 +44,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 
 ### 5. Good/Base/Bad Cases
 
-- Good: Adding a command by adding manifest metadata and, if needed, an executor adapter.
+- Good: Adding command intent metadata and registering its capability handler in each supported host.
 - Base: `marker` query matches `timeline.addMarker` via registry search.
 - Bad: UI code checks `if (query === "marker")` or invokes Resolve APIs directly.
 
@@ -84,7 +84,7 @@ await window.resolveCommandCenter.executeCommand(command.id);
 ## Required Patterns
 
 - Keep renderer access behind `preload.js` with `contextIsolation: true`.
-- Route command execution through command metadata and executor adapters.
+- Route command execution through command capability metadata and host-injected capability handlers.
 - Keep dev renderer startup explicit and separate from built renderer startup.
 
 ---
@@ -98,6 +98,7 @@ await window.resolveCommandCenter.executeCommand(command.id);
 
 ## Code Review Checklist
 
-- No Resolve API names appear under Electron UI/main files except in documentation strings.
+- No Resolve scripting API names appear under Electron UI/main files except Workflow Integration lifecycle calls or documentation strings.
 - Command ids live in command manifests or bridge handler tables, not renderer conditionals.
+- Command manifests describe `capability`, not a Resolve or keyboard execution backend.
 - `npm run dev` and built `npm start` behavior remain distinct.

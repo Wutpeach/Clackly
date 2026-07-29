@@ -8,6 +8,149 @@
 
 Backend code includes local bridge processes, Resolve scripting integration, Workflow Integration Plugin Resolve actions, startup scripts, and command handler dispatch. Backend modules own external capability calls and must expose narrow, typed JSON contracts to callers.
 
+## Scenario: Capability Dispatch
+
+### 1. Scope / Trigger
+
+- Trigger: adding a command that may have more than one execution backend, including Resolve APIs, scripts, Workflow Integration, keyboard shortcuts, or future automation.
+- Commands describe user intent; capability modules decide how that intent is executed.
+
+### 2. Signatures
+
+- Command manifest: `{ id: string, name: string, keywords: string[], capability: string }`
+- Command executor: `createCommandExecutor({ capabilityHandlers, findCommand? }) -> executeCommand(commandId)`
+- Marker capability: `createMarkerCapability(backends) -> { add(options?), selectBackend() }`
+- Unavailable error: `CapabilityUnavailableError(capability, attemptedBackends)`
+- Shortcut manager: `get(name)`, `has(name)`, `canExecute(name)`, and `execute(name, context?)`.
+
+### 3. Contracts
+
+- `command-engine/` validates and routes the `capability` string only. It must not import Resolve APIs, bridge transport, or keyboard implementations.
+- `marker.add` checks backends in order: `resolveApi`, `resolveScriptApi`, `workflowPluginApi`, `keyboardShortcut`; `uiAutomation` is reserved and not implemented.
+- Hosts inject available execution adapters. Workflow Integration injects the Resolve adapter as `workflowPluginApi`; standalone/Utility injects the health-checked bridge adapter as `resolveScriptApi`.
+- Backend fallback happens only during availability selection. Once `addMarker()` starts, its API or semantic error propagates and no lower backend executes.
+- Shortcut mappings live in `shortcut/shortcuts.json`. A mapping alone does not mean it can execute: `canExecute()` is true only when a keyboard executor is injected.
+- The MVP does not synthesize keys, inspect Resolve Keyboard Customization, bind missing shortcuts, or perform UI automation.
+
+### 4. Validation & Error Matrix
+
+- Unknown command id -> command executor throws `Unknown command`.
+- Missing command capability handler -> command executor throws `No capability handler registered`.
+- Backend missing `addMarker` or reporting `isAvailable() === false` -> capability checks the next backend.
+- Backend availability raises `CapabilityUnavailableError` -> capability checks the next backend.
+- Backend availability raises an unexpected error -> propagate it; do not hide infrastructure bugs.
+- No usable backend -> throw `CapabilityUnavailableError` with the capability id and checked backends.
+- Selected backend execution fails -> propagate the same error; do not try keyboard or another backend.
+- Shortcut mapping missing or keyboard executor absent -> ShortcutManager refuses execution without sending input.
+
+### 5. Good/Base/Bad Cases
+
+- Good: command metadata contains `"capability": "marker.add"`.
+- Base: Workflow Plugin injects only `workflowPluginApi`, so `marker.add` delegates to `resolve/adapter.js`.
+- Good: a dead standalone bridge reports unavailable before execution, allowing a future configured keyboard backend to be selected.
+- Bad: command metadata contains `"executor": "resolve"` or a keyboard shortcut string.
+- Bad: catch an `AddMarker` failure and then press `CTRL+M`; the first backend may already have performed a partial action.
+
+### 6. Tests Required
+
+- Assert the highest-priority available backend is selected.
+- Assert unavailable higher backends fall through in priority order.
+- Assert selected-backend execution errors do not call lower backends.
+- Assert no backend produces `CapabilityUnavailableError` with useful metadata.
+- Assert command registry preserves search while returning capability metadata.
+- Assert ShortcutManager mapping, no-executor behavior, and injected-executor request shape.
+- Assert bridge availability uses `/health` and marker execution preserves the existing command-id HTTP payload.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+// command-engine
+if (command.executor === "resolve") {
+  return resolveAdapter.addMarker();
+}
+```
+
+#### Correct
+
+```javascript
+const executeCommand = createCommandExecutor({
+  capabilityHandlers: {
+    "marker.add": markerCapability.add,
+  },
+});
+```
+
+## Scenario: Resolve Adapter Boundary
+
+### 1. Scope / Trigger
+
+- Trigger: adding or changing a command that reads from or writes to the DaVinci Resolve scripting API.
+- Applies to both the Workflow Integration JavaScript path and the Python Utility fallback.
+
+### 2. Signatures
+
+- JavaScript adapter factory: `createResolveAdapter({ getResolve }) -> { addMarker(): Promise<{ ok: true, frame: number }> }`
+- Python adapter action: `add_marker() -> Dict[str, Any]` containing the timeline-relative `frame`.
+- Command contract remains `timeline.addMarker` with `capability: marker.add`; callers pass intent and do not pass Resolve objects or arbitrary API method names.
+
+### 3. Contracts
+
+- All Resolve scripting object calls such as `GetProjectManager`, `GetCurrentTimeline`, `GetCurrentTimecode`, and `AddMarker` live under `resolve/`.
+- `workflow-plugin/main.js` owns Electron and `WorkflowIntegration.node` lifecycle (`Initialize`, `GetResolve`, callbacks, and `CleanUp`) and delegates Resolve scripting actions to `resolve/adapter.js`.
+- `bridge/` owns HTTP transport and command dispatch only; it delegates Python Resolve scripting actions to `resolve/adapter.py`.
+- `command-engine/` owns registry/search metadata and dependency-injected capability routing; it must not import Resolve adapters, bridge transport, shortcut implementations, or Resolve APIs.
+- `capability/marker.js` selects available backends before execution. Once `addMarker()` starts, its error propagates without falling through to a lower backend.
+- `Timeline.AddMarker` receives a zero-based frame id relative to the timeline start, not the absolute `GetStartFrame()` value.
+- The adapter derives the marker frame from `GetCurrentTimecode() - GetStartTimecode()` using the timeline frame rate.
+- Semicolon timecodes at 29.97 and 59.94 use drop-frame numbering. Drop-frame conversion skips timecode labels only; it does not remove media frames.
+
+### 4. Validation & Error Matrix
+
+- No current project or timeline -> adapter raises a user-facing error.
+- Missing current/start timecode or frame rate -> adapter raises a conversion error before calling `AddMarker`.
+- Playhead before timeline start or beyond timeline bounds -> adapter rejects the frame id.
+- Invalid drop-frame label (for example `01:01:00;00` at 29.97) -> adapter rejects the timecode.
+- `AddMarker` returns false with an existing marker at that frame -> adapter reports the duplicate position.
+- `AddMarker` throws or returns false otherwise -> adapter reports the timecode and timeline-relative frame.
+
+### 5. Good/Base/Bad Cases
+
+- Good: `workflow-plugin/main.js` injects `resolveAdapter.addMarker` into the `workflowPluginApi` marker backend.
+- Base: at 24 fps, `01:00:10:00 - 01:00:00:00` produces frame id `240`.
+- Good: at 29.97 drop-frame, `01:01:00;02 - 01:00:00;00` produces frame id `1800`.
+- Bad: adding `GetStartFrame()` back to the relative result and passing an absolute value such as `86640` to `AddMarker`.
+- Bad: calling `timeline.AddMarker` from `command-engine/`, renderer code, Workflow Plugin routing, or the HTTP bridge.
+
+### 6. Tests Required
+
+- JavaScript adapter tests assert the full `AddMarker` argument list and the relative frame id.
+- JavaScript and Python conversion tests cover 24 fps plus valid and invalid 29.97/59.94 drop-frame boundaries.
+- Python fallback tests assert parity with JavaScript marker arguments and errors.
+- Boundary grep must find Resolve scripting calls only under `resolve/` (test doubles are exempt).
+- Manual Resolve validation must confirm the marker appears at the current playhead.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+// workflow-plugin/main.js
+const timeline = project.GetCurrentTimeline();
+timeline.AddMarker(frameId, "Red", "Marker", "", 1);
+```
+
+#### Correct
+
+```javascript
+// workflow-plugin/main.js
+const resolveAdapter = createResolveAdapter({ getResolve });
+const handlers = {
+  "timeline.addMarker": resolveAdapter.addMarker,
+};
+```
+
 ## Scenario: Local Resolve Bridge
 
 ### 1. Scope / Trigger
@@ -33,8 +176,8 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - `RESOLVE_SCRIPT_LIB` points to the Resolve scripting library. Startup scripts preserve an explicit env value, but on Windows may auto-detect the standard vendor install path `C:\Program Files\Blackmagic Design\DaVinci Resolve\fusionscript.dll` only when the file exists.
 - `PYTHONPATH` must include the Resolve scripting `Modules` directory before launching the bridge subprocess. If `RESOLVE_SCRIPT_API` is provided or auto-detected, prepend `%RESOLVE_SCRIPT_API%\Modules` while preserving existing `PYTHONPATH` entries.
 - Startup diagnostics must log whether Resolve scripting values came from the environment, auto-detection, derivation, or are missing.
-- Resolve API access is centralized in bridge modules, not Electron code.
-- In the Workflow Integration Plugin path, Resolve API access is centralized in `workflow-plugin/` main-process integration code through `WorkflowIntegration.node`; renderer/UI code still must not import or call Resolve APIs.
+- Resolve scripting API access is centralized under `resolve/`, not in bridge, command-engine, renderer, or Workflow Plugin routing code.
+- In the Workflow Integration Plugin path, `workflow-plugin/main.js` owns `WorkflowIntegration.node` lifecycle and delegates Resolve scripting actions to `resolve/adapter.js`.
 - Workflow Integration plugins should call `InitializePromise` or `Initialize` before Resolve API access, register `ResolveQuit` when available, and call `CleanUp()` during plugin app shutdown.
 - `WorkflowIntegration.node` is a Resolve-provided native module copied from the local Resolve Developer examples for development installs; do not commit it to the repository.
 
@@ -55,7 +198,7 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - Base: `timeline.addMarker` maps to `add_marker()` and returns the frame id on success.
 - Base: Standard Windows Resolve installs work without manual scripting env configuration when the ProgramData scripting module and Program Files `fusionscript.dll` exist.
 - Bad: Electron calls `DaVinciResolveScript.scriptapp("Resolve")` directly or sends arbitrary Python code over HTTP.
-- Bad: Renderer code calls `WorkflowIntegration.node` or Resolve API methods directly.
+- Bad: Renderer, command-engine, bridge transport, or Workflow Plugin routing code calls Resolve scripting methods directly.
 - Bad: Hardcoding a user-specific Resolve install path such as a home directory, or overwriting explicit scripting env values during auto-detection.
 
 ### 6. Tests Required
@@ -104,7 +247,9 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 ## Forbidden Patterns
 
 - Machine-specific absolute paths in startup scripts.
-- Running Resolve API logic from Electron or generic UI code.
+- Running Resolve scripting logic outside `resolve/`.
+- Storing execution backend names or keyboard shortcuts in command manifests.
+- Falling back to another backend after execution has started.
 - Sending executable code over local HTTP; send command ids only.
 
 ---
@@ -114,7 +259,10 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 - Bind local bridge servers to `127.0.0.1`.
 - Validate JSON payload shape at the HTTP boundary.
 - Keep Resolve command dispatch in one handler table.
-- Keep Workflow Plugin Resolve command dispatch in one handler table such as `RESOLVE_COMMAND_HANDLERS`.
+- Keep command-engine dispatch generic and register capability handlers from each host.
+- Delegate every Resolve scripting action to `resolve/adapter.js` or `resolve/adapter.py`.
+- Route command intent through capability handlers before selecting an execution adapter.
+- Treat configured shortcuts and executable shortcuts as separate states.
 - Make ports, app roots, launch commands, and dev origins configurable through environment variables.
 
 ---
@@ -131,5 +279,8 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 
 - New bridge request fields have documented validation and error behavior.
 - Resolve handler additions are registered in `COMMAND_HANDLERS`.
+- Resolve scripting calls are contained under `resolve/`; command-engine and transport layers contain only command ids and delegation.
+- Command manifests expose `capability`, not an execution backend.
+- Capability tests prove both priority fallback and no fallback after execution begins.
 - Startup scripts are idempotent or tolerate existing bridge/app instances.
 - No `__pycache__`, `.pyc`, or build cache files are left as source changes.

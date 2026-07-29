@@ -2,9 +2,27 @@ const { app, ipcMain } = require("electron");
 const { createPaletteWindow, showPaletteWindow, hidePaletteWindow } = require("./window");
 const { registerPaletteHotkey } = require("./hotkey");
 const { getCommands, searchCommands } = require("../../command-engine/registry");
-const { executeCommand } = require("../../command-engine/executor");
+const { createCommandExecutor } = require("../../command-engine/executor");
+const { createMarkerCapability } = require("../../capability/marker");
+const { createBridgeExecutionAdapter } = require("../../execution-adapter/bridge");
+const { ShortcutManager } = require("../../shortcut/ShortcutManager");
 
 let paletteWindow = null;
+
+const bridgeExecutionAdapter = createBridgeExecutionAdapter();
+const shortcutManager = new ShortcutManager();
+const markerCapability = createMarkerCapability({
+  resolveScriptApi: bridgeExecutionAdapter,
+  keyboardShortcut: {
+    isAvailable: () => shortcutManager.canExecute("ADD_MARKER"),
+    addMarker: (context) => shortcutManager.execute("ADD_MARKER", context)
+  }
+});
+const executeCommand = createCommandExecutor({
+  capabilityHandlers: {
+    "marker.add": markerCapability.add
+  }
+});
 
 function showPalette() {
   showPaletteWindow(paletteWindow);

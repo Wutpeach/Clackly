@@ -1,10 +1,24 @@
 # Clackly
 
-Architecture-validation MVP for a DaVinci Resolve command palette. Electron owns the desktop UI, the command engine owns registry search and executor routing, and Resolve integration is isolated behind a Resolve-side integration layer.
+Architecture-validation MVP for a DaVinci Resolve command palette. Electron owns the desktop UI, the command engine maps command intent to injected capabilities, and `resolve/` is the Resolve Adapter layer. Both the Workflow Integration path and Python fallback delegate project, timeline, timecode, frame-rate, drop-frame conversion, and marker operations to adapters in that directory.
+
+## Capability Routing
+
+Command metadata describes intent with `capability: "marker.add"`; it does not select Resolve or keyboard implementation details. The runtime chain is:
+
+```text
+command-engine -> capability -> execution adapter -> Resolve / keyboard / future automation
+```
+
+`capability/marker.js` selects the first available marker backend in this order: direct Resolve API, Resolve Script API, Workflow Plugin API, configured keyboard shortcut, then a reserved future UI-automation slot. Availability is checked before execution. Once a backend starts marker execution, any semantic or API error is returned without trying a lower backend, avoiding duplicate or partial actions.
+
+The Workflow Integration host injects `resolve/adapter.js` as the Workflow Plugin API backend. The standalone/Utility host injects `execution-adapter/bridge.js` as the Resolve Script API backend; it checks `/health` before sending the existing command-id request to the Python bridge and `resolve/adapter.py`.
+
+`shortcut/shortcuts.json` currently maps `CREATE_FUSION_CLIP` to `CTRL+ALT+F` and `ADD_MARKER` to `CTRL+M`. `ShortcutManager` supports lookup, introspection, and an injected future keyboard executor. It does not bind shortcuts or perform keyboard/UI automation in this MVP. The `Ctrl+Space` palette hotkey remains separate Electron window behavior.
 
 ## Resolve Workflow Integration Plugin
 
-The preferred Resolve-side MVP path is now the Workflow Integration Plugin. Resolve Studio scans the Workflow Integration Plugins root on startup, registers valid plugin manifests, then loads the selected plugin from `Workspace > Workflow Integrations`. Once loaded, Clackly runs as a Resolve Workflow Integration Electron app and calls Resolve through Blackmagic's `WorkflowIntegration.node` JavaScript API.
+The preferred Resolve-side MVP path is now the Workflow Integration Plugin. Resolve Studio scans the Workflow Integration Plugins root on startup, registers valid plugin manifests, then loads the selected plugin from `Workspace > Workflow Integrations`. Once loaded, Clackly runs as a Resolve Workflow Integration Electron app. `workflow-plugin/main.js` owns Electron and Workflow Integration lifecycle plus capability injection, while `resolve/adapter.js` owns the Resolve scripting calls.
 
 This is a better fit than a Utility script for lifecycle-sensitive development:
 
@@ -61,6 +75,12 @@ npm start
 built `dist/renderer/index.html`. Use `npm run start:electron` only when the
 renderer has already been built.
 
+Run the Resolve Adapter regression tests for both integration paths with:
+
+```bash
+npm test
+```
+
 The Electron palette starts hidden. Press `Ctrl+Space` on Windows/Linux or `Cmd+Space` on macOS to show it. The default bridge endpoint is `http://127.0.0.1:49371`; override it with `RESOLVE_COMMAND_CENTER_BRIDGE_URL` or set `RESOLVE_COMMAND_CENTER_PORT`.
 
 ## Resolve Utility Entrypoint
@@ -87,7 +107,7 @@ setx RESOLVE_COMMAND_CENTER_ROOT "D:\Clackly\resolve-command-center"
 
 Resolve's embedded Utility script runner may execute `Clackly.py` without defining `__file__`, including when `Clackly.py` is symlinked into the Utility directory. In that runner mode the script cannot reliably infer its own source-tree location, so `RESOLVE_COMMAND_CENTER_ROOT` is the most reliable path source. If `__file__` is available, the script still checks source-tree and symlink-friendly paths next to the script.
 
-The script is safe to run more than once; it checks the bridge health endpoint before starting another bridge instance. By default it starts `bridge/server.py` as a background Python subprocess, waits briefly for `/health`, then launches Electron. Startup diagnostics are written to:
+The script is safe to run more than once; it checks the bridge health endpoint before starting another bridge instance. By default it starts `bridge/server.py` as a background Python subprocess, waits briefly for `/health`, then launches Electron. The bridge handles HTTP transport and command dispatch, while `resolve/adapter.py` owns all Python Resolve API access. Startup diagnostics are written to:
 
 ```text
 %APPDATA%\Clackly\clackly.log
@@ -124,4 +144,5 @@ Resolve Utility menu scripts are run when selected from the menu; they are not a
 - `connect ECONNREFUSED 127.0.0.1:49371` from Electron means the bridge is not listening on the configured port. Check `%APPDATA%\Clackly\clackly.log` for the app root, Python command, Resolve scripting environment variables, and `/health` wait result. If the bridge subprocess starts and exits, check `%APPDATA%\Clackly\bridge.log` for Python errors from `bridge/server.py`. Common causes are a missing `RESOLVE_COMMAND_CENTER_ROOT`, `python` not being on `PATH`, an incompatible Python selected by `RESOLVE_COMMAND_CENTER_PYTHON_CMD`, or the port already being used by another process.
 - If `/health` succeeds but `timeline.addMarker` fails with `Resolve scripting API is unavailable`, check `%APPDATA%\Clackly\clackly.log` for `RESOLVE_SCRIPT_API`, `RESOLVE_SCRIPT_LIB`, and `PYTHONPATH` source labels. On standard Windows installs these should be auto-detected. If auto-detection fails because Resolve is installed somewhere else, set those variables manually for the Python process that runs the bridge, then restart Resolve.
 - If Workflow Plugin loading shows a warning that the configured global shortcut could not be registered, another app already owns it. Close the old Clackly dev Electron process or set `RESOLVE_COMMAND_CENTER_HOTKEY` before launching Resolve to test another shortcut.
+- If marker creation is refused, move the playhead inside the active timeline and make sure there is not already a timeline marker on that frame. Clackly converts Resolve's displayed playhead timecode to the timeline-relative frame id required by `Timeline.AddMarker`; the error includes both values for diagnosis.
 - A visible `cmd.exe` window during launch is normally the `npm run start` Electron launcher, not the hidden bridge diagnostics. Bridge startup diagnostics are in `%APPDATA%\Clackly\clackly.log`; bridge subprocess stdout and stderr are in `%APPDATA%\Clackly\bridge.log`. For one-off bridge console debugging on Windows, set `RESOLVE_COMMAND_CENTER_SHOW_BRIDGE_CONSOLE=1` before launching Resolve.
