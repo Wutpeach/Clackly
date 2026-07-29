@@ -39,3 +39,24 @@ Implemented Electron/React command palette MVP with command registry, localhost 
 ### Next Steps
 
 - Validate startup.py and timeline.addMarker inside a live DaVinci Resolve project with an active timeline.
+
+
+## Session 2: Resolve Command Center MVP
+
+**Date**: 2026-07-29
+**Task**: Resolve Command Center MVP
+**Branch**: `main`
+
+### Summary
+
+Completed and live-validated the Clackly MVP: Workflow Integration lifecycle, command palette, Resolve Adapter, relative/drop-frame marker execution, Capability Layer, bridge execution adapter, and Shortcut Manager skeleton.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `735c035` | (see git log) |
+
+### Status
+
+[OK] **Completed**
