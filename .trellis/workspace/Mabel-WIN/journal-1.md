@@ -103,3 +103,25 @@ Ran four controlled post-project Resolve configurations with process, responsive
 ### Status
 
 [OK] **Completed**
+
+
+## Session 5: Redesign Clackly command launcher
+
+**Date**: 2026-07-29
+**Task**: Redesign Clackly command launcher
+**Branch**: `main`
+
+### Summary
+
+Implemented the keyboard-first Launcher, Search, and same-size All Actions interfaces; added ranked command modeling and tests, semantic mode IPC, documentation, and Windows-compatible Impeccable hooks; stopped Live preview.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `22bb637` | (see git log) |
+| `5395c1c` | (see git log) |
+
+### Status
+
+[OK] **Completed**
