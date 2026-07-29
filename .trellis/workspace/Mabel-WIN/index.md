@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 3
+- **Total Sessions**: 4
 - **Last Active**: 2026-07-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~84 | Active |
+| `journal-1.md` | ~105 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 4 | 2026-07-29 | Investigate Resolve startup freeze | `0079d7c` | `main` |
 | 3 | 2026-07-29 | Add lightweight capability registry | `ddd75b4`, `7d5dddd` | `main` |
 | 2 | 2026-07-29 | Resolve Command Center MVP | `735c035` | `main` |
 | 1 | 2026-07-28 | Resolve Command Center MVP | - | `-` |

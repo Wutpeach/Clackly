@@ -82,3 +82,24 @@ Added an internal Map-backed capability registry, routed command execution throu
 ### Status
 
 [OK] **Completed**
+
+
+## Session 4: Investigate Resolve startup freeze
+
+**Date**: 2026-07-29
+**Task**: Investigate Resolve startup freeze
+**Branch**: `main`
+
+### Summary
+
+Ran four controlled post-project Resolve configurations with process, responsiveness, and GPU telemetry. The delayed freeze was non-reproducible and Clackly causation was not established; playhead stutter persisted without Clackly and is a separate issue. Restored both integration entrypoints and recorded follow-up defects and hypotheses.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0079d7c` | (see git log) |
+
+### Status
+
+[OK] **Completed**
