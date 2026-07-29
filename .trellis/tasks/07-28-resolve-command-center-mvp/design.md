@@ -141,6 +141,7 @@ Workflow Plugin execution stays on the same command id contract:
 - Workflow Integration Plugins have a clearer loaded-app lifecycle than Utility scripts: `InitializePromise`, app quit, `CleanUp`, and the `ResolveQuit` callback are available.
 - Workflow Integration Plugins are scanned and registered on Resolve startup, but official docs still describe manual loading from `Workspace > Workflow Integrations`.
 - Development install should copy Resolve's `WorkflowIntegration.node` from the local Resolve Developer examples, not commit it to the repository.
+- During development, an old external Electron app launched by `npm start` or the Utility script can still own `CommandOrControl+Space`. If Workflow Plugin hotkey registration fails, it should show its own palette and warn that the user is probably still interacting with the old Python-bridge path.
 
 ## Tradeoffs
 

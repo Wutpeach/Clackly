@@ -40,6 +40,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Bridge failure -> renderer keeps the palette open, shows the error, and refocuses search.
 - Successful command -> Electron hides the palette.
 - Global shortcut registration failure -> main process logs a warning.
+- Workflow Plugin global shortcut registration failure -> plugin shows its own palette and warns that another process owns the shortcut, because otherwise an old Utility/dev Electron process can keep routing commands to the Python bridge.
 
 ### 5. Good/Base/Bad Cases
 

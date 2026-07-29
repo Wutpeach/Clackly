@@ -31,6 +31,8 @@ npm run workflow:install
 
 Restart DaVinci Resolve Studio after installation, then load `Clackly` from `Workspace > Workflow Integrations`. Press `Ctrl+Space`, type `marker`, and press `Enter`.
 
+Do not use `npm run dev`, `npm start`, the Utility script, or an already-running standalone Electron window to validate the Workflow Integration command path. Those launch the bridge-backed external app from `electron/main/main.js`; Workflow Integration validation must use the Resolve menu-loaded plugin window from `workflow-plugin/main.js`.
+
 If you prefer a physical copy instead of a junction:
 
 ```powershell
@@ -118,6 +120,8 @@ Resolve Utility menu scripts are run when selected from the menu; they are not a
 
 - `RuntimeError: Could not locate resolve-command-center app root` from Resolve usually means the Utility runner did not provide `__file__` and `RESOLVE_COMMAND_CENTER_ROOT` is missing or points to the wrong directory. Set `RESOLVE_COMMAND_CENTER_ROOT` to the directory containing `package.json` and `bridge/server.py`, then relaunch Resolve.
 - Symlinking `Clackly.py` is useful for source edits, but it does not guarantee Resolve will expose a script filename to Python. Keep `RESOLVE_COMMAND_CENTER_ROOT` set even when using a symlink.
+- `Error invoking remote method 'commands:execute': Error: Resolve scripting API is unavailable; run the bridge inside Resolve` means the command reached the old bridge-backed external app, not the Workflow Integration handler. Quit any standalone Clackly, `npm run dev`, `npm start`, or Utility-script-launched Electron process, restart Resolve Studio, then open Clackly from `Workspace > Workflow Integrations`.
 - `connect ECONNREFUSED 127.0.0.1:49371` from Electron means the bridge is not listening on the configured port. Check `%APPDATA%\Clackly\clackly.log` for the app root, Python command, Resolve scripting environment variables, and `/health` wait result. If the bridge subprocess starts and exits, check `%APPDATA%\Clackly\bridge.log` for Python errors from `bridge/server.py`. Common causes are a missing `RESOLVE_COMMAND_CENTER_ROOT`, `python` not being on `PATH`, an incompatible Python selected by `RESOLVE_COMMAND_CENTER_PYTHON_CMD`, or the port already being used by another process.
 - If `/health` succeeds but `timeline.addMarker` fails with `Resolve scripting API is unavailable`, check `%APPDATA%\Clackly\clackly.log` for `RESOLVE_SCRIPT_API`, `RESOLVE_SCRIPT_LIB`, and `PYTHONPATH` source labels. On standard Windows installs these should be auto-detected. If auto-detection fails because Resolve is installed somewhere else, set those variables manually for the Python process that runs the bridge, then restart Resolve.
+- If Workflow Plugin loading shows a warning that the configured global shortcut could not be registered, another app already owns it. Close the old Clackly dev Electron process or set `RESOLVE_COMMAND_CENTER_HOTKEY` before launching Resolve to test another shortcut.
 - A visible `cmd.exe` window during launch is normally the `npm run start` Electron launcher, not the hidden bridge diagnostics. Bridge startup diagnostics are in `%APPDATA%\Clackly\clackly.log`; bridge subprocess stdout and stderr are in `%APPDATA%\Clackly\bridge.log`. For one-off bridge console debugging on Windows, set `RESOLVE_COMMAND_CENTER_SHOW_BRIDGE_CONSOLE=1` before launching Resolve.

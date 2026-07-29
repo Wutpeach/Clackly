@@ -1,6 +1,7 @@
+const path = require("node:path");
 const { app, dialog, ipcMain } = require("electron");
 const { createPaletteWindow, hidePaletteWindow, showPaletteWindow } = require("../electron/main/window");
-const { registerPaletteHotkey } = require("../electron/main/hotkey");
+const { getPaletteAccelerator, registerPaletteHotkey } = require("../electron/main/hotkey");
 const { getCommandById, getCommands, searchCommands } = require("../command-engine/registry");
 
 const PLUGIN_ID = "com.wutpeach.clackly";
@@ -15,6 +16,8 @@ let paletteWindow = null;
 let initPromise = null;
 let resolvePromise = null;
 let cleanupDone = false;
+
+app.setPath("userData", path.join(app.getPath("appData"), "Clackly Workflow Plugin"));
 
 function loadWorkflowIntegration() {
   if (WorkflowIntegration) {
@@ -267,6 +270,23 @@ function registerIpcHandlers() {
   ipcMain.on("palette:hide", hidePalette);
 }
 
+function handleHotkeyRegistrationFailure() {
+  const accelerator = getPaletteAccelerator();
+  showPalette();
+  dialog.showMessageBox({
+    type: "warning",
+    title: "Clackly",
+    message: `Clackly could not register ${accelerator}.`,
+    detail: [
+      "Another process is already using the global shortcut.",
+      "Close any old Clackly npm start, Utility script, or Electron dev process, then reload Clackly from Resolve.",
+      "You can also set RESOLVE_COMMAND_CENTER_HOTKEY before launching Resolve to test another shortcut."
+    ].join(" ")
+  }).finally(() => {
+    showPalette();
+  });
+}
+
 function cleanupWorkflowIntegration() {
   if (cleanupDone || !WorkflowIntegration) {
     return;
@@ -303,7 +323,10 @@ if (!hasSingleInstanceLock) {
 
     paletteWindow = createPaletteWindow();
     registerIpcHandlers();
-    registerPaletteHotkey(togglePalette);
+    const hotkeyRegistered = registerPaletteHotkey(togglePalette);
+    if (!hotkeyRegistered) {
+      handleHotkeyRegistrationFailure();
+    }
   });
 
   app.on("will-quit", () => {

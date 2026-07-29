@@ -2,8 +2,12 @@ const { globalShortcut } = require("electron");
 
 const DEFAULT_ACCELERATOR = "CommandOrControl+Space";
 
+function getPaletteAccelerator() {
+  return process.env.RESOLVE_COMMAND_CENTER_HOTKEY || DEFAULT_ACCELERATOR;
+}
+
 function registerPaletteHotkey(onToggle) {
-  const accelerator = process.env.RESOLVE_COMMAND_CENTER_HOTKEY || DEFAULT_ACCELERATOR;
+  const accelerator = getPaletteAccelerator();
   const registered = globalShortcut.register(accelerator, onToggle);
 
   if (!registered) {
@@ -14,5 +18,6 @@ function registerPaletteHotkey(onToggle) {
 }
 
 module.exports = {
+  getPaletteAccelerator,
   registerPaletteHotkey
 };

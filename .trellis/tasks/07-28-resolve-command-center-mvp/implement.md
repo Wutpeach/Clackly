@@ -51,6 +51,9 @@
 - [x] Add a development install script that copies `WorkflowIntegration.node` from Resolve's official examples and registers the plugin under the Workflow Integration Plugins root.
 - [x] Update README and task artifacts to make Workflow Integration the preferred MVP path and Utility scripts a fallback.
 - [x] Run validation commands after the Workflow Plugin pivot.
+- [x] Diagnose post-pivot `commands:execute` bridge error and document that `Resolve scripting API is unavailable; run the bridge inside Resolve` comes from the standalone Electron/Python bridge path, not the Workflow Integration handler.
+- [x] Add a clearer standalone Electron IPC error when the bridge-backed app handles a command that was intended for the Workflow Integration path.
+- [x] Warn and show the Workflow Plugin palette when the global shortcut is already owned by an old dev/Utility Electron process.
 
 ## Validation Commands
 
@@ -68,6 +71,7 @@
 - Open DaVinci Resolve with a project and active timeline.
 - Install the Workflow Integration Plugin with `npm run workflow:install`.
 - Restart DaVinci Resolve Studio and load `Clackly` from `Workspace > Workflow Integrations`.
+- Ensure any standalone Clackly, `npm run dev`, `npm start`, or Utility-script-launched Electron process is closed before testing the Workflow Integration path.
 - Press `Ctrl+Space`, type `marker`, press `Enter`, and confirm a red marker appears at the playhead.
 - Copy or symlink `resolve/Clackly.py` into the Windows Resolve Utility scripts directory.
 - Ensure `RESOLVE_COMMAND_CENTER_ROOT` points to the app root before launching Resolve, especially when Resolve's Utility script runner does not define `__file__` or when using a symlink.
@@ -80,6 +84,7 @@
 - Resolve Python API availability depends on the bridge Python process being able to import Resolve scripting modules. The dev-MVP subprocess path passes through `RESOLVE_SCRIPT_API`, `RESOLVE_SCRIPT_LIB`, and `PYTHONPATH` when present, auto-detects standard Windows install paths when missing, but it cannot inherit Resolve's in-process `resolve` or `bmd` globals.
 - Resolve Utility menu scripts are not true Resolve application startup hooks; production auto-start still needs an installer, launch wrapper, or separate startup trigger.
 - Resolve launch process management can accidentally spawn duplicates; implementation should detect or tolerate an already-running Electron app.
+- The standalone Electron app and the Workflow Integration plugin register the same `commands:execute` IPC channel in separate processes. The error `Resolve scripting API is unavailable; run the bridge inside Resolve` is a strong signal that the active window is the standalone bridge-backed app, not the plugin.
 - Global shortcut registration may fail if another app owns the accelerator; log or surface this in development output.
 - Manual Resolve validation cannot be completed in a headless or Resolve-free environment.
 
