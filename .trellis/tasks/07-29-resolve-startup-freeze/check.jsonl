@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Check that investigation and restoration preserve Resolve/startup contracts and do not ship speculative changes."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check Workflow Plugin/Electron isolation conclusions against actual lifecycle boundaries."}
+{"file":".trellis/tasks/07-29-resolve-startup-freeze/research/initial-startup-evidence.md","reason":"Verify the final root-cause report explains or rejects the initial log correlation with controlled evidence."}

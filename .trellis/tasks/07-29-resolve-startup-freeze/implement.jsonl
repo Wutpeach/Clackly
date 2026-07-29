@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Defines Resolve integration, startup, logging, process, and adapter boundaries that the investigation must preserve."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines Workflow Plugin and Electron lifecycle boundaries relevant to startup isolation."}
+{"file":".trellis/tasks/07-29-resolve-startup-freeze/research/initial-startup-evidence.md","reason":"Provides installed-entrypoint state, correlated timestamps, and the initial hypothesis inventory."}

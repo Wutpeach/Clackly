@@ -1,0 +1,11 @@
+{
+  "utilityPath": "C:\\Users\\Administrator\\AppData\\Roaming\\Blackmagic Design\\DaVinci Resolve\\Support\\Fusion\\Scripts\\Utility\\Clackly.py",
+  "utilityHold": "C:\\Users\\Administrator\\AppData\\Roaming\\Clackly-Trellis-Hold\\07-29-resolve-startup-freeze\\Clackly.py",
+  "start": "2026-07-29T15:08:02.6603412+08:00",
+  "durationSeconds": 90,
+  "workflowHold": "C:\\ProgramData\\Clackly-Trellis-Hold\\07-29-resolve-startup-freeze\\com.wutpeach.clackly",
+  "projectLabel": "interactive safe test project",
+  "logLengthBefore": 1798310,
+  "workflowPath": "C:\\ProgramData\\Blackmagic Design\\DaVinci Resolve\\Support\\Workflow Integration Plugins\\com.wutpeach.clackly",
+  "mode": "workflow-only"
+}
