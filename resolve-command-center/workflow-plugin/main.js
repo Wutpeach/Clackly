@@ -1,6 +1,11 @@
 const path = require("node:path");
 const { app, dialog, ipcMain } = require("electron");
-const { createPaletteWindow, hidePaletteWindow, showPaletteWindow } = require("../electron/main/window");
+const {
+  createPaletteWindow,
+  hidePaletteWindow,
+  showPaletteWindow,
+  setPaletteWindowMode
+} = require("../electron/main/window");
 const { getPaletteAccelerator, registerPaletteHotkey } = require("../electron/main/hotkey");
 const { getCommandById, getCommands, searchCommands } = require("../command-engine/registry");
 const { createCommandExecutor } = require("../command-engine/executor");
@@ -145,6 +150,7 @@ function registerIpcHandlers() {
     hidePalette();
     return result;
   });
+  ipcMain.on("palette:set-mode", (_event, mode) => setPaletteWindowMode(paletteWindow, mode));
   ipcMain.on("palette:hide", hidePalette);
 }
 

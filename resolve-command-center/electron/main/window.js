@@ -1,9 +1,12 @@
 const path = require("node:path");
 const { BrowserWindow } = require("electron");
 
-const DEFAULT_WINDOW_WIDTH = 720;
-const DEFAULT_WINDOW_HEIGHT = 360;
 const DEFAULT_DEV_SERVER_PORT = "5173";
+const PALETTE_SIZES = Object.freeze({
+  launcher: { width: 376, height: 468 },
+  search: { width: 376, height: 468 },
+  "all-actions": { width: 376, height: 468 }
+});
 
 function shouldLoadDevRenderer() {
   return (
@@ -28,9 +31,10 @@ function getRendererUrl() {
 }
 
 function createPaletteWindow() {
+  const initialSize = PALETTE_SIZES.launcher;
   const window = new BrowserWindow({
-    width: DEFAULT_WINDOW_WIDTH,
-    height: DEFAULT_WINDOW_HEIGHT,
+    width: initialSize.width,
+    height: initialSize.height,
     show: false,
     frame: false,
     resizable: false,
@@ -38,7 +42,7 @@ function createPaletteWindow() {
     minimizable: false,
     skipTaskbar: true,
     alwaysOnTop: false,
-    backgroundColor: "#151719",
+    backgroundColor: "#101216",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -63,12 +67,23 @@ function createPaletteWindow() {
   return window;
 }
 
+function setPaletteWindowMode(window, mode) {
+  const size = PALETTE_SIZES[mode];
+  if (!window || window.isDestroyed() || !size) {
+    return false;
+  }
+
+  window.setSize(size.width, size.height, false);
+  window.center();
+  return true;
+}
+
 function showPaletteWindow(window) {
   if (!window || window.isDestroyed()) {
     return;
   }
 
-  window.center();
+  setPaletteWindowMode(window, "launcher");
   window.setSkipTaskbar(true);
   window.setAlwaysOnTop(true, "floating");
   window.show();
@@ -88,5 +103,6 @@ function hidePaletteWindow(window) {
 module.exports = {
   createPaletteWindow,
   showPaletteWindow,
-  hidePaletteWindow
+  hidePaletteWindow,
+  setPaletteWindowMode
 };

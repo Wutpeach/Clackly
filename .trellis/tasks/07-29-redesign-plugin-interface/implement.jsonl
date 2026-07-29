@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend guideline index and project documentation language requirement."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Electron renderer/preload/IPC boundaries and required build/search checks."}
+{"file":".trellis/tasks/07-29-redesign-plugin-interface/research/ui-redesign-evidence.md","reason":"Current renderer/window evidence and preserved prior architecture decisions."}
+{"file":"PRODUCT.md","reason":"Durable product audience, purpose and keyboard-first floating-tool constraints."}
+{"file":"DESIGN.md","reason":"Normative Clackly visual tokens, component language and UI guardrails."}

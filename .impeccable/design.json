@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-29T19:00:20.021+08:00",
+  "title": "Design System: Clackly",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Resolve Signal Orange",
+        "canonical": "#F36A2D",
+        "tonalRamp": ["#321309", "#60230E", "#913717", "#C34F22", "#F36A2D", "#F89567", "#FBC0A4", "#FDE9DE"]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Signal Orange Bright",
+        "canonical": "#FF7A3D",
+        "tonalRamp": ["#351608", "#682A10", "#9B401C", "#CE592B", "#FF7A3D", "#FFA078", "#FFC8AD", "#FDECE3"]
+      },
+      "window-bg": {
+        "role": "neutral",
+        "displayName": "Window Black",
+        "canonical": "#101216",
+        "tonalRamp": ["#101216", "#22262D", "#363C46", "#505865", "#707987", "#969DA8", "#C5C9CF", "#F0F1F3"]
+      },
+      "panel-bg": {
+        "role": "neutral",
+        "displayName": "Panel Graphite",
+        "canonical": "#15181E",
+        "tonalRamp": ["#12151A", "#272C35", "#3D4551", "#586271", "#788291", "#9DA5B0", "#C8CBD1", "#F1F2F4"]
+      },
+      "tile-bg": {
+        "role": "neutral",
+        "displayName": "Tile Graphite",
+        "canonical": "#191D24",
+        "tonalRamp": ["#14171D", "#2A303A", "#424B59", "#5E6978", "#7E8998", "#A2AAB5", "#CACED4", "#F2F3F4"]
+      },
+      "tile-hover": {
+        "role": "neutral",
+        "displayName": "Active Graphite",
+        "canonical": "#202631",
+        "tonalRamp": ["#151A22", "#2C3544", "#455267", "#617087", "#818DA0", "#A4ACB8", "#CBD0D6", "#F2F3F5"]
+      },
+      "shadow-ambient": {
+        "role": "neutral",
+        "displayName": "Ambient Shadow",
+        "canonical": "rgba(0,0,0,0.35)",
+        "tonalRamp": ["rgba(0,0,0,0.72)", "rgba(0,0,0,0.62)", "rgba(0,0,0,0.52)", "rgba(0,0,0,0.42)", "rgba(0,0,0,0.35)", "rgba(0,0,0,0.25)", "rgba(0,0,0,0.15)", "rgba(0,0,0,0.06)"]
+      }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Instrument Title", "purpose": "Wordmark and All Actions title." },
+      "body": { "displayName": "Search Body", "purpose": "Search input and primary operational copy." },
+      "label": { "displayName": "Command Label", "purpose": "Tiles, buttons, and compact control labels." },
+      "section": { "displayName": "Section", "purpose": "Result names and alphabet group headings." },
+      "status": { "displayName": "Status", "purpose": "Execution and error feedback." },
+      "meta": { "displayName": "Metadata", "purpose": "Command categories and availability." },
+      "caption": { "displayName": "Keycap", "purpose": "Shortcuts, alphabet rail, and demo flags." }
+    },
+    "shadows": [
+      { "name": "window-ambient", "value": "0 16px 40px rgba(0,0,0,0.35)", "purpose": "The only structural elevation, applied to the floating palette window." },
+      { "name": "selection-signal", "value": "0 0 12px rgba(243,106,45,0.2)", "purpose": "A restrained signal around the selected launcher tile." },
+      { "name": "status-ambient", "value": "0 8px 22px rgba(0,0,0,0.35)", "purpose": "Separates transient status feedback from dense command content." }
+    ],
+    "motion": [
+      { "name": "feedback-fast", "value": "100ms cubic-bezier(0.16,1,0.3,1)", "purpose": "Tile hover and control state feedback." },
+      { "name": "mode-change", "value": "120ms cubic-bezier(0.16,1,0.3,1)", "purpose": "Launcher, search, and catalog transitions." },
+      { "name": "palette-entry", "value": "140ms cubic-bezier(0.16,1,0.3,1)", "purpose": "Single authored window entrance." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Command Tile",
+      "kind": "button",
+      "refersTo": "tile",
+      "description": "Square launcher action with a precise selected signal.",
+      "html": "<button class=\"ds-command-tile\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z\"/></svg><strong>Add Marker</strong></button>",
+      "css": ".ds-command-tile{display:grid;place-items:center;width:96px;aspect-ratio:1;border:1px solid var(--color-border,rgba(255,255,255,.08));border-radius:8px;color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-tile,#191d24);font:500 13px Inter,sans-serif;transition:transform 100ms,border-color 100ms,background 100ms}.ds-command-tile svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.ds-command-tile:hover,.ds-command-tile:focus-visible{transform:translateY(-1px);border-color:var(--color-accent,#f36a2d);background:var(--color-tile-hover,#202631);outline:none}"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "search-input",
+      "description": "Compact active search field with one orange focus signal.",
+      "html": "<input class=\"ds-search\" value=\"marker\" aria-label=\"Search commands\">",
+      "css": ".ds-search{width:320px;height:42px;padding:0 12px;border:1px solid var(--color-accent,#f36a2d);border-radius:8px;outline:none;color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-panel,#15181e);font:400 15px Inter,sans-serif}.ds-search:focus-visible{box-shadow:0 0 0 3px var(--color-accent-soft,rgba(243,106,45,.15))}"
+    },
+    {
+      "name": "Command Row",
+      "kind": "button",
+      "description": "Dense search and catalog row with metadata kept subordinate.",
+      "html": "<button class=\"ds-command-row\"><span class=\"ds-command-icon\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z\"/></svg></span><span><strong>Add Marker</strong><small>Timeline</small></span><kbd>M</kbd></button>",
+      "css": ".ds-command-row{display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:10px;width:360px;min-height:58px;padding:0 10px;border:1px solid transparent;border-radius:8px;color:var(--color-text-primary,rgba(255,255,255,.92));background:transparent;text-align:left}.ds-command-row:hover,.ds-command-row:focus-visible{border-color:var(--color-accent,#f36a2d);background:var(--color-tile-hover,#202631);outline:none}.ds-command-row>span:nth-child(2){display:grid}.ds-command-row small{color:var(--color-text-muted,rgba(255,255,255,.4));font-size:11px}.ds-command-icon{display:grid;place-items:center;width:32px;height:32px;border:1px solid var(--color-border,rgba(255,255,255,.08));border-radius:6px;color:var(--color-accent,#f36a2d);background:var(--color-tile,#191d24)}.ds-command-icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}"
+    },
+    {
+      "name": "Icon Control",
+      "kind": "button",
+      "description": "Header control that stays quiet until hover or active state.",
+      "html": "<button class=\"ds-icon-control\" aria-label=\"Pin command\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 17v5M5 17h14M6 3h12l-1 7 3 3H4l3-3z\"/></svg></button>",
+      "css": ".ds-icon-control{display:grid;place-items:center;width:30px;height:30px;border:1px solid transparent;border-radius:8px;color:var(--color-text-secondary,rgba(255,255,255,.65));background:transparent}.ds-icon-control svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.ds-icon-control:hover,.ds-icon-control:focus-visible{border-color:var(--color-border,rgba(255,255,255,.08));color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-tile-hover,#202631);outline:none}.ds-icon-control:active{color:var(--color-accent,#f36a2d)}"
+    },
+    {
+      "name": "Alphabet Control",
+      "kind": "nav",
+      "description": "Narrow catalog navigation with an exact one-pixel active indicator.",
+      "html": "<nav class=\"ds-alpha\"><button>A</button><button class=\"active\">B</button><button disabled>C</button></nav>",
+      "css": ".ds-alpha{display:grid;width:32px;border-left:1px solid var(--color-border,rgba(255,255,255,.08));background:var(--color-window,#101216)}.ds-alpha button{position:relative;height:22px;border:0;color:var(--color-text-muted,rgba(255,255,255,.4));background:transparent;font:600 10px Inter,sans-serif}.ds-alpha button.active{color:var(--color-accent,#f36a2d)}.ds-alpha button.active:before{position:absolute;inset:25% auto 25% -1px;width:1px;background:var(--color-accent,#f36a2d);content:''}.ds-alpha button:focus-visible{outline:1px solid var(--color-accent,#f36a2d);outline-offset:-1px}.ds-alpha button:disabled{opacity:.25}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Resolve Precision Instrument",
+    "overview": "Clackly is a compact professional control surface that appears inside the editor's existing Resolve workflow, performs one focused job, and gets out of the way. Dark tonal layers, hairlines, and rare orange signals preserve scanability under sustained editing use.",
+    "keyCharacteristics": [
+      "Dense, keyboard-first, and operational",
+      "Dark neutral layers separated by tone and hairline borders",
+      "Orange reserved for identity, focus, selection, and pinned state",
+      "Small controlled radii and a consistent lucide-react line-icon vocabulary",
+      "Fast motion that confirms state without becoming decoration"
+    ],
+    "rules": [
+      { "name": "The Orange Signal Rule", "body": "Use orange only for identity, focus, active selection, pinned indicators, and essential state; never fill a full tile with it.", "section": "colors" },
+      { "name": "The Two-Line Ceiling Rule", "body": "Command labels use at most two lines and metadata truncates before density is lost.", "section": "typography" },
+      { "name": "The Workspace Preservation Rule", "body": "Every mode occupies only the space required for its current task.", "section": "layout" }
+    ],
+    "dos": [
+      "Do preserve complete keyboard operation and visible focus or selection.",
+      "Do preserve the custom SVG wordmark and mark, and use lucide-react SVG components for interface icons.",
+      "Do label demo content as unavailable prototype data."
+    ],
+    "donts": [
+      "Don't use large glow, full-orange tiles, gradient text, or decorative glass.",
+      "Don't use radii above 16px or consumer-launcher whitespace.",
+      "Don't let renderer UI know how Resolve actions are implemented."
+    ]
+  }
+}

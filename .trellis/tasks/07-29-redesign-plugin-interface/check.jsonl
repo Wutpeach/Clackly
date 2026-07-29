@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review renderer isolation, preload IPC, error behavior and validation requirements."}
+{"file":".trellis/tasks/07-29-redesign-plugin-interface/research/ui-redesign-evidence.md","reason":"Verify the redesign preserves current Electron and Workflow Integration behavior."}
+{"file":"PRODUCT.md","reason":"Check the result remains a compact keyboard-first Resolve overlay."}
+{"file":"DESIGN.md","reason":"Check exact visual tokens, density, motion, SVG and anti-consumer guardrails."}
