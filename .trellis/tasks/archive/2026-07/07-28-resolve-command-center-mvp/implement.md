@@ -75,6 +75,8 @@
 
 ## Manual Validation
 
+- [x] Live Resolve validation confirmed `timeline.addMarker` creates the marker at the current playhead after the relative-frame Adapter fix and Capability Layer wiring.
+
 - Open DaVinci Resolve with a project and active timeline.
 - Install the Workflow Integration Plugin with `npm run workflow:install`.
 - Restart DaVinci Resolve Studio and load `Clackly` from `Workspace > Workflow Integrations`.

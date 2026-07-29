@@ -38,21 +38,21 @@ The user can trigger Resolve actions from a searchable desktop palette without n
 
 ## Acceptance Criteria
 
-- [ ] `npm install` can install the Electron/React app dependencies.
-- [ ] `npm run dev` or an equivalent documented command can launch the MVP Electron app for local UI validation.
-- [ ] Pressing `Ctrl+Space` or `Cmd+Space` shows the command palette window.
-- [ ] The command palette starts hidden, is not shown in the taskbar, is topmost while open, focuses the search input, and hides on `Escape`.
-- [ ] Typing `marker` matches `timeline.addMarker` through registry search rather than command-specific UI logic.
-- [ ] Pressing `Enter` on `timeline.addMarker` in the Workflow Plugin sends only the command id from the renderer to the main process.
-- [ ] The Workflow Plugin maps `timeline.addMarker` to an `addMarker` Resolve action without renderer code importing or invoking Resolve APIs directly.
-- [ ] `timeline.addMarker` routes through `marker.add`; command-engine code contains no Resolve API, bridge transport, or keyboard implementation details.
-- [ ] Workflow Integration injects the JavaScript Resolve adapter as the Workflow Plugin API backend, while standalone/Utility execution injects the health-checked HTTP bridge as the Resolve Script API backend.
-- [ ] Workflow Plugin and Python bridge routes delegate marker execution to adapters under `resolve/`; Resolve scripting method calls do not appear in command-engine or transport modules.
-- [ ] Adapter tests cover ordinary frame rates and valid/invalid 29.97 and 59.94 drop-frame conversion.
-- [ ] In a Resolve Studio session with an open timeline, invoking `timeline.addMarker` creates a red timeline marker at the current playhead frame and then hides the palette.
-- [ ] The Workflow Plugin calls `InitializePromise`, handles `ResolveQuit`, and calls `CleanUp()` during plugin shutdown.
-- [ ] `Clackly.py` documents or implements the installation path for Resolve Utility scripts on Windows and can launch the Electron app without hardcoded user-specific paths.
-- [ ] The repository contains a clear project structure for Electron, command engine, bridge, and Resolve launch code.
+- [x] `npm install` can install the Electron/React app dependencies.
+- [x] `npm run dev` or an equivalent documented command can launch the MVP Electron app for local UI validation.
+- [x] Pressing `Ctrl+Space` or `Cmd+Space` shows the command palette window.
+- [x] The command palette starts hidden, is not shown in the taskbar, is topmost while open, focuses the search input, and hides on `Escape`.
+- [x] Typing `marker` matches `timeline.addMarker` through registry search rather than command-specific UI logic.
+- [x] Pressing `Enter` on `timeline.addMarker` in the Workflow Plugin sends only the command id from the renderer to the main process.
+- [x] The Workflow Plugin maps `timeline.addMarker` to an `addMarker` Resolve action without renderer code importing or invoking Resolve APIs directly.
+- [x] `timeline.addMarker` routes through `marker.add`; command-engine code contains no Resolve API, bridge transport, or keyboard implementation details.
+- [x] Workflow Integration injects the JavaScript Resolve adapter as the Workflow Plugin API backend, while standalone/Utility execution injects the health-checked HTTP bridge as the Resolve Script API backend.
+- [x] Workflow Plugin and Python bridge routes delegate marker execution to adapters under `resolve/`; Resolve scripting method calls do not appear in command-engine or transport modules.
+- [x] Adapter tests cover ordinary frame rates and valid/invalid 29.97 and 59.94 drop-frame conversion.
+- [x] In a Resolve Studio session with an open timeline, invoking `timeline.addMarker` creates a red timeline marker at the current playhead frame and then hides the palette.
+- [x] The Workflow Plugin calls `InitializePromise`, handles `ResolveQuit`, and calls `CleanUp()` during plugin shutdown.
+- [x] `Clackly.py` documents or implements the installation path for Resolve Utility scripts on Windows and can launch the Electron app without hardcoded user-specific paths.
+- [x] The repository contains a clear project structure for Electron, command engine, bridge, and Resolve launch code.
 
 ## Out Of Scope
 
