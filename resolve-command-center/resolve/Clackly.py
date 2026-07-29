@@ -27,6 +27,12 @@ from typing import Dict, List, Optional, Tuple
 DEFAULT_PORT = 49371
 DEFAULT_BRIDGE_HEALTH_TIMEOUT_SECONDS = 5.0
 LOG_PREFIX = "[resolve-command-center]"
+WINDOWS_DEFAULT_RESOLVE_SCRIPT_API = Path(
+    r"C:\ProgramData\Blackmagic Design\DaVinci Resolve\Support\Developer\Scripting"
+)
+WINDOWS_DEFAULT_RESOLVE_SCRIPT_LIB = Path(
+    r"C:\Program Files\Blackmagic Design\DaVinci Resolve\fusionscript.dll"
+)
 
 
 def _port() -> int:
@@ -230,10 +236,73 @@ def _python_command() -> List[str]:
 def _append_pythonpath(environment: Dict[str, str], path: Path) -> None:
     path_text = str(path)
     existing = environment.get("PYTHONPATH", "")
-    parts = [part for part in existing.split(os.pathsep) if part]
-    if path_text not in parts:
-        parts.insert(0, path_text)
+    parts = [
+        part for part in existing.split(os.pathsep)
+        if part and part != path_text
+    ]
+    parts.insert(0, path_text)
     environment["PYTHONPATH"] = os.pathsep.join(parts)
+
+
+def _windows_default_resolve_script_api() -> Optional[Path]:
+    if os.name != "nt":
+        return None
+
+    module_path = WINDOWS_DEFAULT_RESOLVE_SCRIPT_API / "Modules" / "DaVinciResolveScript.py"
+    if module_path.exists():
+        return WINDOWS_DEFAULT_RESOLVE_SCRIPT_API
+
+    return None
+
+
+def _windows_default_resolve_script_lib() -> Optional[Path]:
+    if os.name != "nt":
+        return None
+
+    if WINDOWS_DEFAULT_RESOLVE_SCRIPT_LIB.exists():
+        return WINDOWS_DEFAULT_RESOLVE_SCRIPT_LIB
+
+    return None
+
+
+def _default_resolve_scripting_environment(environment: Dict[str, str]) -> Dict[str, str]:
+    sources: Dict[str, str] = {}
+
+    if environment.get("RESOLVE_SCRIPT_API"):
+        sources["RESOLVE_SCRIPT_API"] = "env"
+    else:
+        detected_api = _windows_default_resolve_script_api()
+        if detected_api:
+            environment["RESOLVE_SCRIPT_API"] = str(detected_api)
+            sources["RESOLVE_SCRIPT_API"] = "auto-detected"
+        else:
+            sources["RESOLVE_SCRIPT_API"] = "missing"
+
+    if environment.get("RESOLVE_SCRIPT_LIB"):
+        sources["RESOLVE_SCRIPT_LIB"] = "env"
+    else:
+        detected_lib = _windows_default_resolve_script_lib()
+        if detected_lib:
+            environment["RESOLVE_SCRIPT_LIB"] = str(detected_lib)
+            sources["RESOLVE_SCRIPT_LIB"] = "auto-detected"
+        else:
+            sources["RESOLVE_SCRIPT_LIB"] = "missing"
+
+    original_pythonpath = environment.get("PYTHONPATH")
+    resolve_script_api = environment.get("RESOLVE_SCRIPT_API")
+    if resolve_script_api:
+        modules_path = Path(resolve_script_api) / "Modules"
+        _append_pythonpath(environment, modules_path)
+        if original_pythonpath:
+            sources["PYTHONPATH"] = "env plus Resolve modules prepend"
+        else:
+            sources["PYTHONPATH"] = "derived from RESOLVE_SCRIPT_API"
+    elif original_pythonpath:
+        sources["PYTHONPATH"] = "env"
+    else:
+        sources["PYTHONPATH"] = "missing"
+
+    return sources
 
 
 def _bridge_environment(app_root: Path) -> Dict[str, str]:
@@ -242,27 +311,31 @@ def _bridge_environment(app_root: Path) -> Dict[str, str]:
     environment["RESOLVE_COMMAND_CENTER_PORT"] = str(_port())
     environment.setdefault("PYTHONUNBUFFERED", "1")
 
-    resolve_script_api = environment.get("RESOLVE_SCRIPT_API")
-    if resolve_script_api:
-        _append_pythonpath(environment, Path(resolve_script_api) / "Modules")
+    sources = _default_resolve_scripting_environment(environment)
+    _log_resolve_scripting_environment(environment, sources)
 
     return environment
 
 
-def _log_resolve_scripting_environment(environment: Dict[str, str]) -> None:
+def _log_resolve_scripting_environment(
+    environment: Dict[str, str],
+    sources: Dict[str, str]
+) -> None:
     keys = ["RESOLVE_SCRIPT_API", "RESOLVE_SCRIPT_LIB", "PYTHONPATH"]
     for key in keys:
         value = environment.get(key)
         if value:
-            _log(f"bridge environment {key}={value}")
+            _log(f"bridge environment {key}={value} ({sources.get(key, 'unknown')})")
         else:
-            _log(f"bridge environment {key}=<missing>")
+            _log(f"bridge environment {key}=<missing> ({sources.get(key, 'missing')})")
 
     if not environment.get("RESOLVE_SCRIPT_API") and not environment.get("RESOLVE_SCRIPT_LIB"):
         _log(
             "Resolve scripting environment variables are missing. The bridge "
             "can still report /health, but Resolve commands may fail unless "
-            "the selected Python can import DaVinciResolveScript or bmd."
+            "the selected Python can import DaVinciResolveScript or bmd. On "
+            "standard Windows installs, Clackly checks ProgramData scripting "
+            "modules and Program Files fusionscript.dll automatically."
         )
 
 
@@ -296,7 +369,6 @@ def _start_bridge_subprocess(app_root: Path) -> None:
         else:
             creationflags |= subprocess.CREATE_NO_WINDOW
 
-    _log_resolve_scripting_environment(environment)
     _log(f"bridge launch command: {_format_command(command)}")
     _log(f"bridge console visible: {show_console}")
 

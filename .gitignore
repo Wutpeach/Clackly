@@ -9,6 +9,7 @@ __pycache__/
 *.local
 *.log
 npm-debug.log*
+WorkflowIntegration.node
 
 .DS_Store
 Thumbs.db

@@ -8,7 +8,8 @@
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron . --dev-renderer\"",
     "start": "npm run build && electron .",
     "start:electron": "electron .",
-    "build": "vite build"
+    "build": "vite build",
+    "workflow:install": "powershell -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1"
   },
   "dependencies": {
     "react": "^18.3.1",

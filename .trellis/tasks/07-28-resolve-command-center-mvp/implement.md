@@ -34,31 +34,51 @@
   - retain thread bridge mode only for debugging the old Utility-script behavior
   - log startup diagnostics to `%APPDATA%/Clackly/clackly.log`
   - redirect hidden bridge subprocess output to `%APPDATA%/Clackly/bridge.log`
+  - auto-detect standard Windows Resolve scripting paths when `RESOLVE_SCRIPT_API` and `RESOLVE_SCRIPT_LIB` are missing
+  - prepend the resolved Resolve scripting `Modules` directory to `PYTHONPATH`
+  - log whether Resolve scripting values came from env, auto-detection, derivation, or are missing
   - wait briefly for the bridge `/health` endpoint before Electron launch
   - launch Electron if it is not already running
   - document Windows Utility script installation target
 - [x] Add README or inline docs covering local dev launch and Resolve Utility script installation.
 - [x] Run validation commands and record any Resolve-only manual verification gaps.
+- [x] Add Workflow Integration Plugin manifest and main entrypoint.
+- [x] Implement Workflow Plugin lifecycle calls:
+  - `InitializePromise`
+  - `ResolveQuit` callback
+  - `CleanUp()` during app shutdown
+- [x] Route Workflow Plugin command execution through command metadata and a Resolve handler table.
+- [x] Add a development install script that copies `WorkflowIntegration.node` from Resolve's official examples and registers the plugin under the Workflow Integration Plugins root.
+- [x] Update README and task artifacts to make Workflow Integration the preferred MVP path and Utility scripts a fallback.
+- [x] Run validation commands after the Workflow Plugin pivot.
 
 ## Validation Commands
 
 - `npm install` from `resolve-command-center/`
 - `npm run build` from `resolve-command-center/`
+- `node -c resolve-command-center/workflow-plugin/main.js`
 - `npm run dev` from `resolve-command-center/` for local UI validation
 - `python -m py_compile resolve-command-center/bridge/server.py resolve-command-center/bridge/resolve_bridge.py resolve-command-center/resolve/Clackly.py`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File resolve-command-center/scripts/install-workflow-plugin.ps1` on a Resolve Studio development machine
 - Targeted subprocess launcher probe with Electron disabled and `/health` checked on a throwaway local port.
+- Targeted environment probe with `RESOLVE_SCRIPT_API`, `RESOLVE_SCRIPT_LIB`, and `PYTHONPATH` unset to confirm standard Windows auto-detection populates bridge env values and prepends `Modules`.
 
 ## Manual Validation
 
 - Open DaVinci Resolve with a project and active timeline.
+- Install the Workflow Integration Plugin with `npm run workflow:install`.
+- Restart DaVinci Resolve Studio and load `Clackly` from `Workspace > Workflow Integrations`.
+- Press `Ctrl+Space`, type `marker`, press `Enter`, and confirm a red marker appears at the playhead.
 - Copy or symlink `resolve/Clackly.py` into the Windows Resolve Utility scripts directory.
 - Ensure `RESOLVE_COMMAND_CENTER_ROOT` points to the app root before launching Resolve, especially when Resolve's Utility script runner does not define `__file__` or when using a symlink.
+- Standard Windows Resolve installs should not require manual `RESOLVE_SCRIPT_API` or `RESOLVE_SCRIPT_LIB`; check `%APPDATA%/Clackly/clackly.log` for auto-detection source labels if `timeline.addMarker` cannot import the scripting API.
 - Launch Resolve and confirm Electron starts automatically.
 - Press `Ctrl+Space`, type `marker`, press `Enter`, and confirm a red marker appears at the playhead.
 
 ## Risky Areas
 
-- Resolve Python API availability depends on the bridge Python process being able to import Resolve scripting modules. The dev-MVP subprocess path passes through `RESOLVE_SCRIPT_API`, `RESOLVE_SCRIPT_LIB`, and `PYTHONPATH` when present, but it cannot inherit Resolve's in-process `resolve` or `bmd` globals.
+- Resolve Python API availability depends on the bridge Python process being able to import Resolve scripting modules. The dev-MVP subprocess path passes through `RESOLVE_SCRIPT_API`, `RESOLVE_SCRIPT_LIB`, and `PYTHONPATH` when present, auto-detects standard Windows install paths when missing, but it cannot inherit Resolve's in-process `resolve` or `bmd` globals.
+- Resolve Utility menu scripts are not true Resolve application startup hooks; production auto-start still needs an installer, launch wrapper, or separate startup trigger.
 - Resolve launch process management can accidentally spawn duplicates; implementation should detect or tolerate an already-running Electron app.
 - Global shortcut registration may fail if another app owns the accelerator; log or surface this in development output.
 - Manual Resolve validation cannot be completed in a headless or Resolve-free environment.

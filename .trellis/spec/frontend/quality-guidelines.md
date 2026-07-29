@@ -6,7 +6,7 @@
 
 ## Overview
 
-Frontend code includes Electron main-process code, preload APIs, and renderer UI. The frontend layer owns desktop behavior and user interaction only; integration actions must cross a narrow IPC/API boundary instead of importing backend or Resolve-specific APIs into renderer code.
+Frontend code includes Electron main-process code, Workflow Integration Plugin main-process code, preload APIs, and renderer UI. The frontend layer owns desktop behavior and user interaction only; integration actions must cross a narrow IPC/API boundary instead of importing backend or Resolve-specific APIs into renderer code.
 
 ## Scenario: Electron Command Palette Boundary
 
@@ -29,7 +29,7 @@ Frontend code includes Electron main-process code, preload APIs, and renderer UI
 
 - Renderer search uses command metadata only: `id`, `name`, and `keywords`.
 - Renderer execution sends only the selected `commandId`.
-- Electron main delegates command execution to the command engine. It must not import Resolve scripting modules or call Resolve API methods.
+- External Electron main delegates command execution to the command engine and local bridge. Workflow Plugin main may call Resolve through `WorkflowIntegration.node`, but renderer code must still send only command ids through preload IPC.
 - Development renderer loading must be explicit, for example `--dev-renderer` or `RESOLVE_COMMAND_CENTER_RENDERER_URL`.
 - Default non-packaged startup should load built renderer files so Resolve-launched Electron does not depend on a Vite dev server.
 
@@ -75,6 +75,7 @@ await window.resolveCommandCenter.executeCommand(command.id);
 
 - Command-specific UI branches for execution behavior.
 - Renderer imports from backend bridge modules or Resolve scripting modules.
+- Renderer imports from `WorkflowIntegration.node` or calls Resolve API methods.
 - Implicit dev-server loading for normal Electron startup.
 
 ---
