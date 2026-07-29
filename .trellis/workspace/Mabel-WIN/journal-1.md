@@ -60,3 +60,25 @@ Completed and live-validated the Clackly MVP: Workflow Integration lifecycle, co
 ### Status
 
 [OK] **Completed**
+
+
+## Session 3: Add lightweight capability registry
+
+**Date**: 2026-07-29
+**Task**: Add lightweight capability registry
+**Branch**: `main`
+
+### Summary
+
+Added an internal Map-backed capability registry, routed command execution through registered capability objects in both Electron hosts, updated tests and architecture specs, and separately updated Trellis agent model hints.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ddd75b4` | (see git log) |
+| `7d5dddd` | (see git log) |
+
+### Status
+
+[OK] **Completed**
