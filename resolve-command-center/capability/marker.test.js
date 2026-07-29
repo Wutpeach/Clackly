@@ -6,7 +6,7 @@ const {
   createMarkerCapability
 } = require("./marker");
 
-test("marker add selects the highest-priority available backend", async () => {
+test("marker execute selects the highest-priority available backend", async () => {
   const calls = [];
   const marker = createMarkerCapability({
     resolveApi: {
@@ -30,7 +30,7 @@ test("marker add selects the highest-priority available backend", async () => {
     }
   });
 
-  assert.deepEqual(await marker.add(), { backend: "resolveApi" });
+  assert.deepEqual(await marker.execute(), { backend: "resolveApi" });
   assert.deepEqual(calls, ["resolveApi"]);
 });
 

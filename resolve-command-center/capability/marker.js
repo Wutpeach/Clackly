@@ -54,6 +54,7 @@ function createMarkerCapability(backends = {}) {
 
   return {
     add,
+    execute: add,
     selectBackend
   };
 }

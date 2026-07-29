@@ -1,11 +1,11 @@
 const { getCommandById } = require("./registry");
 
 function createCommandExecutor({
-  capabilityHandlers,
+  capabilityRegistry,
   findCommand = getCommandById
 }) {
-  if (!capabilityHandlers || typeof capabilityHandlers !== "object") {
-    throw new TypeError("Command executor requires capability handlers");
+  if (!capabilityRegistry || typeof capabilityRegistry.get !== "function") {
+    throw new TypeError("Command executor requires a capability registry");
   }
 
   if (typeof findCommand !== "function") {
@@ -18,12 +18,12 @@ function createCommandExecutor({
       throw new Error(`Unknown command: ${commandId}`);
     }
 
-    const handler = capabilityHandlers[command.capability];
-    if (typeof handler !== "function") {
+    const capability = capabilityRegistry.get(command.capability);
+    if (!capability || typeof capability.execute !== "function") {
       throw new Error(`No capability handler registered for ${command.capability}`);
     }
 
-    return handler(command);
+    return capability.execute(command);
   };
 }
 

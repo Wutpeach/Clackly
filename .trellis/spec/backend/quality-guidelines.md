@@ -18,14 +18,16 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 ### 2. Signatures
 
 - Command manifest: `{ id: string, name: string, keywords: string[], capability: string }`
-- Command executor: `createCommandExecutor({ capabilityHandlers, findCommand? }) -> executeCommand(commandId)`
-- Marker capability: `createMarkerCapability(backends) -> { add(options?), selectBackend() }`
+- Capability registry: `createCapabilityRegistry() -> { register(capabilityId, capability), get(capabilityId) }`
+- Command executor: `createCommandExecutor({ capabilityRegistry, findCommand? }) -> executeCommand(commandId)`
+- Marker capability: `createMarkerCapability(backends) -> { add(options?), execute(command), selectBackend() }`
 - Unavailable error: `CapabilityUnavailableError(capability, attemptedBackends)`
 - Shortcut manager: `get(name)`, `has(name)`, `canExecute(name)`, and `execute(name, context?)`.
 
 ### 3. Contracts
 
 - `command-engine/` validates and routes the `capability` string only. It must not import Resolve APIs, bridge transport, or keyboard implementations.
+- Each host creates a capability registry, registers its host-backed capability objects, and injects the registry into the command executor.
 - `marker.add` checks backends in order: `resolveApi`, `resolveScriptApi`, `workflowPluginApi`, `keyboardShortcut`; `uiAutomation` is reserved and not implemented.
 - Hosts inject available execution adapters. Workflow Integration injects the Resolve adapter as `workflowPluginApi`; standalone/Utility injects the health-checked bridge adapter as `resolveScriptApi`.
 - Backend fallback happens only during availability selection. Once `addMarker()` starts, its API or semantic error propagates and no lower backend executes.
@@ -75,10 +77,10 @@ if (command.executor === "resolve") {
 #### Correct
 
 ```javascript
+const capabilityRegistry = createCapabilityRegistry();
+capabilityRegistry.register("marker.add", markerCapability);
 const executeCommand = createCommandExecutor({
-  capabilityHandlers: {
-    "marker.add": markerCapability.add,
-  },
+  capabilityRegistry,
 });
 ```
 
@@ -259,9 +261,9 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 - Bind local bridge servers to `127.0.0.1`.
 - Validate JSON payload shape at the HTTP boundary.
 - Keep Resolve command dispatch in one handler table.
-- Keep command-engine dispatch generic and register capability handlers from each host.
+- Keep command-engine dispatch generic and register capabilities from each host.
 - Delegate every Resolve scripting action to `resolve/adapter.js` or `resolve/adapter.py`.
-- Route command intent through capability handlers before selecting an execution adapter.
+- Route command intent through the capability registry before selecting an execution adapter.
 - Treat configured shortcuts and executable shortcuts as separate states.
 - Make ports, app roots, launch commands, and dev origins configurable through environment variables.
 

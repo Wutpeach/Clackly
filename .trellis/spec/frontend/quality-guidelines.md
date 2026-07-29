@@ -29,7 +29,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 
 - Renderer search uses command metadata only: `id`, `name`, and `keywords`.
 - Renderer execution sends only the selected `commandId`.
-- Electron hosts delegate command execution to the command engine, which routes intent to injected capability handlers. External Electron injects the bridge execution adapter; Workflow Plugin injects the Resolve adapter. Renderer code still sends only command ids through preload IPC.
+- Electron hosts delegate command execution to the command engine, which resolves intent through an injected capability registry. External Electron registers a bridge-backed capability; Workflow Plugin registers a Resolve-backed capability. Renderer code still sends only command ids through preload IPC.
 - Development renderer loading must be explicit, for example `--dev-renderer` or `RESOLVE_COMMAND_CENTER_RENDERER_URL`.
 - Default non-packaged startup should load built renderer files so Resolve-launched Electron does not depend on a Vite dev server.
 
@@ -44,7 +44,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 
 ### 5. Good/Base/Bad Cases
 
-- Good: Adding command intent metadata and registering its capability handler in each supported host.
+- Good: Adding command intent metadata and registering its capability in each supported host.
 - Base: `marker` query matches `timeline.addMarker` via registry search.
 - Bad: UI code checks `if (query === "marker")` or invokes Resolve APIs directly.
 
@@ -84,7 +84,7 @@ await window.resolveCommandCenter.executeCommand(command.id);
 ## Required Patterns
 
 - Keep renderer access behind `preload.js` with `contextIsolation: true`.
-- Route command execution through command capability metadata and host-injected capability handlers.
+- Route command execution through command capability metadata and a host-injected capability registry.
 - Keep dev renderer startup explicit and separate from built renderer startup.
 
 ---

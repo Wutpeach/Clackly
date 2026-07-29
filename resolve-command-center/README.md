@@ -7,7 +7,7 @@ Architecture-validation MVP for a DaVinci Resolve command palette. Electron owns
 Command metadata describes intent with `capability: "marker.add"`; it does not select Resolve or keyboard implementation details. The runtime chain is:
 
 ```text
-command-engine -> capability -> execution adapter -> Resolve / keyboard / future automation
+command-engine -> capability registry -> capability -> execution adapter -> Resolve / keyboard / future automation
 ```
 
 `capability/marker.js` selects the first available marker backend in this order: direct Resolve API, Resolve Script API, Workflow Plugin API, configured keyboard shortcut, then a reserved future UI-automation slot. Availability is checked before execution. Once a backend starts marker execution, any semantic or API error is returned without trying a lower backend, avoiding duplicate or partial actions.

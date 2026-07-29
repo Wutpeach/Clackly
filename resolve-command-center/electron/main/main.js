@@ -3,6 +3,7 @@ const { createPaletteWindow, showPaletteWindow, hidePaletteWindow } = require(".
 const { registerPaletteHotkey } = require("./hotkey");
 const { getCommands, searchCommands } = require("../../command-engine/registry");
 const { createCommandExecutor } = require("../../command-engine/executor");
+const { createCapabilityRegistry } = require("../../capability/registry");
 const { createMarkerCapability } = require("../../capability/marker");
 const { createBridgeExecutionAdapter } = require("../../execution-adapter/bridge");
 const { ShortcutManager } = require("../../shortcut/ShortcutManager");
@@ -18,10 +19,10 @@ const markerCapability = createMarkerCapability({
     addMarker: (context) => shortcutManager.execute("ADD_MARKER", context)
   }
 });
+const capabilityRegistry = createCapabilityRegistry();
+capabilityRegistry.register("marker.add", markerCapability);
 const executeCommand = createCommandExecutor({
-  capabilityHandlers: {
-    "marker.add": markerCapability.add
-  }
+  capabilityRegistry
 });
 
 function showPalette() {

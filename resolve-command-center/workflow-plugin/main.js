@@ -4,6 +4,7 @@ const { createPaletteWindow, hidePaletteWindow, showPaletteWindow } = require(".
 const { getPaletteAccelerator, registerPaletteHotkey } = require("../electron/main/hotkey");
 const { getCommandById, getCommands, searchCommands } = require("../command-engine/registry");
 const { createCommandExecutor } = require("../command-engine/executor");
+const { createCapabilityRegistry } = require("../capability/registry");
 const { createMarkerCapability } = require("../capability/marker");
 const { createResolveAdapter } = require("../resolve/adapter");
 const { ShortcutManager } = require("../shortcut/ShortcutManager");
@@ -99,10 +100,10 @@ const markerCapability = createMarkerCapability({
     addMarker: (context) => shortcutManager.execute("ADD_MARKER", context)
   }
 });
+const capabilityRegistry = createCapabilityRegistry();
+capabilityRegistry.register("marker.add", markerCapability);
 const executeCapabilityCommand = createCommandExecutor({
-  capabilityHandlers: {
-    "marker.add": markerCapability.add
-  }
+  capabilityRegistry
 });
 
 async function executeWorkflowCommand(commandId) {

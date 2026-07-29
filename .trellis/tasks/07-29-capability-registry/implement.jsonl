@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Defines command, capability, host composition, adapter, and error contracts affected by the registry change."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"The registry replaces duplicated host handler maps with one explicit internal contract."}
+{"file":".trellis/tasks/07-29-capability-registry/research/current-capability-routing.md","reason":"Records the current routing flow and prior capability-layer decisions that implementation must preserve."}
