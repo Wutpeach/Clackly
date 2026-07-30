@@ -13,7 +13,7 @@ colors:
   tile-top: "#24262C"
   tile-bottom: "#21242A"
   tile-hover: "#292D34"
-  toolbar-bg: "rgba(16,18,22,0.78)"
+  toolbar-bg: "rgba(24,26,30,0.72)"
   tile-border-inner: "rgba(255,255,255,0.055)"
   tile-border-middle: "rgba(0,0,0,0.88)"
   tile-border-outer: "rgba(255,255,255,0.12)"
@@ -159,7 +159,7 @@ Square `113px` targets in a three-column CSS Grid with `9px` gaps that visually 
 
 ### Launcher Toolbar
 
-The `44px` footer row shares the Launcher's `#202327` field background and contains a centered `38px` instrument strip with `6px` breathing room below it. Its width is calculated from the same tokens as the Launcher grid: three tile widths plus two grid gaps, so its left and right edges align exactly with the card matrix. The strip starts at the top of the footer row so the gap from the final card row mirrors the first card row's distance from the Launcher field edge. The strip itself uses the darker reference surface `rgba(16,18,22,0.78)`, a faint `rgba(255,255,255,0.05)` border, compact `4px` radius and soft suspended shadow. A theme-orange Lucide Grip button opens All Actions. The search prompt is centered within its remaining zone at `12px` in muted text, while the shortcut remains right-aligned. A short inset divider separates the two zones without touching the toolbar edges. Decorative branding and dedicated Favorites or History controls do not occupy the toolbar.
+The `44px` footer row shares the Launcher's `#202327` field background and contains a centered `38px` instrument strip with `6px` breathing room below it. Its width is calculated from the same tokens as the Launcher grid: three tile widths plus two grid gaps, so its left and right edges align exactly with the card matrix. The strip starts at the top of the footer row so the gap from the final card row mirrors the first card row's distance from the Launcher field edge. The strip itself uses the near-field reference surface `rgba(24,26,30,0.72)`, remaining only modestly darker than the Launcher field, with a faint `rgba(255,255,255,0.05)` border, compact `4px` radius and soft suspended shadow. A theme-orange Lucide Grip button opens All Actions. The search prompt is centered within its remaining zone at `12px` in muted text, while the shortcut remains right-aligned. A short inset divider separates the two zones without touching the toolbar edges. Decorative branding and dedicated Favorites or History controls do not occupy the toolbar.
 
 ### Search
 
