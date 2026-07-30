@@ -119,7 +119,10 @@ function Header({ mode, selectedCommand, pinned, onBack, onTogglePin, onSettings
 function CommandMeta({ command, pinned }) {
   return (
     <>
-      <span className="command-icon"><Icon name={command.icon} size={22} /></span>
+      <span className="command-icon">
+        <Icon name={command.icon} size={22} />
+        {pinned && <span className="pin-indicator" aria-label="Pinned" />}
+      </span>
       <span className="command-copy">
         <span className="command-name">{command.name}</span>
         <span className="command-detail">
@@ -127,7 +130,6 @@ function CommandMeta({ command, pinned }) {
           {!command.available && <span className="prototype-label">Prototype</span>}
         </span>
       </span>
-      {pinned && <span className="pin-indicator" aria-label="Pinned" />}
       {command.shortcut && <kbd>{command.shortcut}</kbd>}
     </>
   );

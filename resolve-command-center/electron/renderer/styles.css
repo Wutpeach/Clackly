@@ -510,7 +510,7 @@ kbd {
 
 .command-row {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto auto;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -564,6 +564,7 @@ kbd {
 }
 
 .command-icon {
+  position: relative;
   display: grid;
   place-items: center;
   width: 32px;
@@ -572,6 +573,14 @@ kbd {
   border-radius: 6px;
   color: var(--color-text-secondary);
   background: var(--color-tile);
+}
+
+.command-icon .pin-indicator {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
 }
 
 .command-row.selected .command-icon {
