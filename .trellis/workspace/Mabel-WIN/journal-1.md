@@ -125,3 +125,25 @@ Implemented the keyboard-first Launcher, Search, and same-size All Actions inter
 ### Status
 
 [OK] **Completed**
+
+
+## Session 6: Polish Clackly launcher and repair Codex Stop hook
+
+**Date**: 2026-07-30
+**Task**: Polish Clackly launcher and repair Codex Stop hook
+**Branch**: `main`
+
+### Summary
+
+Polished the fixed-size launcher with layered tiles, centered icon and label composition, a path-only geometric CLACKLY wordmark, and an inset footer; fixed Impeccable Codex Stop output compatibility with regression coverage.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a84ddb8` | (see git log) |
+| `7cf3818` | (see git log) |
+
+### Status
+
+[OK] **Completed**
