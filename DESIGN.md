@@ -10,9 +10,9 @@ colors:
   panel-bg: "#15181E"
   header-bottom: "#1C1F23"
   tile-bg: "#191D24"
-  tile-top: "#1A1E25"
-  tile-bottom: "#171B22"
-  tile-hover: "#202631"
+  tile-top: "#24262C"
+  tile-bottom: "#21242A"
+  tile-hover: "#292D34"
   toolbar-bg: "rgba(16,18,22,0.78)"
   tile-border-inner: "rgba(255,255,255,0.055)"
   tile-border-middle: "rgba(0,0,0,0.88)"
@@ -155,7 +155,7 @@ A compact `48px` header row uses the same `#202327` field background as the Laun
 
 ### Command Tiles
 
-Square `113px` targets in a three-column CSS Grid with `9px` gaps that visually match the matrix's outer inset. Default tiles use a `#1A1E25` to `#171B22` vertical gradient with three concentric edge layers: subtle white inset, black middle border and gray outer outline. Hover brightens the edge and increases physical separation by `1px`; selected tiles replace only the black middle border with orange. Launcher position keycaps `1–9` sit at the top-left and the pinned indicator sits at the top-right. Prototype commands remain visibly subdued and accessibly unavailable without an extra `DEMO` label. Icons are optically centered at `32px`; one- and two-line labels use HarmonyOS Sans at `450` weight to keep the dense grid visually light.
+Square `113px` targets in a three-column CSS Grid with `9px` gaps that visually match the matrix's outer inset. Default tiles use a `#24262C` to `#21242A` vertical gradient, sitting slightly above the Launcher field rather than dropping into a darker layer, with three concentric edge layers: subtle white inset, black middle border and gray outer outline. Hover brightens the edge and increases physical separation by `1px`; selected tiles replace only the black middle border with orange. Launcher position keycaps `1–9` sit at the top-left and the pinned indicator sits at the top-right. Prototype commands remain visibly subdued and accessibly unavailable without an extra `DEMO` label. Icons are optically centered at `32px`; one- and two-line labels use HarmonyOS Sans at `450` weight to keep the dense grid visually light.
 
 ### Launcher Toolbar
 

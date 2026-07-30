@@ -13,11 +13,11 @@
   --color-panel: #15181e;
   --color-header-bottom: #1c1f23;
   --color-tile: #191d24;
-  --color-tile-top: #1a1e25;
-  --color-tile-bottom: #171b22;
-  --color-tile-disabled-top: #191d23;
-  --color-tile-disabled-bottom: #161a20;
-  --color-tile-hover: #202631;
+  --color-tile-top: #24262c;
+  --color-tile-bottom: #21242a;
+  --color-tile-disabled-top: #23252b;
+  --color-tile-disabled-bottom: #202329;
+  --color-tile-hover: #292d34;
   --color-tile-border-inner: rgba(255, 255, 255, 0.055);
   --color-tile-border-middle: rgba(0, 0, 0, 0.88);
   --color-tile-border-outer: rgba(255, 255, 255, 0.12);
