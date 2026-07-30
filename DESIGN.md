@@ -8,7 +8,7 @@ colors:
   window-bg: "#101216"
   launcher-bg: "#202327"
   panel-bg: "#15181E"
-  header-bottom: "#13171D"
+  header-bottom: "#1C1F23"
   tile-bg: "#191D24"
   tile-top: "#1A1E25"
   tile-bottom: "#171B22"
@@ -90,7 +90,7 @@ components:
     rounded: "{rounded.control}"
     height: "42px"
   header-surface:
-    backgroundColor: "{colors.panel-bg}"
+    backgroundColor: "{colors.launcher-bg}"
     textColor: "{colors.text-primary}"
     rounded: "{rounded.toolbar}"
     height: "40px"
@@ -151,7 +151,7 @@ The silhouette is precise and lightly softened: `8px` for the window, `2px` for 
 
 ### Header
 
-A compact `48px` header row uses the same `#202327` field background as the Launcher, with `4px` vertical and `8px` horizontal inset. Brand, Pin and Settings share one continuous `40px` high physical surface with a `#15181E` to `#13171D` gradient, faint hairline, top inset highlight and lower inset shade, without an external drop shadow. The brand flexes to fill the remaining width; Pin and Settings each occupy a `40px` zone. Two short inset dividers separate Brand from Pin and Pin from Settings without splitting the shared surface into separate cards. A `2×24px` orange signal line introduces the brand area. The CLACKLY wordmark sits left at `118px` wide and `18px` high, drawn entirely with project-owned SVG paths/shapes: geometric light letterforms and an orange open-chevron `A`, with no `<text>` or font dependency.
+A compact `48px` header row uses the same `#202327` field background as the Launcher, with `4px` vertical and `8px` horizontal inset. Brand, Pin and Settings share one continuous `40px` high physical surface with a restrained `#202327` to `#1C1F23` gradient, keeping the title bar within the Launcher's tonal family while preserving faint hairline, top inset highlight and lower inset shade, without an external drop shadow. The brand flexes to fill the remaining width; Pin and Settings each occupy a `40px` zone. Two short inset dividers separate Brand from Pin and Pin from Settings without splitting the shared surface into separate cards. A `2×24px` orange signal line introduces the brand area. The CLACKLY wordmark sits left at `118px` wide and `18px` high, drawn entirely with project-owned SVG paths/shapes: geometric light letterforms and an orange open-chevron `A`, with no `<text>` or font dependency.
 
 ### Command Tiles
 

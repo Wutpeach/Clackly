@@ -11,7 +11,7 @@
   --color-window: #101216;
   --color-launcher: #202327;
   --color-panel: #15181e;
-  --color-header-bottom: #13171d;
+  --color-header-bottom: #1c1f23;
   --color-tile: #191d24;
   --color-tile-top: #1a1e25;
   --color-tile-bottom: #171b22;
@@ -133,7 +133,7 @@ input:focus-visible {
   overflow: hidden;
   border: 1px solid var(--color-border-faint);
   border-radius: 4px;
-  background: linear-gradient(180deg, var(--color-panel) 0%, var(--color-header-bottom) 100%);
+  background: linear-gradient(180deg, var(--color-launcher) 0%, var(--color-header-bottom) 100%);
   box-shadow: var(--header-surface-shadow);
 }
 
