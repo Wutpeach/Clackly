@@ -12,7 +12,7 @@ import {
   ChevronLeft,
   Command as CommandIcon,
   Flag,
-  Grid3X3,
+  Grip,
   Palette,
   Pin,
   Scissors,
@@ -71,7 +71,7 @@ const ICONS = {
   command: CommandIcon,
   pin: Pin,
   settings: Settings,
-  grid: Grid3X3,
+  grip: Grip,
   arrow: ChevronLeft
 };
 
@@ -87,28 +87,30 @@ function getCommandAriaLabel(command) {
 function Header({ mode, selectedCommand, pinned, onBack, onTogglePin, onSettings }) {
   return (
     <header className="palette-header">
-      <div className="brand-lockup">
-        {mode !== "launcher" && (
-          <button className="icon-button back-button" type="button" onClick={onBack} aria-label="Back to launcher">
-            <Icon name="arrow" size={18} />
+      <div className="header-surface">
+        <div className="brand-lockup">
+          {mode !== "launcher" && (
+            <button className="icon-button back-button" type="button" onClick={onBack} aria-label="Back to launcher">
+              <Icon name="arrow" size={18} />
+            </button>
+          )}
+          <img className="clackly-logo" src={logoUrl} alt="Clackly" />
+        </div>
+        <div className="header-actions">
+          <button
+            className={pinned ? "icon-button active" : "icon-button"}
+            type="button"
+            onClick={onTogglePin}
+            aria-label={selectedCommand ? `${pinned ? "Unpin" : "Pin"} ${selectedCommand.name}` : "Pin selected command"}
+            aria-pressed={pinned}
+            disabled={!selectedCommand}
+          >
+            <Icon name="pin" size={17} />
           </button>
-        )}
-        <img className="clackly-logo" src={logoUrl} alt="Clackly" />
-      </div>
-      <div className="header-actions">
-        <button
-          className={pinned ? "icon-button active" : "icon-button"}
-          type="button"
-          onClick={onTogglePin}
-          aria-label={selectedCommand ? `${pinned ? "Unpin" : "Pin"} ${selectedCommand.name}` : "Pin selected command"}
-          aria-pressed={pinned}
-          disabled={!selectedCommand}
-        >
-          <Icon name="pin" size={17} />
-        </button>
-        <button className="icon-button" type="button" onClick={onSettings} aria-label="Settings">
-          <Icon name="settings" size={18} />
-        </button>
+          <button className="icon-button" type="button" onClick={onSettings} aria-label="Settings">
+            <Icon name="settings" size={18} />
+          </button>
+        </div>
       </div>
     </header>
   );
@@ -327,12 +329,11 @@ function App() {
                 onClick={() => executeCommand(command)}
               >
                 <span className="tile-topline">
+                  <kbd aria-hidden="true">{index + 1}</kbd>
                   {pinnedIds.has(command.id) ? <span className="pin-indicator" aria-label="Pinned" /> : <span />}
-                  {command.shortcut && <kbd>{command.shortcut}</kbd>}
                 </span>
                 <span className="tile-icon"><Icon name={command.icon} size={30} /></span>
                 <span className="tile-label">{command.name}</span>
-                {!command.available && <span className="tile-state">Demo</span>}
               </button>
             ))}
           </div>
@@ -445,16 +446,22 @@ function App() {
       )}
 
       {mode === "launcher" && (
-        <footer className="launcher-footer">
-          <button type="button" className="all-actions-button" onClick={() => setMode("all-actions")}>
-            <Icon name="grid" size={17} />
-            <span>All Actions</span>
-          </button>
-          <button type="button" className="search-prompt" onClick={() => enterSearch("")}>
-            <span>Type to search…</span><kbd>⌘ K</kbd>
-          </button>
-          <img src={markUrl} alt="" />
-        </footer>
+        <div className="launcher-footer-area">
+          <footer className="launcher-footer">
+            <button
+              type="button"
+              className="all-actions-button"
+              aria-label="All Actions"
+              title="All Actions"
+              onClick={() => setMode("all-actions")}
+            >
+              <Icon name="grip" size={18} />
+            </button>
+            <button type="button" className="search-prompt" onClick={() => enterSearch("")}>
+              <span>Type to search…</span><kbd>⌘ K</kbd>
+            </button>
+          </footer>
+        </div>
       )}
 
       {(status || isExecuting) && (

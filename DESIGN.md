@@ -6,9 +6,17 @@ colors:
   accent-hover: "#FF7A3D"
   accent-soft: "rgba(243,106,45,0.15)"
   window-bg: "#101216"
+  launcher-bg: "#202327"
   panel-bg: "#15181E"
+  header-bottom: "#13171D"
   tile-bg: "#191D24"
+  tile-top: "#1A1E25"
+  tile-bottom: "#171B22"
   tile-hover: "#202631"
+  toolbar-bg: "rgba(16,18,22,0.78)"
+  tile-border-inner: "rgba(255,255,255,0.055)"
+  tile-border-middle: "rgba(0,0,0,0.88)"
+  tile-border-outer: "rgba(255,255,255,0.12)"
   text-primary: "rgba(255,255,255,0.92)"
   text-secondary: "rgba(255,255,255,0.65)"
   text-muted: "rgba(255,255,255,0.4)"
@@ -17,57 +25,60 @@ colors:
   shadow-ambient: "rgba(0,0,0,0.35)"
 typography:
   title:
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    fontFamily: "'HarmonyOS Sans', 'Segoe UI', system-ui, sans-serif"
     fontSize: "18px"
     fontWeight: 600
     lineHeight: 1
     letterSpacing: "0.16em"
   body:
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    fontFamily: "'HarmonyOS Sans', 'Segoe UI', system-ui, sans-serif"
     fontSize: "15px"
     fontWeight: 400
     lineHeight: 1.4
   label:
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    fontFamily: "'HarmonyOS Sans', 'Segoe UI', system-ui, sans-serif"
     fontSize: "13px"
     fontWeight: 500
     lineHeight: 1.25
   section:
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    fontFamily: "'HarmonyOS Sans', 'Segoe UI', system-ui, sans-serif"
     fontSize: "14px"
     fontWeight: 600
     lineHeight: 1.2
   status:
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    fontFamily: "'HarmonyOS Sans', 'Segoe UI', system-ui, sans-serif"
     fontSize: "12px"
     fontWeight: 400
     lineHeight: 1.35
   meta:
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    fontFamily: "'HarmonyOS Sans', 'Segoe UI', system-ui, sans-serif"
     fontSize: "11px"
     fontWeight: 400
     lineHeight: 1.2
   caption:
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    fontFamily: "'HarmonyOS Sans', 'Segoe UI', system-ui, sans-serif"
     fontSize: "10px"
     fontWeight: 600
     lineHeight: 1
 rounded:
   window: "8px"
   control: "6px"
+  tile: "2px"
+  toolbar: "4px"
   icon: "6px"
   keycap: "4px"
 spacing:
   xs: "4px"
   sm: "8px"
+  launcher-gap: "9px"
   md: "16px"
 components:
   tile:
     backgroundColor: "{colors.tile-bg}"
     textColor: "{colors.text-primary}"
-    rounded: "{rounded.control}"
-    padding: "8px 9px 9px"
-    size: "96px"
+    rounded: "{rounded.tile}"
+    padding: "8px 10px 10px"
+    size: "113px"
   tile-hover:
     backgroundColor: "{colors.tile-hover}"
     textColor: "{colors.text-primary}"
@@ -77,6 +88,17 @@ components:
     textColor: "{colors.text-primary}"
     rounded: "{rounded.control}"
     height: "42px"
+  header-surface:
+    backgroundColor: "{colors.panel-bg}"
+    textColor: "{colors.text-primary}"
+    rounded: "{rounded.toolbar}"
+    height: "40px"
+  launcher-toolbar:
+    backgroundColor: "{colors.toolbar-bg}"
+    textColor: "{colors.text-muted}"
+    rounded: "{rounded.toolbar}"
+    height: "38px"
+    width: "357px"
 ---
 
 # Design System: Clackly
@@ -97,14 +119,14 @@ Clackly is a compact professional control surface that appears inside the editor
 
 ## Colors
 
-The system uses restrained near-black layers and one precise orange signal. Backgrounds establish hierarchy through small tonal steps; orange never becomes a large fill.
+The system uses restrained near-black layers and one precise orange signal. The Launcher command field uses `#202327`, sitting close to the tile tones while remaining visibly distinct from the darker internal surfaces. Backgrounds establish hierarchy through small tonal steps; orange never becomes a large fill.
 
 **The Orange Signal Rule.** Use the accent only for the logo mark, focus, active selection, pinned indicators and essential state. Never fill a full tile with orange.
 
 ## Typography
 
-**Display Font:** Inter with SF Pro Display, Geist and system sans-serif fallback  
-**Body Font:** Inter with system sans-serif fallback
+**Display Font:** HarmonyOS Sans with Segoe UI and system sans-serif fallback
+**Body Font:** HarmonyOS Sans with system sans-serif fallback
 
 Typography is compact and utilitarian. Labels prioritize fast scanning; the wordmark earns distinction through geometric construction and increased tracking rather than a decorative display face.
 
@@ -112,31 +134,31 @@ Typography is compact and utilitarian. Labels prioritize fast scanning; the word
 
 ## Layout
 
-The launcher is a fixed floating instrument, not a responsive page. Every mode retains the `376×468px` footprint so browsing never occupies more of the Resolve workspace than launching or searching. Launcher uses a `56px` header, a compact `3×3` square grid with `16px` outer padding and `8–10px` gaps, and a `44px` bottom action bar. All Actions fits its grouped command list and narrow `32px` alphabet rail inside the same window.
+The launcher is a fixed floating instrument, not a responsive page. Every mode retains the `376×468px` footprint so browsing never occupies more of the Resolve workspace than launching or searching. Launcher uses a compact `48px` header, a centered `3×3` square grid with `8px` outer padding and `9px` gaps, and a `44px` bottom action bar. The `113px` tiles and wider gaps preserve the matrix's previous `357px` total footprint while adding breathing room. All Actions fits its grouped command list and narrow `32px` alphabet rail inside the same window.
 
 **The Workspace Preservation Rule.** Every layout must occupy only the space required for the current task and must not turn into a full application window.
 
 ## Elevation & Depth
 
-Depth comes from tonal layering, precise hairlines and shallow physical separation. The window receives an ambient shadow (`0 18px 44px rgba(0,0,0,0.35)`) plus a faint inner top highlight. Launcher tiles combine a restrained inner highlight, lower inset shade and a small offset separation shadow; selected tiles replace colored glow with a crisp orange edge and dark inset separator.
+Depth comes from tonal layering, precise hairlines and shallow physical separation. The window receives an ambient shadow (`0 18px 44px rgba(0,0,0,0.35)`) plus a faint inner top highlight. Launcher tiles use a restrained vertical dark gradient and a three-layer edge: inner white highlight, middle near-black physical border, and outer gray outline. A soft `0 7px 16px rgba(0,0,0,0.26)` shadow separates each tile from the `#202327` launcher field. Selection changes only the middle border from black to orange, retaining the inner and outer layers plus a minimal low-opacity glow. The footer strip floats subtly with a faint border, inner highlight and `0 8px 20px rgba(0,0,0,0.22)` shadow.
 
 ## Shapes
 
-The silhouette is precise and lightly softened: `8px` for the window and `6px` for tiles, inputs and buttons. Corners above `16px` are prohibited because they shift the product toward consumer-app softness. Interface icons come from `lucide-react`, use a fixed `1.9px` absolute stroke width and retain matched optical sizes; the Clackly logo and mark remain custom SVG assets.
+The silhouette is precise and lightly softened: `8px` for the window, `2px` for launcher tiles, and `6px` for inputs and buttons. Corners above `16px` are prohibited because they shift the product toward consumer-app softness. Interface icons come from `lucide-react`, use a fixed `1.9px` absolute stroke width and retain matched optical sizes; the Clackly logo and mark remain custom SVG assets.
 
 ## Components
 
 ### Header
 
-A `56px` bar with `16px` horizontal padding. A slim orange signal line introduces the brand area. The CLACKLY wordmark sits left at `110–130px` wide and approximately `20px` high, drawn entirely with project-owned SVG paths/shapes: geometric light letterforms and an orange open-chevron `A`, with no `<text>` or font dependency. Compact Pin and Settings controls sit right.
+A compact `48px` header row uses the same `#202327` field background as the Launcher, with `4px` vertical and `8px` horizontal inset. Brand, Pin and Settings share one continuous `40px` high physical surface with a `#15181E` to `#13171D` gradient, faint hairline, top inset highlight and lower inset shade, without an external drop shadow. The brand flexes to fill the remaining width; Pin and Settings each occupy a `40px` zone. Two short inset dividers separate Brand from Pin and Pin from Settings without splitting the shared surface into separate cards. A `2×24px` orange signal line introduces the brand area. The CLACKLY wordmark sits left at `118px` wide and `18px` high, drawn entirely with project-owned SVG paths/shapes: geometric light letterforms and an orange open-chevron `A`, with no `<text>` or font dependency.
 
 ### Command Tiles
 
-Square `96px` targets in a three-column CSS Grid. Default tiles use the tile neutral, strong/subtle layered hairlines and shallow inset/offset depth. Hover brightens the layer and moves upward by `1px`; selected tiles receive a crisp `1px` orange border with neutral inset separation. Icons are optically centered at `28–32px`; one- and two-line labels form a centered block below them.
+Square `113px` targets in a three-column CSS Grid with `9px` gaps that visually match the matrix's outer inset. Default tiles use a `#1A1E25` to `#171B22` vertical gradient with three concentric edge layers: subtle white inset, black middle border and gray outer outline. Hover brightens the edge and increases physical separation by `1px`; selected tiles replace only the black middle border with orange. Launcher position keycaps `1–9` sit at the top-left and the pinned indicator sits at the top-right. Prototype commands remain visibly subdued and accessibly unavailable without an extra `DEMO` label. Icons are optically centered at `32px`; one- and two-line labels use HarmonyOS Sans at `450` weight to keep the dense grid visually light.
 
 ### Launcher Toolbar
 
-The `44px` footer row contains a `32px` inset instrument strip with `6px` vertical breathing room. All Actions, the search prompt and the existing Clackly mark occupy distinct zones separated by one-pixel dividers. The reference surface treatment does not introduce Favorites or History controls.
+The `44px` footer row shares the Launcher's `#202327` field background and contains a centered `38px` instrument strip with `6px` breathing room below it. Its width is calculated from the same tokens as the Launcher grid: three tile widths plus two grid gaps, so its left and right edges align exactly with the card matrix. The strip starts at the top of the footer row so the gap from the final card row mirrors the first card row's distance from the Launcher field edge. The strip itself uses the darker reference surface `rgba(16,18,22,0.78)`, a faint `rgba(255,255,255,0.05)` border, compact `4px` radius and soft suspended shadow. A theme-orange Lucide Grip button opens All Actions. The search prompt is centered within its remaining zone at `12px` in muted text, while the shortcut remains right-aligned. A short inset divider separates the two zones without touching the toolbar edges. Decorative branding and dedicated Favorites or History controls do not occupy the toolbar.
 
 ### Search
 
@@ -158,7 +180,7 @@ Window entry lasts `120–160ms`, fading from transparent and scaling from `.98`
 - **Do** use CSS variables for every confirmed color and reusable measurement.
 - **Do** preserve the path-only custom SVG wordmark and mark, and use `lucide-react` SVG components for interface icons.
 - **Do** keep launcher icons and one/two-line command labels optically centered as one command unit.
-- **Do** use demo content only when clearly marked as unavailable prototype data.
+- **Do** keep prototype commands visually subdued and programmatically unavailable without adding a `DEMO` badge.
 
 ### Don't:
 

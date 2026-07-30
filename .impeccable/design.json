@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-30T12:00:00+08:00",
+  "generatedAt": "2026-07-30T14:52:57+08:00",
   "title": "Design System: Clackly",
   "extensions": {
     "colorMeta": {
@@ -22,11 +22,23 @@
         "canonical": "#101216",
         "tonalRamp": ["#101216", "#22262D", "#363C46", "#505865", "#707987", "#969DA8", "#C5C9CF", "#F0F1F3"]
       },
+      "launcher-bg": {
+        "role": "neutral",
+        "displayName": "Launcher Graphite",
+        "canonical": "#202327",
+        "tonalRamp": ["#151719", "#292D32", "#41464D", "#5D636C", "#7D848D", "#A2A8AF", "#CDD0D4", "#F2F3F4"]
+      },
       "panel-bg": {
         "role": "neutral",
         "displayName": "Panel Graphite",
         "canonical": "#15181E",
         "tonalRamp": ["#12151A", "#272C35", "#3D4551", "#586271", "#788291", "#9DA5B0", "#C8CBD1", "#F1F2F4"]
+      },
+      "header-bottom": {
+        "role": "neutral",
+        "displayName": "Header Lower Graphite",
+        "canonical": "#13171D",
+        "tonalRamp": ["#111419", "#252B34", "#3B4450", "#56606E", "#767F8E", "#9CA4AF", "#C7CBD1", "#F1F2F4"]
       },
       "tile-bg": {
         "role": "neutral",
@@ -39,6 +51,12 @@
         "displayName": "Active Graphite",
         "canonical": "#202631",
         "tonalRamp": ["#151A22", "#2C3544", "#455267", "#617087", "#818DA0", "#A4ACB8", "#CBD0D6", "#F2F3F5"]
+      },
+      "toolbar-bg": {
+        "role": "neutral",
+        "displayName": "Toolbar Glass Black",
+        "canonical": "rgba(16,18,22,0.78)",
+        "tonalRamp": ["rgba(8,9,11,0.92)", "rgba(16,18,22,0.88)", "rgba(35,39,47,0.82)", "rgba(62,68,79,0.78)", "rgba(98,105,117,0.72)", "rgba(145,151,160,0.64)", "rgba(199,203,208,0.52)", "rgba(242,243,244,0.4)"]
       },
       "shadow-ambient": {
         "role": "neutral",
@@ -54,12 +72,14 @@
       "section": { "displayName": "Section", "purpose": "Result names and alphabet group headings." },
       "status": { "displayName": "Status", "purpose": "Execution and error feedback." },
       "meta": { "displayName": "Metadata", "purpose": "Command categories and availability." },
-      "caption": { "displayName": "Keycap", "purpose": "Shortcuts, alphabet rail, and demo flags." }
+      "caption": { "displayName": "Keycap", "purpose": "Launcher positions, shortcuts, and alphabet rail." }
     },
     "shadows": [
       { "name": "window-ambient", "value": "0 18px 44px rgba(0,0,0,0.35)", "purpose": "Ambient separation for the floating palette window, paired with a faint inner top highlight." },
-      { "name": "tile-surface", "value": "inset 0 1px rgba(255,255,255,0.055), inset 0 -1px rgba(0,0,0,0.38), 0 2px 3px rgba(0,0,0,0.3)", "purpose": "Layered hairline and shallow physical separation for launcher tiles." },
-      { "name": "selection-signal", "value": "1px #F36A2D edge with neutral inset separation", "purpose": "A crisp selected edge without a zero-offset colored halo." },
+      { "name": "header-inset", "value": "inset 0 1px rgba(255,255,255,0.04), inset 0 -1px rgba(0,0,0,0.38)", "purpose": "Gives the continuous header surface physical depth without any external lower shadow." },
+      { "name": "tile-surface", "value": "inset 0 0 0 1px rgba(255,255,255,0.055), 0 0 0 1px rgba(255,255,255,0.12), 0 7px 16px rgba(0,0,0,0.26)", "purpose": "Inner white edge, black physical border, gray outer outline, and soft separation for launcher tiles." },
+      { "name": "selection-signal", "value": "1px #F36A2D middle edge with neutral inner and outer layers", "purpose": "Selection changes only the tile's middle black edge to orange." },
+      { "name": "toolbar-surface", "value": "inset 0 1px rgba(255,255,255,0.04), 0 8px 20px rgba(0,0,0,0.22)", "purpose": "Subtle suspended depth for the compact launcher toolbar." },
       { "name": "status-ambient", "value": "0 8px 22px rgba(0,0,0,0.35)", "purpose": "Separates transient status feedback from dense command content." }
     ],
     "motion": [
@@ -74,8 +94,8 @@
       "kind": "button",
       "refersTo": "tile",
       "description": "Square launcher action with a precise selected signal.",
-      "html": "<button class=\"ds-command-tile\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z\"/></svg><strong>Add Marker</strong></button>",
-      "css": ".ds-command-tile{display:grid;place-items:center;width:96px;aspect-ratio:1;border:1px solid rgba(255,255,255,.13);border-radius:6px;color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-tile,#191d24);box-shadow:inset 0 1px rgba(255,255,255,.055),inset 0 -1px rgba(0,0,0,.38),0 2px 3px rgba(0,0,0,.3);font:560 12px/1.22 Inter,sans-serif;text-align:center;transition:transform 100ms,border-color 100ms,background 100ms}.ds-command-tile svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.ds-command-tile:hover{transform:translateY(-1px);background:var(--color-tile-hover,#202631)}.ds-command-tile:focus-visible{outline:1px solid rgba(255,255,255,.52);outline-offset:-3px}.ds-command-tile[aria-selected=true]{border-color:var(--color-accent,#f36a2d);box-shadow:inset 0 0 0 1px rgba(0,0,0,.68),0 2px 4px rgba(0,0,0,.42)}"
+      "html": "<button class=\"ds-command-tile\"><span class=\"ds-tile-top\"><kbd>1</kbd><i></i></span><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z\"/></svg><strong>Add Marker</strong></button>",
+      "css": ".ds-command-tile{display:grid;grid-template-rows:18px 1fr 34px;width:113px;aspect-ratio:1;padding:8px 10px 10px;border:1px solid rgba(0,0,0,.88);border-radius:2px;color:rgba(255,255,255,.92);background:linear-gradient(180deg,#1a1e25,#171b22);box-shadow:inset 0 0 0 1px rgba(255,255,255,.055),0 0 0 1px rgba(255,255,255,.12),0 7px 16px rgba(0,0,0,.26);font:450 13px/1.22 'HarmonyOS Sans','Segoe UI',system-ui,sans-serif;text-align:center;transition:transform 100ms,border-color 100ms,background 100ms,box-shadow 100ms}.ds-tile-top{display:flex;justify-content:space-between}.ds-tile-top kbd{min-width:20px;height:18px;border:1px solid rgba(255,255,255,.08);border-radius:4px;color:rgba(255,255,255,.65);background:#15181e;font:600 10px/1 'HarmonyOS Sans',sans-serif}.ds-tile-top i{width:5px;height:5px;border-radius:50%;background:#f36a2d}.ds-command-tile>svg{align-self:end;justify-self:center;width:32px;height:32px;margin-bottom:10px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.ds-command-tile:hover{transform:translateY(-1px);background:#202631;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07),0 0 0 1px rgba(255,255,255,.16),0 9px 18px rgba(0,0,0,.28)}.ds-command-tile:focus-visible{outline:1px solid rgba(255,255,255,.52);outline-offset:-3px}.ds-command-tile[aria-selected=true]{border-color:#f36a2d;box-shadow:inset 0 0 0 1px rgba(255,255,255,.055),0 0 0 1px rgba(255,255,255,.12),0 7px 16px rgba(0,0,0,.28),0 0 10px rgba(243,106,45,.08)}"
     },
     {
       "name": "Search Field",
@@ -83,28 +103,44 @@
       "refersTo": "search-input",
       "description": "Compact active search field with one orange focus signal.",
       "html": "<input class=\"ds-search\" value=\"marker\" aria-label=\"Search commands\">",
-      "css": ".ds-search{width:320px;height:42px;padding:0 12px;border:1px solid var(--color-accent,#f36a2d);border-radius:6px;outline:none;color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-panel,#15181e);font:400 15px Inter,sans-serif}.ds-search:focus-visible{box-shadow:0 0 0 3px var(--color-accent-soft,rgba(243,106,45,.15))}"
+      "css": ".ds-search{width:320px;height:42px;padding:0 12px;border:1px solid var(--color-accent,#f36a2d);border-radius:6px;outline:none;color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-panel,#15181e);font:400 15px 'HarmonyOS Sans','Segoe UI',system-ui,sans-serif}.ds-search:focus-visible{box-shadow:0 0 0 3px var(--color-accent-soft,rgba(243,106,45,.15))}"
     },
     {
       "name": "Command Row",
       "kind": "button",
       "description": "Dense search and catalog row with metadata kept subordinate.",
       "html": "<button class=\"ds-command-row\"><span class=\"ds-command-icon\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z\"/></svg></span><span><strong>Add Marker</strong><small>Timeline</small></span><kbd>M</kbd></button>",
-      "css": ".ds-command-row{display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:10px;width:360px;min-height:58px;padding:0 10px;border:1px solid transparent;border-radius:6px;color:var(--color-text-primary,rgba(255,255,255,.92));background:transparent;text-align:left}.ds-command-row:hover,.ds-command-row:focus-visible{border-color:var(--color-accent,#f36a2d);background:var(--color-tile-hover,#202631);outline:none}.ds-command-row>span:nth-child(2){display:grid}.ds-command-row small{color:var(--color-text-muted,rgba(255,255,255,.4));font-size:11px}.ds-command-icon{display:grid;place-items:center;width:32px;height:32px;border:1px solid var(--color-border,rgba(255,255,255,.08));border-radius:6px;color:var(--color-accent,#f36a2d);background:var(--color-tile,#191d24)}.ds-command-icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}"
+      "css": ".ds-command-row{display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:10px;width:360px;min-height:58px;padding:0 10px;border:1px solid transparent;border-radius:6px;color:var(--color-text-primary,rgba(255,255,255,.92));background:transparent;font-family:'HarmonyOS Sans','Segoe UI',system-ui,sans-serif;text-align:left}.ds-command-row:hover,.ds-command-row:focus-visible{border-color:var(--color-accent,#f36a2d);background:var(--color-tile-hover,#202631);outline:none}.ds-command-row>span:nth-child(2){display:grid}.ds-command-row small{color:var(--color-text-muted,rgba(255,255,255,.4));font-size:11px}.ds-command-icon{display:grid;place-items:center;width:32px;height:32px;border:1px solid var(--color-border,rgba(255,255,255,.08));border-radius:6px;color:var(--color-accent,#f36a2d);background:var(--color-tile,#191d24)}.ds-command-icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}"
     },
     {
       "name": "Icon Control",
       "kind": "button",
-      "description": "Header control that stays quiet until hover or active state.",
+      "description": "Forty-pixel control zone inside the continuous header surface.",
       "html": "<button class=\"ds-icon-control\" aria-label=\"Pin command\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 17v5M5 17h14M6 3h12l-1 7 3 3H4l3-3z\"/></svg></button>",
-      "css": ".ds-icon-control{display:grid;place-items:center;width:30px;height:30px;border:1px solid transparent;border-radius:6px;color:var(--color-text-secondary,rgba(255,255,255,.65));background:transparent}.ds-icon-control svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.ds-icon-control:hover,.ds-icon-control:focus-visible{border-color:var(--color-border,rgba(255,255,255,.08));color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-tile-hover,#202631);outline:none}.ds-icon-control:active{color:var(--color-accent,#f36a2d)}"
+      "css": ".ds-icon-control{display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:0;color:var(--color-text-secondary,rgba(255,255,255,.65));background:transparent}.ds-icon-control svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.ds-icon-control:hover,.ds-icon-control:focus-visible{color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-tile-hover,#202631);outline:1px solid var(--color-accent,#f36a2d);outline-offset:-1px}.ds-icon-control:active{color:var(--color-accent,#f36a2d)}"
     },
     {
       "name": "Alphabet Control",
       "kind": "nav",
       "description": "Narrow catalog navigation with an exact one-pixel active indicator.",
       "html": "<nav class=\"ds-alpha\"><button>A</button><button class=\"active\">B</button><button disabled>C</button></nav>",
-      "css": ".ds-alpha{display:grid;width:32px;border-left:1px solid var(--color-border,rgba(255,255,255,.08));background:var(--color-window,#101216)}.ds-alpha button{position:relative;height:22px;border:0;color:var(--color-text-muted,rgba(255,255,255,.4));background:transparent;font:600 10px Inter,sans-serif}.ds-alpha button.active{color:var(--color-accent,#f36a2d)}.ds-alpha button.active:before{position:absolute;inset:25% auto 25% -1px;width:1px;background:var(--color-accent,#f36a2d);content:''}.ds-alpha button:focus-visible{outline:1px solid var(--color-accent,#f36a2d);outline-offset:-1px}.ds-alpha button:disabled{opacity:.25}"
+      "css": ".ds-alpha{display:grid;width:32px;border-left:1px solid var(--color-border,rgba(255,255,255,.08));background:var(--color-window,#101216)}.ds-alpha button{position:relative;height:22px;border:0;color:var(--color-text-muted,rgba(255,255,255,.4));background:transparent;font:600 10px 'HarmonyOS Sans','Segoe UI',system-ui,sans-serif}.ds-alpha button.active{color:var(--color-accent,#f36a2d)}.ds-alpha button.active:before{position:absolute;inset:25% auto 25% -1px;width:1px;background:var(--color-accent,#f36a2d);content:''}.ds-alpha button:focus-visible{outline:1px solid var(--color-accent,#f36a2d);outline-offset:-1px}.ds-alpha button:disabled{opacity:.25}"
+    },
+    {
+      "name": "Header Surface",
+      "kind": "nav",
+      "refersTo": "header-surface",
+      "description": "One continuous inset header body divided into brand, Pin, and Settings zones.",
+      "html": "<nav class=\"ds-header\"><span class=\"ds-brand\"><i></i><strong>CLACKLY</strong></span><button aria-label=\"Pin\">⌖</button><button aria-label=\"Settings\">⚙</button></nav>",
+      "css": ".ds-header{display:grid;grid-template-columns:1fr 40px 40px;width:360px;height:40px;overflow:hidden;border:1px solid rgba(255,255,255,.05);border-radius:4px;color:rgba(255,255,255,.92);background:linear-gradient(180deg,#15181e,#13171d);box-shadow:inset 0 1px rgba(255,255,255,.04),inset 0 -1px rgba(0,0,0,.38);font-family:'HarmonyOS Sans','Segoe UI',system-ui,sans-serif}.ds-brand{display:flex;align-items:center;gap:11px;padding:0 12px}.ds-brand i{width:2px;height:24px;border-radius:2px;background:#f36a2d}.ds-brand strong{font-size:15px;letter-spacing:.16em}.ds-header button{position:relative;border:0;border-left:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.65);background:transparent}.ds-header button:hover,.ds-header button:focus-visible{color:rgba(255,255,255,.92);background:#202631;outline:1px solid #f36a2d;outline-offset:-1px}"
+    },
+    {
+      "name": "Launcher Toolbar",
+      "kind": "nav",
+      "refersTo": "launcher-toolbar",
+      "description": "Grid-aligned launcher strip with the All Actions grip and centered search prompt.",
+      "html": "<nav class=\"ds-toolbar\"><button class=\"ds-grip\" aria-label=\"All Actions\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"9\" cy=\"5\" r=\"1\"/><circle cx=\"9\" cy=\"12\" r=\"1\"/><circle cx=\"9\" cy=\"19\" r=\"1\"/><circle cx=\"15\" cy=\"5\" r=\"1\"/><circle cx=\"15\" cy=\"12\" r=\"1\"/><circle cx=\"15\" cy=\"19\" r=\"1\"/></svg></button><button class=\"ds-prompt\"><span>Type to search…</span><kbd>⌘ K</kbd></button></nav>",
+      "css": ".ds-toolbar{display:grid;grid-template-columns:42px 1fr;width:357px;height:38px;overflow:hidden;border:1px solid rgba(255,255,255,.05);border-radius:4px;background:rgba(16,18,22,.78);box-shadow:inset 0 1px rgba(255,255,255,.04),0 8px 20px rgba(0,0,0,.22);font-family:'HarmonyOS Sans','Segoe UI',system-ui,sans-serif}.ds-toolbar button{border:0;background:transparent}.ds-grip{display:grid;place-items:center;color:#f36a2d}.ds-grip svg{width:18px;height:18px;fill:currentColor}.ds-prompt{position:relative;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 9px;color:rgba(255,255,255,.4);font-size:12px}.ds-prompt:before{position:absolute;inset:7px auto 7px 0;width:1px;background:rgba(255,255,255,.08);content:''}.ds-prompt span{grid-column:2}.ds-prompt kbd{grid-column:3;justify-self:end;color:rgba(255,255,255,.65);font-size:10px}.ds-toolbar button:hover,.ds-toolbar button:focus-visible{color:rgba(255,255,255,.92);background:rgba(255,255,255,.045);outline:1px solid #f36a2d;outline-offset:-1px}"
     }
   ],
   "narrative": {
@@ -126,7 +162,7 @@
       "Do preserve complete keyboard operation and visible focus or selection.",
       "Do preserve the path-only custom SVG wordmark and mark, and use lucide-react SVG components for interface icons.",
       "Do center launcher icons and one/two-line labels as one command unit.",
-      "Do label demo content as unavailable prototype data."
+      "Do keep prototype commands visually subdued and programmatically unavailable without a DEMO badge."
     ],
     "donts": [
       "Don't use large glow, full-orange tiles, gradient text, or decorative glass.",
