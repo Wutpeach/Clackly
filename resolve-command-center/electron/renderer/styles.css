@@ -33,7 +33,7 @@
   --color-border-strong: rgba(255, 255, 255, 0.13);
   --color-shadow: rgba(0, 0, 0, 0.35);
   --surface-inset: inset 0 1px rgba(255, 255, 255, 0.055), inset 0 -1px rgba(0, 0, 0, 0.38);
-  --radius-window: 8px;
+  --radius-window: 4px;
   --radius-control: 6px;
   --radius-tile: 2px;
   --radius-rail: 3px;
@@ -50,7 +50,7 @@
   --motion-fast: 100ms;
   --motion-mode: 120ms;
   color: var(--color-text-primary);
-  background: var(--color-window);
+  background: transparent;
   font-family: "HarmonyOS Sans", "Segoe UI", system-ui, sans-serif;
   font-synthesis: none;
 }
@@ -71,7 +71,7 @@ body {
   place-items: center;
   margin: 0;
   overflow: hidden;
-  background: var(--color-window);
+  background: transparent;
 }
 
 button,
