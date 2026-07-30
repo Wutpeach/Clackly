@@ -352,6 +352,13 @@ kbd {
   line-height: 1;
 }
 
+.command-tile kbd {
+  width: 18px;
+  min-width: 18px;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.12);
+}
+
 .pin-indicator {
   width: 5px;
   height: 5px;
@@ -382,7 +389,7 @@ kbd {
   border: 1px solid var(--color-border-faint);
   border-radius: var(--radius-toolbar);
   background: var(--color-toolbar);
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.04), 0 8px 20px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
 }
 
 .all-actions-button,
@@ -404,9 +411,7 @@ kbd {
 
 .search-prompt {
   position: relative;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 0;
+  justify-content: center;
   padding: 0 9px;
   overflow: hidden;
   color: var(--color-text-muted);
@@ -425,17 +430,9 @@ kbd {
 }
 
 .search-prompt > span {
-  grid-column: 2;
-  justify-self: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.search-prompt > kbd {
-  grid-column: 3;
-  justify-self: end;
-  color: var(--color-text-secondary);
 }
 
 .all-actions-button:hover {

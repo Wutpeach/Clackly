@@ -453,7 +453,7 @@ function App() {
               <Icon name="grip" size={18} />
             </button>
             <button type="button" className="search-prompt" onClick={() => enterSearch("")}>
-              <span>Type to search…</span><kbd>⌘ K</kbd>
+              <span>Type to search…</span>
             </button>
           </footer>
         </div>
