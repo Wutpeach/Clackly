@@ -1168,7 +1168,8 @@ export function resolveHarness(env = {}, event = null) {
   const explicit = env?.IMPECCABLE_HOOK_HARNESS;
   if (explicit === 'cursor') return 'cursor';
   if (explicit === 'github') return 'github';
-  if (explicit === 'claude' || explicit === 'codex') return 'claude';
+  if (explicit === 'codex') return 'codex';
+  if (explicit === 'claude') return 'claude';
   // GitHub Copilot's postToolUse event uses camelCase `toolName`/`toolArgs` and
   // has no `tool_name`/`tool_input`. That shape is the discriminator.
   if (event && typeof event === 'object'
@@ -1177,6 +1178,7 @@ export function resolveHarness(env = {}, event = null) {
     return 'github';
   }
   if (typeof event?.conversation_id === 'string' && event.conversation_id) return 'cursor';
+  if (typeof event?.turn_id === 'string' && event.turn_id) return 'codex';
   return 'claude';
 }
 
@@ -1937,7 +1939,20 @@ export const STOP_MAX_FILES = 20;
  */
 export async function runStopHook({ stdinJson, env = {}, cwd = process.cwd(), now = Date.now, detector } = {}) {
   const audit = { ts: new Date(now()).toISOString(), event: 'Stop' };
-  const result = (extra) => ({ exitCode: 0, stdout: '', audit: { ...audit, ...extra } });
+  let event;
+  let stdinMalformed = false;
+  try {
+    event = typeof stdinJson === 'string' ? JSON.parse(stdinJson) : stdinJson;
+  } catch {
+    stdinMalformed = true;
+  }
+  const harness = resolveHarness(env, event);
+  audit.harness = harness;
+  const result = (extra) => ({
+    exitCode: 0,
+    stdout: harness === 'codex' ? JSON.stringify({ continue: true }) : '',
+    audit: { ...audit, ...extra },
+  });
 
   try {
     // Re-entrancy guard, same as the per-edit pass.
@@ -1950,10 +1965,7 @@ export async function runStopHook({ stdinJson, env = {}, cwd = process.cwd(), no
 
     const started = Date.now();
 
-    let event;
-    try {
-      event = typeof stdinJson === 'string' ? JSON.parse(stdinJson) : stdinJson;
-    } catch {
+    if (stdinMalformed) {
       return result({ skipped: 'stdin-malformed', durationMs: Date.now() - started });
     }
     if (!event || typeof event !== 'object') {
@@ -1973,9 +1985,6 @@ export async function runStopHook({ stdinJson, env = {}, cwd = process.cwd(), no
     if (event.stop_hook_active === true) {
       return result({ skipped: 'stop-hook-active', durationMs: Date.now() - started });
     }
-
-    const harness = resolveHarness(env, event);
-    audit.harness = harness;
 
     // A Stop event carries no file, so the session cwd is the project.
     // Umbrella-dir launches keyed their per-edit cache to the edited file's
@@ -2074,15 +2083,14 @@ export async function runStopHook({ stdinJson, env = {}, cwd = process.cwd(), no
       },
     };
   } catch (err) {
-    return {
-      exitCode: 0,
-      stdout: '',
-      audit: { ...audit, error: String(err && err.message ? err.message : err) },
-    };
+    return result({ error: String(err && err.message ? err.message : err) });
   }
 }
 
 export function payload(text, eventName = 'PostToolUse', harness = 'claude') {
+  if (harness === 'codex' && eventName === 'Stop') {
+    return JSON.stringify({ decision: 'block', reason: text });
+  }
   if (harness === 'cursor') {
     return JSON.stringify({ additional_context: text });
   }

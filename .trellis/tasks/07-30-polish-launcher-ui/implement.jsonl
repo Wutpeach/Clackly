@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend guideline index and project UI scope."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Renderer boundaries, fixed palette size, icon rules, and required build/test contracts."}
+{"file":".trellis/tasks/07-30-polish-launcher-ui/research/reference-analysis.md","reason":"Visual evidence extracted from the user-provided reference image and the approved toolbar semantics."}

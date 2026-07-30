@@ -13,7 +13,7 @@
  *     surfaced, and emits once via the Stop additionalContext channel.
  *
  * Contract: never break a turn. Always exit 0. Clean files emit a small ack
- * unless quiet mode is enabled; a clean Stop pass is silent.
+ * unless quiet mode is enabled; a clean Codex Stop emits continuation JSON.
  *
  * Most logic lives in `hook-lib.mjs` so it is unit-testable without a
  * subprocess. This file is the thin stdin/stdout adapter.
