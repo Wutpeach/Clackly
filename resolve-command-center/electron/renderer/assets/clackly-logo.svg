@@ -1,4 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 126 20" role="img" aria-labelledby="title">
   <title id="title">Clackly</title>
-  <text x="1" y="15" fill="rgba(255,255,255,0.88)" font-family="Inter,Segoe UI,sans-serif" font-size="17" font-weight="650" letter-spacing="2.2"><tspan>CL</tspan><tspan fill="#F36A2D">A</tspan><tspan>CKLY</tspan></text>
+  <g fill="none" stroke="rgba(255,255,255,0.88)" stroke-width="1.7" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M13 3H5L2 6V14L5 17H13" />
+    <path d="M20 3V17H31" />
+    <path d="M68 3H60L57 6V14L60 17H68" />
+    <path d="M76 3V17M88 3L76 10L88 17" />
+    <path d="M95 3V17H106" />
+    <path d="M113 3L119 10L125 3M119 10V17" />
+  </g>
+  <path d="M38 17L44 3L50 17" fill="none" stroke="#F36A2D" stroke-width="1.9" stroke-linecap="square" stroke-linejoin="miter" />
 </svg>

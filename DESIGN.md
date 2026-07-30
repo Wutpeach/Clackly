@@ -13,6 +13,7 @@ colors:
   text-secondary: "rgba(255,255,255,0.65)"
   text-muted: "rgba(255,255,255,0.4)"
   border-subtle: "rgba(255,255,255,0.08)"
+  border-strong: "rgba(255,255,255,0.13)"
   shadow-ambient: "rgba(0,0,0,0.35)"
 typography:
   title:
@@ -52,8 +53,8 @@ typography:
     fontWeight: 600
     lineHeight: 1
 rounded:
-  window: "12px"
-  control: "8px"
+  window: "8px"
+  control: "6px"
   icon: "6px"
   keycap: "4px"
 spacing:
@@ -65,7 +66,7 @@ components:
     backgroundColor: "{colors.tile-bg}"
     textColor: "{colors.text-primary}"
     rounded: "{rounded.control}"
-    padding: "12px"
+    padding: "8px 9px 9px"
     size: "96px"
   tile-hover:
     backgroundColor: "{colors.tile-hover}"
@@ -117,21 +118,25 @@ The launcher is a fixed floating instrument, not a responsive page. Every mode r
 
 ## Elevation & Depth
 
-Depth comes primarily from tonal layering and subtle borders. The window alone receives an ambient shadow (`0 16px 40px rgba(0,0,0,0.35)`). Tiles have no resting shadow; selected content may use only a restrained orange halo (`0 0 12px rgba(243,106,45,0.2)`).
+Depth comes from tonal layering, precise hairlines and shallow physical separation. The window receives an ambient shadow (`0 18px 44px rgba(0,0,0,0.35)`) plus a faint inner top highlight. Launcher tiles combine a restrained inner highlight, lower inset shade and a small offset separation shadow; selected tiles replace colored glow with a crisp orange edge and dark inset separator.
 
 ## Shapes
 
-The silhouette is precise and lightly softened: `12px` for the window and `8px` for tiles, inputs and buttons. Corners above `16px` are prohibited because they shift the product toward consumer-app softness. Interface icons come from `lucide-react`, use a fixed `1.9px` absolute stroke width and retain matched optical sizes; the Clackly logo and mark remain custom SVG assets.
+The silhouette is precise and lightly softened: `8px` for the window and `6px` for tiles, inputs and buttons. Corners above `16px` are prohibited because they shift the product toward consumer-app softness. Interface icons come from `lucide-react`, use a fixed `1.9px` absolute stroke width and retain matched optical sizes; the Clackly logo and mark remain custom SVG assets.
 
 ## Components
 
 ### Header
 
-A `56px` bar with `16px` horizontal padding. The CLACKLY SVG wordmark sits left at `110–130px` wide and approximately `20px` high; compact Pin and Settings controls sit right.
+A `56px` bar with `16px` horizontal padding. A slim orange signal line introduces the brand area. The CLACKLY wordmark sits left at `110–130px` wide and approximately `20px` high, drawn entirely with project-owned SVG paths/shapes: geometric light letterforms and an orange open-chevron `A`, with no `<text>` or font dependency. Compact Pin and Settings controls sit right.
 
 ### Command Tiles
 
-Square `96px` targets in a three-column CSS Grid. Default tiles use the tile neutral and subtle border. Hover brightens the layer and moves upward by `1px`; selected tiles receive a `1px` orange border. Icons are centered at `28–32px`; labels use the label typography role.
+Square `96px` targets in a three-column CSS Grid. Default tiles use the tile neutral, strong/subtle layered hairlines and shallow inset/offset depth. Hover brightens the layer and moves upward by `1px`; selected tiles receive a crisp `1px` orange border with neutral inset separation. Icons are optically centered at `28–32px`; one- and two-line labels form a centered block below them.
+
+### Launcher Toolbar
+
+The `44px` footer row contains a `32px` inset instrument strip with `6px` vertical breathing room. All Actions, the search prompt and the existing Clackly mark occupy distinct zones separated by one-pixel dividers. The reference surface treatment does not introduce Favorites or History controls.
 
 ### Search
 
@@ -151,12 +156,14 @@ Window entry lasts `120–160ms`, fading from transparent and scaling from `.98`
 
 - **Do** preserve complete keyboard operation and visible focus/selection.
 - **Do** use CSS variables for every confirmed color and reusable measurement.
-- **Do** preserve the custom SVG wordmark and mark, and use `lucide-react` SVG components for interface icons.
+- **Do** preserve the path-only custom SVG wordmark and mark, and use `lucide-react` SVG components for interface icons.
+- **Do** keep launcher icons and one/two-line command labels optically centered as one command unit.
 - **Do** use demo content only when clearly marked as unavailable prototype data.
 
 ### Don't:
 
 - **Don't** use large glow, full-orange tiles, gradient text or decorative glass effects.
+- **Don't** use SVG `<text>` or font-dependent rendering for the CLACKLY wordmark.
 - **Don't** use radii above `16px`, oversized whitespace or card-heavy consumer layouts.
 - **Don't** let UI code know how Resolve actions are implemented.
 - **Don't** add a dedicated History control; history influences ranking instead.

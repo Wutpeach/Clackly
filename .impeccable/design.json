@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-29T19:00:20.021+08:00",
+  "generatedAt": "2026-07-30T12:00:00+08:00",
   "title": "Design System: Clackly",
   "extensions": {
     "colorMeta": {
@@ -57,8 +57,9 @@
       "caption": { "displayName": "Keycap", "purpose": "Shortcuts, alphabet rail, and demo flags." }
     },
     "shadows": [
-      { "name": "window-ambient", "value": "0 16px 40px rgba(0,0,0,0.35)", "purpose": "The only structural elevation, applied to the floating palette window." },
-      { "name": "selection-signal", "value": "0 0 12px rgba(243,106,45,0.2)", "purpose": "A restrained signal around the selected launcher tile." },
+      { "name": "window-ambient", "value": "0 18px 44px rgba(0,0,0,0.35)", "purpose": "Ambient separation for the floating palette window, paired with a faint inner top highlight." },
+      { "name": "tile-surface", "value": "inset 0 1px rgba(255,255,255,0.055), inset 0 -1px rgba(0,0,0,0.38), 0 2px 3px rgba(0,0,0,0.3)", "purpose": "Layered hairline and shallow physical separation for launcher tiles." },
+      { "name": "selection-signal", "value": "1px #F36A2D edge with neutral inset separation", "purpose": "A crisp selected edge without a zero-offset colored halo." },
       { "name": "status-ambient", "value": "0 8px 22px rgba(0,0,0,0.35)", "purpose": "Separates transient status feedback from dense command content." }
     ],
     "motion": [
@@ -74,7 +75,7 @@
       "refersTo": "tile",
       "description": "Square launcher action with a precise selected signal.",
       "html": "<button class=\"ds-command-tile\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z\"/></svg><strong>Add Marker</strong></button>",
-      "css": ".ds-command-tile{display:grid;place-items:center;width:96px;aspect-ratio:1;border:1px solid var(--color-border,rgba(255,255,255,.08));border-radius:8px;color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-tile,#191d24);font:500 13px Inter,sans-serif;transition:transform 100ms,border-color 100ms,background 100ms}.ds-command-tile svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.ds-command-tile:hover,.ds-command-tile:focus-visible{transform:translateY(-1px);border-color:var(--color-accent,#f36a2d);background:var(--color-tile-hover,#202631);outline:none}"
+      "css": ".ds-command-tile{display:grid;place-items:center;width:96px;aspect-ratio:1;border:1px solid rgba(255,255,255,.13);border-radius:6px;color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-tile,#191d24);box-shadow:inset 0 1px rgba(255,255,255,.055),inset 0 -1px rgba(0,0,0,.38),0 2px 3px rgba(0,0,0,.3);font:560 12px/1.22 Inter,sans-serif;text-align:center;transition:transform 100ms,border-color 100ms,background 100ms}.ds-command-tile svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.ds-command-tile:hover{transform:translateY(-1px);background:var(--color-tile-hover,#202631)}.ds-command-tile:focus-visible{outline:1px solid rgba(255,255,255,.52);outline-offset:-3px}.ds-command-tile[aria-selected=true]{border-color:var(--color-accent,#f36a2d);box-shadow:inset 0 0 0 1px rgba(0,0,0,.68),0 2px 4px rgba(0,0,0,.42)}"
     },
     {
       "name": "Search Field",
@@ -82,21 +83,21 @@
       "refersTo": "search-input",
       "description": "Compact active search field with one orange focus signal.",
       "html": "<input class=\"ds-search\" value=\"marker\" aria-label=\"Search commands\">",
-      "css": ".ds-search{width:320px;height:42px;padding:0 12px;border:1px solid var(--color-accent,#f36a2d);border-radius:8px;outline:none;color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-panel,#15181e);font:400 15px Inter,sans-serif}.ds-search:focus-visible{box-shadow:0 0 0 3px var(--color-accent-soft,rgba(243,106,45,.15))}"
+      "css": ".ds-search{width:320px;height:42px;padding:0 12px;border:1px solid var(--color-accent,#f36a2d);border-radius:6px;outline:none;color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-panel,#15181e);font:400 15px Inter,sans-serif}.ds-search:focus-visible{box-shadow:0 0 0 3px var(--color-accent-soft,rgba(243,106,45,.15))}"
     },
     {
       "name": "Command Row",
       "kind": "button",
       "description": "Dense search and catalog row with metadata kept subordinate.",
       "html": "<button class=\"ds-command-row\"><span class=\"ds-command-icon\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z\"/></svg></span><span><strong>Add Marker</strong><small>Timeline</small></span><kbd>M</kbd></button>",
-      "css": ".ds-command-row{display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:10px;width:360px;min-height:58px;padding:0 10px;border:1px solid transparent;border-radius:8px;color:var(--color-text-primary,rgba(255,255,255,.92));background:transparent;text-align:left}.ds-command-row:hover,.ds-command-row:focus-visible{border-color:var(--color-accent,#f36a2d);background:var(--color-tile-hover,#202631);outline:none}.ds-command-row>span:nth-child(2){display:grid}.ds-command-row small{color:var(--color-text-muted,rgba(255,255,255,.4));font-size:11px}.ds-command-icon{display:grid;place-items:center;width:32px;height:32px;border:1px solid var(--color-border,rgba(255,255,255,.08));border-radius:6px;color:var(--color-accent,#f36a2d);background:var(--color-tile,#191d24)}.ds-command-icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}"
+      "css": ".ds-command-row{display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:10px;width:360px;min-height:58px;padding:0 10px;border:1px solid transparent;border-radius:6px;color:var(--color-text-primary,rgba(255,255,255,.92));background:transparent;text-align:left}.ds-command-row:hover,.ds-command-row:focus-visible{border-color:var(--color-accent,#f36a2d);background:var(--color-tile-hover,#202631);outline:none}.ds-command-row>span:nth-child(2){display:grid}.ds-command-row small{color:var(--color-text-muted,rgba(255,255,255,.4));font-size:11px}.ds-command-icon{display:grid;place-items:center;width:32px;height:32px;border:1px solid var(--color-border,rgba(255,255,255,.08));border-radius:6px;color:var(--color-accent,#f36a2d);background:var(--color-tile,#191d24)}.ds-command-icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}"
     },
     {
       "name": "Icon Control",
       "kind": "button",
       "description": "Header control that stays quiet until hover or active state.",
       "html": "<button class=\"ds-icon-control\" aria-label=\"Pin command\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 17v5M5 17h14M6 3h12l-1 7 3 3H4l3-3z\"/></svg></button>",
-      "css": ".ds-icon-control{display:grid;place-items:center;width:30px;height:30px;border:1px solid transparent;border-radius:8px;color:var(--color-text-secondary,rgba(255,255,255,.65));background:transparent}.ds-icon-control svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.ds-icon-control:hover,.ds-icon-control:focus-visible{border-color:var(--color-border,rgba(255,255,255,.08));color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-tile-hover,#202631);outline:none}.ds-icon-control:active{color:var(--color-accent,#f36a2d)}"
+      "css": ".ds-icon-control{display:grid;place-items:center;width:30px;height:30px;border:1px solid transparent;border-radius:6px;color:var(--color-text-secondary,rgba(255,255,255,.65));background:transparent}.ds-icon-control svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.ds-icon-control:hover,.ds-icon-control:focus-visible{border-color:var(--color-border,rgba(255,255,255,.08));color:var(--color-text-primary,rgba(255,255,255,.92));background:var(--color-tile-hover,#202631);outline:none}.ds-icon-control:active{color:var(--color-accent,#f36a2d)}"
     },
     {
       "name": "Alphabet Control",
@@ -123,11 +124,13 @@
     ],
     "dos": [
       "Do preserve complete keyboard operation and visible focus or selection.",
-      "Do preserve the custom SVG wordmark and mark, and use lucide-react SVG components for interface icons.",
+      "Do preserve the path-only custom SVG wordmark and mark, and use lucide-react SVG components for interface icons.",
+      "Do center launcher icons and one/two-line labels as one command unit.",
       "Do label demo content as unavailable prototype data."
     ],
     "donts": [
       "Don't use large glow, full-orange tiles, gradient text, or decorative glass.",
+      "Don't use SVG text or font-dependent rendering for the CLACKLY wordmark.",
       "Don't use radii above 16px or consumer-launcher whitespace.",
       "Don't let renderer UI know how Resolve actions are implemented."
     ]
