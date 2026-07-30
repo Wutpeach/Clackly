@@ -352,7 +352,8 @@ kbd {
   line-height: 1;
 }
 
-.command-tile kbd {
+.command-tile kbd,
+.all-actions-view .command-row kbd {
   width: 18px;
   min-width: 18px;
   padding: 0;
