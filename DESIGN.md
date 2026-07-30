@@ -64,6 +64,7 @@ rounded:
   window: "8px"
   control: "6px"
   tile: "2px"
+  rail: "3px"
   toolbar: "4px"
   icon: "6px"
   keycap: "4px"
@@ -166,7 +167,7 @@ The search field is `42px` high with an orange active border. Result rows are `5
 
 ### Alphabet Navigation
 
-The All Actions rail is `32px` wide. The selected letter uses orange text plus a short indicator line and must correspond to the visible command group.
+The All Actions field uses the same `#202327` background as the Launcher field and the outer Header row, preserving one continuous instrument body across modes. Its list remains scrollable while the native scrollbar stays hidden. A persistent `32px` `# / A–Z` alphabet rail occupies the far-right column inside a compact `3px` radius container using the same `#202327` fill, a faint full outline and black inset edge. The shared fill keeps it integrated while the edge treatment establishes the control boundary. The selected letter uses orange text plus a short indicator line and must correspond to the visible command group.
 
 ### Motion
 

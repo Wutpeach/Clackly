@@ -388,12 +388,7 @@ function App() {
       )}
 
       {mode === "all-actions" && (
-
         <section className="all-actions-view" aria-label="All actions">
-          <div className="all-actions-title">
-            <div><span>Command catalog</span><h1>All Actions</h1></div>
-            <span>{catalog.length} actions</span>
-          </div>
           <div className="all-actions-body">
             <div className="grouped-command-list" role="listbox" aria-label="All commands">
               {groupedCommands.map(([letter, commands]) => (
