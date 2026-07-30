@@ -538,6 +538,34 @@ kbd {
   background: var(--color-tile-hover);
 }
 
+.all-actions-view .command-row {
+  margin-bottom: 8px;
+  border-color: var(--color-tile-border-middle);
+  border-radius: var(--radius-tile);
+  background: linear-gradient(180deg, var(--color-tile-top) 0%, var(--color-tile-bottom) 100%);
+  box-shadow: inset 0 0 0 1px var(--color-tile-border-inner), 0 0 0 1px var(--color-tile-border-outer), 0 4px 10px rgba(0, 0, 0, 0.22);
+  transition: border-color var(--motion-fast), background var(--motion-fast), color var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.all-actions-view .command-row:hover {
+  background: var(--color-tile-hover);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07), 0 0 0 1px rgba(255, 255, 255, 0.16), 0 6px 14px rgba(0, 0, 0, 0.26);
+}
+
+.all-actions-view .command-row.selected {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-tile-border-inner), 0 0 0 1px var(--color-tile-border-outer), 0 4px 10px rgba(0, 0, 0, 0.24), 0 0 10px rgba(243, 106, 45, 0.08);
+}
+
+.all-actions-view .command-row:active {
+  background: #15191f;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035), inset 0 2px 4px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(255, 255, 255, 0.1), 0 2px 6px rgba(0, 0, 0, 0.24);
+}
+
+.all-actions-view .command-row[aria-disabled="true"] {
+  background: linear-gradient(180deg, var(--color-tile-disabled-top) 0%, var(--color-tile-disabled-bottom) 100%);
+}
+
 .command-icon {
   display: grid;
   place-items: center;
@@ -623,7 +651,6 @@ kbd {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 32px;
   min-height: 0;
-  border-top: 1px solid var(--color-border);
 }
 
 .grouped-command-list {
@@ -654,10 +681,10 @@ kbd {
   grid-template-rows: repeat(27, 1fr);
   min-height: 0;
   padding: 5px 0;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 0;
   border-radius: var(--radius-rail);
   background: var(--color-launcher);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
 }
 
 .alphabet-rail button {
