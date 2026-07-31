@@ -2,6 +2,12 @@
 
 Architecture-validation MVP for a DaVinci Resolve command palette. Electron owns the desktop UI, the command engine maps command intent to injected capabilities, and `resolve/` is the Resolve Adapter layer. Both the Workflow Integration path and Python fallback delegate project, timeline, timecode, frame-rate, drop-frame conversion, and marker operations to adapters in that directory.
 
+Four existing sources own UI metadata: Capability Metadata owns Feature identity and schema, Command Metadata owns Command presentation, Interaction Binding owns executable mouse triggers, and Config Schema owns field labels and validation. Renderer code projects these records and contains no Command-id presentation table, prototype catalog, or shortcut badge fixture.
+
+## Command Metadata
+
+Command manifests require `id`, `name`, `description`, `category`, `icon`, `keywords`, and `capability`. The Command Registry validates and defensively projects that fixed shape through list, search, and lookup. Launcher, Search, and All Actions use those registered records directly; the browser preview intentionally returns an empty catalog and renders the normal empty state.
+
 ## Interaction Binding
 
 Mouse input is routed separately from command and capability execution:
@@ -10,15 +16,13 @@ Mouse input is routed separately from command and capability execution:
 command card -> interaction binding -> Command ID -> command registry -> Capability ID -> capability -> execution adapter
 ```
 
-`interaction/BindingStorage.js` persists `appData/Clackly/bindings.json`. Each binding maps a target plus an exact left/right mouse-button and `CTRL`/`SHIFT`/`ALT` modifier set to `action.command`; it never stores a Capability ID. `interaction/trigger.js` is the shared validator/normalizer used by persisted bindings, renderer mouse events, and Command interaction help. A missing file receives the compatibility default that maps an unmodified left click on `timeline.addMarker` back to that Command. Keyboard Enter still executes the selected Command directly.
+`interaction/BindingStorage.js` persists `appData/Clackly/bindings.json`. Each binding maps a target plus an exact left/right mouse-button and `CTRL`/`SHIFT`/`ALT` modifier set to `action.command`; it never stores a Capability ID. `interaction/trigger.js` is the shared validator/normalizer used by persisted bindings and renderer mouse events. A missing file receives the compatibility default that maps an unmodified left click on `timeline.addMarker` back to that Command. Keyboard Enter still executes the selected Command directly.
 
 Interaction Binding does not implement double-clicks, wildcard modifiers, global shortcuts, key synthesis, or Resolve shortcut discovery/mutation. The existing palette hotkey and `ShortcutManager` remain separate systems.
 
 ## Interaction Help
 
-Commands may declare optional `interactionHelp` rows containing the same canonical mouse trigger plus a user-facing `label` and `description`. The Command Registry validates and returns this descriptive metadata; it remains separate from bindings and never resolves a Capability ID. Launcher, Search, and All Actions render declared rows in the existing hover/focus tooltip surface, while status, errors, and execution messages keep priority. Commands without help retain the existing generic or prototype hint.
-
-`timeline.addMarker` currently declares only the truthful unmodified `Click` operation. Right-click and modified-click help should be added only alongside real Commands and bindings. Double Click is not part of the trigger schema.
+`InteractionManager.listBindings()` exposes normalized defensive binding records through the same semantic preload API in both Electron hosts. One renderer projection selects bindings for the hovered/focused target Command, resolves each `action.command` against loaded Command Metadata, formats the generic trigger label (`Click`, `Shift + Right Click`, and so on), and uses the action Command description. Palette and Settings share this projection, so remapping a binding updates help without changing Command Metadata or renderer branches. Missing action metadata omits only that help row; empty bindings fall back to the target Command description.
 
 ## Capability Routing
 
@@ -34,13 +38,13 @@ Each capability keeps descriptive metadata separate from execution. The registry
 
 The Workflow Integration host injects `resolve/adapter.js` as the Workflow Plugin API backend. The standalone/Utility host injects `execution-adapter/bridge.js` as the Resolve Script API backend; it checks `/health` before sending the existing command-id request to the Python bridge and `resolve/adapter.py`.
 
-Capability metadata also owns a plain `configSchema`. `config/SchemaValidator.js` validates schema fields and values, `ConfigStorage` persists the shared Electron `appData/Clackly/config.json` document with atomic replacement, and `ConfigManager` reloads that shared document before reads and writes while exposing capability-scoped values. Before execution, the command engine blocks capabilities with missing required settings and passes configuration as the second argument: `execute(command, { config })`. Capabilities read only their own declared values through `config.get(key)`; they do not access the file or storage service directly. The Workflow Integration host still keeps its separate Electron `userData` path.
+Capability metadata also owns a plain `configSchema`. `config/SchemaValidator.js` validates schema fields and values, while `config/SchemaLabels.js` is the single explicit-label/key-fallback formatter used by `ConfigManager` and `FeatureCatalog`. FeatureCatalog returns cloned schemas with every `field.label` resolved, so Settings only renders labels. `ConfigStorage` persists the shared Electron `appData/Clackly/config.json` document with atomic replacement, and `ConfigManager` reloads that shared document before reads and writes while exposing capability-scoped values. Before execution, the command engine blocks capabilities with missing required settings and passes configuration as the second argument: `execute(command, { config })`. Capabilities read only their own declared values through `config.get(key)`; they do not access the file or storage service directly. The Workflow Integration host still keeps its separate Electron `userData` path.
 
 ## Feature UI Framework
 
 The Settings button opens a separate native-framed `760x560` window (minimum `640x480`) while Launcher, Search, and All Actions remain in the fixed `376x468` palette. `feature-ui/FeatureCatalog.js` projects full defensive metadata records from the existing Capability Registry, so registering a capability automatically adds it to the category-grouped Settings sidebar.
 
-The unified detail panel renders feature identity and schema from Capability Metadata, interaction help from associated Command Metadata, and all settings through the generic `SettingsRenderer`. String, number, boolean, color, path, folder, and select fields use native controls. Path/folder selection uses Electron dialogs, drafts remain local until Save, and Save/Reset cross preload IPC into `ConfigManager`; renderer code never reads config files or calls capabilities and Resolve APIs directly.
+The unified detail panel renders feature identity and resolved schema from Capability Metadata, binding-derived interaction help for associated Commands, and all settings through the generic `SettingsRenderer`. String, number, boolean, color, path, folder, and select fields use native controls. Path/folder selection uses Electron dialogs, drafts remain local until Save, and Save/Reset cross preload IPC into `ConfigManager`; renderer code never reads config files or calls capabilities and Resolve APIs directly.
 
 Feature Lifecycle adds three independent dimensions to that metadata-driven UI: `installed`, persisted `enabled`, and readiness `status`. Readiness is one of `ready`, `loading`, `missing-config`, `missing-dependency`, `unavailable`, or `error`. Every lifecycle record also contains the fixed structured contract `details: { missing: string[], action: "open-settings" | null }`; renderer code uses these fields for visibility, execution permission, warnings, and Settings recovery without parsing the user-facing `message`.
 
@@ -54,7 +58,7 @@ Command ID -> Capability ID -> enabled assertion -> configuration assertion -> C
 
 Capabilities may optionally expose a side-effect-free `checkAvailability()` returning `ready`, named `missing-dependency`, or `unavailable` data. Capabilities without a probe remain ready after configuration is complete. The marker probe reuses backend selection but never executes a marker action.
 
-`shortcut/shortcuts.json` currently maps `CREATE_FUSION_CLIP` to `CTRL+ALT+F` and `ADD_MARKER` to `CTRL+M`. `ShortcutManager` supports lookup, introspection, and an injected future keyboard executor. It does not bind shortcuts or perform keyboard/UI automation in this MVP. The `Ctrl+Space` palette hotkey remains separate Electron window behavior.
+`shortcut/shortcuts.json` currently maps `CREATE_FUSION_CLIP` to `CTRL+ALT+F` and `ADD_MARKER` to `CTRL+M`. `ShortcutManager` supports lookup, introspection, and an injected future keyboard executor. It does not bind shortcuts, expose shortcut presentation metadata, or perform keyboard/UI automation in this MVP. The palette therefore shows no Command shortcut badge. The `Ctrl+Space` palette hotkey remains separate Electron window behavior.
 
 ## Resolve Workflow Integration Plugin
 

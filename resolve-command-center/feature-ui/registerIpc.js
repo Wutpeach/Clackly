@@ -4,8 +4,10 @@ function registerFeatureUiIpc({
   featureCatalog,
   configManager,
   featureStatusManager,
+  interactionManager,
   openSettings
 }) {
+  ipcMain.handle("interactions:list", () => interactionManager.listBindings());
   ipcMain.handle("features:list", () => featureCatalog.getAllFeatures());
   ipcMain.handle("feature-status:list", () => featureStatusManager.list());
   ipcMain.handle("feature-status:refresh", (_event, featureId) => (

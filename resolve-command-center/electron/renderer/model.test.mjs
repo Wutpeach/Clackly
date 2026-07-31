@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  PROTOTYPE_COMMANDS,
   canExecuteCommand,
   canExecuteFeature,
   createPresentationCatalog,
@@ -10,7 +9,6 @@ import {
   getInteractionHelp,
   getRecoveryAction,
   getSettingsControl,
-  getSettingsFieldLabel,
   groupFeaturesByCategory,
   groupCommands,
   isFeatureVisible,
@@ -50,17 +48,16 @@ test("grouping sorts commands and collects non-letter initials under #", () => {
   assert.equal(grouped[1][1][0].name, "Alpha");
 });
 
-test("prototype entries stay unavailable when combined with real commands", () => {
-  const interactionHelp = [
-    { trigger: { type: "mouse", button: "left", modifiers: [] }, label: "Click", description: "Run command" }
-  ];
+test("presentation catalog preserves registered command metadata only", () => {
   const catalog = createPresentationCatalog([
     {
       id: "timeline.addMarker",
       capability: "marker.add",
       name: "Add Marker",
+      description: "Add marker at current frame",
+      category: "Timeline",
+      icon: "marker",
       keywords: ["marker"],
-      interactionHelp
     }
   ], [{
     id: "marker.add",
@@ -71,10 +68,12 @@ test("prototype entries stay unavailable when combined with real commands", () =
     details: { missing: [], action: null }
   }]);
 
+  assert.equal(catalog.length, 1);
   assert.equal(catalog[0].available, true);
-  assert.equal(catalog[0].interactionHelp, interactionHelp);
-  assert.ok(PROTOTYPE_COMMANDS.every((command) => command.available === false));
-  assert.ok(catalog.slice(1).every((command) => command.available === false));
+  assert.equal(catalog[0].description, "Add marker at current frame");
+  assert.equal(catalog[0].category, "Timeline");
+  assert.equal(catalog[0].icon, "marker");
+  assert.equal(Object.hasOwn(catalog[0], "shortcut"), false);
 });
 
 test("feature lifecycle projection drives visibility, execution, warning, and recovery", () => {
@@ -132,26 +131,54 @@ test("feature lifecycle projection drives visibility, execution, warning, and re
 });
 
 test("command hints prefer descriptions and fall back to command state", () => {
-  assert.equal(getCommandHint({ name: "Add Marker", available: true, shortcut: "M" }), "Add Marker — Shortcut M");
-  assert.equal(getCommandHint({ name: "Blade Cut", available: false }), "Blade Cut is prototype-only and cannot be executed.");
   assert.equal(getCommandHint({ name: "Add Marker", description: "Add a marker at the playhead." }), "Add a marker at the playhead.");
+  assert.equal(getCommandHint({ name: "Add Marker" }), "Add Marker");
 });
 
-test("interaction help projects declared rows defensively", () => {
-  const interactionHelp = [
-    { trigger: { type: "mouse", button: "right", modifiers: [] }, label: "Right Click", description: "Open options" },
-    { trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT", "ALT"] }, label: "Modified Click", description: "Run alternate action" }
+test("interaction help joins normalized bindings to action command descriptions", () => {
+  const target = { id: "timeline.addMarker", description: "Add marker at current frame" };
+  const commands = [
+    target,
+    { id: "timeline.openOptions", description: "Open marker options" },
+    { id: "timeline.addNote", description: "Add a marker note" }
   ];
-  const projected = getInteractionHelp({ interactionHelp });
+  const bindings = [
+    {
+      id: "left",
+      target: target.id,
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.addMarker" }
+    },
+    {
+      id: "right",
+      target: target.id,
+      trigger: { type: "mouse", button: "right", modifiers: ["SHIFT"] },
+      action: { command: "timeline.openOptions" }
+    },
+    {
+      id: "modified",
+      target: target.id,
+      trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT", "ALT"] },
+      action: { command: "timeline.addNote" }
+    },
+    {
+      id: "unresolved",
+      target: target.id,
+      trigger: { type: "mouse", button: "right", modifiers: [] },
+      action: { command: "missing.command" }
+    }
+  ];
+  const projected = getInteractionHelp(target, commands, bindings);
 
   assert.deepEqual(projected, [
-    { label: "Right Click", description: "Open options" },
-    { label: "Modified Click", description: "Run alternate action" }
+    { label: "Click", description: "Add marker at current frame" },
+    { label: "Shift + Right Click", description: "Open marker options" },
+    { label: "Ctrl + Shift + Alt + Click", description: "Add a marker note" }
   ]);
   projected[0].label = "Changed";
-  assert.equal(interactionHelp[0].label, "Right Click");
-  assert.deepEqual(getInteractionHelp({ interactionHelp: [null, { label: "", description: "Missing" }] }), []);
-  assert.deepEqual(getInteractionHelp({}), []);
+  assert.equal(bindings[0].trigger.button, "left");
+  assert.deepEqual(getInteractionHelp(target, commands, []), []);
+  assert.deepEqual(getInteractionHelp(target, commands, [{ ...bindings[0], target: "other" }]), []);
 });
 
 test("settings model maps all supported schema types to native controls", () => {
@@ -174,8 +201,6 @@ test("settings model maps all supported schema types to native controls", () => 
     { kind: "picker", inputType: "text", pickerType: "folder" },
     { kind: "select", options: ["first", "second"] }
   ]);
-  assert.equal(getSettingsFieldLabel("executablePath", fields.executablePath), "Executable Path");
-  assert.equal(getSettingsFieldLabel("output_folder", { ...fields.output_folder, label: "Output" }), "Output");
   assert.throws(() => getSettingsControl({ type: "secret" }), /Unsupported settings field type/);
 });
 

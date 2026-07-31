@@ -52,6 +52,22 @@ test("interaction manager exactly matches mouse bindings and delegates once", as
     }
   });
 
+  const listed = manager.listBindings();
+  assert.deepEqual(listed[0], {
+    id: "left",
+    target: "timeline.addMarker",
+    trigger: { type: "mouse", button: "left", modifiers: [] },
+    action: { command: "left.command" }
+  });
+  listed[0].trigger.modifiers.push("ALT");
+  listed[0].action.command = "changed";
+  assert.deepEqual(manager.listBindings()[0], {
+    id: "left",
+    target: "timeline.addMarker",
+    trigger: { type: "mouse", button: "left", modifiers: [] },
+    action: { command: "left.command" }
+  });
+
   assert.deepEqual(await manager.handle(mouse(0)), {
     matched: true,
     command: "left.command",

@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify Command Registry and Interaction Binding remain authoritative without changing executor, Capability, adapter, or Resolve behavior."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify all functional command presentation and help are metadata/binding driven and no renderer fixtures or label duplication remain."}
+{"file":".trellis/tasks/07-31-phase-5-6-metadata-cleanup/research/current-metadata-duplication.md","reason":"Check every identified duplication point is removed and each preserved boundary remains unchanged."}

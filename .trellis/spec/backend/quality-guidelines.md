@@ -17,7 +17,7 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 
 ### 2. Signatures
 
-- Command manifest: `{ id: string, name: string, keywords: string[], capability: string, interactionHelp?: InteractionHelp[] }`
+- Command manifest: `{ id: string, name: string, description: string, category: string, icon: string, keywords: string[], capability: string }`
 - Capability metadata: `{ id: string, name: string, description: string, category: string, icon: string, version: string, type: string, providers: string[], configSchema: object }`
 - Capability registry: `createCapabilityRegistry() -> { register(capabilityId, capability), get(capabilityId), getMetadata(capabilityId), getAllCapabilities() }`
 - Command executor: `createCommandExecutor({ capabilityRegistry, configManager, findCommand? }) -> executeCommand(commandId)`
@@ -29,6 +29,7 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 ### 3. Contracts
 
 - `command-engine/` validates and routes the `capability` string only. It must not import Resolve APIs, bridge transport, or keyboard implementations.
+- Command Registry requires non-empty `description`, `category`, and `icon`, returns only the fixed Command shape, and keeps search limited to id/name/keywords.
 - Each host creates a capability registry, registers its host-backed capability objects, and injects the registry into the command executor.
 - Registered capabilities keep descriptive data under `capability.metadata`; `register(capabilityId, capability)` and `get(capabilityId)` retain their existing execution-object behavior.
 - Every capability declares `metadata.configSchema`; use `{}` when it has no settings. Registry registration validates the schema before storing the capability.
@@ -43,6 +44,7 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 ### 4. Validation & Error Matrix
 
 - Unknown command id -> command executor throws `Unknown command`.
+- Missing/blank Command presentation fields -> Command Registry rejects the manifest before catalog or execution use.
 - Missing command capability handler -> command executor throws `No capability handler registered`.
 - Missing capability metadata, blank required string fields, invalid or sparse `providers`, or a metadata id that differs from the registry key -> registration throws `TypeError`.
 - Unknown capability metadata id -> `getMetadata()` returns `null`.
@@ -56,10 +58,12 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 ### 5. Good/Base/Bad Cases
 
 - Good: command metadata contains `"capability": "marker.add"`.
+- Good: a registered Command declares its own description/category/icon and appears correctly without renderer overrides.
 - Good: the marker capability exposes nested metadata and the registry projects only catalog fields for future UI consumers.
 - Base: Workflow Plugin injects only `workflowPluginApi`, so `marker.add` delegates to `resolve/adapter.js`.
 - Good: a dead standalone bridge reports unavailable before execution, allowing a future configured keyboard backend to be selected.
 - Bad: command metadata contains `"executor": "resolve"` or a keyboard shortcut string.
+- Bad: a Command manifest duplicates binding triggers or renderer code supplies presentation defaults by Command id.
 - Bad: Electron host registration duplicates marker metadata or computes provider availability for the catalog.
 - Bad: catch an `AddMarker` failure and then press `CTRL+M`; the first backend may already have performed a partial action.
 
@@ -73,6 +77,7 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - Assert catalog listing returns only `id`, `name`, `category`, and `icon`.
 - Assert missing, malformed, id-mismatched, and sparse-provider metadata cannot register.
 - Assert command registry preserves search while returning capability metadata.
+- Assert Command Registry requires presentation fields, defensively clones keywords, and omits unsupported help/executor fields.
 - Assert ShortcutManager mapping, no-executor behavior, and injected-executor request shape.
 - Assert bridge availability uses `/health` and marker execution preserves the existing command-id HTTP payload.
 
@@ -111,6 +116,7 @@ const executeCommand = createCommandExecutor({
 
 - Config field: `{ type: "string" | "number" | "boolean" | "color" | "path" | "folder" | "select", label?: string, required?: boolean, options?: string[] }`
 - Config schema: `Record<string, ConfigField>` stored at `capability.metadata.configSchema`.
+- Schema labels: `resolveSchemaFieldLabel(key, field) -> string` and `withResolvedSchemaLabels(schema) -> cloned schema`.
 - Storage: `new ConfigStorage(filePath)`, `ConfigStorage.fromAppData(appDataPath)`, `load()`, and `save(config)`.
 - Manager: `new ConfigManager({ capabilityRegistry, storage, validator? })` with `save(capabilityId, values, { requireComplete? })`, `get(capabilityId, key?)`, `update(capabilityId, patch)`, `reset(capabilityId)`, `assertConfigured(capabilityId)`, and `forCapability(capabilityId)`.
 - Executor context: `capability.execute(command, { config: configManager.forCapability(command.capability) })`.
@@ -120,6 +126,7 @@ const executeCommand = createCommandExecutor({
 - Both Electron hosts use `ConfigStorage.fromAppData(app.getPath("appData"))`, resolving to shared `appData/Clackly/config.json`; Workflow Integration keeps its separate `userData` root.
 - The stored JSON root maps capability ids to flat configuration objects. ConfigStorage is the only configuration filesystem owner.
 - ConfigManager resolves schemas through Capability Registry metadata, preserves unknown capability sections, returns copies, and reloads before reads and writes so long-running hosts observe sequential changes.
+- A non-empty explicit Schema `field.label` wins; otherwise the shared label utility formats camelCase and `.`, `_`, `-` separators. ConfigManager uses it for missing-required projections, and FeatureCatalog returns cloned schemas with resolved labels.
 - String-like types are strings, numbers are finite, booleans are booleans, and select values must match declared options. This layer does not inspect paths/folders or parse colors.
 - Settings IPC calls `save(..., { requireComplete: true })` so missing required fields fail before persistence; non-UI callers may still save partial drafts before `assertConfigured()` gates execution.
 - `reset(capabilityId)` reloads the shared document, removes only that capability section, preserves unrelated and unknown sections, persists the remainder, and returns `{}`.
@@ -141,6 +148,7 @@ const executeCommand = createCommandExecutor({
 - Good: capability metadata declares `configSchema`, future UI reads that metadata, and capability execution calls `context.config.get("aePath")`.
 - Base: `marker.add` declares `configSchema: {}` and executes exactly as before.
 - Good: both hosts share the config file but reload before operations, preserving sequential changes made by the other host.
+- Good: `output_folder` projects as `Output folder` in lifecycle messages and Settings without renderer formatting.
 - Bad: a capability imports `node:fs`, receives ConfigStorage, or reads another capability id.
 - Bad: ConfigManager keeps a startup snapshot of the shared document and later overwrites another host's settings.
 
@@ -152,6 +160,7 @@ const executeCommand = createCommandExecutor({
 - Assert two long-running managers observe sequential shared-file changes and preserve unrelated capability sections.
 - Assert executor blocks incomplete configuration before execution and otherwise passes the unchanged command plus scoped context.
 - Assert both host composition roots use the common appData path while Workflow Integration retains its userData override.
+- Assert explicit/fallback Schema labels and nested schema immutability in ConfigManager and FeatureCatalog projections.
 
 ### 7. Wrong vs Correct
 
@@ -418,15 +427,16 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 - Stored binding: `{ target: string, trigger: { type: "mouse", button: "left" | "right", modifiers: ("CTRL" | "SHIFT" | "ALT")[] }, action: { command: string } }`
 - Renderer/IPC event: `{ target: string, type: "mouse", button: number, ctrlKey: boolean, shiftKey: boolean, altKey: boolean }`
 - Storage: `BindingStorage.fromAppData(appDataPath)`, `load()`, and `save(bindings)`.
-- Manager: `new InteractionManager({ bindingStorage, executeCommand })` and `handle(event) -> Promise<{ matched: false } | { matched: true, command: string, result: unknown }>`.
+- Manager: `new InteractionManager({ bindingStorage, executeCommand })`, `listBindings() -> Array<{ id, target, trigger, action: { command } }>`, and `handle(event) -> Promise<{ matched: false } | { matched: true, command: string, result: unknown }>`.
 - Shared trigger helpers: `normalizeTrigger(trigger)`, `normalizeMouseEventTrigger(event)`, and `triggersEqual(left, right)`.
 
 ### 3. Contracts
 
 - Stored bindings map `target` plus an exact mouse `button` and normalized `CTRL`, `SHIFT`, `ALT` set to `action.command`.
-- Binding storage, renderer-event normalization, and Command interaction-help validation use the same shared canonical trigger module and modifier order.
+- Binding storage and renderer-event normalization use the same shared canonical trigger module and modifier order.
 - `BindingStorage` owns validation and `appData/Clackly/bindings.json`; it may compose `ConfigStorage` for atomic JSON persistence but must not store bindings in capability configuration.
 - `InteractionManager` accepts plain target/button/modifier facts, performs one exact match, and delegates only the matched Command ID to the injected command executor.
+- `listBindings()` returns normalized defensive records in BindingStorage order; both hosts expose the same read-only semantic IPC and no mutation IPC.
 - Command Registry remains the only Command ID -> Capability ID mapping owner. Interaction modules do not import command or capability registries.
 - Missing files receive the unmodified `timeline.addMarker` left-click compatibility binding once. An explicitly persisted empty object remains empty.
 - Unsupported mouse buttons return `{ matched: false }`; malformed events and bindings fail clearly; executor errors propagate unchanged.
@@ -453,6 +463,7 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 
 - Assert first-run creation, persistence, modifier normalization, duplicate normalized-trigger rejection, malformed binding rejection, and defensive results.
 - Assert exact left/right matching, individual and combined modifiers, extra-modifier non-match, unmatched behavior, one-call delegation, and unchanged executor errors.
+- Assert binding listing includes ids, preserves normalized order, and cannot mutate storage through returned nested objects.
 - Run the full Node suite and renderer build after host or IPC composition changes.
 
 ### 7. Wrong vs Correct
@@ -470,55 +481,62 @@ const result = await interactionManager.handle(event);
 // InteractionManager delegates only binding.action.command to executeCommand().
 ```
 
-## Scenario: Command Interaction Help
+## Scenario: Binding-Derived Interaction Help
 
 ### 1. Scope / Trigger
 
-- Trigger: adding descriptive mouse-operation guidance to Command metadata or returning Commands to a renderer.
+- Trigger: listing executable mouse bindings or projecting help for Command surfaces.
+- Interaction Binding remains the trigger owner; Command Metadata supplies only the action description.
 
 ### 2. Signatures
 
-- Interaction Help: `{ trigger: { type: "mouse", button: "left" | "right", modifiers: ("CTRL" | "SHIFT" | "ALT")[] }, label: string, description: string }`.
+- Binding list record: `{ id: string, target: string, trigger: CanonicalMouseTrigger, action: { command: string } }`.
+- Preload operation: `listInteractionBindings() -> Promise<BindingRecord[]>`.
+- Renderer projection: `getInteractionHelp(targetCommand, commands, bindings) -> Array<{ label: string, description: string }>`.
 
 ### 3. Contracts
 
-- `interactionHelp` is optional and normalizes to `[]`; each entry contains only `trigger`, `label`, and `description`.
-- Command Registry validates triggers through `interaction/trigger.js`, rejects duplicate normalized triggers, and returns fresh nested metadata from list, search, and lookup operations.
-- Interaction Help is Command-owned descriptive metadata. It does not store, infer, or resolve Capability IDs and does not alter execution or binding persistence.
-- The live marker Command advertises only its existing unmodified left-click operation. Double Click is not supported.
+- Command manifests contain no trigger/help rows. Command Registry validates required presentation strings and returns the fixed defensive Command shape.
+- `InteractionManager.listBindings()` is a read-only projection over `BindingStorage.load()` and preserves normalized storage order.
+- The renderer selects bindings by `binding.target === targetCommand.id`, resolves `binding.action.command` against loaded Command Metadata, and uses that action Command's `description`.
+- Trigger labels are generic: canonical modifiers render in `Ctrl`, `Shift`, `Alt` order followed by `Click` or `Right Click`.
+- Palette and Settings call the same pure projection. No layer infers a Capability ID or changes execution routing.
 
 ### 4. Validation & Error Matrix
 
-- Malformed help array/entry, blank label/description, unsupported button/modifier, duplicate modifier, or duplicate normalized trigger -> fail during Command loading.
-- Missing help -> return `interactionHelp: []` and preserve existing search/execution behavior.
+- Missing/malformed Command `description`, `category`, or `icon` -> fail during Command loading.
+- Missing action Command metadata -> omit that help row; execution retains its existing unknown-Command error.
+- Empty bindings or no bindings for the target -> return `[]`; UI uses the target Command description as the generic hint.
+- Malformed bindings remain BindingStorage errors and do not move validation into the renderer.
 
 ### 5. Good/Base/Bad Cases
 
-- Good: `interactionHelp` describes a Command card's actual bound operations using the same normalized trigger contract as BindingStorage.
-- Base: `timeline.addMarker` declares one unmodified left-click row with authored `Click` label and marker description.
-- Good: Commands without help normalize to `interactionHelp: []` and keep existing search/execution behavior.
-- Bad: generating labels from modifiers in the renderer, copying trigger validation into Command Registry, or storing a Capability ID in help metadata.
-- Bad: advertising a modified-click operation before its Command and binding exist.
+- Good: remapping a target binding to another registered Command changes the displayed description without editing renderer or target Command metadata.
+- Base: the default marker binding renders `Click` plus `Add marker at current frame`.
+- Good: `SHIFT` plus right click renders `Shift + Right Click` in the same order as normalized storage.
+- Bad: copying triggers into a Command manifest or adding a Command-id-specific help table.
+- Bad: returning BindingStorage or Command Registry objects through preload instead of plain records.
 
 ### 6. Tests Required
 
-- Assert Click, Right Click, individual/combined modifiers, malformed values, duplicate triggers, defensive results, and unchanged Command ID -> Capability ID mapping.
+- Assert left/right labels, canonical modifier order, remapped action Commands, empty bindings, unresolved action Commands, defensive listing, and unchanged Command ID -> Capability ID mapping.
+- Assert standalone and Workflow Integration compose the same `interactions:list` preload/IPC operation.
 
 ### 7. Wrong vs Correct
 
 #### Wrong
 
 ```javascript
-const help = command.capability === "marker.add"
-  ? [{ label: "Click", description: "Add marker" }]
+const help = command.id === "timeline.addMarker"
+  ? [{ label: "Click", description: command.description }]
   : [];
 ```
 
 #### Correct
 
 ```javascript
-const [{ label, description }] = command.interactionHelp;
-// The registry validated trigger/label/description from Command metadata.
+const help = getInteractionHelp(command, commands, bindings);
+// Bindings own triggers; action Command Metadata owns descriptions.
 ```
 
 ---

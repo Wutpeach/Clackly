@@ -20,6 +20,7 @@ function SettingsApp({ api, Icon }) {
   const [features, setFeatures] = useState([]);
   const [featureStatuses, setFeatureStatuses] = useState([]);
   const [commands, setCommands] = useState([]);
+  const [bindings, setBindings] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [savedValues, setSavedValues] = useState({});
   const [draftValues, setDraftValues] = useState({});
@@ -35,19 +36,25 @@ function SettingsApp({ api, Icon }) {
   const groupedFeatures = useMemo(() => groupFeaturesByCategory(visibleFeatures), [visibleFeatures]);
   const helpCommands = useMemo(() => commands
     .filter((command) => command.capability === selectedId)
-    .map((command) => ({ ...command, help: getInteractionHelp(command) }))
-    .filter((command) => command.help.length > 0), [commands, selectedId]);
+    .map((command) => ({ ...command, help: getInteractionHelp(command, commands, bindings) }))
+    .filter((command) => command.help.length > 0), [bindings, commands, selectedId]);
   const hasSchema = Boolean(selectedFeature && Object.keys(selectedFeature.configSchema).length);
   const hasSavedValues = Object.keys(savedValues).length > 0;
 
   useEffect(() => {
     document.title = "Clackly Settings";
     let active = true;
-    Promise.all([api.listFeatures(), api.listCommands(), api.listFeatureStatuses()])
-      .then(([nextFeatures, nextCommands, nextStatuses]) => {
+    Promise.all([
+      api.listFeatures(),
+      api.listCommands(),
+      api.listInteractionBindings(),
+      api.listFeatureStatuses()
+    ])
+      .then(([nextFeatures, nextCommands, nextBindings, nextStatuses]) => {
         if (!active) return;
         setFeatures(nextFeatures);
         setCommands(nextCommands);
+        setBindings(nextBindings);
         setFeatureStatuses(nextStatuses);
         setSelectedId((current) => nextFeatures.some(({ id }) => id === current)
           ? current

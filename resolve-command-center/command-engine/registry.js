@@ -1,6 +1,5 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { normalizeTrigger } = require("../interaction/trigger");
 
 const DEFAULT_COMMAND_DIR = path.join(__dirname, "commands");
 
@@ -32,74 +31,41 @@ function normalizeCommand(command, filePath) {
     throw new Error(`Invalid command entry in ${filePath}`);
   }
 
-  const { id, name, keywords = [], capability, interactionHelp = [] } = command;
-  if (typeof id !== "string" || id.length === 0) {
-    throw new Error(`Command in ${filePath} is missing a string id`);
+  const { id, name, description, category, icon, keywords = [], capability } = command;
+  if (typeof id !== "string" || id.trim().length === 0) {
+    throw new Error(`Command in ${filePath} is missing a non-empty string id`);
   }
 
-  if (typeof name !== "string" || name.length === 0) {
-    throw new Error(`Command ${id} in ${filePath} is missing a string name`);
+  for (const [field, value] of Object.entries({ name, description, category, icon, capability })) {
+    if (typeof value !== "string" || value.trim().length === 0) {
+      throw new Error(`Command ${id} in ${filePath} is missing a non-empty string ${field}`);
+    }
   }
 
   if (!Array.isArray(keywords) || keywords.some((keyword) => typeof keyword !== "string")) {
     throw new Error(`Command ${id} in ${filePath} must define string keywords`);
   }
 
-  if (typeof capability !== "string" || capability.length === 0) {
-    throw new Error(`Command ${id} in ${filePath} is missing a string capability`);
-  }
-
-  if (!Array.isArray(interactionHelp)) {
-    throw new TypeError(`Command ${id} in ${filePath} interactionHelp must be an array`);
-  }
-
-  const seenTriggers = new Set();
-  const normalizedHelp = interactionHelp.map((entry, index) => {
-    const label = `Command ${id} interactionHelp[${index}]`;
-    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
-      throw new TypeError(`${label} must be an object`);
-    }
-    const prototype = Object.getPrototypeOf(entry);
-    if (prototype !== Object.prototype && prototype !== null) {
-      throw new TypeError(`${label} must be a plain object`);
-    }
-    const keys = Object.keys(entry).sort();
-    if (keys.length !== 3 || keys[0] !== "description" || keys[1] !== "label" || keys[2] !== "trigger") {
-      throw new TypeError(`${label} must contain only trigger, label, description`);
-    }
-    if (typeof entry.label !== "string" || entry.label.trim().length === 0) {
-      throw new TypeError(`${label} label must be a non-empty string`);
-    }
-    if (typeof entry.description !== "string" || entry.description.trim().length === 0) {
-      throw new TypeError(`${label} description must be a non-empty string`);
-    }
-
-    const trigger = normalizeTrigger(entry.trigger, `${label} trigger`);
-    const signature = JSON.stringify(trigger);
-    if (seenTriggers.has(signature)) {
-      throw new TypeError(`Command ${id} has duplicate interactionHelp trigger`);
-    }
-    seenTriggers.add(signature);
-    return { trigger, label: entry.label, description: entry.description };
-  });
-
   return {
     id,
     name,
+    description,
+    category,
+    icon,
     keywords: [...keywords],
-    capability,
-    interactionHelp: normalizedHelp
+    capability
   };
 }
 
 function cloneCommand(command) {
   return {
-    ...command,
+    id: command.id,
+    name: command.name,
+    description: command.description,
+    category: command.category,
+    icon: command.icon,
     keywords: [...command.keywords],
-    interactionHelp: command.interactionHelp.map((entry) => ({
-      ...entry,
-      trigger: { ...entry.trigger, modifiers: [...entry.trigger.modifiers] }
-    }))
+    capability: command.capability
   };
 }
 

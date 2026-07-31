@@ -38,18 +38,10 @@ import {
   rankCommands
 } from "./model.mjs";
 
-const PREVIEW_COMMANDS = [
-  {
-    id: "timeline.addMarker",
-    name: "Add Marker",
-    keywords: ["marker", "mark", "timeline", "red"],
-    capability: "marker.add"
-  }
-];
-
 const browserPreview = !window.resolveCommandCenter;
 const api = window.resolveCommandCenter || {
-  listCommands: async () => PREVIEW_COMMANDS,
+  listCommands: async () => [],
+  listInteractionBindings: async () => [],
   executeCommand: async () => {
     throw new Error("Live preview only — open Clackly in Electron to execute commands.");
   },
@@ -57,22 +49,8 @@ const api = window.resolveCommandCenter || {
     throw new Error("Live preview only — open Clackly in Electron to execute commands.");
   },
   listFeatures: async () => [],
-  listFeatureStatuses: async () => [{
-    id: "marker.add",
-    installed: true,
-    enabled: true,
-    status: "ready",
-    message: null,
-    details: { missing: [], action: null }
-  }],
-  refreshFeatureStatuses: async () => [{
-    id: "marker.add",
-    installed: true,
-    enabled: true,
-    status: "ready",
-    message: null,
-    details: { missing: [], action: null }
-  }],
+  listFeatureStatuses: async () => [],
+  refreshFeatureStatuses: async () => [],
   setFeatureEnabled: async (featureId, enabled) => ({
     id: featureId,
     installed: true,
@@ -96,8 +74,6 @@ const api = window.resolveCommandCenter || {
 };
 
 const ALPHABET = ["#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
-const INITIAL_PINNED = ["timeline.addMarker", "edit.bladeCut"];
-const INITIAL_RECENT = ["color.changeClipColor", "timeline.goToIn"];
 
 const ICONS = {
   marker: Bookmark,
@@ -124,7 +100,6 @@ function Icon({ name, size = 24 }) {
 }
 
 function getCommandAriaLabel(command) {
-  if (!command.available) return `${command.name}, prototype only, cannot be executed`;
   const warning = getFeatureWarning(command.featureStatus);
   return warning ? `${command.name}, ${warning.message}` : undefined;
 }
@@ -172,13 +147,11 @@ function CommandMeta({ command, pinned }) {
         <span className="command-name">{command.name}</span>
         <span className="command-detail">
           {command.category}
-          {!command.available && <span className="prototype-label">Prototype</span>}
-          {command.available && !canExecuteCommand(command) && (
-            <span className="prototype-label">{getFeatureWarning(command.featureStatus)?.kind}</span>
+          {!canExecuteCommand(command) && (
+            <span className="status-label">{getFeatureWarning(command.featureStatus)?.kind}</span>
           )}
         </span>
       </span>
-      {command.shortcut && <kbd>{command.shortcut}</kbd>}
     </>
   );
 }
@@ -188,13 +161,15 @@ function PaletteApp() {
   const searchRef = useRef(null);
   const [mode, setMode] = useState("launcher");
   const [catalog, setCatalog] = useState(() => createPresentationCatalog([]));
+  const [commands, setCommands] = useState([]);
+  const [bindings, setBindings] = useState([]);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [status, setStatus] = useState("");
   const [hintedCommand, setHintedCommand] = useState(null);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [pinnedIds, setPinnedIds] = useState(() => new Set(INITIAL_PINNED));
-  const [recentIds, setRecentIds] = useState(() => new Set(INITIAL_RECENT));
+  const [pinnedIds, setPinnedIds] = useState(() => new Set());
+  const [recentIds, setRecentIds] = useState(() => new Set());
 
   const launcherCommands = useMemo(
     () => rankCommands(catalog, "", pinnedIds, recentIds).slice(0, 9),
@@ -216,7 +191,9 @@ function PaletteApp() {
       : launcherCommands;
   const selectedCommand = activeCommands[selectedIndex] || null;
   const currentLetter = selectedCommand ? getCommandGroup(selectedCommand) : groupedCommands[0]?.[0] || "A";
-  const interactionHelp = canExecuteCommand(hintedCommand) ? getInteractionHelp(hintedCommand) : [];
+  const interactionHelp = canExecuteCommand(hintedCommand)
+    ? getInteractionHelp(hintedCommand, commands, bindings)
+    : [];
   const commandHint = interactionHelp.length ? "" : getCommandHint(hintedCommand);
   const activeHintId = (interactionHelp.length || commandHint) && !status && !isExecuting ? hintedCommand.id : null;
   const message = status || (isExecuting ? "Running command…" : commandHint);
@@ -225,13 +202,18 @@ function PaletteApp() {
     let mounted = true;
     const refreshCatalog = async () => {
       try {
-        const [commands, cachedStatuses] = await Promise.all([
+        const [nextCommands, nextBindings, cachedStatuses] = await Promise.all([
           api.listCommands(),
+          api.listInteractionBindings(),
           api.listFeatureStatuses()
         ]);
-        if (mounted) setCatalog(createPresentationCatalog(commands, cachedStatuses));
+        if (mounted) {
+          setCommands(nextCommands);
+          setBindings(nextBindings);
+          setCatalog(createPresentationCatalog(nextCommands, cachedStatuses));
+        }
         const featureStatuses = await api.refreshFeatureStatuses();
-        if (mounted) setCatalog(createPresentationCatalog(commands, featureStatuses));
+        if (mounted) setCatalog(createPresentationCatalog(nextCommands, featureStatuses));
       } catch (error) {
         if (mounted) setStatus(error.message);
       }
@@ -424,7 +406,8 @@ function PaletteApp() {
 
       {mode === "launcher" && (
         <section className="launcher-view" aria-label="Launcher">
-          <div className="launcher-grid" role="listbox" aria-label="Pinned and recent commands">
+          {launcherCommands.length > 0 ? (
+          <div className="launcher-grid" role="listbox" aria-label="Commands">
             {launcherCommands.map((command, index) => (
               <button
                 key={command.id}
@@ -457,6 +440,12 @@ function PaletteApp() {
               </button>
             ))}
           </div>
+          ) : (
+            <div className="empty-state">
+              <strong>No actions registered</strong>
+              <span>Registered command metadata will appear here automatically.</span>
+            </div>
+          )}
         </section>
       )}
 
@@ -505,7 +494,7 @@ function PaletteApp() {
             {searchCommands.length === 0 && (
               <div className="empty-state">
                 <strong>No matching actions</strong>
-                <span>Try a command, page, or editing verb.</span>
+                <span>Try another command name or editing verb.</span>
               </div>
             )}
           </div>
@@ -551,6 +540,12 @@ function PaletteApp() {
                   })}
                 </section>
               ))}
+              {groupedCommands.length === 0 && (
+                <div className="empty-state">
+                  <strong>No actions registered</strong>
+                  <span>Registered command metadata will appear here automatically.</span>
+                </div>
+              )}
             </div>
             <nav className="alphabet-rail" aria-label="Command groups">
               {ALPHABET.map((letter) => {

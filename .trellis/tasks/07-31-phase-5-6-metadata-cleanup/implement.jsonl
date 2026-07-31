@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Preserve Command/Capability execution contracts while replacing Command-owned trigger help with Binding-derived help and shared Schema labels."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Remove prototype and command-id presentation branches while keeping lifecycle gating, accessibility, Settings, and Electron window behavior intact."}
+{"file":".trellis/tasks/07-31-phase-5-6-metadata-cleanup/research/current-metadata-duplication.md","reason":"Implement against the verified duplicate sources and explicit no-change execution boundaries from the Phase 5 architecture review."}

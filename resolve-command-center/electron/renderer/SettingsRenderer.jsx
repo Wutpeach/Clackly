@@ -1,5 +1,5 @@
 import React from "react";
-import { getSettingsControl, getSettingsFieldLabel } from "./model.mjs";
+import { getSettingsControl } from "./model.mjs";
 
 function SettingsRenderer({ schema, values, onChange, onPick, disabled = false }) {
   const fields = Object.entries(schema);
@@ -16,7 +16,6 @@ function SettingsRenderer({ schema, values, onChange, onPick, disabled = false }
     <div className="settings-fields">
       {fields.map(([key, field]) => {
         const control = getSettingsControl(field);
-        const label = getSettingsFieldLabel(key, field);
         const inputId = `setting-${key}`;
         const value = values[key];
 
@@ -31,14 +30,14 @@ function SettingsRenderer({ schema, values, onChange, onPick, disabled = false }
                 disabled={disabled}
                 onChange={(event) => onChange(key, event.target.checked)}
               />
-              <label htmlFor={inputId}>{label}{field.required ? " *" : ""}</label>
+              <label htmlFor={inputId}>{field.label}{field.required ? " *" : ""}</label>
             </div>
           );
         }
 
         return (
           <div className="settings-field" key={key}>
-            <label htmlFor={inputId}>{label}{field.required ? " *" : ""}</label>
+            <label htmlFor={inputId}>{field.label}{field.required ? " *" : ""}</label>
             {control.kind === "select" ? (
               <select
                 id={inputId}

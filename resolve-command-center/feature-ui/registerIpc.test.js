@@ -40,9 +40,15 @@ test("feature UI IPC exposes semantic catalog, config, picker, and settings oper
       },
       reset: () => ({})
     },
+    interactionManager: {
+      listBindings: () => [{ id: "left", target: "timeline.addMarker" }]
+    },
     openSettings: (id) => { opened = true; openedFeature = id; }
   });
 
+  assert.deepEqual(await handlers.get("interactions:list")(), [
+    { id: "left", target: "timeline.addMarker" }
+  ]);
   assert.deepEqual(await handlers.get("features:list")(), [{ id: "marker.add" }]);
   assert.deepEqual(await handlers.get("feature-status:list")(), [
     { id: "marker.add", status: "loading" }

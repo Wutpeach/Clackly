@@ -155,15 +155,15 @@ A compact `48px` header row uses the same `#202327` field background as the Laun
 
 ### Command Tiles
 
-Square `113px` targets in a three-column CSS Grid with `9px` gaps that visually match the matrix's outer inset. Default tiles use a `#24262C` to `#21242A` vertical gradient, sitting slightly above the Launcher field rather than dropping into a darker layer, with three concentric edge layers: subtle white inset, black middle border and gray outer outline. Hover brightens the edge and increases physical separation by `1px`; selected tiles replace only the black middle border with orange. Launcher position keycaps `1–9` sit at the top-left and the pinned indicator sits at the top-right. Prototype commands remain visibly subdued and accessibly unavailable without an extra `DEMO` label. Icons are optically centered at `32px`; one- and two-line labels use HarmonyOS Sans at `450` weight to keep the dense grid visually light.
+Square `113px` targets in a three-column CSS Grid with `9px` gaps that visually match the matrix's outer inset. Default tiles use a `#24262C` to `#21242A` vertical gradient, sitting slightly above the Launcher field rather than dropping into a darker layer, with three concentric edge layers: subtle white inset, black middle border and gray outer outline. Hover brightens the edge and increases physical separation by `1px`; selected tiles replace only the black middle border with orange. Launcher position keycaps `1–9` sit at the top-left and the pinned indicator sits at the top-right. Only registered Commands render; an empty registry uses the normal empty state. Icons are optically centered at `32px`; one- and two-line labels use HarmonyOS Sans at `450` weight to keep the dense grid visually light.
 
 ### Launcher Toolbar
 
-The `44px` footer row shares the Launcher's `#202327` field background and contains a centered `38px` instrument strip with `6px` breathing room below it. Its width is calculated from the same tokens as the Launcher grid: three tile widths plus two grid gaps, so its left and right edges align exactly with the card matrix. The strip starts at the top of the footer row so the gap from the final card row mirrors the first card row's distance from the Launcher field edge. The strip itself uses the near-field reference surface `rgba(24,26,30,0.72)`, remaining only modestly darker than the Launcher field, with a faint `rgba(255,255,255,0.05)` border, compact `4px` radius and soft suspended shadow. A theme-orange Lucide Grip button opens All Actions. The search prompt is centered within its remaining zone at `12px` in muted text, while the shortcut remains right-aligned. A short inset divider separates the two zones without touching the toolbar edges. Decorative branding and dedicated Favorites or History controls do not occupy the toolbar.
+The `44px` footer row shares the Launcher's `#202327` field background and contains a centered `38px` instrument strip with `6px` breathing room below it. Its width is calculated from the same tokens as the Launcher grid: three tile widths plus two grid gaps, so its left and right edges align exactly with the card matrix. The strip starts at the top of the footer row so the gap from the final card row mirrors the first card row's distance from the Launcher field edge. The strip itself uses the near-field reference surface `rgba(24,26,30,0.72)`, remaining only modestly darker than the Launcher field, with a faint `rgba(255,255,255,0.05)` border, compact `4px` radius and soft suspended shadow. A theme-orange Lucide Grip button opens All Actions, and the search prompt is centered within its remaining zone at `12px` in muted text. A short inset divider separates the two zones without touching the toolbar edges. Decorative branding and dedicated Favorites or History controls do not occupy the toolbar.
 
 ### Search
 
-The search field is `42px` high with an orange active border. Result rows are `54–60px` high and expose icon, name, category, shortcut and availability/pinned status without weakening the command name hierarchy.
+The search field is `42px` high with an orange active border. Result rows are `54–60px` high and expose registered icon, name, category, lifecycle status and pinned state without weakening the command name hierarchy.
 
 ### Alphabet Navigation
 
@@ -181,7 +181,7 @@ Window entry lasts `120–160ms`, fading from transparent and scaling from `.98`
 - **Do** use CSS variables for every confirmed color and reusable measurement.
 - **Do** preserve the path-only custom SVG wordmark and mark, and use `lucide-react` SVG components for interface icons.
 - **Do** keep launcher icons and one/two-line command labels optically centered as one command unit.
-- **Do** keep prototype commands visually subdued and programmatically unavailable without adding a `DEMO` badge.
+- **Do** render only registered Command metadata and use the truthful empty state when none is available.
 
 ### Don't:
 

@@ -21,18 +21,20 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
   - `window.resolveCommandCenter.listCommands() -> Promise<Command[]>`
   - `window.resolveCommandCenter.searchCommands(query: string) -> Promise<Command[]>`
   - `window.resolveCommandCenter.executeCommand(commandId: string) -> Promise<object>`
+  - `window.resolveCommandCenter.listInteractionBindings() -> Promise<BindingRecord[]>`
   - `window.resolveCommandCenter.hidePalette() -> void`
   - `window.resolveCommandCenter.setPaletteMode(mode: "launcher" | "search" | "all-actions") -> void`
   - `window.resolveCommandCenter.onPaletteShown(callback: () -> void) -> () -> void`
 - Command shape:
-  - `{ id: string, name: string, keywords: string[], capability: string, interactionHelp: InteractionHelp[] }`
+  - `{ id: string, name: string, description: string, category: string, icon: string, keywords: string[], capability: string }`
 
 ### 3. Contracts
 
 - Renderer search uses command metadata only: `id`, `name`, and `keywords`.
+- Launcher, Search, All Actions, ranking, icons, accessibility names, and generic hints preserve registered Command Metadata; renderer code contains no Command-id presentation override.
 - Renderer execution sends only the selected `commandId`.
-- Renderer presentation may project Command-owned `interactionHelp` for display, but must not infer help from Command IDs, bindings, or Capability metadata.
-- Prototype-only presentation commands remain outside the command registry, announce that they cannot execute, and are rejected in the renderer before IPC.
+- Renderer presentation contains registered Commands only. Browser preview returns an empty catalog, and pinned/recent state starts empty.
+- Command shortcut badges are absent until an authoritative presentation contract exists.
 - Renderer resizing sends a semantic palette mode, never arbitrary width/height values. Both standalone Electron and Workflow Integration route `palette:set-mode` through the shared window helper.
 - Launcher, Search, and All Actions all use the fixed `376x468` window footprint; mode changes replace content without occupying more of the Resolve workspace.
 - Electron hosts delegate command execution to the command engine, which resolves intent through an injected capability registry. External Electron registers a bridge-backed capability; Workflow Plugin registers a Resolve-backed capability. Renderer code still sends only command ids through preload IPC.
@@ -47,7 +49,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Unknown command id -> command engine rejects with a user-facing error.
 - Missing capability handler -> command engine rejects with a user-facing error.
 - Unknown palette mode -> shared window helper refuses the resize; the renderer cannot supply dimensions directly.
-- Prototype-only command -> renderer shows an unavailable message and does not invoke `executeCommand`.
+- Empty registered catalog -> Launcher and All Actions render truthful empty states; browser preview does not inject fixtures.
 - Bridge failure -> renderer keeps the palette open, shows the error, and refocuses search.
 - Successful command -> Electron hides the palette.
 - Global shortcut registration failure -> main process logs a warning.
@@ -58,15 +60,15 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Good: Adding command intent metadata and registering its capability in each supported host.
 - Base: `marker` query matches `timeline.addMarker` via registry search.
 - Good: Switching to All Actions sends `"all-actions"` while the host keeps the window at `376x468`.
-- Good: Presentation fixtures are visibly and accessibly unavailable but can still demonstrate ranking and grouping.
+- Good: registering a Command with declared description/category/icon makes it appear correctly without renderer edits.
 - Bad: UI code checks `if (query === "marker")` or invokes Resolve APIs directly.
-- Bad: Searching category labels, registering demo commands as capabilities, or sending `{ width, height }` from the renderer.
+- Bad: searching category labels, adding prototype fixtures, or sending `{ width, height }` from the renderer.
 
 ### 6. Tests Required
 
 - Assert query matching returns expected command ids for names and keywords.
 - Assert presentation category text alone does not match a command.
-- Assert prototype entries remain unavailable and cannot reach execution IPC.
+- Assert registered Command presentation is preserved, the empty catalog stays empty, and no shortcut/prototype entries are synthesized.
 - Assert every accepted palette mode maps to `376x468` and standalone/Workflow hosts register the same semantic IPC channel.
 - Assert renderer uses preload APIs instead of direct Node or Resolve imports.
 - Assert `npm run build` succeeds and file-backed Electron startup has a built renderer target.
@@ -102,19 +104,19 @@ window.resolveCommandCenter.setPaletteMode("all-actions");
 ### 2. Signatures
 
 - `new FeatureCatalog({ capabilityRegistry }).getAllFeatures() -> CapabilityMetadata[]`.
-- Preload APIs: `listFeatures()`, `getConfig(capabilityId)`, `saveConfig(capabilityId, values)`, `resetConfig(capabilityId)`, `pickPath("path" | "folder")`, and `openSettings()`.
+- Preload APIs: `listFeatures()`, `listInteractionBindings()`, `getConfig(capabilityId)`, `saveConfig(capabilityId, values)`, `resetConfig(capabilityId)`, `pickPath("path" | "folder")`, and `openSettings()`.
 - `SettingsRenderer({ schema, values, onChange, onPick, disabled })`.
 
 ### 3. Contracts
 
 - One registered Capability is one feature; there is no second feature manifest, registry, feature-id branch, or feature-specific page.
-- Feature identity and schema come from Capability Metadata. Interaction Help remains Command-owned and is associated only through `command.capability === feature.id`.
+- Feature identity and schema come from Capability Metadata. Help targets Commands through `command.capability === feature.id` and derives rows from normalized bindings plus action Command descriptions.
 - Standalone Electron and Workflow Integration register the same feature/config/picker channels through the shared IPC helper.
 - Settings is one native-framed, resizable `760x560` window with a `640x480` minimum. Repeated opens reuse and focus it; it does not hide on blur or become always-on-top.
 - Launcher, Search, and All Actions remain in the frameless fixed `376x468` palette.
 - The existing renderer bundle selects Settings through a main-process-owned `?view=settings` marker. Renderer code never sends dimensions.
 - Draft values remain local until Save. Save and Reset route through ConfigManager; path and folder fields route through Electron native dialogs.
-- SettingsRenderer maps only the seven validated schema types to native controls and derives missing labels generically from field keys.
+- FeatureCatalog clones schemas with resolved labels from the shared backend utility. SettingsRenderer maps only the seven validated schema types to native controls and renders `field.label` without fallback formatting.
 
 ### 4. Validation & Error Matrix
 
@@ -128,7 +130,7 @@ window.resolveCommandCenter.setPaletteMode("all-actions");
 ### 5. Good/Base/Bad Cases
 
 - Good: registering a new Capability with metadata and a schema makes it appear in the shared Settings window without renderer edits.
-- Base: `marker.add` appears under Timeline, renders its metadata and Interaction Help, and truthfully shows that no settings are required.
+- Base: `marker.add` appears under Timeline, renders its metadata and binding-derived Interaction Help, and truthfully shows that no settings are required.
 - Good: both Electron hosts call the shared IPC registrar and shared Settings window helper while retaining their own Capability providers.
 - Bad: adding a renderer branch such as `if (feature.id === "marker.add")`, a feature-specific BrowserWindow, or a second renderer bundle.
 - Bad: reading `config.json`, importing ConfigStorage, resolving a Capability implementation, or calling Resolve APIs from renderer code.
@@ -136,7 +138,7 @@ window.resolveCommandCenter.setPaletteMode("all-actions");
 ### 6. Tests Required
 
 - Assert catalog ordering, full defensive metadata, exact category filtering, and discovery after registration.
-- Assert all seven schema types map to their native controls and feature category grouping preserves registry order.
+- Assert all seven schema types map to their native controls, resolved explicit/fallback labels are immutable, and feature category grouping preserves registry order.
 - Assert feature/config/picker IPC semantics, picker cancellation, ConfigManager reset preservation, and complete-save validation.
 - Assert palette dimensions remain `376x468`, Settings dimensions remain main-process-owned, and an existing Settings window is restored/focused instead of duplicated.
 - Run `npm test`, `npm run build`, and boundary searches for renderer Capability/Resolve/storage coupling.
@@ -182,7 +184,7 @@ return <SettingsRenderer schema={feature.configSchema} values={draft} />;
 - Settings shows one generic Enable/Disable control, status details, and a compact non-ready/disabled sidebar indicator with hover and focus description.
 - Save, Reset, and Enable/Disable refresh lifecycle without replacing unsaved draft configuration.
 - `open-settings` focuses/reuses the native Settings singleton and selects the affected Feature through a semantic main-process event.
-- Launcher, Search, and All Actions intercept non-ready activation generically. Prototype commands keep their existing unavailable behavior.
+- Launcher, Search, and All Actions intercept non-ready activation generically; no unregistered presentation fixtures enter lifecycle projection.
 - Direct keyboard execution still sends Command id; mouse Interaction Binding still sends target and mouse facts. Command Engine remains the final stale-state gate.
 - Lifecycle refresh is explicit on load/show and after mutations; no renderer polling or Capability-specific JSX is added.
 - Render cached lifecycle snapshots, including initial `loading`, before awaiting explicit refresh so the UI never temporarily assumes readiness.
@@ -195,7 +197,7 @@ return <SettingsRenderer schema={feature.configSchema} values={draft} />;
 - Loading -> temporarily unavailable with progress text.
 - Unknown/uninstalled Feature -> hidden from Settings.
 - Missing lifecycle record for a functional Command -> hidden and non-executable.
-- Prototype command -> prototype message and no lifecycle recovery routing.
+- Unregistered Command -> absent from catalog and lifecycle projection.
 - Lifecycle IPC failure -> existing status/error surface remains visible and palette stays open.
 
 ### 5. Good/Base/Bad Cases
@@ -208,7 +210,7 @@ return <SettingsRenderer schema={feature.configSchema} values={draft} />;
 
 ### 6. Tests Required
 
-- Pure model tests cover joins, visibility, execution, warnings, recovery, missing-status fail-closed behavior, and prototype precedence.
+- Pure model tests cover joins, visibility, execution, warnings, recovery, and missing-status fail-closed behavior.
 - IPC tests cover list/refresh/set-enabled and targeted Settings selection.
 - Build and boundary searches prove no renderer Capability/provider/config/message parsing or command-specific lifecycle branch.
 - Manually verify ready, loading, disabled, missing config/dependency, unavailable, error, focus tooltip, and Settings recovery states when fixtures exist.
@@ -244,6 +246,7 @@ if (!canExecuteCommand(command)) {
 ### 2. Signatures
 
 - Preload API: `window.resolveCommandCenter.executeInteraction(event) -> Promise<InteractionResult>`.
+- Read-only preload API: `window.resolveCommandCenter.listInteractionBindings() -> Promise<BindingRecord[]>`.
 - Event: `{ target: command.id, type: "mouse", button: event.button, ctrlKey: boolean, shiftKey: boolean, altKey: boolean }`.
 - Result: `{ matched: false }` or `{ matched: true, command: string, result: unknown }`.
 
@@ -253,10 +256,10 @@ if (!canExecuteCommand(command)) {
 - Left click and suppressed context-menu events share the same interaction route. Cards contain no Command-selection table or Capability ID mapping.
 - Keyboard Enter and keyboard-generated button activation keep the direct `executeCommand(command.id)` route.
 - Successful matched mouse execution is hidden by the host; unmatched interactions execute nothing and leave the palette available.
-- Browser preview keeps its local execution-unavailable behavior and does not emulate persisted bindings.
+- Browser preview returns empty Commands and bindings and renders the normal empty catalog state.
 - Double-click handlers and global-shortcut behavior are outside renderer interaction binding.
 - Hover and keyboard focus use the same existing `aria-describedby` tooltip relationship in Launcher, Search, and All Actions.
-- Status, error, and executing messages replace interaction help until cleared; Commands without declared help retain the generic/prototype hint.
+- Status, error, and executing messages replace interaction help until cleared; Commands without target bindings retain their metadata description.
 
 ### 4. Validation & Error Matrix
 
@@ -264,8 +267,8 @@ if (!canExecuteCommand(command)) {
 - No binding -> renderer clears the executing state and leaves the palette open.
 - Interaction/executor error -> renderer displays the error and restores focus using the existing command error path.
 - Keyboard Enter or keyboard-generated button click (`event.detail === 0`) -> execute the selected Command directly; do not route it through mouse bindings.
-- Prototype-only command -> do not invoke either execution IPC method.
-- Declared functional-command help -> render compact label/description rows in the existing bottom overlay without resizing the `376x468` palette.
+- Empty or unresolved binding help -> omit the row and retain the target Command description.
+- Binding-derived functional-command help -> render compact label/description rows in the existing bottom overlay without resizing the `376x468` palette.
 
 ### 5. Good/Base/Bad Cases
 
@@ -279,7 +282,7 @@ if (!canExecuteCommand(command)) {
 
 - Run Interaction unit tests, `npm test`, and `npm run build`.
 - Search renderer/preload interaction routing for Capability mapping, double-click handlers, and shortcut-manager coupling.
-- Assert the renderer model defensively projects declared help rows and preserves generic/prototype fallbacks.
+- Assert the renderer model joins target bindings to remapped action Command descriptions, preserves normalized left/right/modifier order, and handles empty/unresolved bindings.
 
 ### 7. Wrong vs Correct
 
@@ -317,7 +320,7 @@ onContextMenu={(event) => executeInteraction(command, event)}
 
 - Keep renderer access behind `preload.js` with `contextIsolation: true`.
 - Route command execution through command capability metadata and a host-injected capability registry.
-- Keep prototype presentation data unavailable and outside executable manifests.
+- Keep Command presentation Registry-only; do not add prototype catalogs, browser fixtures, or Command-id overrides.
 - Keep palette sizing in the shared Electron window helper and expose only semantic mode changes through preload.
 - Use Lucide for functional controls/command icons and project SVGs for the Clackly identity.
 - Draw the CLACKLY wordmark with project-owned SVG paths/shapes and keep its accessible name on the consuming `<img>`.
@@ -390,6 +393,6 @@ return { exitCode: 0, stdout: JSON.stringify({ continue: true }) };
 - Command ids live in command manifests or bridge handler tables, not renderer conditionals.
 - Command manifests describe `capability`, not a Resolve or keyboard execution backend.
 - All palette modes remain `376x468`; both Electron hosts share `palette:set-mode` behavior.
-- Prototype commands include accessible unavailable messaging and never call execution IPC.
+- Browser preview and empty registries render the normal empty catalog state without fixtures.
 - Functional icons come from Lucide while `clackly-logo.svg` and `clackly-mark.svg` remain custom assets.
 - `npm run dev` and built `npm start` behavior remain distinct.

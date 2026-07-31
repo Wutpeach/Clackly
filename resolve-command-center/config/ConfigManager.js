@@ -1,4 +1,5 @@
 const { SchemaValidator } = require("./SchemaValidator");
+const { resolveSchemaFieldLabel } = require("./SchemaLabels");
 
 function isPlainObject(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -129,10 +130,7 @@ class ConfigManager {
     this.validator.validateValues(schema, values);
     return this.validator.getMissingRequired(schema, values).map((key) => ({
       key,
-      label: schema[key].label || key
-        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-        .replace(/[._-]+/g, " ")
-        .replace(/^./, (character) => character.toUpperCase())
+      label: resolveSchemaFieldLabel(key, schema[key])
     }));
   }
 

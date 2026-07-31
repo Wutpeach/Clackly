@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("resolveCommandCenter", {
   searchCommands: (query) => ipcRenderer.invoke("commands:search", query),
   executeCommand: (commandId) => ipcRenderer.invoke("commands:execute", commandId),
   executeInteraction: (event) => ipcRenderer.invoke("interactions:execute", event),
+  listInteractionBindings: () => ipcRenderer.invoke("interactions:list"),
   listFeatures: () => ipcRenderer.invoke("features:list"),
   listFeatureStatuses: () => ipcRenderer.invoke("feature-status:list"),
   refreshFeatureStatuses: (featureId) => ipcRenderer.invoke("feature-status:refresh", featureId),

@@ -1,86 +1,3 @@
-export const PROTOTYPE_COMMANDS = [
-  {
-    id: "timeline.addFlag",
-    name: "Add Flag",
-    keywords: ["flag", "clip", "timeline"],
-    category: "Timeline",
-    shortcut: "G",
-    icon: "flag",
-    available: false
-  },
-  {
-    id: "edit.bladeCut",
-    name: "Blade Cut",
-    keywords: ["blade", "cut", "split", "edit"],
-    category: "Edit",
-    shortcut: "B",
-    icon: "blade",
-    available: false
-  },
-  {
-    id: "color.changeClipColor",
-    name: "Change Clip Color",
-    keywords: ["clip", "color", "label"],
-    category: "Color",
-    shortcut: "C",
-    icon: "palette",
-    available: false
-  },
-  {
-    id: "gallery.exportStill",
-    name: "Export Still",
-    keywords: ["export", "still", "gallery", "frame"],
-    category: "Gallery",
-    shortcut: "E",
-    icon: "export",
-    available: false
-  },
-  {
-    id: "project.findTimeline",
-    name: "Find Timeline",
-    keywords: ["find", "search", "timeline"],
-    category: "Project",
-    shortcut: "/",
-    icon: "search",
-    available: false
-  },
-  {
-    id: "timeline.goToIn",
-    name: "Go to In Point",
-    keywords: ["go", "in", "point", "timeline"],
-    category: "Timeline",
-    shortcut: "I",
-    icon: "in-point",
-    available: false
-  },
-  {
-    id: "audio.normalize",
-    name: "Normalize Audio",
-    keywords: ["audio", "normalize", "level"],
-    category: "Audio",
-    shortcut: "N",
-    icon: "waveform",
-    available: false
-  },
-  {
-    id: "effects.openLibrary",
-    name: "Open Effects",
-    keywords: ["open", "effects", "library", "fx"],
-    category: "Effects",
-    shortcut: "F",
-    icon: "spark",
-    available: false
-  }
-];
-
-const REAL_COMMAND_PRESENTATION = {
-  "timeline.addMarker": {
-    category: "Timeline",
-    shortcut: "M",
-    icon: "marker"
-  }
-};
-
 export function joinFeatureStatuses(items, statuses) {
   const byId = new Map((statuses || []).map((status) => [status.id, status]));
   return items.map((item) => ({
@@ -119,38 +36,41 @@ export function canExecuteCommand(command) {
 }
 
 export function createPresentationCatalog(realCommands, statuses = []) {
-  const joinedCommands = joinFeatureStatuses(realCommands, statuses)
-    .filter((command) => isFeatureVisible(command.featureStatus));
-  const real = joinedCommands.map((command) => ({
+  return joinFeatureStatuses(realCommands, statuses)
+    .filter((command) => isFeatureVisible(command.featureStatus))
+    .map((command) => ({
     ...command,
-    category: "Command",
-    shortcut: "",
-    icon: "command",
-    available: true,
-    ...REAL_COMMAND_PRESENTATION[command.id]
+    available: true
   }));
-
-  return [...real, ...PROTOTYPE_COMMANDS];
 }
 
 export function getCommandHint(command) {
   if (!command) return "";
   const lifecycleWarning = command.featureStatus && getFeatureWarning(command.featureStatus);
   if (lifecycleWarning) return lifecycleWarning.message;
-  if (command.description) return command.description;
-  if (!command.available) return `${command.name} is prototype-only and cannot be executed.`;
-  return command.shortcut ? `${command.name} — Shortcut ${command.shortcut}` : command.name;
+  return command.description || command.name || "";
 }
 
-export function getInteractionHelp(command) {
-  if (!Array.isArray(command?.interactionHelp)) return [];
-  return command.interactionHelp
-    .filter((entry) => entry
-      && typeof entry.label === "string"
-      && entry.label.trim()
-      && typeof entry.description === "string"
-      && entry.description.trim())
-    .map(({ label, description }) => ({ label, description }));
+export function getInteractionHelp(targetCommand, commands, bindings) {
+  if (!targetCommand || !Array.isArray(commands) || !Array.isArray(bindings)) return [];
+  const commandsById = new Map(commands.map((command) => [command.id, command]));
+
+  return bindings.flatMap((binding) => {
+    if (binding.target !== targetCommand.id) return [];
+    const actionCommand = commandsById.get(binding.action?.command);
+    if (!actionCommand) return [];
+
+    const button = binding.trigger?.button === "right" ? "Right Click" : "Click";
+    const modifiers = (binding.trigger?.modifiers || []).map((modifier) => ({
+      CTRL: "Ctrl",
+      SHIFT: "Shift",
+      ALT: "Alt"
+    })[modifier] || modifier);
+    return [{
+      label: [...modifiers, button].join(" + "),
+      description: actionCommand.description
+    }];
+  });
 }
 
 function matches(command, query) {
@@ -209,15 +129,6 @@ export function groupCommands(commands) {
     if (right === "#") return 1;
     return left.localeCompare(right);
   });
-}
-
-export function getSettingsFieldLabel(key, field = {}) {
-  if (typeof field.label === "string" && field.label.trim()) return field.label;
-  const words = key
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[._-]+/g, " ")
-    .trim();
-  return words ? words.charAt(0).toUpperCase() + words.slice(1) : key;
 }
 
 export function getSettingsControl(field) {

@@ -26,6 +26,15 @@ class InteractionManager {
     this.executeCommand = executeCommand;
   }
 
+  listBindings() {
+    return Object.entries(this.bindingStorage.load()).map(([id, binding]) => ({
+      id,
+      target: binding.target,
+      trigger: { ...binding.trigger, modifiers: [...binding.trigger.modifiers] },
+      action: { command: binding.action.command }
+    }));
+  }
+
   async handle(event) {
     const interaction = normalizeEvent(event);
     if (!interaction.trigger.button) {

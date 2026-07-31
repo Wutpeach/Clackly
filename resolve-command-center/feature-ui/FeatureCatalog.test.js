@@ -24,7 +24,9 @@ function capability(id, category, configSchema = {}) {
 test("feature catalog returns ordered defensive copies of full capability metadata", () => {
   const registry = createCapabilityRegistry();
   registry.register("first", capability("first", "Timeline", {
-    color: { type: "color", label: "Color" }
+    markerColor: { type: "color", label: "Color" },
+    output_folder: { type: "folder" },
+    mode: { type: "select", options: ["first", "second"] }
   }));
   registry.register("second", capability("second", "Edit"));
   registry.register("third", capability("third", "Timeline"));
@@ -33,12 +35,18 @@ test("feature catalog returns ordered defensive copies of full capability metada
   const features = catalog.getAllFeatures();
   assert.deepEqual(features.map(({ id }) => id), ["first", "second", "third"]);
   assert.equal(features[0].description, "first description");
-  assert.deepEqual(features[0].configSchema, { color: { type: "color", label: "Color" } });
+  assert.deepEqual(features[0].configSchema, {
+    markerColor: { type: "color", label: "Color" },
+    output_folder: { type: "folder", label: "Output folder" },
+    mode: { type: "select", options: ["first", "second"], label: "Mode" }
+  });
 
   features[0].name = "Changed";
-  features[0].configSchema.color.label = "Changed";
+  features[0].configSchema.markerColor.label = "Changed";
+  features[0].configSchema.mode.options.push("changed");
   assert.equal(catalog.getAllFeatures()[0].name, "first");
-  assert.equal(catalog.getAllFeatures()[0].configSchema.color.label, "Color");
+  assert.equal(catalog.getAllFeatures()[0].configSchema.markerColor.label, "Color");
+  assert.deepEqual(catalog.getAllFeatures()[0].configSchema.mode.options, ["first", "second"]);
 });
 
 test("feature catalog filters exact categories and discovers later registrations", () => {

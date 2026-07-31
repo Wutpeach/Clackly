@@ -597,7 +597,7 @@ kbd {
   white-space: nowrap;
 }
 
-.prototype-label {
+.status-label {
   color: var(--color-accent);
 }
 

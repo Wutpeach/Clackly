@@ -203,6 +203,7 @@ function registerIpcHandlers() {
     featureCatalog,
     configManager,
     featureStatusManager,
+    interactionManager,
     openSettings
   });
 }

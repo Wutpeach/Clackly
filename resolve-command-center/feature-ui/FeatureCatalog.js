@@ -1,3 +1,5 @@
+const { withResolvedSchemaLabels } = require("../config/SchemaLabels");
+
 class FeatureCatalog {
   constructor({ capabilityRegistry } = {}) {
     if (!capabilityRegistry
@@ -10,9 +12,11 @@ class FeatureCatalog {
   }
 
   getAllFeatures() {
-    return this.capabilityRegistry.getAllCapabilities().map(({ id }) => (
-      structuredClone(this.capabilityRegistry.getMetadata(id))
-    ));
+    return this.capabilityRegistry.getAllCapabilities().map(({ id }) => {
+      const feature = structuredClone(this.capabilityRegistry.getMetadata(id));
+      feature.configSchema = withResolvedSchemaLabels(feature.configSchema);
+      return feature;
+    });
   }
 
   getByCategory(category) {
