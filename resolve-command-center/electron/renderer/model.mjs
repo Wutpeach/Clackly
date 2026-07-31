@@ -94,6 +94,13 @@ export function createPresentationCatalog(realCommands) {
   return [...real, ...PROTOTYPE_COMMANDS];
 }
 
+export function getCommandHint(command) {
+  if (!command) return "";
+  if (command.description) return command.description;
+  if (!command.available) return `${command.name} is prototype-only and cannot be executed.`;
+  return command.shortcut ? `${command.name} — Shortcut ${command.shortcut}` : command.name;
+}
+
 function matches(command, query) {
   const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (tokens.length === 0) {

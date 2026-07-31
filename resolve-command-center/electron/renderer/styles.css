@@ -22,6 +22,7 @@
   --color-tile-border-middle: rgba(0, 0, 0, 0.88);
   --color-tile-border-outer: rgba(255, 255, 255, 0.12);
   --color-toolbar: rgba(24, 26, 30, 0.72);
+  --color-tooltip: #2c3036;
   --color-accent: #f36a2d;
   --color-accent-hover: #ff7a3d;
   --color-accent-soft: rgba(243, 106, 45, 0.15);
@@ -695,29 +696,27 @@ kbd {
 
 .status-message {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
-  left: 12px;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 5;
-  min-height: 34px;
-  padding: 8px 10px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 10px 12px;
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-tile);
   color: var(--color-text-secondary);
-  background: var(--color-panel);
-  box-shadow: 0 8px 22px var(--color-shadow);
+  background: var(--color-tooltip);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.32);
   font-size: 12px;
   line-height: 1.35;
   text-overflow: ellipsis;
 }
 
-.palette-shell[data-mode="launcher"] .status-message {
-  bottom: 52px;
-}
-
 .status-message.error {
-  border-color: var(--color-accent);
   color: var(--color-text-primary);
 }
 

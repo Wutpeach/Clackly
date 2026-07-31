@@ -25,6 +25,7 @@ import {
 import logoUrl from "./assets/clackly-logo.svg";
 import {
   createPresentationCatalog,
+  getCommandHint,
   getCommandGroup,
   groupCommands,
   rankCommands
@@ -142,6 +143,7 @@ function App() {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [status, setStatus] = useState("");
+  const [hintedCommand, setHintedCommand] = useState(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [pinnedIds, setPinnedIds] = useState(() => new Set(INITIAL_PINNED));
   const [recentIds, setRecentIds] = useState(() => new Set(INITIAL_RECENT));
@@ -166,6 +168,9 @@ function App() {
       : launcherCommands;
   const selectedCommand = activeCommands[selectedIndex] || null;
   const currentLetter = selectedCommand ? getCommandGroup(selectedCommand) : groupedCommands[0]?.[0] || "A";
+  const commandHint = getCommandHint(hintedCommand);
+  const activeHintId = commandHint && !status && !isExecuting ? hintedCommand.id : null;
+  const message = status || (isExecuting ? "Running command…" : commandHint);
 
   useEffect(() => {
     let mounted = true;
@@ -182,6 +187,7 @@ function App() {
       setQuery("");
       setSelectedIndex(0);
       setStatus("");
+      setHintedCommand(null);
       setIsExecuting(false);
       requestAnimationFrame(() => shellRef.current?.focus());
     });
@@ -196,6 +202,7 @@ function App() {
     api.setPaletteMode?.(mode);
     setSelectedIndex(0);
     setStatus("");
+    setHintedCommand(null);
     requestAnimationFrame(() => {
       if (mode === "search") searchRef.current?.focus();
       else shellRef.current?.focus();
@@ -204,6 +211,7 @@ function App() {
 
   useEffect(() => {
     setSelectedIndex(0);
+    setHintedCommand(null);
   }, [query]);
 
   useEffect(() => {
@@ -238,10 +246,7 @@ function App() {
 
   async function executeCommand(command) {
     if (!command || isExecuting) return;
-    if (!command.available) {
-      setStatus(`${command.name} is prototype-only and cannot be executed.`);
-      return;
-    }
+    if (!command.available) return;
 
     setIsExecuting(true);
     setStatus("");
@@ -325,8 +330,17 @@ function App() {
                 aria-label={getCommandAriaLabel(command)}
                 aria-selected={index === selectedIndex}
                 aria-disabled={!command.available}
-                onMouseEnter={() => setSelectedIndex(index)}
-                onFocus={() => setSelectedIndex(index)}
+                aria-describedby={activeHintId === command.id ? "command-hint" : undefined}
+                onMouseEnter={() => {
+                  setSelectedIndex(index);
+                  setHintedCommand(command);
+                }}
+                onMouseLeave={() => setHintedCommand(null)}
+                onFocus={() => {
+                  setSelectedIndex(index);
+                  setHintedCommand(command);
+                }}
+                onBlur={() => setHintedCommand(null)}
                 onClick={() => executeCommand(command)}
               >
                 <span className="tile-topline">
@@ -366,8 +380,17 @@ function App() {
                 aria-label={getCommandAriaLabel(command)}
                 aria-selected={index === selectedIndex}
                 aria-disabled={!command.available}
-                onMouseEnter={() => setSelectedIndex(index)}
-                onFocus={() => setSelectedIndex(index)}
+                aria-describedby={activeHintId === command.id ? "command-hint" : undefined}
+                onMouseEnter={() => {
+                  setSelectedIndex(index);
+                  setHintedCommand(command);
+                }}
+                onMouseLeave={() => setHintedCommand(null)}
+                onFocus={() => {
+                  setSelectedIndex(index);
+                  setHintedCommand(command);
+                }}
+                onBlur={() => setHintedCommand(null)}
                 onClick={() => executeCommand(command)}
               >
                 <CommandMeta command={command} pinned={pinnedIds.has(command.id)} />
@@ -402,8 +425,17 @@ function App() {
                         aria-label={getCommandAriaLabel(command)}
                         aria-selected={index === selectedIndex}
                         aria-disabled={!command.available}
-                        onMouseEnter={() => setSelectedIndex(index)}
-                        onFocus={() => setSelectedIndex(index)}
+                        aria-describedby={activeHintId === command.id ? "command-hint" : undefined}
+                        onMouseEnter={() => {
+                          setSelectedIndex(index);
+                          setHintedCommand(command);
+                        }}
+                        onMouseLeave={() => setHintedCommand(null)}
+                        onFocus={() => {
+                          setSelectedIndex(index);
+                          setHintedCommand(command);
+                        }}
+                        onBlur={() => setHintedCommand(null)}
                         onClick={() => executeCommand(command)}
                       >
                         <CommandMeta command={command} pinned={pinnedIds.has(command.id)} />
@@ -455,9 +487,14 @@ function App() {
         </div>
       )}
 
-      {(status || isExecuting) && (
-        <div className={status ? "status-message error" : "status-message"} role="status" aria-live="polite">
-          {status || "Running command…"}
+      {message && (
+        <div
+          id={activeHintId ? "command-hint" : undefined}
+          className={status ? "status-message error" : "status-message"}
+          role={activeHintId ? "tooltip" : "status"}
+          aria-live={activeHintId ? undefined : "polite"}
+        >
+          {message}
         </div>
       )}
     </main>

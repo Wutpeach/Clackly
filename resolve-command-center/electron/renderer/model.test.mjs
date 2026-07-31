@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   PROTOTYPE_COMMANDS,
   createPresentationCatalog,
+  getCommandHint,
   groupCommands,
   rankCommands
 } from "./model.mjs";
@@ -47,4 +48,10 @@ test("prototype entries stay unavailable when combined with real commands", () =
   assert.equal(catalog[0].available, true);
   assert.ok(PROTOTYPE_COMMANDS.every((command) => command.available === false));
   assert.ok(catalog.slice(1).every((command) => command.available === false));
+});
+
+test("command hints prefer descriptions and fall back to command state", () => {
+  assert.equal(getCommandHint({ name: "Add Marker", available: true, shortcut: "M" }), "Add Marker — Shortcut M");
+  assert.equal(getCommandHint({ name: "Blade Cut", available: false }), "Blade Cut is prototype-only and cannot be executed.");
+  assert.equal(getCommandHint({ name: "Add Marker", description: "Add a marker at the playhead." }), "Add a marker at the playhead.");
 });
