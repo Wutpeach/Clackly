@@ -147,3 +147,24 @@ Polished the fixed-size launcher with layered tiles, centered icon and label com
 ### Status
 
 [OK] **Completed**
+
+
+## Session 7: Add capability metadata
+
+**Date**: 2026-07-31
+**Task**: Add capability metadata
+**Branch**: `main`
+
+### Summary
+
+Extended the internal Capability Registry with validated capability metadata lookup and UI-safe catalog summaries while preserving execution routing; added marker metadata, regression coverage, documentation, and backend specs.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a88fcf5` | (see git log) |
+
+### Status
+
+[OK] **Completed**
