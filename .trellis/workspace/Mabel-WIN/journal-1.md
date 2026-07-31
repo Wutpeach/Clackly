@@ -294,3 +294,24 @@ Removed renderer-owned prototypes and command presentation fixtures, made Comman
 ### Status
 
 [OK] **Completed**
+
+
+## Session 14: Phase 6 Script Runtime
+
+**Date**: 2026-07-31
+**Task**: Phase 6 Script Runtime
+**Branch**: `main`
+
+### Summary
+
+Added metadata-discovered Python script capabilities, runtime provider execution, five-field ScriptContext, tests, docs, and backend contracts.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4076abb` | (see git log) |
+
+### Status
+
+[OK] **Completed**
