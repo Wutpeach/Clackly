@@ -2,13 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   PROTOTYPE_COMMANDS,
+  canExecuteCommand,
+  canExecuteFeature,
   createPresentationCatalog,
   getCommandHint,
+  getFeatureWarning,
   getInteractionHelp,
+  getRecoveryAction,
   getSettingsControl,
   getSettingsFieldLabel,
   groupFeaturesByCategory,
   groupCommands,
+  isFeatureVisible,
+  joinFeatureStatuses,
   rankCommands
 } from "./model.mjs";
 
@@ -49,13 +55,80 @@ test("prototype entries stay unavailable when combined with real commands", () =
     { trigger: { type: "mouse", button: "left", modifiers: [] }, label: "Click", description: "Run command" }
   ];
   const catalog = createPresentationCatalog([
-    { id: "timeline.addMarker", name: "Add Marker", keywords: ["marker"], interactionHelp }
-  ]);
+    {
+      id: "timeline.addMarker",
+      capability: "marker.add",
+      name: "Add Marker",
+      keywords: ["marker"],
+      interactionHelp
+    }
+  ], [{
+    id: "marker.add",
+    installed: true,
+    enabled: true,
+    status: "ready",
+    message: null,
+    details: { missing: [], action: null }
+  }]);
 
   assert.equal(catalog[0].available, true);
   assert.equal(catalog[0].interactionHelp, interactionHelp);
   assert.ok(PROTOTYPE_COMMANDS.every((command) => command.available === false));
   assert.ok(catalog.slice(1).every((command) => command.available === false));
+});
+
+test("feature lifecycle projection drives visibility, execution, warning, and recovery", () => {
+  const ready = {
+    id: "marker.add",
+    installed: true,
+    enabled: true,
+    status: "ready",
+    message: null,
+    details: { missing: [], action: null }
+  };
+  const missing = {
+    ...ready,
+    status: "missing-config",
+    message: "Missing Resolve Path",
+    details: { missing: ["resolvePath"], action: "open-settings" }
+  };
+  const disabled = { ...ready, enabled: false };
+  const loading = { ...ready, status: "loading", message: "Checking feature availability…" };
+
+  assert.equal(isFeatureVisible(ready), true);
+  assert.equal(isFeatureVisible({ ...ready, installed: false }), false);
+  assert.equal(canExecuteFeature(ready), true);
+  assert.equal(canExecuteFeature(missing), false);
+  assert.equal(canExecuteFeature(disabled), false);
+  assert.equal(canExecuteFeature(loading), false);
+  assert.deepEqual(getFeatureWarning(missing), {
+    kind: "missing-config",
+    message: "Missing Resolve Path"
+  });
+  assert.deepEqual(getFeatureWarning(disabled), {
+    kind: "disabled",
+    message: "Feature is disabled."
+  });
+  assert.deepEqual(getFeatureWarning(loading), {
+    kind: "loading",
+    message: "Checking feature availability…"
+  });
+  assert.equal(getRecoveryAction(missing), "open-settings");
+  assert.equal(getRecoveryAction(ready), null);
+
+  const [command] = createPresentationCatalog([
+    { id: "timeline.addMarker", capability: "marker.add", name: "Add Marker", keywords: [] }
+  ], [missing]);
+  assert.equal(command.featureStatus, missing);
+  assert.equal(canExecuteCommand(command), false);
+  assert.equal(getCommandHint(command), "Missing Resolve Path");
+  assert.deepEqual(joinFeatureStatuses([{ id: "marker.add" }], [ready])[0].featureStatus, ready);
+
+  const withoutStatus = createPresentationCatalog([
+    { id: "timeline.addMarker", capability: "marker.add", name: "Add Marker", keywords: [] }
+  ]);
+  assert.equal(withoutStatus.some(({ id }) => id === "timeline.addMarker"), false);
+  assert.equal(canExecuteCommand({ available: true, featureStatus: null }), false);
 });
 
 test("command hints prefer descriptions and fall back to command state", () => {

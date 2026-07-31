@@ -171,6 +171,79 @@ await capability.execute(command, {
 });
 ```
 
+## Scenario: Feature Lifecycle Projection
+
+### 1. Scope / Trigger
+
+- Trigger: exposing installation, enablement, configuration readiness, dependency readiness, or provider availability to Feature UI.
+- Lifecycle is an advisory projection plus a synchronous execution gate; it does not replace Capability execution.
+
+### 2. Signatures
+
+- Lifecycle record: `{ id, installed, enabled, status, message, details: { missing, action } }`.
+- Status: `"ready" | "loading" | "missing-config" | "missing-dependency" | "unavailable" | "error"`.
+- Manager: `new FeatureStatusManager({ capabilityRegistry, configManager, stateStorage })` with `list()`, `get(id)`, `refresh(id?)`, `setEnabled(id, enabled)`, and `assertEnabled(id)`.
+- State storage: `FeatureStateStorage.fromAppData(appDataPath)`, `getEnabled(id)`, and `setEnabled(id, boolean)`.
+- Optional Capability probe: `checkAvailability() -> Promise<{ status, message, details }>` where probe status is only `ready`, `missing-dependency`, or `unavailable`.
+- Config projection: `ConfigManager.getMissingRequired(id) -> Array<{ key, label }>`.
+
+### 3. Contracts
+
+- Capability Registry remains the only Feature registry and owns `installed`; no lifecycle manifest duplicates metadata.
+- `installed`, persisted `enabled`, and readiness `status` are independent dimensions.
+- Every record always includes `details.missing` and `details.action`; `message` is presentation text, never a machine-readable branch source.
+- `FeatureStateStorage` composes the existing atomic JSON storage and writes only capability-scoped `{ enabled: boolean }` records to shared `appData/Clackly/feature-status.json`.
+- Missing enablement means enabled. Reads and writes reload the file and preserve unrelated feature sections.
+- Persisted feature entries contain exactly `{ enabled: boolean }`; reject derived or unknown fields instead of silently retaining them.
+- Refresh checks configuration before a probe. Missing required config returns schema keys, label-based text, and `open-settings` without probing.
+- A Capability without `checkAvailability()` is ready when configured. Probes must be side-effect free and cannot return manager-owned `loading` or `error`.
+- Unexpected storage/config/probe failures become a sanitized in-memory `error`; derived status is never persisted and can recover on refresh.
+- An error refresh preserves the last known `enabled` dimension instead of resetting a known disabled feature to the default.
+- Command execution remains Command ID -> Capability ID -> Capability. `assertEnabled()` runs before existing configuration and execution steps.
+
+### 4. Validation & Error Matrix
+
+- Unknown `get(id)` -> uninstalled record; normal `list()` -> registered capabilities only.
+- Unknown `setEnabled` / `assertEnabled` -> reject as unknown Feature.
+- Non-boolean enablement, malformed persisted enablement, or persisted keys other than `enabled` -> `TypeError`.
+- Missing required config -> `missing-config`, schema keys in `details.missing`, `open-settings` action.
+- Named non-empty dependency ids -> `missing-dependency`; missing ids for that status -> sanitized `error`.
+- No usable provider without a named dependency -> `unavailable`.
+- Malformed probe status/details/action/message or unexpected exception -> sanitized `error`, with no stack or raw error serialization.
+- Disabled command -> reject before configuration lookup and `capability.execute()`.
+
+### 5. Good/Base/Bad Cases
+
+- Good: `marker.add.checkAvailability()` calls `selectBackend()` and returns readiness without calling `addMarker()`.
+- Base: an older Capability with no probe is ready after its required configuration is complete.
+- Good: a disabled Feature can still report `missing-config`; readiness and enablement do not overwrite each other.
+- Bad: persisting `status`, `message`, `details`, execution errors, or probe results.
+- Bad: changing Command metadata or mapping a Command to a different Capability based on lifecycle status.
+
+### 6. Tests Required
+
+- Cover loading defaults, uninstalled lookup, defensive snapshots, enablement persistence/reloads, and unrelated section preservation.
+- Cover config-before-probe precedence, label projection, all readiness statuses, malformed probes, sanitized errors, recovery, and error refresh preserving known enablement.
+- Cover side-effect-free marker availability and disabled-before-config/execution ordering.
+- Verify both hosts use shared appData state while retaining host-specific providers.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+if (status.message.includes("Missing")) openSettings();
+await capability.execute(command);
+```
+
+#### Correct
+
+```javascript
+featureStatusManager.assertEnabled(command.capability);
+configManager.assertConfigured(command.capability);
+await capability.execute(command, { config: configManager.forCapability(command.capability) });
+```
+
 ## Scenario: Resolve Adapter Boundary
 
 ### 1. Scope / Trigger

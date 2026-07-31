@@ -160,6 +160,80 @@ return <SettingsRenderer schema={feature.configSchema} values={draft} />;
 
 ---
 
+## Scenario: Feature Lifecycle UI
+
+### 1. Scope / Trigger
+
+- Trigger: Feature Settings or command surfaces need lifecycle visibility, warnings, execution gating, or recovery navigation.
+- Applies to shared Feature UI IPC/preload, Settings, Launcher, Search, and All Actions.
+
+### 2. Signatures
+
+- Preload: `listFeatureStatuses()`, `refreshFeatureStatuses(featureId?)`, `setFeatureEnabled(featureId, enabled)`, `openSettings(featureId?)`, and `onSettingsFeatureSelected(callback)`.
+- Lifecycle record: `{ id, installed, enabled, status, message, details: { missing: string[], action: "open-settings" | null } }`.
+- Renderer projections: `joinFeatureStatuses`, `isFeatureVisible`, `canExecuteFeature`, `getFeatureWarning`, `getRecoveryAction`, and `canExecuteCommand`.
+
+### 3. Contracts
+
+- Renderer joins Commands and Feature metadata to lifecycle records only by existing Capability id; it never resolves Capability objects or provider implementations.
+- Feature visibility uses `installed`; execution requires installed + enabled + ready; warnings use enabled/status; recovery uses structured `details.action`.
+- A functional Command without a matching installed lifecycle record fails closed: do not display or execute it.
+- Renderer may display `message` but must not parse it or branch on its wording.
+- Settings shows one generic Enable/Disable control, status details, and a compact non-ready/disabled sidebar indicator with hover and focus description.
+- Save, Reset, and Enable/Disable refresh lifecycle without replacing unsaved draft configuration.
+- `open-settings` focuses/reuses the native Settings singleton and selects the affected Feature through a semantic main-process event.
+- Launcher, Search, and All Actions intercept non-ready activation generically. Prototype commands keep their existing unavailable behavior.
+- Direct keyboard execution still sends Command id; mouse Interaction Binding still sends target and mouse facts. Command Engine remains the final stale-state gate.
+- Lifecycle refresh is explicit on load/show and after mutations; no renderer polling or Capability-specific JSX is added.
+- Render cached lifecycle snapshots, including initial `loading`, before awaiting explicit refresh so the UI never temporarily assumes readiness.
+
+### 4. Validation & Error Matrix
+
+- Installed + enabled + ready -> existing command/interaction route.
+- Disabled or non-ready -> no execution IPC; show lifecycle warning.
+- `details.action === "open-settings"` -> reuse/focus Settings and select `command.capability`.
+- Loading -> temporarily unavailable with progress text.
+- Unknown/uninstalled Feature -> hidden from Settings.
+- Missing lifecycle record for a functional Command -> hidden and non-executable.
+- Prototype command -> prototype message and no lifecycle recovery routing.
+- Lifecycle IPC failure -> existing status/error surface remains visible and palette stays open.
+
+### 5. Good/Base/Bad Cases
+
+- Good: a new registered Capability automatically receives Settings status UI and palette gating without renderer edits.
+- Base: `marker.add` reports provider readiness through the generic record and remains associated through `command.capability`.
+- Good: sidebar tooltip is available on both hover and keyboard focus with `aria-describedby`.
+- Bad: `if (command.capability === "ae.export")`, provider checks, config-schema completeness logic, or `message.includes(...)` in renderer code.
+- Bad: a second Settings window, background polling, or renderer-owned status persistence.
+
+### 6. Tests Required
+
+- Pure model tests cover joins, visibility, execution, warnings, recovery, missing-status fail-closed behavior, and prototype precedence.
+- IPC tests cover list/refresh/set-enabled and targeted Settings selection.
+- Build and boundary searches prove no renderer Capability/provider/config/message parsing or command-specific lifecycle branch.
+- Manually verify ready, loading, disabled, missing config/dependency, unavailable, error, focus tooltip, and Settings recovery states when fixtures exist.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+if (status.message.startsWith("Missing")) {
+  openSettings(command.id);
+}
+```
+
+#### Correct
+
+```javascript
+if (!canExecuteCommand(command)) {
+  showWarning(getFeatureWarning(command.featureStatus));
+  if (getRecoveryAction(command.featureStatus) === "open-settings") {
+    api.openSettings(command.capability);
+  }
+}
+```
+
 ## Scenario: Command Card Mouse Interaction
 
 ### 1. Scope / Trigger

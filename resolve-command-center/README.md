@@ -42,6 +42,18 @@ The Settings button opens a separate native-framed `760x560` window (minimum `64
 
 The unified detail panel renders feature identity and schema from Capability Metadata, interaction help from associated Command Metadata, and all settings through the generic `SettingsRenderer`. String, number, boolean, color, path, folder, and select fields use native controls. Path/folder selection uses Electron dialogs, drafts remain local until Save, and Save/Reset cross preload IPC into `ConfigManager`; renderer code never reads config files or calls capabilities and Resolve APIs directly.
 
+Feature Lifecycle adds three independent dimensions to that metadata-driven UI: `installed`, persisted `enabled`, and readiness `status`. Readiness is one of `ready`, `loading`, `missing-config`, `missing-dependency`, `unavailable`, or `error`. Every lifecycle record also contains the fixed structured contract `details: { missing: string[], action: "open-settings" | null }`; renderer code uses these fields for visibility, execution permission, warnings, and Settings recovery without parsing the user-facing `message`.
+
+Only enablement overrides are persisted, in shared `appData/Clackly/feature-status.json`. Derived readiness, messages, errors, and recovery details remain in memory and are refreshed on renderer load and after Save, Reset, or Enable/Disable. Both Electron hosts share this file and the same Feature UI IPC, while retaining their different Capability providers.
+
+Command execution keeps the existing boundary and adds one gate:
+
+```text
+Command ID -> Capability ID -> enabled assertion -> configuration assertion -> Capability.execute()
+```
+
+Capabilities may optionally expose a side-effect-free `checkAvailability()` returning `ready`, named `missing-dependency`, or `unavailable` data. Capabilities without a probe remain ready after configuration is complete. The marker probe reuses backend selection but never executes a marker action.
+
 `shortcut/shortcuts.json` currently maps `CREATE_FUSION_CLIP` to `CTRL+ALT+F` and `ADD_MARKER` to `CTRL+M`. `ShortcutManager` supports lookup, introspection, and an injected future keyboard executor. It does not bind shortcuts or perform keyboard/UI automation in this MVP. The `Ctrl+Space` palette hotkey remains separate Electron window behavior.
 
 ## Resolve Workflow Integration Plugin

@@ -126,3 +126,22 @@ test("marker add reports a CapabilityUnavailableError when no backend can execut
     return true;
   });
 });
+
+test("marker availability reuses backend selection without executing an action", async () => {
+  let executed = false;
+  const available = createMarkerCapability({
+    resolveApi: { isAvailable: () => true, addMarker: () => { executed = true; } }
+  });
+  assert.deepEqual(await available.checkAvailability(), {
+    status: "ready",
+    message: null,
+    details: { missing: [], action: null }
+  });
+  assert.equal(executed, false);
+
+  assert.deepEqual(await createMarkerCapability().checkAvailability(), {
+    status: "unavailable",
+    message: "No marker provider is available.",
+    details: { missing: [], action: null }
+  });
+});

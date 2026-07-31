@@ -20,6 +20,8 @@ const { createResolveAdapter } = require("../resolve/adapter");
 const { ShortcutManager } = require("../shortcut/ShortcutManager");
 const { FeatureCatalog } = require("../feature-ui/FeatureCatalog");
 const { registerFeatureUiIpc } = require("../feature-ui/registerIpc");
+const { FeatureStateStorage } = require("../feature-status/FeatureStateStorage");
+const { FeatureStatusManager } = require("../feature-status/FeatureStatusManager");
 
 const PLUGIN_ID = "com.wutpeach.clackly";
 
@@ -120,9 +122,15 @@ const configManager = new ConfigManager({
   capabilityRegistry,
   storage: ConfigStorage.fromAppData(app.getPath("appData"))
 });
+const featureStatusManager = new FeatureStatusManager({
+  capabilityRegistry,
+  configManager,
+  stateStorage: FeatureStateStorage.fromAppData(app.getPath("appData"))
+});
 const executeCapabilityCommand = createCommandExecutor({
   capabilityRegistry,
-  configManager
+  configManager,
+  featureStatusManager
 });
 
 async function executeWorkflowCommand(commandId) {
@@ -152,9 +160,9 @@ function hidePalette() {
   hidePaletteWindow(paletteWindow);
 }
 
-function openSettings() {
+function openSettings(featureId) {
   const previousWindow = settingsWindow;
-  settingsWindow = openSettingsWindow(settingsWindow);
+  settingsWindow = openSettingsWindow(settingsWindow, featureId);
   if (settingsWindow !== previousWindow) {
     const openedWindow = settingsWindow;
     openedWindow.once("closed", () => {
@@ -194,6 +202,7 @@ function registerIpcHandlers() {
     dialog,
     featureCatalog,
     configManager,
+    featureStatusManager,
     openSettings
   });
 }

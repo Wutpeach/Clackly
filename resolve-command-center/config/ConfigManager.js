@@ -123,6 +123,19 @@ class ConfigManager {
     this.validator.validateValues(schema, values);
   }
 
+  getMissingRequired(capabilityId) {
+    const schema = this.getSchema(capabilityId);
+    const values = this.getCapabilityValues(capabilityId);
+    this.validator.validateValues(schema, values);
+    return this.validator.getMissingRequired(schema, values).map((key) => ({
+      key,
+      label: schema[key].label || key
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replace(/[._-]+/g, " ")
+        .replace(/^./, (character) => character.toUpperCase())
+    }));
+  }
+
   forCapability(capabilityId) {
     this.getSchema(capabilityId);
     return {

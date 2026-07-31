@@ -109,8 +109,14 @@ function createSettingsWindow(BrowserWindowType = BrowserWindow) {
   return window;
 }
 
-function openSettingsWindow(window) {
-  const settingsWindow = !window || window.isDestroyed() ? createSettingsWindow() : window;
+function openSettingsWindow(window, featureId) {
+  const created = !window || window.isDestroyed();
+  const settingsWindow = created ? createSettingsWindow() : window;
+  if (typeof featureId === "string" && featureId.trim()) {
+    const selectFeature = () => settingsWindow.webContents.send("settings:select-feature", featureId);
+    if (created) settingsWindow.once("ready-to-show", selectFeature);
+    else selectFeature();
+  }
   if (settingsWindow.isMinimized()) settingsWindow.restore();
   settingsWindow.show();
   settingsWindow.focus();

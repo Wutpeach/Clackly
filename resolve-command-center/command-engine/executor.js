@@ -3,6 +3,7 @@ const { getCommandById } = require("./registry");
 function createCommandExecutor({
   capabilityRegistry,
   configManager,
+  featureStatusManager,
   findCommand = getCommandById
 }) {
   if (!capabilityRegistry || typeof capabilityRegistry.get !== "function") {
@@ -29,6 +30,7 @@ function createCommandExecutor({
       throw new Error(`No capability handler registered for ${command.capability}`);
     }
 
+    featureStatusManager?.assertEnabled(command.capability);
     configManager.assertConfigured(command.capability);
     return capability.execute(command, {
       config: configManager.forCapability(command.capability)

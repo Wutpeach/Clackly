@@ -66,6 +66,19 @@ test("opening settings reuses, restores, shows, and focuses an existing window",
   assert.deepEqual(calls, ["restore", "show", "focus"]);
 });
 
+test("opening existing settings selects the requested feature", () => {
+  const messages = [];
+  const settings = {
+    isDestroyed: () => false,
+    isMinimized: () => false,
+    show() {},
+    focus() {},
+    webContents: { send: (...args) => messages.push(args) }
+  };
+  openSettingsWindow(settings, "ae.export");
+  assert.deepEqual(messages, [["settings:select-feature", "ae.export"]]);
+});
+
 test("settings window owns native sizing and built renderer routing without a blur listener", () => {
   withoutDevRenderer(() => {
     class FakeBrowserWindow {

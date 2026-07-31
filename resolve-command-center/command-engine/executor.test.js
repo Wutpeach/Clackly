@@ -19,6 +19,7 @@ test("command execution routes intent metadata through the capability registry",
     }
   };
   const configured = [];
+  const enabled = [];
   const executeCommand = createCommandExecutor({
     capabilityRegistry: {
       get: (capabilityId) => capabilityId === command.capability ? capability : null
@@ -30,12 +31,34 @@ test("command execution routes intent metadata through the capability registry",
         return scopedConfig;
       }
     },
+    featureStatusManager: { assertEnabled: (id) => enabled.push(id) },
     findCommand: (commandId) => commandId === command.id ? command : null
   });
 
   assert.deepEqual(await executeCommand(command.id), { ok: true });
   assert.deepEqual(configured, [command.capability]);
+  assert.deepEqual(enabled, [command.capability]);
   assert.deepEqual(received, [[command, { config: scopedConfig }]]);
+});
+
+test("command execution blocks disabled features before configuration and capability execution", async () => {
+  let configured = false;
+  let executed = false;
+  const executeCommand = createCommandExecutor({
+    capabilityRegistry: { get: () => ({ execute: () => { executed = true; } }) },
+    configManager: {
+      assertConfigured: () => { configured = true; },
+      forCapability: () => ({ get: () => null })
+    },
+    featureStatusManager: {
+      assertEnabled: () => { throw new Error("Feature is disabled: marker.add"); }
+    },
+    findCommand: () => ({ id: "timeline.addMarker", capability: "marker.add" })
+  });
+
+  await assert.rejects(executeCommand("timeline.addMarker"), /disabled: marker\.add/);
+  assert.equal(configured, false);
+  assert.equal(executed, false);
 });
 
 test("command execution reports unknown commands and missing capabilities", async () => {

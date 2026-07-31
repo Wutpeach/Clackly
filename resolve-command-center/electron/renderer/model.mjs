@@ -81,8 +81,47 @@ const REAL_COMMAND_PRESENTATION = {
   }
 };
 
-export function createPresentationCatalog(realCommands) {
-  const real = realCommands.map((command) => ({
+export function joinFeatureStatuses(items, statuses) {
+  const byId = new Map((statuses || []).map((status) => [status.id, status]));
+  return items.map((item) => ({
+    ...item,
+    featureStatus: byId.get(item.capability || item.id) || null
+  }));
+}
+
+export function isFeatureVisible(status) {
+  return Boolean(status?.installed);
+}
+
+export function canExecuteFeature(status) {
+  return Boolean(status?.installed && status.enabled && status.status === "ready");
+}
+
+export function getFeatureWarning(status) {
+  if (!status) return { kind: "loading", message: "Checking feature availability…" };
+  if (!status.enabled) return { kind: "disabled", message: "Feature is disabled." };
+  if (status.status === "ready") return null;
+  return {
+    kind: status.status,
+    message: status.message || (status.status === "loading"
+      ? "Checking feature availability…"
+      : "Feature is unavailable.")
+  };
+}
+
+export function getRecoveryAction(status) {
+  return status?.details?.action === "open-settings" ? "open-settings" : null;
+}
+
+export function canExecuteCommand(command) {
+  if (!command?.available) return false;
+  return canExecuteFeature(command.featureStatus);
+}
+
+export function createPresentationCatalog(realCommands, statuses = []) {
+  const joinedCommands = joinFeatureStatuses(realCommands, statuses)
+    .filter((command) => isFeatureVisible(command.featureStatus));
+  const real = joinedCommands.map((command) => ({
     ...command,
     category: "Command",
     shortcut: "",
@@ -96,6 +135,8 @@ export function createPresentationCatalog(realCommands) {
 
 export function getCommandHint(command) {
   if (!command) return "";
+  const lifecycleWarning = command.featureStatus && getFeatureWarning(command.featureStatus);
+  if (lifecycleWarning) return lifecycleWarning.message;
   if (command.description) return command.description;
   if (!command.available) return `${command.name} is prototype-only and cannot be executed.`;
   return command.shortcut ? `${command.name} — Shortcut ${command.shortcut}` : command.name;

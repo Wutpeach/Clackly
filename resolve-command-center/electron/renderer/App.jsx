@@ -13,6 +13,7 @@ import {
   Command as CommandIcon,
   Flag,
   Grip,
+  LoaderCircle,
   Palette,
   Pin,
   Scissors,
@@ -20,15 +21,19 @@ import {
   Settings,
   SkipBack,
   Sparkles,
+  TriangleAlert,
   Upload
 } from "lucide-react";
 import logoUrl from "./assets/clackly-logo.svg";
 import SettingsApp from "./SettingsApp.jsx";
 import {
+  canExecuteCommand,
   createPresentationCatalog,
   getCommandHint,
   getCommandGroup,
+  getFeatureWarning,
   getInteractionHelp,
+  getRecoveryAction,
   groupCommands,
   rankCommands
 } from "./model.mjs";
@@ -37,7 +42,8 @@ const PREVIEW_COMMANDS = [
   {
     id: "timeline.addMarker",
     name: "Add Marker",
-    keywords: ["marker", "mark", "timeline", "red"]
+    keywords: ["marker", "mark", "timeline", "red"],
+    capability: "marker.add"
   }
 ];
 
@@ -51,6 +57,30 @@ const api = window.resolveCommandCenter || {
     throw new Error("Live preview only — open Clackly in Electron to execute commands.");
   },
   listFeatures: async () => [],
+  listFeatureStatuses: async () => [{
+    id: "marker.add",
+    installed: true,
+    enabled: true,
+    status: "ready",
+    message: null,
+    details: { missing: [], action: null }
+  }],
+  refreshFeatureStatuses: async () => [{
+    id: "marker.add",
+    installed: true,
+    enabled: true,
+    status: "ready",
+    message: null,
+    details: { missing: [], action: null }
+  }],
+  setFeatureEnabled: async (featureId, enabled) => ({
+    id: featureId,
+    installed: true,
+    enabled,
+    status: "ready",
+    message: null,
+    details: { missing: [], action: null }
+  }),
   getConfig: async () => ({}),
   saveConfig: async (_capabilityId, values) => values,
   resetConfig: async () => ({}),
@@ -61,7 +91,8 @@ const api = window.resolveCommandCenter || {
   onPaletteShown: (callback) => {
     requestAnimationFrame(callback);
     return () => {};
-  }
+  },
+  onSettingsFeatureSelected: () => () => {}
 };
 
 const ALPHABET = ["#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
@@ -82,7 +113,9 @@ const ICONS = {
   pin: Pin,
   settings: Settings,
   grip: Grip,
-  arrow: ChevronLeft
+  arrow: ChevronLeft,
+  loading: LoaderCircle,
+  warning: TriangleAlert
 };
 
 function Icon({ name, size = 24 }) {
@@ -91,7 +124,9 @@ function Icon({ name, size = 24 }) {
 }
 
 function getCommandAriaLabel(command) {
-  return command.available ? undefined : `${command.name}, prototype only, cannot be executed`;
+  if (!command.available) return `${command.name}, prototype only, cannot be executed`;
+  const warning = getFeatureWarning(command.featureStatus);
+  return warning ? `${command.name}, ${warning.message}` : undefined;
 }
 
 function Header({ mode, selectedCommand, pinned, onBack, onTogglePin, onSettings }) {
@@ -138,6 +173,9 @@ function CommandMeta({ command, pinned }) {
         <span className="command-detail">
           {command.category}
           {!command.available && <span className="prototype-label">Prototype</span>}
+          {command.available && !canExecuteCommand(command) && (
+            <span className="prototype-label">{getFeatureWarning(command.featureStatus)?.kind}</span>
+          )}
         </span>
       </span>
       {command.shortcut && <kbd>{command.shortcut}</kbd>}
@@ -178,20 +216,27 @@ function PaletteApp() {
       : launcherCommands;
   const selectedCommand = activeCommands[selectedIndex] || null;
   const currentLetter = selectedCommand ? getCommandGroup(selectedCommand) : groupedCommands[0]?.[0] || "A";
-  const interactionHelp = hintedCommand?.available ? getInteractionHelp(hintedCommand) : [];
+  const interactionHelp = canExecuteCommand(hintedCommand) ? getInteractionHelp(hintedCommand) : [];
   const commandHint = interactionHelp.length ? "" : getCommandHint(hintedCommand);
   const activeHintId = (interactionHelp.length || commandHint) && !status && !isExecuting ? hintedCommand.id : null;
   const message = status || (isExecuting ? "Running command…" : commandHint);
 
   useEffect(() => {
     let mounted = true;
-    api.listCommands()
-      .then((commands) => {
-        if (mounted) setCatalog(createPresentationCatalog(commands));
-      })
-      .catch((error) => {
+    const refreshCatalog = async () => {
+      try {
+        const [commands, cachedStatuses] = await Promise.all([
+          api.listCommands(),
+          api.listFeatureStatuses()
+        ]);
+        if (mounted) setCatalog(createPresentationCatalog(commands, cachedStatuses));
+        const featureStatuses = await api.refreshFeatureStatuses();
+        if (mounted) setCatalog(createPresentationCatalog(commands, featureStatuses));
+      } catch (error) {
         if (mounted) setStatus(error.message);
-      });
+      }
+    };
+    refreshCatalog();
 
     const unsubscribe = api.onPaletteShown(() => {
       setMode("launcher");
@@ -200,6 +245,7 @@ function PaletteApp() {
       setStatus("");
       setHintedCommand(null);
       setIsExecuting(false);
+      refreshCatalog();
       requestAnimationFrame(() => shellRef.current?.focus());
     });
 
@@ -258,6 +304,13 @@ function PaletteApp() {
   async function executeCommand(command) {
     if (!command || isExecuting) return;
     if (!command.available) return;
+    if (!canExecuteCommand(command)) {
+      setStatus(getFeatureWarning(command.featureStatus)?.message || "Feature is unavailable.");
+      if (getRecoveryAction(command.featureStatus) === "open-settings") {
+        api.openSettings(command.capability);
+      }
+      return;
+    }
 
     setIsExecuting(true);
     setStatus("");
@@ -280,6 +333,13 @@ function PaletteApp() {
       return;
     }
     if (!command || isExecuting || !command.available) return;
+    if (!canExecuteCommand(command)) {
+      setStatus(getFeatureWarning(command.featureStatus)?.message || "Feature is unavailable.");
+      if (getRecoveryAction(command.featureStatus) === "open-settings") {
+        api.openSettings(command.capability);
+      }
+      return;
+    }
 
     setIsExecuting(true);
     setStatus("");
@@ -373,7 +433,7 @@ function PaletteApp() {
                 role="option"
                 aria-label={getCommandAriaLabel(command)}
                 aria-selected={index === selectedIndex}
-                aria-disabled={!command.available}
+                aria-disabled={!canExecuteCommand(command)}
                 aria-describedby={activeHintId === command.id ? "command-hint" : undefined}
                 onMouseEnter={() => {
                   setSelectedIndex(index);
@@ -424,7 +484,7 @@ function PaletteApp() {
                 role="option"
                 aria-label={getCommandAriaLabel(command)}
                 aria-selected={index === selectedIndex}
-                aria-disabled={!command.available}
+                aria-disabled={!canExecuteCommand(command)}
                 aria-describedby={activeHintId === command.id ? "command-hint" : undefined}
                 onMouseEnter={() => {
                   setSelectedIndex(index);
@@ -470,7 +530,7 @@ function PaletteApp() {
                         role="option"
                         aria-label={getCommandAriaLabel(command)}
                         aria-selected={index === selectedIndex}
-                        aria-disabled={!command.available}
+                        aria-disabled={!canExecuteCommand(command)}
                         aria-describedby={activeHintId === command.id ? "command-hint" : undefined}
                         onMouseEnter={() => {
                           setSelectedIndex(index);

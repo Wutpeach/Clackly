@@ -7,7 +7,7 @@ function createManager(initial = {}) {
   let persisted = structuredClone(initial);
   const schemas = {
     "ae.export": {
-      aePath: { type: "path", required: true },
+      aePath: { type: "path", label: "After Effects Path", required: true },
       mode: { type: "select", required: true, options: ["composition", "selected"] },
       enabled: { type: "boolean" }
     },
@@ -73,6 +73,15 @@ test("config manager reports every missing required field and accepts complete o
   manager.save("ae.export", { aePath: "C:/AfterFX.exe", mode: "selected" });
   assert.doesNotThrow(() => manager.assertConfigured("ae.export"));
   assert.doesNotThrow(() => manager.assertConfigured("marker.add"));
+  assert.deepEqual(manager.getMissingRequired("ae.export"), []);
+});
+
+test("config manager projects missing required keys with schema labels and readable fallback labels", () => {
+  const { manager } = createManager();
+  assert.deepEqual(manager.getMissingRequired("ae.export"), [
+    { key: "aePath", label: "After Effects Path" },
+    { key: "mode", label: "Mode" }
+  ]);
 });
 
 test("config manager validates stored values before exposing or executing them", () => {

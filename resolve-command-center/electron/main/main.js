@@ -19,6 +19,8 @@ const { createBridgeExecutionAdapter } = require("../../execution-adapter/bridge
 const { ShortcutManager } = require("../../shortcut/ShortcutManager");
 const { FeatureCatalog } = require("../../feature-ui/FeatureCatalog");
 const { registerFeatureUiIpc } = require("../../feature-ui/registerIpc");
+const { FeatureStateStorage } = require("../../feature-status/FeatureStateStorage");
+const { FeatureStatusManager } = require("../../feature-status/FeatureStatusManager");
 
 let paletteWindow = null;
 let settingsWindow = null;
@@ -39,9 +41,15 @@ const configManager = new ConfigManager({
   capabilityRegistry,
   storage: ConfigStorage.fromAppData(app.getPath("appData"))
 });
+const featureStatusManager = new FeatureStatusManager({
+  capabilityRegistry,
+  configManager,
+  stateStorage: FeatureStateStorage.fromAppData(app.getPath("appData"))
+});
 const executeCommand = createCommandExecutor({
   capabilityRegistry,
-  configManager
+  configManager,
+  featureStatusManager
 });
 const interactionManager = new InteractionManager({
   bindingStorage: BindingStorage.fromAppData(app.getPath("appData")),
@@ -70,9 +78,9 @@ function hidePalette() {
   hidePaletteWindow(paletteWindow);
 }
 
-function openSettings() {
+function openSettings(featureId) {
   const previousWindow = settingsWindow;
-  settingsWindow = openSettingsWindow(settingsWindow);
+  settingsWindow = openSettingsWindow(settingsWindow, featureId);
   if (settingsWindow !== previousWindow) {
     const openedWindow = settingsWindow;
     openedWindow.once("closed", () => {
@@ -112,6 +120,7 @@ function registerIpcHandlers() {
     dialog,
     featureCatalog,
     configManager,
+    featureStatusManager,
     openSettings
   });
 }

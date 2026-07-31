@@ -52,6 +52,22 @@ function createMarkerCapability(backends = {}) {
     return backend.addMarker(options);
   }
 
+  async function checkAvailability() {
+    try {
+      await selectBackend();
+      return { status: "ready", message: null, details: { missing: [], action: null } };
+    } catch (error) {
+      if (error instanceof CapabilityUnavailableError) {
+        return {
+          status: "unavailable",
+          message: "No marker provider is available.",
+          details: { missing: [], action: null }
+        };
+      }
+      throw error;
+    }
+  }
+
   return {
     metadata: {
       id: "marker.add",
@@ -65,6 +81,7 @@ function createMarkerCapability(backends = {}) {
       configSchema: {}
     },
     add,
+    checkAvailability,
     execute: add,
     selectBackend
   };

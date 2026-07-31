@@ -816,8 +816,9 @@ kbd {
 }
 
 .feature-button {
+  position: relative;
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: 20px minmax(0, 1fr) 16px;
   align-items: center;
   gap: 9px;
   width: 100%;
@@ -851,6 +852,44 @@ kbd {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.feature-status-indicator {
+  display: grid;
+  place-items: center;
+  color: var(--color-accent-hover);
+}
+
+.feature-status-indicator.loading svg {
+  animation: status-spin 900ms linear infinite;
+}
+
+.feature-status-tooltip {
+  position: absolute;
+  right: 8px;
+  bottom: calc(100% - 2px);
+  left: 38px;
+  z-index: 4;
+  display: block;
+  padding: 7px 9px;
+  overflow: visible;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  background: var(--color-tooltip);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.32);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: normal;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.feature-button:hover .feature-status-tooltip,
+.feature-button:focus-visible .feature-status-tooltip {
+  visibility: visible;
+  opacity: 1;
 }
 
 .feature-detail {
@@ -925,6 +964,93 @@ kbd {
   color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 650;
+}
+
+.feature-lifecycle {
+  padding: 16px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-panel);
+  box-shadow: var(--surface-inset);
+}
+
+.feature-lifecycle-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.feature-lifecycle-heading h2 {
+  margin: 0 0 5px;
+  font-size: 14px;
+}
+
+.feature-lifecycle-heading p {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.feature-lifecycle-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.feature-lifecycle-actions button {
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  background: var(--color-tile);
+  box-shadow: var(--surface-inset);
+  cursor: default;
+}
+
+.feature-lifecycle-actions button:hover:not(:disabled) {
+  background: var(--color-tile-hover);
+}
+
+.feature-lifecycle-actions button:disabled {
+  opacity: 0.42;
+}
+
+.feature-lifecycle-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin: 16px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.feature-lifecycle-details > div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+
+.feature-lifecycle-details dt,
+.feature-lifecycle-details dd {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.feature-lifecycle-details dt {
+  color: var(--color-text-muted);
+}
+
+.feature-lifecycle-details dd {
+  overflow-wrap: anywhere;
+  color: var(--color-text-secondary);
+  text-transform: capitalize;
 }
 
 .settings-fields {
@@ -1109,6 +1235,12 @@ kbd {
   }
 }
 
+@keyframes status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .palette-shell,
   .search-view,
@@ -1124,6 +1256,10 @@ kbd {
   .feature-button,
   .settings-actions button {
     transition-duration: 0ms;
+  }
+
+  .feature-status-indicator.loading svg {
+    animation: none;
   }
 
   .command-tile:hover {

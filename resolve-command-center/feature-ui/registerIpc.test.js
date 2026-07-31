@@ -21,11 +21,17 @@ test("feature UI IPC exposes semantic catalog, config, picker, and settings oper
     }
   };
   let opened = false;
+  let openedFeature = null;
 
   registerFeatureUiIpc({
     ipcMain,
     dialog,
     featureCatalog: { getAllFeatures: () => [{ id: "marker.add" }] },
+    featureStatusManager: {
+      list: () => [{ id: "marker.add", status: "loading" }],
+      refresh: (id) => ({ id, status: "ready" }),
+      setEnabled: (id, enabled) => ({ id, enabled })
+    },
     configManager: {
       get: (id) => ({ id }),
       save: (id, values, options) => {
@@ -34,10 +40,21 @@ test("feature UI IPC exposes semantic catalog, config, picker, and settings oper
       },
       reset: () => ({})
     },
-    openSettings: () => { opened = true; }
+    openSettings: (id) => { opened = true; openedFeature = id; }
   });
 
   assert.deepEqual(await handlers.get("features:list")(), [{ id: "marker.add" }]);
+  assert.deepEqual(await handlers.get("feature-status:list")(), [
+    { id: "marker.add", status: "loading" }
+  ]);
+  assert.deepEqual(await handlers.get("feature-status:refresh")(null, "marker.add"), {
+    id: "marker.add",
+    status: "ready"
+  });
+  assert.deepEqual(await handlers.get("feature-status:set-enabled")(null, "marker.add", false), {
+    id: "marker.add",
+    enabled: false
+  });
   assert.deepEqual(await handlers.get("config:get")(null, "marker.add"), { id: "marker.add" });
   assert.deepEqual(await handlers.get("config:save")(null, "marker.add", { color: "#f36a2d" }), {
     id: "marker.add",
@@ -52,6 +69,7 @@ test("feature UI IPC exposes semantic catalog, config, picker, and settings oper
     { properties: ["openDirectory"] }
   ]);
   await assert.rejects(() => handlers.get("dialog:pick-path")(null, "other"), /path or folder/);
-  listeners.get("settings:open")();
+  listeners.get("settings:open")(null, "marker.add");
   assert.equal(opened, true);
+  assert.equal(openedFeature, "marker.add");
 });
