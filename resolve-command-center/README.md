@@ -40,6 +40,52 @@ The Workflow Integration host injects `resolve/adapter.js` as the Workflow Plugi
 
 Capability metadata also owns a plain `configSchema`. `config/SchemaValidator.js` validates schema fields and values, while `config/SchemaLabels.js` is the single explicit-label/key-fallback formatter used by `ConfigManager` and `FeatureCatalog`. FeatureCatalog returns cloned schemas with every `field.label` resolved, so Settings only renders labels. `ConfigStorage` persists the shared Electron `appData/Clackly/config.json` document with atomic replacement, and `ConfigManager` reloads that shared document before reads and writes while exposing capability-scoped values. Before execution, the command engine blocks capabilities with missing required settings and passes configuration as the second argument: `execute(command, { config })`. Capabilities read only their own declared values through `config.get(key)`; they do not access the file or storage service directly. The Workflow Integration host still keeps its separate Electron `userData` path.
 
+## Python Script Capabilities
+
+Script-backed Features use the normal Command and Capability path. Add three artifacts without editing either Electron host, the renderer, or Command Engine:
+
+1. A Python feature script under the application root.
+2. A Capability JSON manifest in `capability/definitions/`.
+3. A Command JSON manifest in `command-engine/commands/` that names the Capability id.
+
+The Capability manifest keeps the existing metadata and `configSchema`, and adds:
+
+```json
+{
+  "id": "media.export",
+  "name": "Export Media",
+  "description": "Export the current timeline",
+  "category": "Export",
+  "icon": "download",
+  "version": "1.0.0",
+  "type": "command",
+  "providers": ["script"],
+  "executor": {
+    "type": "script",
+    "runtime": "python",
+    "entry": "scripts/export.py"
+  },
+  "configSchema": {
+    "output": { "type": "folder", "label": "Output folder", "required": true }
+  }
+}
+```
+
+The entry must be a relative file path contained by the application root. Python is the only implemented runtime. A script exports one synchronous or asynchronous `execute(context)` function and returns a JSON-serializable value:
+
+```python
+async def execute(context):
+    context.logger.info("Starting export")
+    project_name = context.project.GetName()
+    return {"project": project_name, "output": context.config["output"]}
+```
+
+`context` exposes exactly `resolve`, `config`, `logger`, `project`, and `timeline`. The logger supports `debug`, `info`, `warning`, and `error`. Resolve objects are loaded lazily through `resolve/adapter.py`; configuration is a plain snapshot scoped to the Capability. Script stdout, stderr, and logger calls are captured and replayed without entering the JSON result channel.
+
+The script runtime invokes the `python` executable from the host `PATH`. `RESOLVE_COMMAND_CENTER_PYTHON_CMD` remains specific to the Utility bridge because it is a full command and may include arguments.
+
+Scripts are trusted local Feature code, not sandboxed third-party code. Each execution starts one Python subprocess. Sandboxing, permissions, process pooling, cancellation, timeouts, streaming, package environments, interpreter discovery UI, and Lua/Node/shell runtimes are deferred until a concrete need justifies them.
+
 ## Feature UI Framework
 
 The Settings button opens a separate native-framed `760x560` window (minimum `640x480`) while Launcher, Search, and All Actions remain in the fixed `376x468` palette. `feature-ui/FeatureCatalog.js` projects full defensive metadata records from the existing Capability Registry, so registering a capability automatically adds it to the category-grouped Settings sidebar.

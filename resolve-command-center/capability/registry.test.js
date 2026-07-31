@@ -76,6 +76,32 @@ test("capability registry validates registration and preserves execution objects
     }),
     /select options must be a non-empty array/
   );
+  const scriptCapability = {
+    metadata: {
+      ...metadata,
+      id: "script.run",
+      providers: ["script"],
+      executor: { type: "script", runtime: "python", entry: "scripts/run.py" }
+    },
+    execute() {}
+  };
+  assert.equal(registry.register("script.run", scriptCapability), scriptCapability);
+  for (const executor of [
+    null,
+    [],
+    { type: "", runtime: "python", entry: "scripts/run.py" },
+    { type: "script", runtime: "", entry: "scripts/run.py" },
+    { type: "script", runtime: "python", entry: "" },
+    { type: "native", runtime: "python", entry: "scripts/run.py" }
+  ]) {
+    assert.throws(
+      () => registry.register("invalid", {
+        metadata: { ...metadata, id: "invalid", executor },
+        execute() {}
+      }),
+      /executor|Unsupported capability executor type/
+    );
+  }
   assert.throws(
     () => registry.register("invalid", { metadata, execute() {} }),
     /id must match/

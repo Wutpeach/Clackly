@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend layer index and ownership routing for Capability, Resolve, and bridge work."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Current executable contracts for Capability dispatch, configuration scoping, Resolve adapter ownership, error behavior, and tests."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"The feature crosses metadata, Capability, provider, process protocol, Python context, and host composition boundaries."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse Command manifest discovery, ConfigManager scoping, and Resolve adapter ownership instead of duplicating contracts."}
+{"file":".trellis/tasks/07-31-phase-6-script-runtime/research/current-script-runtime-boundary.md","reason":"Repository-backed current flow, minimum architecture fit, context transport, and deliberate MVP limits."}

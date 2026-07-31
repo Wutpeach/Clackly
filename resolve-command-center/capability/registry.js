@@ -1,5 +1,14 @@
 const { SchemaValidator } = require("../config/SchemaValidator");
 
+function isPlainObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
 function createCapabilityRegistry() {
   const capabilities = new Map();
   const schemaValidator = new SchemaValidator();
@@ -37,6 +46,23 @@ function createCapabilityRegistry() {
       typeof provider !== "string" || provider.trim().length === 0
     ))) {
       throw new TypeError("Capability metadata providers must be an array of non-empty strings");
+    }
+
+    if (metadata.executor !== undefined) {
+      if (!isPlainObject(metadata.executor)) {
+        throw new TypeError("Capability metadata executor must be an object");
+      }
+
+      for (const field of ["type", "runtime", "entry"]) {
+        if (typeof metadata.executor[field] !== "string"
+          || metadata.executor[field].trim().length === 0) {
+          throw new TypeError(`Capability metadata executor requires a non-empty ${field}`);
+        }
+      }
+
+      if (metadata.executor.type !== "script") {
+        throw new TypeError(`Unsupported capability executor type: ${metadata.executor.type}`);
+      }
     }
 
     schemaValidator.validateSchema(metadata.configSchema);

@@ -12,6 +12,7 @@ const { getCommandById, getCommands, searchCommands } = require("../command-engi
 const { createCommandExecutor } = require("../command-engine/executor");
 const { createCapabilityRegistry } = require("../capability/registry");
 const { createMarkerCapability } = require("../capability/marker");
+const { registerScriptCapabilities } = require("../capability/registerScripts");
 const { ConfigManager } = require("../config/ConfigManager");
 const { ConfigStorage } = require("../config/ConfigStorage");
 const { BindingStorage } = require("../interaction/BindingStorage");
@@ -117,6 +118,7 @@ const markerCapability = createMarkerCapability({
 });
 const capabilityRegistry = createCapabilityRegistry();
 capabilityRegistry.register("marker.add", markerCapability);
+registerScriptCapabilities({ capabilityRegistry });
 const featureCatalog = new FeatureCatalog({ capabilityRegistry });
 const configManager = new ConfigManager({
   capabilityRegistry,

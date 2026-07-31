@@ -18,7 +18,7 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 ### 2. Signatures
 
 - Command manifest: `{ id: string, name: string, description: string, category: string, icon: string, keywords: string[], capability: string }`
-- Capability metadata: `{ id: string, name: string, description: string, category: string, icon: string, version: string, type: string, providers: string[], configSchema: object }`
+- Capability metadata: `{ id: string, name: string, description: string, category: string, icon: string, version: string, type: string, providers: string[], executor?: { type: "script", runtime: string, entry: string }, configSchema: object }`
 - Capability registry: `createCapabilityRegistry() -> { register(capabilityId, capability), get(capabilityId), getMetadata(capabilityId), getAllCapabilities() }`
 - Command executor: `createCommandExecutor({ capabilityRegistry, configManager, findCommand? }) -> executeCommand(commandId)`
 - Capability execution: `capability.execute(command, { config })`, where `config.get(key)` is scoped to that capability.
@@ -33,6 +33,7 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - Each host creates a capability registry, registers its host-backed capability objects, and injects the registry into the command executor.
 - Registered capabilities keep descriptive data under `capability.metadata`; `register(capabilityId, capability)` and `get(capabilityId)` retain their existing execution-object behavior.
 - Every capability declares `metadata.configSchema`; use `{}` when it has no settings. Registry registration validates the schema before storing the capability.
+- Handwritten capabilities may omit `metadata.executor`. Metadata-discovered script capabilities declare `executor.type = "script"`; Command metadata never declares an executor or runtime.
 - `getMetadata(capabilityId)` returns the full metadata object or `null`. `getAllCapabilities()` returns fresh catalog summaries containing only `id`, `name`, `category`, and `icon`, never execution functions.
 - Metadata `providers` names supported provider families such as `resolve-api` and `shortcut`; it does not report host-specific runtime availability or expose internal backend ids.
 - `marker.add` checks backends in order: `resolveApi`, `resolveScriptApi`, `workflowPluginApi`, `keyboardShortcut`; `uiAutomation` is reserved and not implemented.
@@ -47,6 +48,7 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - Missing/blank Command presentation fields -> Command Registry rejects the manifest before catalog or execution use.
 - Missing command capability handler -> command executor throws `No capability handler registered`.
 - Missing capability metadata, blank required string fields, invalid or sparse `providers`, or a metadata id that differs from the registry key -> registration throws `TypeError`.
+- Malformed executor metadata, blank runtime/entry, or an unsupported executor type -> registration throws `TypeError` before the host registry changes.
 - Unknown capability metadata id -> `getMetadata()` returns `null`.
 - Backend missing `addMarker` or reporting `isAvailable() === false` -> capability checks the next backend.
 - Backend availability raises `CapabilityUnavailableError` -> capability checks the next backend.
@@ -76,6 +78,7 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - Assert registry lookup preserves the same execution object while metadata lookup returns the full metadata object.
 - Assert catalog listing returns only `id`, `name`, `category`, and `icon`.
 - Assert missing, malformed, id-mismatched, and sparse-provider metadata cannot register.
+- Assert handwritten capabilities without `executor` remain valid and malformed script executor metadata cannot register.
 - Assert command registry preserves search while returning capability metadata.
 - Assert Command Registry requires presentation fields, defensively clones keywords, and omits unsupported help/executor fields.
 - Assert ShortcutManager mapping, no-executor behavior, and injected-executor request shape.
@@ -103,6 +106,93 @@ const executeCommand = createCommandExecutor({
   capabilityRegistry,
   configManager,
 });
+```
+
+## Scenario: Script Capability Runtime
+
+### 1. Scope / Trigger
+
+- Trigger: adding or changing a Capability whose execution is implemented by a local script runtime.
+- Phase 6 implements Python only. Lua, Node, shell, and external-process runtimes require a future runtime provider, not Command, Capability, or UI branches.
+
+### 2. Signatures
+
+- Capability executor metadata: `{ type: "script", runtime: "python", entry: string }` where `entry` is relative to the application root.
+- Runtime dispatcher: `new ScriptExecutor(Map<runtime, provider>).execute(scriptDefinition, context)`.
+- Runtime provider: `provider.execute(scriptDefinition, context) -> Promise<JSONValue>`.
+- Script Capability Provider: `execute(scriptDefinition, { config })`, where `config.get()` returns the capability-scoped snapshot.
+- Python feature entry: sync or async `execute(context) -> JSON-serializable result`.
+- Python ScriptContext public attributes: `resolve`, `config`, `logger`, `project`, `timeline`.
+- Python process request: `{ "config": object }` on stdin.
+- Python process response: `{ "ok": true, "result": JSONValue, "logs": LogRecord[] }` or `{ "ok": false, "error": { "type": string, "message": string }, "logs": LogRecord[] }`.
+
+### 3. Contracts
+
+- Capability definitions are discovered from sorted JSON manifests and converted into ordinary executable Capability objects before FeatureCatalog and ConfigManager are created.
+- The existing Capability Registry remains the only Feature registry. Registration validates all discovered definitions before mutating the host registry, preventing partial registration.
+- A script Capability delegates `Capability -> ScriptCapabilityProvider -> ScriptExecutor -> runtime provider`; only the runtime provider knows the interpreter or `node:child_process`.
+- Both Electron hosts call the same script registration helper in the same registry-composition position.
+- Command Engine, Command Metadata, Interaction Binding, renderer, Feature UI, and the fixed-command HTTP bridge contain no script/runtime selection branches.
+- `ScriptCapabilityProvider` converts `ConfigManager.forCapability(id)` into a defensive plain snapshot. Scripts never receive ConfigStorage, ConfigManager, another Capability's settings, Electron, or UI objects.
+- PythonProvider resolves `entry` under the application root, rejects absolute/missing/escaping paths including symlink escapes, spawns with `shell: false`, and reserves process stdout for one JSON envelope.
+- The Python runner captures feature stdout/stderr as log records, supports sync/async `execute(context)`, and requires JSON-serializable results.
+- `context.resolve`, `context.project`, and `context.timeline` are lazy and cached through `resolve.adapter.py`; config-only scripts do not require a live Resolve connection.
+- Python scripts are trusted local Capability code. ScriptContext is an API boundary, not an OS/filesystem sandbox.
+- One subprocess is used per execution. Add pooling only after measured startup cost justifies shared runtime state.
+- `RESOLVE_COMMAND_CENTER_PYTHON_CMD` belongs to the legacy bridge launcher and may contain arguments. PythonProvider must not treat it as a single executable; use its executable-only constructor injection when customization is needed.
+
+### 4. Validation & Error Matrix
+
+- Missing definitions directory -> register zero script Capabilities without error.
+- Invalid manifest root/entry, duplicate discovered id, malformed Capability metadata, or malformed executor -> reject before adding any discovered Capability to the host registry.
+- Unknown `scriptDefinition.runtime` -> ScriptExecutor rejects without invoking a provider.
+- Absolute, missing, non-file, or application-root-escaping entry -> PythonProvider rejects before spawning.
+- Python spawn error, stdin failure, non-zero exit, invalid JSON/envelope/log record, or logger replay failure -> reject with a controlled error naming the script entry.
+- Missing/non-callable Python `execute`, import/runtime exception, or non-JSON result -> runner returns a structured error envelope; PythonProvider rejects it.
+- Missing Resolve/project/timeline -> error occurs only when the corresponding lazy context service is accessed.
+- Once Python execution starts, do not retry another runtime or execution backend.
+
+### 5. Good/Base/Bad Cases
+
+- Good: adding `scripts/export.py`, one Capability manifest with `configSchema` and executor metadata, and one Command manifest makes the Feature discoverable and executable without host/UI/Command Engine edits.
+- Base: a config-only Python script reads `context.config`, logs through `context.logger`, and returns a JSON object without connecting to Resolve.
+- Good: a Resolve script reads `context.project` and `context.timeline`; only the runtime-owned adapter resolves them.
+- Bad: a Command manifest contains `runtime: "python"`, renderer calls a script IPC method, or Capability code imports `node:child_process`.
+- Bad: a feature script imports `resolve.adapter`, ConfigStorage, Electron, or Clackly source paths instead of using ScriptContext.
+- Bad: adding empty Lua/Node provider classes before those runtimes are implemented.
+
+### 6. Tests Required
+
+- Assert sorted object/array manifest loading, duplicate rejection, defensive definitions, optional-executor compatibility, and atomic registration failure.
+- Assert a temporary Script + Capability manifest + Command manifest executes through the real Command executor and appears through FeatureCatalog.
+- Assert ScriptExecutor dispatches only the named provider and rejects missing/unsupported runtimes.
+- Assert ScriptCapabilityProvider requires scoped config, passes a defensive plain snapshot, and does not forward the Command or ConfigManager.
+- Assert PythonProvider path containment, `shell: false`, config request, result/log replay, spawn/stdin/exit/protocol/logger failures, and executable-only Python customization.
+- Assert the Python runner exposes exactly five public context attributes, keeps Resolve access lazy/cached, supports sync/async scripts, captures stdout/stderr, and rejects missing execute, exceptions, NaN, and other non-JSON results.
+- Run full Node/Python tests, Python compile, production build, `git diff --check`, and boundary searches for process/Command Engine/renderer/Resolve ownership.
+- Record live Resolve/Workflow Integration execution as a manual validation gap when Resolve is unavailable.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+// command-engine/executor.js
+if (command.runtime === "python") {
+  return spawn("python", [command.entry]);
+}
+```
+
+#### Correct
+
+```javascript
+const capability = capabilityRegistry.get(command.capability);
+await capability.execute(command, {
+  config: configManager.forCapability(command.capability),
+});
+
+// Generic script Capability delegates through the registered runtime provider.
+await scriptExecutor.execute(metadata.executor, scriptContext);
 ```
 
 ## Scenario: Capability Configuration
