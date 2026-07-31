@@ -2,8 +2,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { ConfigStorage } = require("../config/ConfigStorage");
+const { normalizeTrigger } = require("./trigger");
 
-const MODIFIERS = ["CTRL", "SHIFT", "ALT"];
 const DEFAULT_BINDINGS = {
   "timeline.addMarker.left-click": {
     target: "timeline.addMarker",
@@ -36,25 +36,6 @@ function requireText(value, label) {
   }
 }
 
-function normalizeModifiers(value, label) {
-  if (!Array.isArray(value)) {
-    throw new TypeError(`${label} must be an array`);
-  }
-
-  const modifiers = new Set();
-  for (const modifier of value) {
-    if (!MODIFIERS.includes(modifier)) {
-      throw new TypeError(`${label} contains unsupported modifier: ${modifier}`);
-    }
-    if (modifiers.has(modifier)) {
-      throw new TypeError(`${label} contains duplicate modifier: ${modifier}`);
-    }
-    modifiers.add(modifier);
-  }
-
-  return MODIFIERS.filter((modifier) => modifiers.has(modifier));
-}
-
 function normalizeBindings(bindings) {
   requireObject(bindings, "Bindings root");
 
@@ -64,23 +45,15 @@ function normalizeBindings(bindings) {
     requireText(id, "Binding id");
     requireObject(binding, `Binding ${id}`, ["target", "trigger", "action"]);
     requireText(binding.target, `Binding ${id} target`);
-    requireObject(binding.trigger, `Binding ${id} trigger`, ["type", "button", "modifiers"]);
     requireObject(binding.action, `Binding ${id} action`, ["command"]);
-
-    if (binding.trigger.type !== "mouse") {
-      throw new TypeError(`Binding ${id} trigger type must be mouse`);
-    }
-    if (binding.trigger.button !== "left" && binding.trigger.button !== "right") {
-      throw new TypeError(`Binding ${id} trigger button must be left or right`);
-    }
     requireText(binding.action.command, `Binding ${id} action command`);
 
-    const modifiers = normalizeModifiers(binding.trigger.modifiers, `Binding ${id} modifiers`);
+    const trigger = normalizeTrigger(binding.trigger, `Binding ${id} trigger`);
     const signature = JSON.stringify([
       binding.target,
-      binding.trigger.type,
-      binding.trigger.button,
-      ...modifiers
+      trigger.type,
+      trigger.button,
+      ...trigger.modifiers
     ]);
     if (triggers.has(signature)) {
       throw new TypeError(`Duplicate interaction trigger for binding ${id}`);
@@ -89,11 +62,7 @@ function normalizeBindings(bindings) {
 
     normalized.push([id, {
       target: binding.target,
-      trigger: {
-        type: "mouse",
-        button: binding.trigger.button,
-        modifiers
-      },
+      trigger,
       action: { command: binding.action.command }
     }]);
   }

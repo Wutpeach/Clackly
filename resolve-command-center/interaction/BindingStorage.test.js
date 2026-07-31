@@ -55,9 +55,10 @@ test("binding storage initializes, normalizes, persists, and validates bindings"
     new Date(),
     { broken: { target: "timeline.addMarker", trigger: {}, action: { command: "x" } } },
     { broken: { target: "timeline.addMarker", trigger: { type: "mouse", button: "middle", modifiers: [] }, action: { command: "x" } } },
-    { broken: { target: "timeline.addMarker", trigger: { type: "mouse", button: "left", modifiers: ["META"] }, action: { command: "x" } } }
+    { broken: { target: "timeline.addMarker", trigger: { type: "mouse", button: "left", modifiers: ["META"] }, action: { command: "x" } } },
+    { broken: { target: "timeline.addMarker", trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "CTRL"] }, action: { command: "x" } } }
   ]) {
-    assert.throws(() => storage.save(invalid), /must|unsupported/);
+    assert.throws(() => storage.save(invalid), /must|unsupported|duplicate/);
   }
 
   assert.throws(() => storage.save({

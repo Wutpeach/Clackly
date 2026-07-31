@@ -3,6 +3,13 @@
     "id": "timeline.addMarker",
     "name": "Add Marker",
     "keywords": ["marker", "mark", "timeline", "red"],
-    "capability": "marker.add"
+    "capability": "marker.add",
+    "interactionHelp": [
+      {
+        "trigger": { "type": "mouse", "button": "left", "modifiers": [] },
+        "label": "Click",
+        "description": "Add marker at current frame"
+      }
+    ]
   }
 ]

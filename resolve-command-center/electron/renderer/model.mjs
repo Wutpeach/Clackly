@@ -101,6 +101,17 @@ export function getCommandHint(command) {
   return command.shortcut ? `${command.name} — Shortcut ${command.shortcut}` : command.name;
 }
 
+export function getInteractionHelp(command) {
+  if (!Array.isArray(command?.interactionHelp)) return [];
+  return command.interactionHelp
+    .filter((entry) => entry
+      && typeof entry.label === "string"
+      && entry.label.trim()
+      && typeof entry.description === "string"
+      && entry.description.trim())
+    .map(({ label, description }) => ({ label, description }));
+}
+
 function matches(command, query) {
   const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (tokens.length === 0) {

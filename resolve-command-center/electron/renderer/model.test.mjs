@@ -4,6 +4,7 @@ import {
   PROTOTYPE_COMMANDS,
   createPresentationCatalog,
   getCommandHint,
+  getInteractionHelp,
   groupCommands,
   rankCommands
 } from "./model.mjs";
@@ -41,11 +42,15 @@ test("grouping sorts commands and collects non-letter initials under #", () => {
 });
 
 test("prototype entries stay unavailable when combined with real commands", () => {
+  const interactionHelp = [
+    { trigger: { type: "mouse", button: "left", modifiers: [] }, label: "Click", description: "Run command" }
+  ];
   const catalog = createPresentationCatalog([
-    { id: "timeline.addMarker", name: "Add Marker", keywords: ["marker"] }
+    { id: "timeline.addMarker", name: "Add Marker", keywords: ["marker"], interactionHelp }
   ]);
 
   assert.equal(catalog[0].available, true);
+  assert.equal(catalog[0].interactionHelp, interactionHelp);
   assert.ok(PROTOTYPE_COMMANDS.every((command) => command.available === false));
   assert.ok(catalog.slice(1).every((command) => command.available === false));
 });
@@ -54,4 +59,21 @@ test("command hints prefer descriptions and fall back to command state", () => {
   assert.equal(getCommandHint({ name: "Add Marker", available: true, shortcut: "M" }), "Add Marker — Shortcut M");
   assert.equal(getCommandHint({ name: "Blade Cut", available: false }), "Blade Cut is prototype-only and cannot be executed.");
   assert.equal(getCommandHint({ name: "Add Marker", description: "Add a marker at the playhead." }), "Add a marker at the playhead.");
+});
+
+test("interaction help projects declared rows defensively", () => {
+  const interactionHelp = [
+    { trigger: { type: "mouse", button: "right", modifiers: [] }, label: "Right Click", description: "Open options" },
+    { trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT", "ALT"] }, label: "Modified Click", description: "Run alternate action" }
+  ];
+  const projected = getInteractionHelp({ interactionHelp });
+
+  assert.deepEqual(projected, [
+    { label: "Right Click", description: "Open options" },
+    { label: "Modified Click", description: "Run alternate action" }
+  ]);
+  projected[0].label = "Changed";
+  assert.equal(interactionHelp[0].label, "Right Click");
+  assert.deepEqual(getInteractionHelp({ interactionHelp: [null, { label: "", description: "Missing" }] }), []);
+  assert.deepEqual(getInteractionHelp({}), []);
 });

@@ -27,6 +27,7 @@ import {
   createPresentationCatalog,
   getCommandHint,
   getCommandGroup,
+  getInteractionHelp,
   groupCommands,
   rankCommands
 } from "./model.mjs";
@@ -170,8 +171,9 @@ function App() {
       : launcherCommands;
   const selectedCommand = activeCommands[selectedIndex] || null;
   const currentLetter = selectedCommand ? getCommandGroup(selectedCommand) : groupedCommands[0]?.[0] || "A";
-  const commandHint = getCommandHint(hintedCommand);
-  const activeHintId = commandHint && !status && !isExecuting ? hintedCommand.id : null;
+  const interactionHelp = hintedCommand?.available ? getInteractionHelp(hintedCommand) : [];
+  const commandHint = interactionHelp.length ? "" : getCommandHint(hintedCommand);
+  const activeHintId = (interactionHelp.length || commandHint) && !status && !isExecuting ? hintedCommand.id : null;
   const message = status || (isExecuting ? "Running command…" : commandHint);
 
   useEffect(() => {
@@ -525,14 +527,19 @@ function App() {
         </div>
       )}
 
-      {message && (
+      {(message || interactionHelp.length > 0) && (
         <div
           id={activeHintId ? "command-hint" : undefined}
-          className={status ? "status-message error" : "status-message"}
+          className={`${status ? "status-message error" : "status-message"}${activeHintId && interactionHelp.length ? " interaction-help" : ""}`}
           role={activeHintId ? "tooltip" : "status"}
           aria-live={activeHintId ? undefined : "polite"}
         >
-          {message}
+          {activeHintId && interactionHelp.length ? interactionHelp.map((entry, index) => (
+            <div className="interaction-help-row" key={`${entry.label}-${index}`}>
+              <span className="interaction-help-label">{entry.label}</span>
+              <span className="interaction-help-description">{entry.description}</span>
+            </div>
+          )) : message}
         </div>
       )}
     </main>

@@ -25,12 +25,13 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
   - `window.resolveCommandCenter.setPaletteMode(mode: "launcher" | "search" | "all-actions") -> void`
   - `window.resolveCommandCenter.onPaletteShown(callback: () -> void) -> () -> void`
 - Command shape:
-  - `{ id: string, name: string, keywords: string[], capability: string }`
+  - `{ id: string, name: string, keywords: string[], capability: string, interactionHelp: InteractionHelp[] }`
 
 ### 3. Contracts
 
 - Renderer search uses command metadata only: `id`, `name`, and `keywords`.
 - Renderer execution sends only the selected `commandId`.
+- Renderer presentation may project Command-owned `interactionHelp` for display, but must not infer help from Command IDs, bindings, or Capability metadata.
 - Prototype-only presentation commands remain outside the command registry, announce that they cannot execute, and are rejected in the renderer before IPC.
 - Renderer resizing sends a semantic palette mode, never arbitrary width/height values. Both standalone Electron and Workflow Integration route `palette:set-mode` through the shared window helper.
 - Launcher, Search, and All Actions all use the fixed `376x468` window footprint; mode changes replace content without occupying more of the Resolve workspace.
@@ -112,6 +113,8 @@ window.resolveCommandCenter.setPaletteMode("all-actions");
 - Successful matched mouse execution is hidden by the host; unmatched interactions execute nothing and leave the palette available.
 - Browser preview keeps its local execution-unavailable behavior and does not emulate persisted bindings.
 - Double-click handlers and global-shortcut behavior are outside renderer interaction binding.
+- Hover and keyboard focus use the same existing `aria-describedby` tooltip relationship in Launcher, Search, and All Actions.
+- Status, error, and executing messages replace interaction help until cleared; Commands without declared help retain the generic/prototype hint.
 
 ### 4. Validation & Error Matrix
 
@@ -120,6 +123,7 @@ window.resolveCommandCenter.setPaletteMode("all-actions");
 - Interaction/executor error -> renderer displays the error and restores focus using the existing command error path.
 - Keyboard Enter or keyboard-generated button click (`event.detail === 0`) -> execute the selected Command directly; do not route it through mouse bindings.
 - Prototype-only command -> do not invoke either execution IPC method.
+- Declared functional-command help -> render compact label/description rows in the existing bottom overlay without resizing the `376x468` palette.
 
 ### 5. Good/Base/Bad Cases
 
@@ -133,6 +137,7 @@ window.resolveCommandCenter.setPaletteMode("all-actions");
 
 - Run Interaction unit tests, `npm test`, and `npm run build`.
 - Search renderer/preload interaction routing for Capability mapping, double-click handlers, and shortcut-manager coupling.
+- Assert the renderer model defensively projects declared help rows and preserves generic/prototype fallbacks.
 
 ### 7. Wrong vs Correct
 

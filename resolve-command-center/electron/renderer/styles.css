@@ -720,6 +720,31 @@ kbd {
   color: var(--color-text-primary);
 }
 
+.status-message.interaction-help {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding-block: 8px;
+}
+
+.interaction-help-row {
+  display: grid;
+  grid-template-columns: minmax(64px, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+}
+
+.interaction-help-label {
+  color: var(--color-text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.interaction-help-description {
+  min-width: 0;
+  color: var(--color-text-secondary);
+}
+
 @keyframes palette-enter {
   from {
     opacity: 0;

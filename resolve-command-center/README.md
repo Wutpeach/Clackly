@@ -10,9 +10,15 @@ Mouse input is routed separately from command and capability execution:
 command card -> interaction binding -> Command ID -> command registry -> Capability ID -> capability -> execution adapter
 ```
 
-`interaction/BindingStorage.js` persists `appData/Clackly/bindings.json`. Each binding maps a target plus an exact left/right mouse-button and `CTRL`/`SHIFT`/`ALT` modifier set to `action.command`; it never stores a Capability ID. A missing file receives the compatibility default that maps an unmodified left click on `timeline.addMarker` back to that Command. Keyboard Enter still executes the selected Command directly.
+`interaction/BindingStorage.js` persists `appData/Clackly/bindings.json`. Each binding maps a target plus an exact left/right mouse-button and `CTRL`/`SHIFT`/`ALT` modifier set to `action.command`; it never stores a Capability ID. `interaction/trigger.js` is the shared validator/normalizer used by persisted bindings, renderer mouse events, and Command interaction help. A missing file receives the compatibility default that maps an unmodified left click on `timeline.addMarker` back to that Command. Keyboard Enter still executes the selected Command directly.
 
 Interaction Binding does not implement double-clicks, wildcard modifiers, global shortcuts, key synthesis, or Resolve shortcut discovery/mutation. The existing palette hotkey and `ShortcutManager` remain separate systems.
+
+## Interaction Help
+
+Commands may declare optional `interactionHelp` rows containing the same canonical mouse trigger plus a user-facing `label` and `description`. The Command Registry validates and returns this descriptive metadata; it remains separate from bindings and never resolves a Capability ID. Launcher, Search, and All Actions render declared rows in the existing hover/focus tooltip surface, while status, errors, and execution messages keep priority. Commands without help retain the existing generic or prototype hint.
+
+`timeline.addMarker` currently declares only the truthful unmodified `Click` operation. Right-click and modified-click help should be added only alongside real Commands and bindings. Double Click is not part of the trigger schema.
 
 ## Capability Routing
 

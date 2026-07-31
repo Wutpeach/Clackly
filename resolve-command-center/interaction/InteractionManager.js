@@ -1,8 +1,4 @@
-const MODIFIERS = [
-  ["ctrlKey", "CTRL"],
-  ["shiftKey", "SHIFT"],
-  ["altKey", "ALT"]
-];
+const { normalizeMouseEventTrigger, triggersEqual } = require("./trigger");
 
 function normalizeEvent(event) {
   if (event === null || typeof event !== "object" || Array.isArray(event)) {
@@ -11,24 +7,9 @@ function normalizeEvent(event) {
   if (typeof event.target !== "string" || event.target.trim().length === 0) {
     throw new TypeError("Interaction target must be a non-empty string");
   }
-  if (event.type !== "mouse") {
-    throw new TypeError("Interaction type must be mouse");
-  }
-  if (!Number.isInteger(event.button)) {
-    throw new TypeError("Interaction button must be an integer");
-  }
-  for (const [key] of MODIFIERS) {
-    if (typeof event[key] !== "boolean") {
-      throw new TypeError(`Interaction ${key} must be a boolean`);
-    }
-  }
-
-  const button = event.button === 0 ? "left" : event.button === 2 ? "right" : null;
   return {
     target: event.target,
-    type: "mouse",
-    button,
-    modifiers: MODIFIERS.filter(([key]) => event[key]).map(([, modifier]) => modifier)
+    trigger: normalizeMouseEventTrigger(event)
   };
 }
 
@@ -47,16 +28,13 @@ class InteractionManager {
 
   async handle(event) {
     const interaction = normalizeEvent(event);
-    if (!interaction.button) {
+    if (!interaction.trigger.button) {
       return { matched: false };
     }
 
     const binding = Object.values(this.bindingStorage.load()).find((candidate) =>
       candidate.target === interaction.target
-      && candidate.trigger.type === interaction.type
-      && candidate.trigger.button === interaction.button
-      && candidate.trigger.modifiers.length === interaction.modifiers.length
-      && candidate.trigger.modifiers.every((modifier, index) => modifier === interaction.modifiers[index])
+      && triggersEqual(candidate.trigger, interaction.trigger)
     );
     if (!binding) {
       return { matched: false };

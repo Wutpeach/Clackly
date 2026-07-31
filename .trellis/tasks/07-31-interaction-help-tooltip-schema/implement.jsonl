@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Defines current Command Registry, Interaction Binding, trigger validation, Command-to-Capability, and testing boundaries that the help metadata must extend without changing execution."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines Command Metadata consumption, hover/focus tooltip accessibility, fixed palette, and generic renderer boundary."}
+{"file":".trellis/tasks/07-31-interaction-help-tooltip-schema/research/current-help-boundary.md","reason":"Records the existing command metadata projection, bottom hint surface, duplicated trigger logic, truthful live-command scope, and explicit Double Click exclusion."}

@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify shared trigger reuse, Command-owned help validation, defensive metadata, and unchanged execution/Capability boundaries."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify all command-card views render metadata-driven help with existing accessibility, status precedence, and fixed-window constraints."}
+{"file":".trellis/tasks/07-31-interaction-help-tooltip-schema/research/current-help-boundary.md","reason":"Check the final implementation against the researched registry, interaction, renderer, and Double Click scope decisions."}

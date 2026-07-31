@@ -17,7 +17,7 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 
 ### 2. Signatures
 
-- Command manifest: `{ id: string, name: string, keywords: string[], capability: string }`
+- Command manifest: `{ id: string, name: string, keywords: string[], capability: string, interactionHelp?: InteractionHelp[] }`
 - Capability metadata: `{ id: string, name: string, description: string, category: string, icon: string, version: string, type: string, providers: string[], configSchema: object }`
 - Capability registry: `createCapabilityRegistry() -> { register(capabilityId, capability), get(capabilityId), getMetadata(capabilityId), getAllCapabilities() }`
 - Command executor: `createCommandExecutor({ capabilityRegistry, configManager, findCommand? }) -> executeCommand(commandId)`
@@ -344,10 +344,12 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 - Renderer/IPC event: `{ target: string, type: "mouse", button: number, ctrlKey: boolean, shiftKey: boolean, altKey: boolean }`
 - Storage: `BindingStorage.fromAppData(appDataPath)`, `load()`, and `save(bindings)`.
 - Manager: `new InteractionManager({ bindingStorage, executeCommand })` and `handle(event) -> Promise<{ matched: false } | { matched: true, command: string, result: unknown }>`.
+- Shared trigger helpers: `normalizeTrigger(trigger)`, `normalizeMouseEventTrigger(event)`, and `triggersEqual(left, right)`.
 
 ### 3. Contracts
 
 - Stored bindings map `target` plus an exact mouse `button` and normalized `CTRL`, `SHIFT`, `ALT` set to `action.command`.
+- Binding storage, renderer-event normalization, and Command interaction-help validation use the same shared canonical trigger module and modifier order.
 - `BindingStorage` owns validation and `appData/Clackly/bindings.json`; it may compose `ConfigStorage` for atomic JSON persistence but must not store bindings in capability configuration.
 - `InteractionManager` accepts plain target/button/modifier facts, performs one exact match, and delegates only the matched Command ID to the injected command executor.
 - Command Registry remains the only Command ID -> Capability ID mapping owner. Interaction modules do not import command or capability registries.
@@ -391,6 +393,57 @@ if (event.ctrlKey) capabilityRegistry.get("marker.add").execute();
 ```javascript
 const result = await interactionManager.handle(event);
 // InteractionManager delegates only binding.action.command to executeCommand().
+```
+
+## Scenario: Command Interaction Help
+
+### 1. Scope / Trigger
+
+- Trigger: adding descriptive mouse-operation guidance to Command metadata or returning Commands to a renderer.
+
+### 2. Signatures
+
+- Interaction Help: `{ trigger: { type: "mouse", button: "left" | "right", modifiers: ("CTRL" | "SHIFT" | "ALT")[] }, label: string, description: string }`.
+
+### 3. Contracts
+
+- `interactionHelp` is optional and normalizes to `[]`; each entry contains only `trigger`, `label`, and `description`.
+- Command Registry validates triggers through `interaction/trigger.js`, rejects duplicate normalized triggers, and returns fresh nested metadata from list, search, and lookup operations.
+- Interaction Help is Command-owned descriptive metadata. It does not store, infer, or resolve Capability IDs and does not alter execution or binding persistence.
+- The live marker Command advertises only its existing unmodified left-click operation. Double Click is not supported.
+
+### 4. Validation & Error Matrix
+
+- Malformed help array/entry, blank label/description, unsupported button/modifier, duplicate modifier, or duplicate normalized trigger -> fail during Command loading.
+- Missing help -> return `interactionHelp: []` and preserve existing search/execution behavior.
+
+### 5. Good/Base/Bad Cases
+
+- Good: `interactionHelp` describes a Command card's actual bound operations using the same normalized trigger contract as BindingStorage.
+- Base: `timeline.addMarker` declares one unmodified left-click row with authored `Click` label and marker description.
+- Good: Commands without help normalize to `interactionHelp: []` and keep existing search/execution behavior.
+- Bad: generating labels from modifiers in the renderer, copying trigger validation into Command Registry, or storing a Capability ID in help metadata.
+- Bad: advertising a modified-click operation before its Command and binding exist.
+
+### 6. Tests Required
+
+- Assert Click, Right Click, individual/combined modifiers, malformed values, duplicate triggers, defensive results, and unchanged Command ID -> Capability ID mapping.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+const help = command.capability === "marker.add"
+  ? [{ label: "Click", description: "Add marker" }]
+  : [];
+```
+
+#### Correct
+
+```javascript
+const [{ label, description }] = command.interactionHelp;
+// The registry validated trigger/label/description from Command metadata.
 ```
 
 ---
