@@ -168,3 +168,24 @@ Extended the internal Capability Registry with validated capability metadata loo
 ### Status
 
 [OK] **Completed**
+
+
+## Session 8: Add capability config schema
+
+**Date**: 2026-07-31
+**Task**: Add capability config schema
+**Branch**: `main`
+
+### Summary
+
+Added schema-driven capability configuration with validated metadata, atomic shared JSON storage, capability-scoped ConfigManager access, central required-setting enforcement, cross-host freshness, and executor context injection without UI or plugin scope.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8266fd6` | (see git log) |
+
+### Status
+
+[OK] **Completed**
