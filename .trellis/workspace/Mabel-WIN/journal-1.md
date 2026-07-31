@@ -252,3 +252,24 @@ Implemented metadata-driven FeatureCatalog and schema settings UI in a dedicated
 ### Status
 
 [OK] **Completed**
+
+
+## Session 12: Phase 5.5 Feature Lifecycle
+
+**Date**: 2026-07-31
+**Task**: Phase 5.5 Feature Lifecycle
+**Branch**: `main`
+
+### Summary
+
+Added three-axis feature lifecycle projection, enablement persistence, readiness probes, Command Engine disabled gate, generic Settings and palette status UI, targeted recovery navigation, tests, and cross-layer specs.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `966e27a` | (see git log) |
+
+### Status
+
+[OK] **Completed**
