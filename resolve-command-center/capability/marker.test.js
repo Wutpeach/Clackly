@@ -15,7 +15,8 @@ test("marker capability exposes descriptive metadata", () => {
     icon: "marker",
     version: "1.0.0",
     type: "command",
-    providers: ["resolve-api", "shortcut"]
+    providers: ["resolve-api", "shortcut"],
+    configSchema: {}
   });
 });
 
@@ -45,6 +46,23 @@ test("marker execute selects the highest-priority available backend", async () =
 
   assert.deepEqual(await marker.execute(), { backend: "resolveApi" });
   assert.deepEqual(calls, ["resolveApi"]);
+});
+
+test("marker execute preserves the command argument when a config context is provided", async () => {
+  const command = { id: "timeline.addMarker", capability: "marker.add" };
+  const marker = createMarkerCapability({
+    resolveApi: {
+      addMarker: async (received) => {
+        assert.equal(received, command);
+        return { ok: true };
+      }
+    }
+  });
+
+  assert.deepEqual(
+    await marker.execute(command, { config: { get: () => null } }),
+    { ok: true }
+  );
 });
 
 test("marker add falls back when higher-priority backends are unavailable", async () => {

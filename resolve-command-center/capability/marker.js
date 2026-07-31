@@ -61,7 +61,8 @@ function createMarkerCapability(backends = {}) {
       icon: "marker",
       version: "1.0.0",
       type: "command",
-      providers: ["resolve-api", "shortcut"]
+      providers: ["resolve-api", "shortcut"],
+      configSchema: {}
     },
     add,
     execute: add,

@@ -18,10 +18,11 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 ### 2. Signatures
 
 - Command manifest: `{ id: string, name: string, keywords: string[], capability: string }`
-- Capability metadata: `{ id: string, name: string, description: string, category: string, icon: string, version: string, type: string, providers: string[] }`
+- Capability metadata: `{ id: string, name: string, description: string, category: string, icon: string, version: string, type: string, providers: string[], configSchema: object }`
 - Capability registry: `createCapabilityRegistry() -> { register(capabilityId, capability), get(capabilityId), getMetadata(capabilityId), getAllCapabilities() }`
-- Command executor: `createCommandExecutor({ capabilityRegistry, findCommand? }) -> executeCommand(commandId)`
-- Marker capability: `createMarkerCapability(backends) -> { metadata, add(options?), execute(command), selectBackend() }`
+- Command executor: `createCommandExecutor({ capabilityRegistry, configManager, findCommand? }) -> executeCommand(commandId)`
+- Capability execution: `capability.execute(command, { config })`, where `config.get(key)` is scoped to that capability.
+- Marker capability: `createMarkerCapability(backends) -> { metadata, add(options?), execute(command, context?), selectBackend() }`
 - Unavailable error: `CapabilityUnavailableError(capability, attemptedBackends)`
 - Shortcut manager: `get(name)`, `has(name)`, `canExecute(name)`, and `execute(name, context?)`.
 
@@ -30,6 +31,7 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - `command-engine/` validates and routes the `capability` string only. It must not import Resolve APIs, bridge transport, or keyboard implementations.
 - Each host creates a capability registry, registers its host-backed capability objects, and injects the registry into the command executor.
 - Registered capabilities keep descriptive data under `capability.metadata`; `register(capabilityId, capability)` and `get(capabilityId)` retain their existing execution-object behavior.
+- Every capability declares `metadata.configSchema`; use `{}` when it has no settings. Registry registration validates the schema before storing the capability.
 - `getMetadata(capabilityId)` returns the full metadata object or `null`. `getAllCapabilities()` returns fresh catalog summaries containing only `id`, `name`, `category`, and `icon`, never execution functions.
 - Metadata `providers` names supported provider families such as `resolve-api` and `shortcut`; it does not report host-specific runtime availability or expose internal backend ids.
 - `marker.add` checks backends in order: `resolveApi`, `resolveScriptApi`, `workflowPluginApi`, `keyboardShortcut`; `uiAutomation` is reserved and not implemented.
@@ -94,6 +96,76 @@ capabilityRegistry.getMetadata("marker.add");
 capabilityRegistry.getAllCapabilities();
 const executeCommand = createCommandExecutor({
   capabilityRegistry,
+  configManager,
+});
+```
+
+## Scenario: Capability Configuration
+
+### 1. Scope / Trigger
+
+- Trigger: adding a capability setting, reading configuration during capability execution, or changing configuration persistence.
+- Capability code declares settings as metadata; it does not build Settings UI or read files.
+
+### 2. Signatures
+
+- Config field: `{ type: "string" | "number" | "boolean" | "color" | "path" | "folder" | "select", label?: string, required?: boolean, options?: string[] }`
+- Config schema: `Record<string, ConfigField>` stored at `capability.metadata.configSchema`.
+- Storage: `new ConfigStorage(filePath)`, `ConfigStorage.fromAppData(appDataPath)`, `load()`, and `save(config)`.
+- Manager: `new ConfigManager({ capabilityRegistry, storage, validator? })` with `save(capabilityId, values)`, `get(capabilityId, key?)`, `update(capabilityId, patch)`, `assertConfigured(capabilityId)`, and `forCapability(capabilityId)`.
+- Executor context: `capability.execute(command, { config: configManager.forCapability(command.capability) })`.
+
+### 3. Contracts
+
+- Both Electron hosts use `ConfigStorage.fromAppData(app.getPath("appData"))`, resolving to shared `appData/Clackly/config.json`; Workflow Integration keeps its separate `userData` root.
+- The stored JSON root maps capability ids to flat configuration objects. ConfigStorage is the only configuration filesystem owner.
+- ConfigManager resolves schemas through Capability Registry metadata, preserves unknown capability sections, returns copies, and reloads before reads and writes so long-running hosts observe sequential changes.
+- String-like types are strings, numbers are finite, booleans are booleans, and select values must match declared options. This layer does not inspect paths/folders or parse colors.
+- The executor checks required configuration before capability execution. The original command remains the first argument; the second context exposes only a capability-scoped `config.get(key)` reader.
+- Simultaneous cross-process writes remain last-writer-wins until concurrent Settings writers justify interprocess locking.
+
+### 4. Validation & Error Matrix
+
+- Missing or malformed `configSchema`, unsupported type, invalid label/required flag, or invalid select options -> registry registration throws `TypeError`.
+- Missing config file -> ConfigStorage loads `{}`.
+- Invalid JSON or non-object storage root -> ConfigStorage throws clearly and does not replace the file.
+- Unknown capability id or config key -> ConfigManager throws clearly.
+- Stored or submitted type mismatch / invalid select value -> ConfigManager throws `TypeError` before exposing or executing it.
+- Missing or blank required string-like fields -> executor rejects before `capability.execute()` and names the capability plus all missing fields.
+- Empty schema -> execution proceeds without setup.
+
+### 5. Good/Base/Bad Cases
+
+- Good: capability metadata declares `configSchema`, future UI reads that metadata, and capability execution calls `context.config.get("aePath")`.
+- Base: `marker.add` declares `configSchema: {}` and executes exactly as before.
+- Good: both hosts share the config file but reload before operations, preserving sequential changes made by the other host.
+- Bad: a capability imports `node:fs`, receives ConfigStorage, or reads another capability id.
+- Bad: ConfigManager keeps a startup snapshot of the shared document and later overwrites another host's settings.
+
+### 6. Tests Required
+
+- Assert every supported schema/value type plus malformed and sparse select options.
+- Assert missing-file load, invalid JSON/root errors, atomic replacement, failed-write cleanup, and previous-file preservation.
+- Assert save/get/update copies, unknown ids/keys, invalid stored values, missing/blank required values, and scoped reads.
+- Assert two long-running managers observe sequential shared-file changes and preserve unrelated capability sections.
+- Assert executor blocks incomplete configuration before execution and otherwise passes the unchanged command plus scoped context.
+- Assert both host composition roots use the common appData path while Workflow Integration retains its userData override.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+const config = JSON.parse(fs.readFileSync("config.json"));
+await capability.execute(command, config[command.capability]);
+```
+
+#### Correct
+
+```javascript
+configManager.assertConfigured(command.capability);
+await capability.execute(command, {
+  config: configManager.forCapability(command.capability),
 });
 ```
 

@@ -1,5 +1,8 @@
+const { SchemaValidator } = require("../config/SchemaValidator");
+
 function createCapabilityRegistry() {
   const capabilities = new Map();
+  const schemaValidator = new SchemaValidator();
   const requiredMetadataStrings = [
     "id",
     "name",
@@ -35,6 +38,8 @@ function createCapabilityRegistry() {
     ))) {
       throw new TypeError("Capability metadata providers must be an array of non-empty strings");
     }
+
+    schemaValidator.validateSchema(metadata.configSchema);
 
     if (metadata.id !== capabilityId) {
       throw new TypeError("Capability metadata id must match the registered capability id");

@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Review config modules and executor integration against the established capability and host boundaries."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check schema, storage, manager, executor, and future UI data contracts as one cross-layer flow."}
+{"file":".trellis/tasks/07-31-capability-config-schema/research/current-config-boundary.md","reason":"Verify the final implementation preserves the approved shared-path and scoped-context decisions without adding UI or plugin scope."}

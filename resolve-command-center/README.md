@@ -16,6 +16,8 @@ Each capability keeps descriptive metadata separate from execution. The registry
 
 The Workflow Integration host injects `resolve/adapter.js` as the Workflow Plugin API backend. The standalone/Utility host injects `execution-adapter/bridge.js` as the Resolve Script API backend; it checks `/health` before sending the existing command-id request to the Python bridge and `resolve/adapter.py`.
 
+Capability metadata also owns a plain `configSchema`. `config/SchemaValidator.js` validates schema fields and values, `ConfigStorage` persists the shared Electron `appData/Clackly/config.json` document with atomic replacement, and `ConfigManager` reloads that shared document before reads and writes while exposing capability-scoped values. Before execution, the command engine blocks capabilities with missing required settings and passes configuration as the second argument: `execute(command, { config })`. Capabilities read only their own declared values through `config.get(key)`; they do not access the file or storage service directly. The Workflow Integration host still keeps its separate Electron `userData` path.
+
 `shortcut/shortcuts.json` currently maps `CREATE_FUSION_CLIP` to `CTRL+ALT+F` and `ADD_MARKER` to `CTRL+M`. `ShortcutManager` supports lookup, introspection, and an injected future keyboard executor. It does not bind shortcuts or perform keyboard/UI automation in this MVP. The `Ctrl+Space` palette hotkey remains separate Electron window behavior.
 
 ## Resolve Workflow Integration Plugin

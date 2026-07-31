@@ -13,7 +13,10 @@ test("capability registry validates registration and preserves execution objects
     icon: "marker",
     version: "1.0.0",
     type: "command",
-    providers: ["resolve-api", "shortcut"]
+    providers: ["resolve-api", "shortcut"],
+    configSchema: {
+      color: { type: "color", label: "Marker color" }
+    }
   };
   const capability = { metadata, execute: async () => ({ ok: true }) };
 
@@ -54,6 +57,24 @@ test("capability registry validates registration and preserves execution objects
       execute() {}
     }),
     /providers must be an array of non-empty strings/
+  );
+  assert.throws(
+    () => registry.register("invalid", {
+      metadata: { ...metadata, id: "invalid", configSchema: undefined },
+      execute() {}
+    }),
+    /configSchema must be an object/
+  );
+  assert.throws(
+    () => registry.register("invalid", {
+      metadata: {
+        ...metadata,
+        id: "invalid",
+        configSchema: { mode: { type: "select", options: [] } }
+      },
+      execute() {}
+    }),
+    /select options must be a non-empty array/
   );
   assert.throws(
     () => registry.register("invalid", { metadata, execute() {} }),

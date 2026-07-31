@@ -10,6 +10,8 @@ const { getCommands, searchCommands } = require("../../command-engine/registry")
 const { createCommandExecutor } = require("../../command-engine/executor");
 const { createCapabilityRegistry } = require("../../capability/registry");
 const { createMarkerCapability } = require("../../capability/marker");
+const { ConfigManager } = require("../../config/ConfigManager");
+const { ConfigStorage } = require("../../config/ConfigStorage");
 const { createBridgeExecutionAdapter } = require("../../execution-adapter/bridge");
 const { ShortcutManager } = require("../../shortcut/ShortcutManager");
 
@@ -26,8 +28,13 @@ const markerCapability = createMarkerCapability({
 });
 const capabilityRegistry = createCapabilityRegistry();
 capabilityRegistry.register("marker.add", markerCapability);
+const configManager = new ConfigManager({
+  capabilityRegistry,
+  storage: ConfigStorage.fromAppData(app.getPath("appData"))
+});
 const executeCommand = createCommandExecutor({
-  capabilityRegistry
+  capabilityRegistry,
+  configManager
 });
 
 function showPalette() {
