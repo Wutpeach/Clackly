@@ -1,0 +1,2 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Check the final registry and capability changes against established execution and layering contracts."}
+{"file":".trellis/tasks/07-31-capability-metadata/research/current-metadata-boundary.md","reason":"Verify that metadata queries were added without changing registration callers or execution behavior."}

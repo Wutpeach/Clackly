@@ -10,6 +10,8 @@ Command metadata describes intent with `capability: "marker.add"`; it does not s
 command-engine -> capability registry -> capability -> execution adapter -> Resolve / keyboard / future automation
 ```
 
+Each capability keeps descriptive metadata separate from execution. The registry's `getMetadata(id)` returns the full metadata contract, while `getAllCapabilities()` returns catalog summaries containing only `id`, `name`, `category`, and `icon`. Provider metadata describes supported provider families, not which backend is currently available in a host.
+
 `capability/marker.js` selects the first available marker backend in this order: direct Resolve API, Resolve Script API, Workflow Plugin API, configured keyboard shortcut, then a reserved future UI-automation slot. Availability is checked before execution. Once a backend starts marker execution, any semantic or API error is returned without trying a lower backend, avoiding duplicate or partial actions.
 
 The Workflow Integration host injects `resolve/adapter.js` as the Workflow Plugin API backend. The standalone/Utility host injects `execution-adapter/bridge.js` as the Resolve Script API backend; it checks `/health` before sending the existing command-id request to the Python bridge and `resolve/adapter.py`.

@@ -53,6 +53,16 @@ function createMarkerCapability(backends = {}) {
   }
 
   return {
+    metadata: {
+      id: "marker.add",
+      name: "Add Marker",
+      description: "Add marker at current timeline position",
+      category: "Timeline",
+      icon: "marker",
+      version: "1.0.0",
+      type: "command",
+      providers: ["resolve-api", "shortcut"]
+    },
     add,
     execute: add,
     selectBackend

@@ -1,5 +1,14 @@
 function createCapabilityRegistry() {
   const capabilities = new Map();
+  const requiredMetadataStrings = [
+    "id",
+    "name",
+    "description",
+    "category",
+    "icon",
+    "version",
+    "type"
+  ];
 
   function register(capabilityId, capability) {
     if (typeof capabilityId !== "string" || capabilityId.trim().length === 0) {
@@ -8,6 +17,27 @@ function createCapabilityRegistry() {
 
     if (!capability || typeof capability !== "object" || typeof capability.execute !== "function") {
       throw new TypeError("Capability registry requires an execution object with execute()");
+    }
+
+    const { metadata } = capability;
+    if (!metadata || typeof metadata !== "object") {
+      throw new TypeError("Capability registry requires capability metadata");
+    }
+
+    for (const field of requiredMetadataStrings) {
+      if (typeof metadata[field] !== "string" || metadata[field].trim().length === 0) {
+        throw new TypeError(`Capability metadata requires a non-empty ${field}`);
+      }
+    }
+
+    if (!Array.isArray(metadata.providers) || Array.from(metadata.providers).some((provider) => (
+      typeof provider !== "string" || provider.trim().length === 0
+    ))) {
+      throw new TypeError("Capability metadata providers must be an array of non-empty strings");
+    }
+
+    if (metadata.id !== capabilityId) {
+      throw new TypeError("Capability metadata id must match the registered capability id");
     }
 
     if (capabilities.has(capabilityId)) {
@@ -22,7 +52,20 @@ function createCapabilityRegistry() {
     return capabilities.get(capabilityId) || null;
   }
 
-  return { register, get };
+  function getMetadata(capabilityId) {
+    return get(capabilityId)?.metadata || null;
+  }
+
+  function getAllCapabilities() {
+    return Array.from(capabilities.values(), ({ metadata }) => ({
+      id: metadata.id,
+      name: metadata.name,
+      category: metadata.category,
+      icon: metadata.icon
+    }));
+  }
+
+  return { register, get, getMetadata, getAllCapabilities };
 }
 
 module.exports = { createCapabilityRegistry };

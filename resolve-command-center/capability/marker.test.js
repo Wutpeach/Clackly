@@ -6,6 +6,19 @@ const {
   createMarkerCapability
 } = require("./marker");
 
+test("marker capability exposes descriptive metadata", () => {
+  assert.deepEqual(createMarkerCapability().metadata, {
+    id: "marker.add",
+    name: "Add Marker",
+    description: "Add marker at current timeline position",
+    category: "Timeline",
+    icon: "marker",
+    version: "1.0.0",
+    type: "command",
+    providers: ["resolve-api", "shortcut"]
+  });
+});
+
 test("marker execute selects the highest-priority available backend", async () => {
   const calls = [];
   const marker = createMarkerCapability({

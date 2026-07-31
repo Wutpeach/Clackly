@@ -18,9 +18,10 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 ### 2. Signatures
 
 - Command manifest: `{ id: string, name: string, keywords: string[], capability: string }`
-- Capability registry: `createCapabilityRegistry() -> { register(capabilityId, capability), get(capabilityId) }`
+- Capability metadata: `{ id: string, name: string, description: string, category: string, icon: string, version: string, type: string, providers: string[] }`
+- Capability registry: `createCapabilityRegistry() -> { register(capabilityId, capability), get(capabilityId), getMetadata(capabilityId), getAllCapabilities() }`
 - Command executor: `createCommandExecutor({ capabilityRegistry, findCommand? }) -> executeCommand(commandId)`
-- Marker capability: `createMarkerCapability(backends) -> { add(options?), execute(command), selectBackend() }`
+- Marker capability: `createMarkerCapability(backends) -> { metadata, add(options?), execute(command), selectBackend() }`
 - Unavailable error: `CapabilityUnavailableError(capability, attemptedBackends)`
 - Shortcut manager: `get(name)`, `has(name)`, `canExecute(name)`, and `execute(name, context?)`.
 
@@ -28,6 +29,9 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 
 - `command-engine/` validates and routes the `capability` string only. It must not import Resolve APIs, bridge transport, or keyboard implementations.
 - Each host creates a capability registry, registers its host-backed capability objects, and injects the registry into the command executor.
+- Registered capabilities keep descriptive data under `capability.metadata`; `register(capabilityId, capability)` and `get(capabilityId)` retain their existing execution-object behavior.
+- `getMetadata(capabilityId)` returns the full metadata object or `null`. `getAllCapabilities()` returns fresh catalog summaries containing only `id`, `name`, `category`, and `icon`, never execution functions.
+- Metadata `providers` names supported provider families such as `resolve-api` and `shortcut`; it does not report host-specific runtime availability or expose internal backend ids.
 - `marker.add` checks backends in order: `resolveApi`, `resolveScriptApi`, `workflowPluginApi`, `keyboardShortcut`; `uiAutomation` is reserved and not implemented.
 - Hosts inject available execution adapters. Workflow Integration injects the Resolve adapter as `workflowPluginApi`; standalone/Utility injects the health-checked bridge adapter as `resolveScriptApi`.
 - Backend fallback happens only during availability selection. Once `addMarker()` starts, its API or semantic error propagates and no lower backend executes.
@@ -38,6 +42,8 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 
 - Unknown command id -> command executor throws `Unknown command`.
 - Missing command capability handler -> command executor throws `No capability handler registered`.
+- Missing capability metadata, blank required string fields, invalid or sparse `providers`, or a metadata id that differs from the registry key -> registration throws `TypeError`.
+- Unknown capability metadata id -> `getMetadata()` returns `null`.
 - Backend missing `addMarker` or reporting `isAvailable() === false` -> capability checks the next backend.
 - Backend availability raises `CapabilityUnavailableError` -> capability checks the next backend.
 - Backend availability raises an unexpected error -> propagate it; do not hide infrastructure bugs.
@@ -48,9 +54,11 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 ### 5. Good/Base/Bad Cases
 
 - Good: command metadata contains `"capability": "marker.add"`.
+- Good: the marker capability exposes nested metadata and the registry projects only catalog fields for future UI consumers.
 - Base: Workflow Plugin injects only `workflowPluginApi`, so `marker.add` delegates to `resolve/adapter.js`.
 - Good: a dead standalone bridge reports unavailable before execution, allowing a future configured keyboard backend to be selected.
 - Bad: command metadata contains `"executor": "resolve"` or a keyboard shortcut string.
+- Bad: Electron host registration duplicates marker metadata or computes provider availability for the catalog.
 - Bad: catch an `AddMarker` failure and then press `CTRL+M`; the first backend may already have performed a partial action.
 
 ### 6. Tests Required
@@ -59,6 +67,9 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - Assert unavailable higher backends fall through in priority order.
 - Assert selected-backend execution errors do not call lower backends.
 - Assert no backend produces `CapabilityUnavailableError` with useful metadata.
+- Assert registry lookup preserves the same execution object while metadata lookup returns the full metadata object.
+- Assert catalog listing returns only `id`, `name`, `category`, and `icon`.
+- Assert missing, malformed, id-mismatched, and sparse-provider metadata cannot register.
 - Assert command registry preserves search while returning capability metadata.
 - Assert ShortcutManager mapping, no-executor behavior, and injected-executor request shape.
 - Assert bridge availability uses `/health` and marker execution preserves the existing command-id HTTP payload.
@@ -79,6 +90,8 @@ if (command.executor === "resolve") {
 ```javascript
 const capabilityRegistry = createCapabilityRegistry();
 capabilityRegistry.register("marker.add", markerCapability);
+capabilityRegistry.getMetadata("marker.add");
+capabilityRegistry.getAllCapabilities();
 const executeCommand = createCommandExecutor({
   capabilityRegistry,
 });

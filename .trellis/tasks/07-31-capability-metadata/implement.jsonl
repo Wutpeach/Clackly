@@ -1,0 +1,2 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Defines the current capability registry, execution, host composition, and adapter boundaries that implementation must preserve."}
+{"file":".trellis/tasks/07-31-capability-metadata/research/current-metadata-boundary.md","reason":"Records the current registry flow and the minimum metadata extension supported by repository evidence."}
