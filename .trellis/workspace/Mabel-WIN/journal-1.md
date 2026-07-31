@@ -231,3 +231,24 @@ Added Command-owned interactionHelp metadata, extracted the shared left/right mo
 ### Status
 
 [OK] **Completed**
+
+
+## Session 11: Feature UI Framework
+
+**Date**: 2026-07-31
+**Task**: Feature UI Framework
+**Branch**: `main`
+
+### Summary
+
+Implemented metadata-driven FeatureCatalog and schema settings UI in a dedicated reusable Electron Settings window, with shared dual-host IPC, ConfigManager save/reset flow, Command-owned Interaction Help, tests, build verification, and updated code specs.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9254b1b` | (see git log) |
+
+### Status
+
+[OK] **Completed**
