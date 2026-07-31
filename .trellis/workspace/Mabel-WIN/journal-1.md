@@ -189,3 +189,24 @@ Added schema-driven capability configuration with validated metadata, atomic sha
 ### Status
 
 [OK] **Completed**
+
+
+## Session 9: Implement interaction binding system
+
+**Date**: 2026-07-31
+**Task**: Implement interaction binding system
+**Branch**: `main`
+
+### Summary
+
+Added persisted left/right mouse interaction bindings with CTRL/SHIFT/ALT exact matching, Command ID-only dispatch through the existing Command Registry and Capability chain, Electron host/preload/renderer integration, focused tests, and executable backend/frontend specs. Excluded double-click and shortcut-manager scope.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2c33bc2` | (see git log) |
+
+### Status
+
+[OK] **Completed**

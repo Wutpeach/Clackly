@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 8
+- **Total Sessions**: 9
 - **Last Active**: 2026-07-31
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~191 | Active |
+| `journal-1.md` | ~212 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 9 | 2026-07-31 | Implement interaction binding system | `2c33bc2` | `main` |
 | 8 | 2026-07-31 | Add capability config schema | `8266fd6` | `main` |
 | 7 | 2026-07-31 | Add capability metadata | `a88fcf5` | `main` |
 | 6 | 2026-07-30 | Polish Clackly launcher and repair Codex Stop hook | `a84ddb8`, `7cf3818` | `main` |
