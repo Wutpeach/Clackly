@@ -16,6 +16,17 @@ function mergeStatuses(current, next) {
   return [...byId.values()];
 }
 
+function SettingsTitlebar() {
+  return (
+    <header className="settings-titlebar">
+      <div className="settings-titlebar-drag">
+        <span className="settings-titlebar-brand"><img src={logoUrl} alt="Clackly" /></span>
+        <span className="settings-titlebar-label">Settings</span>
+      </div>
+    </header>
+  );
+}
+
 function SettingsApp({ api, Icon }) {
   const [features, setFeatures] = useState([]);
   const [featureStatuses, setFeatureStatuses] = useState([]);
@@ -193,24 +204,33 @@ function SettingsApp({ api, Icon }) {
   }
 
   if (loading) {
-    return <main className="settings-shell settings-state" role="status">Loading features…</main>;
+    return (
+      <main className="settings-shell">
+        <SettingsTitlebar />
+        <div className="settings-state" role="status">Loading features…</div>
+      </main>
+    );
   }
 
   if (visibleFeatures.length === 0) {
     const loadError = status?.kind === "error" ? status.message : null;
     return (
-      <main className="settings-shell settings-state" role={loadError ? "alert" : undefined}>
-        <strong>{loadError ? "Unable to load features" : "No features registered"}</strong>
-        <span>{loadError || "Registered capability metadata will appear here automatically."}</span>
+      <main className="settings-shell">
+        <SettingsTitlebar />
+        <div className="settings-state" role={loadError ? "alert" : undefined}>
+          <strong>{loadError ? "Unable to load features" : "No features registered"}</strong>
+          <span>{loadError || "Registered capability metadata will appear here automatically."}</span>
+        </div>
       </main>
     );
   }
 
   return (
     <main className="settings-shell">
-      <aside className="feature-sidebar" aria-label="Features">
-        <div className="settings-brand"><img src={logoUrl} alt="Clackly" /></div>
-        <nav className="feature-navigation">
+      <SettingsTitlebar />
+      <div className="settings-workspace">
+        <aside className="feature-sidebar" aria-label="Features">
+          <nav className="feature-navigation">
           {groupedFeatures.map(([category, categoryFeatures], categoryIndex) => (
             <section className="feature-category" key={category} aria-labelledby={`feature-category-${categoryIndex}`}>
               <h2 id={`feature-category-${categoryIndex}`}>{category}</h2>
@@ -246,11 +266,11 @@ function SettingsApp({ api, Icon }) {
               })}
             </section>
           ))}
-        </nav>
-      </aside>
+          </nav>
+        </aside>
 
-      {selectedFeature && (
-        <section className="feature-detail" aria-labelledby="feature-title">
+        {selectedFeature && (
+          <section className="feature-detail" aria-labelledby="feature-title">
           <div className="feature-detail-scroll">
             <header className="feature-detail-header">
               <span className="feature-detail-icon"><Icon name={selectedFeature.icon} size={26} /></span>
@@ -336,8 +356,9 @@ function SettingsApp({ api, Icon }) {
               {busy ? "Working…" : "Save"}
             </button>
           </footer>
-        </section>
-      )}
+          </section>
+        )}
+      </div>
     </main>
   );
 }

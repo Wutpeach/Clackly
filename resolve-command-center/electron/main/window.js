@@ -90,7 +90,12 @@ function createSettingsWindow(BrowserWindowType = BrowserWindow) {
     minWidth: SETTINGS_SIZE.minWidth,
     minHeight: SETTINGS_SIZE.minHeight,
     show: false,
-    frame: true,
+    titleBarStyle: "hidden",
+    titleBarOverlay: {
+      color: "#202327",
+      symbolColor: "#EBEBEC",
+      height: 48
+    },
     resizable: true,
     alwaysOnTop: false,
     autoHideMenuBar: true,

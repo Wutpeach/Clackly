@@ -102,7 +102,12 @@ test("settings window owns native sizing and built renderer routing without a bl
       minWidth: 640,
       minHeight: 480,
       show: false,
-      frame: true,
+      titleBarStyle: "hidden",
+      titleBarOverlay: {
+        color: "#202327",
+        symbolColor: "#EBEBEC",
+        height: 48
+      },
       resizable: true,
       alwaysOnTop: false,
       autoHideMenuBar: true,

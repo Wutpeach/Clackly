@@ -88,7 +88,7 @@ Scripts are trusted local Feature code, not sandboxed third-party code. Each exe
 
 ## Feature UI Framework
 
-The Settings button opens a separate native-framed `760x560` window (minimum `640x480`) while Launcher, Search, and All Actions remain in the fixed `376x468` palette. `feature-ui/FeatureCatalog.js` projects full defensive metadata records from the existing Capability Registry, so registering a capability automatically adds it to the category-grouped Settings sidebar.
+The Settings button opens a separate `760x560` window (minimum `640x480`) with a Clackly title bar and native window controls, while Launcher, Search, and All Actions remain in the fixed `376x468` palette. `feature-ui/FeatureCatalog.js` projects full defensive metadata records from the existing Capability Registry, so registering a capability automatically adds it to the category-grouped Settings sidebar.
 
 The unified detail panel renders feature identity and resolved schema from Capability Metadata, binding-derived interaction help for associated Commands, and all settings through the generic `SettingsRenderer`. String, number, boolean, color, path, folder, and select fields use native controls. Path/folder selection uses Electron dialogs, drafts remain local until Save, and Save/Reset cross preload IPC into `ConfigManager`; renderer code never reads config files or calls capabilities and Resolve APIs directly.
 
