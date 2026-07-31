@@ -169,3 +169,42 @@ export function groupCommands(commands) {
     return left.localeCompare(right);
   });
 }
+
+export function getSettingsFieldLabel(key, field = {}) {
+  if (typeof field.label === "string" && field.label.trim()) return field.label;
+  const words = key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[._-]+/g, " ")
+    .trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : key;
+}
+
+export function getSettingsControl(field) {
+  switch (field.type) {
+    case "string":
+      return { kind: "input", inputType: "text" };
+    case "number":
+      return { kind: "input", inputType: "number" };
+    case "boolean":
+      return { kind: "checkbox" };
+    case "color":
+      return { kind: "input", inputType: "color" };
+    case "path":
+    case "folder":
+      return { kind: "picker", inputType: "text", pickerType: field.type };
+    case "select":
+      return { kind: "select", options: [...field.options] };
+    default:
+      throw new TypeError(`Unsupported settings field type: ${field.type}`);
+  }
+}
+
+export function groupFeaturesByCategory(features) {
+  const groups = new Map();
+  for (const feature of features) {
+    const group = groups.get(feature.category) || [];
+    group.push(feature);
+    groups.set(feature.category, group);
+  }
+  return [...groups.entries()];
+}

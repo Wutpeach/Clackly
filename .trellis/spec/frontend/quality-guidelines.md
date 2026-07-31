@@ -92,6 +92,74 @@ window.resolveCommandCenter.setPaletteMode("all-actions");
 
 ---
 
+## Scenario: Metadata-Driven Feature Settings
+
+### 1. Scope / Trigger
+
+- Trigger: exposing Capability Metadata or configuration in Electron UI.
+- Applies to FeatureCatalog, Settings BrowserWindow lifecycle, preload/IPC, SettingsRenderer, and the unified feature detail panel.
+
+### 2. Signatures
+
+- `new FeatureCatalog({ capabilityRegistry }).getAllFeatures() -> CapabilityMetadata[]`.
+- Preload APIs: `listFeatures()`, `getConfig(capabilityId)`, `saveConfig(capabilityId, values)`, `resetConfig(capabilityId)`, `pickPath("path" | "folder")`, and `openSettings()`.
+- `SettingsRenderer({ schema, values, onChange, onPick, disabled })`.
+
+### 3. Contracts
+
+- One registered Capability is one feature; there is no second feature manifest, registry, feature-id branch, or feature-specific page.
+- Feature identity and schema come from Capability Metadata. Interaction Help remains Command-owned and is associated only through `command.capability === feature.id`.
+- Standalone Electron and Workflow Integration register the same feature/config/picker channels through the shared IPC helper.
+- Settings is one native-framed, resizable `760x560` window with a `640x480` minimum. Repeated opens reuse and focus it; it does not hide on blur or become always-on-top.
+- Launcher, Search, and All Actions remain in the frameless fixed `376x468` palette.
+- The existing renderer bundle selects Settings through a main-process-owned `?view=settings` marker. Renderer code never sends dimensions.
+- Draft values remain local until Save. Save and Reset route through ConfigManager; path and folder fields route through Electron native dialogs.
+- SettingsRenderer maps only the seven validated schema types to native controls and derives missing labels generically from field keys.
+
+### 4. Validation & Error Matrix
+
+- Empty feature catalog -> truthful empty state.
+- Empty schema -> “No settings required”; Save disabled.
+- Missing help -> “No interaction help available.”
+- Picker cancellation -> `null`; draft remains unchanged.
+- Invalid required/type/select value -> ConfigManager error shown; persisted values remain unchanged.
+- Settings close or feature navigation -> never executes a Command or capability.
+
+### 5. Good/Base/Bad Cases
+
+- Good: registering a new Capability with metadata and a schema makes it appear in the shared Settings window without renderer edits.
+- Base: `marker.add` appears under Timeline, renders its metadata and Interaction Help, and truthfully shows that no settings are required.
+- Good: both Electron hosts call the shared IPC registrar and shared Settings window helper while retaining their own Capability providers.
+- Bad: adding a renderer branch such as `if (feature.id === "marker.add")`, a feature-specific BrowserWindow, or a second renderer bundle.
+- Bad: reading `config.json`, importing ConfigStorage, resolving a Capability implementation, or calling Resolve APIs from renderer code.
+
+### 6. Tests Required
+
+- Assert catalog ordering, full defensive metadata, exact category filtering, and discovery after registration.
+- Assert all seven schema types map to their native controls and feature category grouping preserves registry order.
+- Assert feature/config/picker IPC semantics, picker cancellation, ConfigManager reset preservation, and complete-save validation.
+- Assert palette dimensions remain `376x468`, Settings dimensions remain main-process-owned, and an existing Settings window is restored/focused instead of duplicated.
+- Run `npm test`, `npm run build`, and boundary searches for renderer Capability/Resolve/storage coupling.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+if (feature.id === "marker.add") {
+  return <MarkerSettings />;
+}
+```
+
+#### Correct
+
+```javascript
+const features = await window.resolveCommandCenter.listFeatures();
+return <SettingsRenderer schema={feature.configSchema} values={draft} />;
+```
+
+---
+
 ## Scenario: Command Card Mouse Interaction
 
 ### 1. Scope / Trigger

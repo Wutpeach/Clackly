@@ -1,0 +1,97 @@
+import React from "react";
+import { getSettingsControl, getSettingsFieldLabel } from "./model.mjs";
+
+function SettingsRenderer({ schema, values, onChange, onPick, disabled = false }) {
+  const fields = Object.entries(schema);
+  if (fields.length === 0) {
+    return <p className="settings-empty-copy">No settings required.</p>;
+  }
+
+  async function pickValue(key, type) {
+    const picked = await onPick(type);
+    if (picked !== null) onChange(key, picked);
+  }
+
+  return (
+    <div className="settings-fields">
+      {fields.map(([key, field]) => {
+        const control = getSettingsControl(field);
+        const label = getSettingsFieldLabel(key, field);
+        const inputId = `setting-${key}`;
+        const value = values[key];
+
+        if (control.kind === "checkbox") {
+          return (
+            <div className="settings-field checkbox-field" key={key}>
+              <input
+                id={inputId}
+                type="checkbox"
+                checked={Boolean(value)}
+                required={field.required}
+                disabled={disabled}
+                onChange={(event) => onChange(key, event.target.checked)}
+              />
+              <label htmlFor={inputId}>{label}{field.required ? " *" : ""}</label>
+            </div>
+          );
+        }
+
+        return (
+          <div className="settings-field" key={key}>
+            <label htmlFor={inputId}>{label}{field.required ? " *" : ""}</label>
+            {control.kind === "select" ? (
+              <select
+                id={inputId}
+                value={value ?? ""}
+                required={field.required}
+                disabled={disabled}
+                onChange={(event) => onChange(key, event.target.value || undefined)}
+              >
+                <option value="" disabled={Boolean(field.required)}>Select an option</option>
+                {control.options.map((option, index) => (
+                  <option key={`${option}-${index}`} value={option}>{option}</option>
+                ))}
+              </select>
+            ) : control.kind === "picker" ? (
+              <div className="settings-picker-control">
+                <input
+                  id={inputId}
+                  type="text"
+                  value={value ?? ""}
+                  required={field.required}
+                  disabled={disabled}
+                  onChange={(event) => onChange(key, event.target.value)}
+                />
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => pickValue(key, control.pickerType)}
+                >
+                  Browse
+                </button>
+              </div>
+            ) : (
+              <input
+                id={inputId}
+                type={control.inputType}
+                value={value ?? (control.inputType === "color" ? "#101216" : "")}
+                required={field.required}
+                disabled={disabled}
+                onChange={(event) => {
+                  if (control.inputType !== "number") {
+                    onChange(key, event.target.value);
+                    return;
+                  }
+                  const next = event.target.valueAsNumber;
+                  onChange(key, Number.isFinite(next) ? next : undefined);
+                }}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default SettingsRenderer;

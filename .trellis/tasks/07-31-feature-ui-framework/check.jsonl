@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify feature/config services reuse existing owners, reset preserves unrelated data, Interaction Help stays Command-owned, and execution/Resolve boundaries are unchanged."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify metadata-driven sidebar/detail rendering, context-isolated IPC, Settings window lifecycle, unchanged fixed palette modes, keyboard/accessibility behavior, and identical host channels."}
+{"file":".trellis/tasks/07-31-feature-ui-framework/research/current-feature-ui-boundary.md","reason":"Check the final diff against the researched minimal extension points and excluded complexity."}

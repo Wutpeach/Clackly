@@ -57,9 +57,15 @@ class ConfigManager {
     return values;
   }
 
-  save(capabilityId, values) {
+  save(capabilityId, values, { requireComplete = false } = {}) {
     const schema = this.getSchema(capabilityId);
     this.validator.validateValues(schema, values);
+    const missing = requireComplete ? this.validator.getMissingRequired(schema, values) : [];
+    if (missing.length > 0) {
+      throw new Error(
+        `Capability ${capabilityId} is missing required configuration: ${missing.join(", ")}`
+      );
+    }
 
     const nextConfig = {
       ...this.loadConfig(),
@@ -95,6 +101,14 @@ class ConfigManager {
     this.validator.validateValues(schema, values);
     this.storage.save({ ...config, [capabilityId]: { ...values } });
     return { ...values };
+  }
+
+  reset(capabilityId) {
+    this.getSchema(capabilityId);
+    const config = this.loadConfig();
+    delete config[capabilityId];
+    this.storage.save(config);
+    return {};
   }
 
   assertConfigured(capabilityId) {

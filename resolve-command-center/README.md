@@ -36,6 +36,12 @@ The Workflow Integration host injects `resolve/adapter.js` as the Workflow Plugi
 
 Capability metadata also owns a plain `configSchema`. `config/SchemaValidator.js` validates schema fields and values, `ConfigStorage` persists the shared Electron `appData/Clackly/config.json` document with atomic replacement, and `ConfigManager` reloads that shared document before reads and writes while exposing capability-scoped values. Before execution, the command engine blocks capabilities with missing required settings and passes configuration as the second argument: `execute(command, { config })`. Capabilities read only their own declared values through `config.get(key)`; they do not access the file or storage service directly. The Workflow Integration host still keeps its separate Electron `userData` path.
 
+## Feature UI Framework
+
+The Settings button opens a separate native-framed `760x560` window (minimum `640x480`) while Launcher, Search, and All Actions remain in the fixed `376x468` palette. `feature-ui/FeatureCatalog.js` projects full defensive metadata records from the existing Capability Registry, so registering a capability automatically adds it to the category-grouped Settings sidebar.
+
+The unified detail panel renders feature identity and schema from Capability Metadata, interaction help from associated Command Metadata, and all settings through the generic `SettingsRenderer`. String, number, boolean, color, path, folder, and select fields use native controls. Path/folder selection uses Electron dialogs, drafts remain local until Save, and Save/Reset cross preload IPC into `ConfigManager`; renderer code never reads config files or calls capabilities and Resolve APIs directly.
+
 `shortcut/shortcuts.json` currently maps `CREATE_FUSION_CLIP` to `CTRL+ALT+F` and `ADD_MARKER` to `CTRL+M`. `ShortcutManager` supports lookup, introspection, and an injected future keyboard executor. It does not bind shortcuts or perform keyboard/UI automation in this MVP. The `Ctrl+Space` palette hotkey remains separate Electron window behavior.
 
 ## Resolve Workflow Integration Plugin

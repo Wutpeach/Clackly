@@ -4,7 +4,7 @@ const test = require("node:test");
 const { ConfigManager } = require("./ConfigManager");
 
 function createManager(initial = {}) {
-  let persisted = initial;
+  let persisted = structuredClone(initial);
   const schemas = {
     "ae.export": {
       aePath: { type: "path", required: true },
@@ -21,11 +21,11 @@ function createManager(initial = {}) {
       getMetadata: (id) => schemas[id] ? { id, configSchema: schemas[id] } : null
     },
     storage: {
-      load: () => persisted,
-      save: (config) => { persisted = config; }
+      load: () => structuredClone(persisted),
+      save: (config) => { persisted = structuredClone(config); }
     }
   });
-  return { manager, getPersisted: () => persisted };
+  return { manager, getPersisted: () => structuredClone(persisted) };
 }
 
 test("config manager saves, copies, updates, and preserves unknown stored capabilities", () => {
@@ -124,4 +124,30 @@ test("scoped config readers expose only their capability's declared values", () 
   assert.equal(config.get("aePath"), "C:/AfterFX.exe");
   assert.throws(() => config.get("marker.add"), /Unknown configuration key/);
   assert.deepEqual(Object.keys(config), ["get"]);
+});
+
+test("reset removes only the selected capability and rejects unknown capabilities", () => {
+  const { manager, getPersisted } = createManager({
+    "ae.export": { aePath: "C:/AfterFX.exe" },
+    "caption.set": { text: "Keep me" },
+    legacy: { keep: true }
+  });
+
+  assert.deepEqual(manager.reset("ae.export"), {});
+  assert.deepEqual(getPersisted(), {
+    "caption.set": { text: "Keep me" },
+    legacy: { keep: true }
+  });
+  assert.throws(() => manager.reset("missing"), /Unknown capability/);
+});
+
+test("complete saves reject missing required values without persisting", () => {
+  const initial = { legacy: { keep: true } };
+  const { manager, getPersisted } = createManager(initial);
+
+  assert.throws(
+    () => manager.save("ae.export", { aePath: "C:/AfterFX.exe" }, { requireComplete: true }),
+    /missing required configuration: mode/
+  );
+  assert.deepEqual(getPersisted(), initial);
 });

@@ -112,7 +112,7 @@ const executeCommand = createCommandExecutor({
 - Config field: `{ type: "string" | "number" | "boolean" | "color" | "path" | "folder" | "select", label?: string, required?: boolean, options?: string[] }`
 - Config schema: `Record<string, ConfigField>` stored at `capability.metadata.configSchema`.
 - Storage: `new ConfigStorage(filePath)`, `ConfigStorage.fromAppData(appDataPath)`, `load()`, and `save(config)`.
-- Manager: `new ConfigManager({ capabilityRegistry, storage, validator? })` with `save(capabilityId, values)`, `get(capabilityId, key?)`, `update(capabilityId, patch)`, `assertConfigured(capabilityId)`, and `forCapability(capabilityId)`.
+- Manager: `new ConfigManager({ capabilityRegistry, storage, validator? })` with `save(capabilityId, values, { requireComplete? })`, `get(capabilityId, key?)`, `update(capabilityId, patch)`, `reset(capabilityId)`, `assertConfigured(capabilityId)`, and `forCapability(capabilityId)`.
 - Executor context: `capability.execute(command, { config: configManager.forCapability(command.capability) })`.
 
 ### 3. Contracts
@@ -121,6 +121,8 @@ const executeCommand = createCommandExecutor({
 - The stored JSON root maps capability ids to flat configuration objects. ConfigStorage is the only configuration filesystem owner.
 - ConfigManager resolves schemas through Capability Registry metadata, preserves unknown capability sections, returns copies, and reloads before reads and writes so long-running hosts observe sequential changes.
 - String-like types are strings, numbers are finite, booleans are booleans, and select values must match declared options. This layer does not inspect paths/folders or parse colors.
+- Settings IPC calls `save(..., { requireComplete: true })` so missing required fields fail before persistence; non-UI callers may still save partial drafts before `assertConfigured()` gates execution.
+- `reset(capabilityId)` reloads the shared document, removes only that capability section, preserves unrelated and unknown sections, persists the remainder, and returns `{}`.
 - The executor checks required configuration before capability execution. The original command remains the first argument; the second context exposes only a capability-scoped `config.get(key)` reader.
 - Simultaneous cross-process writes remain last-writer-wins until concurrent Settings writers justify interprocess locking.
 
@@ -146,7 +148,7 @@ const executeCommand = createCommandExecutor({
 
 - Assert every supported schema/value type plus malformed and sparse select options.
 - Assert missing-file load, invalid JSON/root errors, atomic replacement, failed-write cleanup, and previous-file preservation.
-- Assert save/get/update copies, unknown ids/keys, invalid stored values, missing/blank required values, and scoped reads.
+- Assert save/get/update/reset copies, unknown ids/keys, invalid stored values, complete-save required validation, missing/blank required values, and scoped reads.
 - Assert two long-running managers observe sequential shared-file changes and preserve unrelated capability sections.
 - Assert executor blocks incomplete configuration before execution and otherwise passes the unchanged command plus scoped context.
 - Assert both host composition roots use the common appData path while Workflow Integration retains its userData override.

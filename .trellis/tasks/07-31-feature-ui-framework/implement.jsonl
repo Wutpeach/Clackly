@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Defines Capability Metadata, ConfigManager, Command-owned Interaction Help, Command-to-Capability execution, and host composition boundaries the UI framework must preserve."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines preload isolation, fixed 376x468 behavior for Launcher/Search/All Actions, keyboard accessibility, renderer metadata rules, and dual-host parity; Settings must remain a separate window rather than changing those palette modes."}
+{"file":".trellis/tasks/07-31-feature-ui-framework/research/current-feature-ui-boundary.md","reason":"Records the existing registry, config, IPC, renderer, and Interaction Help extension points plus deliberate exclusions for Phase 5."}

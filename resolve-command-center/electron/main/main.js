@@ -1,6 +1,7 @@
-const { app, ipcMain } = require("electron");
+const { app, dialog, ipcMain } = require("electron");
 const {
   createPaletteWindow,
+  openSettingsWindow,
   showPaletteWindow,
   hidePaletteWindow,
   setPaletteWindowMode
@@ -16,8 +17,11 @@ const { BindingStorage } = require("../../interaction/BindingStorage");
 const { InteractionManager } = require("../../interaction/InteractionManager");
 const { createBridgeExecutionAdapter } = require("../../execution-adapter/bridge");
 const { ShortcutManager } = require("../../shortcut/ShortcutManager");
+const { FeatureCatalog } = require("../../feature-ui/FeatureCatalog");
+const { registerFeatureUiIpc } = require("../../feature-ui/registerIpc");
 
 let paletteWindow = null;
+let settingsWindow = null;
 
 const bridgeExecutionAdapter = createBridgeExecutionAdapter();
 const shortcutManager = new ShortcutManager();
@@ -30,6 +34,7 @@ const markerCapability = createMarkerCapability({
 });
 const capabilityRegistry = createCapabilityRegistry();
 capabilityRegistry.register("marker.add", markerCapability);
+const featureCatalog = new FeatureCatalog({ capabilityRegistry });
 const configManager = new ConfigManager({
   capabilityRegistry,
   storage: ConfigStorage.fromAppData(app.getPath("appData"))
@@ -65,6 +70,17 @@ function hidePalette() {
   hidePaletteWindow(paletteWindow);
 }
 
+function openSettings() {
+  const previousWindow = settingsWindow;
+  settingsWindow = openSettingsWindow(settingsWindow);
+  if (settingsWindow !== previousWindow) {
+    const openedWindow = settingsWindow;
+    openedWindow.once("closed", () => {
+      if (settingsWindow === openedWindow) settingsWindow = null;
+    });
+  }
+}
+
 function togglePalette() {
   if (paletteWindow && paletteWindow.isVisible()) {
     hidePalette();
@@ -91,6 +107,13 @@ function registerIpcHandlers() {
   });
   ipcMain.on("palette:set-mode", (_event, mode) => setPaletteWindowMode(paletteWindow, mode));
   ipcMain.on("palette:hide", hidePalette);
+  registerFeatureUiIpc({
+    ipcMain,
+    dialog,
+    featureCatalog,
+    configManager,
+    openSettings
+  });
 }
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();

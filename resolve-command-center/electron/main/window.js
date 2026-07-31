@@ -7,6 +7,12 @@ const PALETTE_SIZES = Object.freeze({
   search: { width: 376, height: 468 },
   "all-actions": { width: 376, height: 468 }
 });
+const SETTINGS_SIZE = Object.freeze({
+  width: 760,
+  height: 560,
+  minWidth: 640,
+  minHeight: 480
+});
 
 function shouldLoadDevRenderer() {
   return (
@@ -28,6 +34,20 @@ function getRendererUrl() {
   }
 
   return null;
+}
+
+function loadRenderer(window, view) {
+  const rendererUrl = getRendererUrl();
+  if (rendererUrl) {
+    const url = new URL(rendererUrl);
+    if (view) url.searchParams.set("view", view);
+    return window.loadURL(url.toString());
+  }
+
+  return window.loadFile(
+    path.join(__dirname, "../../dist/renderer/index.html"),
+    view ? { query: { view } } : undefined
+  );
 }
 
 function createPaletteWindow() {
@@ -52,12 +72,7 @@ function createPaletteWindow() {
     }
   });
 
-  const rendererUrl = getRendererUrl();
-  if (rendererUrl) {
-    window.loadURL(rendererUrl);
-  } else {
-    window.loadFile(path.join(__dirname, "../../dist/renderer/index.html"));
-  }
+  loadRenderer(window);
 
   window.on("blur", () => {
     if (window.isVisible()) {
@@ -66,6 +81,40 @@ function createPaletteWindow() {
   });
 
   return window;
+}
+
+function createSettingsWindow(BrowserWindowType = BrowserWindow) {
+  const window = new BrowserWindowType({
+    width: SETTINGS_SIZE.width,
+    height: SETTINGS_SIZE.height,
+    minWidth: SETTINGS_SIZE.minWidth,
+    minHeight: SETTINGS_SIZE.minHeight,
+    show: false,
+    frame: true,
+    resizable: true,
+    alwaysOnTop: false,
+    autoHideMenuBar: true,
+    backgroundColor: "#101216",
+    title: "Clackly Settings",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  });
+
+  loadRenderer(window, "settings");
+  window.center();
+  return window;
+}
+
+function openSettingsWindow(window) {
+  const settingsWindow = !window || window.isDestroyed() ? createSettingsWindow() : window;
+  if (settingsWindow.isMinimized()) settingsWindow.restore();
+  settingsWindow.show();
+  settingsWindow.focus();
+  return settingsWindow;
 }
 
 function setPaletteWindowMode(window, mode) {
@@ -102,7 +151,11 @@ function hidePaletteWindow(window) {
 }
 
 module.exports = {
+  PALETTE_SIZES,
+  SETTINGS_SIZE,
   createPaletteWindow,
+  createSettingsWindow,
+  openSettingsWindow,
   showPaletteWindow,
   hidePaletteWindow,
   setPaletteWindowMode

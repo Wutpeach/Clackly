@@ -5,6 +5,9 @@ import {
   createPresentationCatalog,
   getCommandHint,
   getInteractionHelp,
+  getSettingsControl,
+  getSettingsFieldLabel,
+  groupFeaturesByCategory,
   groupCommands,
   rankCommands
 } from "./model.mjs";
@@ -76,4 +79,40 @@ test("interaction help projects declared rows defensively", () => {
   assert.equal(interactionHelp[0].label, "Right Click");
   assert.deepEqual(getInteractionHelp({ interactionHelp: [null, { label: "", description: "Missing" }] }), []);
   assert.deepEqual(getInteractionHelp({}), []);
+});
+
+test("settings model maps all supported schema types to native controls", () => {
+  const fields = {
+    title: { type: "string" },
+    frame: { type: "number" },
+    enabled: { type: "boolean" },
+    color: { type: "color" },
+    executablePath: { type: "path" },
+    output_folder: { type: "folder" },
+    mode: { type: "select", options: ["first", "second"] }
+  };
+
+  assert.deepEqual(Object.values(fields).map(getSettingsControl), [
+    { kind: "input", inputType: "text" },
+    { kind: "input", inputType: "number" },
+    { kind: "checkbox" },
+    { kind: "input", inputType: "color" },
+    { kind: "picker", inputType: "text", pickerType: "path" },
+    { kind: "picker", inputType: "text", pickerType: "folder" },
+    { kind: "select", options: ["first", "second"] }
+  ]);
+  assert.equal(getSettingsFieldLabel("executablePath", fields.executablePath), "Executable Path");
+  assert.equal(getSettingsFieldLabel("output_folder", { ...fields.output_folder, label: "Output" }), "Output");
+  assert.throws(() => getSettingsControl({ type: "secret" }), /Unsupported settings field type/);
+});
+
+test("feature grouping preserves catalog category and feature order", () => {
+  const groups = groupFeaturesByCategory([
+    { id: "first", category: "Timeline" },
+    { id: "second", category: "Edit" },
+    { id: "third", category: "Timeline" }
+  ]);
+
+  assert.deepEqual(groups.map(([category]) => category), ["Timeline", "Edit"]);
+  assert.deepEqual(groups[0][1].map(({ id }) => id), ["first", "third"]);
 });

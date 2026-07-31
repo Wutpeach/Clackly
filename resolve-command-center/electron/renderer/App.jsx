@@ -23,6 +23,7 @@ import {
   Upload
 } from "lucide-react";
 import logoUrl from "./assets/clackly-logo.svg";
+import SettingsApp from "./SettingsApp.jsx";
 import {
   createPresentationCatalog,
   getCommandHint,
@@ -49,6 +50,12 @@ const api = window.resolveCommandCenter || {
   executeInteraction: async () => {
     throw new Error("Live preview only — open Clackly in Electron to execute commands.");
   },
+  listFeatures: async () => [],
+  getConfig: async () => ({}),
+  saveConfig: async (_capabilityId, values) => values,
+  resetConfig: async () => ({}),
+  pickPath: async () => null,
+  openSettings: () => window.open("?view=settings", "clackly-settings"),
   hidePalette: () => {},
   setPaletteMode: () => {},
   onPaletteShown: (callback) => {
@@ -138,7 +145,7 @@ function CommandMeta({ command, pinned }) {
   );
 }
 
-function App() {
+function PaletteApp() {
   const shellRef = useRef(null);
   const searchRef = useRef(null);
   const [mode, setMode] = useState("launcher");
@@ -352,7 +359,7 @@ function App() {
         pinned={selectedPinned}
         onBack={goToLauncher}
         onTogglePin={toggleSelectedPin}
-        onSettings={() => setStatus("Settings are outside this prototype.")}
+        onSettings={() => api.openSettings()}
       />
 
       {mode === "launcher" && (
@@ -544,6 +551,12 @@ function App() {
       )}
     </main>
   );
+}
+
+function App() {
+  return new URLSearchParams(window.location.search).get("view") === "settings"
+    ? <SettingsApp api={api} Icon={Icon} />
+    : <PaletteApp />;
 }
 
 export default App;

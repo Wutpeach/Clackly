@@ -2,6 +2,7 @@ const path = require("node:path");
 const { app, dialog, ipcMain } = require("electron");
 const {
   createPaletteWindow,
+  openSettingsWindow,
   hidePaletteWindow,
   showPaletteWindow,
   setPaletteWindowMode
@@ -17,11 +18,14 @@ const { BindingStorage } = require("../interaction/BindingStorage");
 const { InteractionManager } = require("../interaction/InteractionManager");
 const { createResolveAdapter } = require("../resolve/adapter");
 const { ShortcutManager } = require("../shortcut/ShortcutManager");
+const { FeatureCatalog } = require("../feature-ui/FeatureCatalog");
+const { registerFeatureUiIpc } = require("../feature-ui/registerIpc");
 
 const PLUGIN_ID = "com.wutpeach.clackly";
 
 let WorkflowIntegration = null;
 let paletteWindow = null;
+let settingsWindow = null;
 let initPromise = null;
 let resolvePromise = null;
 let cleanupDone = false;
@@ -111,6 +115,7 @@ const markerCapability = createMarkerCapability({
 });
 const capabilityRegistry = createCapabilityRegistry();
 capabilityRegistry.register("marker.add", markerCapability);
+const featureCatalog = new FeatureCatalog({ capabilityRegistry });
 const configManager = new ConfigManager({
   capabilityRegistry,
   storage: ConfigStorage.fromAppData(app.getPath("appData"))
@@ -147,6 +152,17 @@ function hidePalette() {
   hidePaletteWindow(paletteWindow);
 }
 
+function openSettings() {
+  const previousWindow = settingsWindow;
+  settingsWindow = openSettingsWindow(settingsWindow);
+  if (settingsWindow !== previousWindow) {
+    const openedWindow = settingsWindow;
+    openedWindow.once("closed", () => {
+      if (settingsWindow === openedWindow) settingsWindow = null;
+    });
+  }
+}
+
 function togglePalette() {
   if (paletteWindow && paletteWindow.isVisible()) {
     hidePalette();
@@ -173,6 +189,13 @@ function registerIpcHandlers() {
   });
   ipcMain.on("palette:set-mode", (_event, mode) => setPaletteWindowMode(paletteWindow, mode));
   ipcMain.on("palette:hide", hidePalette);
+  registerFeatureUiIpc({
+    ipcMain,
+    dialog,
+    featureCatalog,
+    configManager,
+    openSettings
+  });
 }
 
 function handleHotkeyRegistrationFailure() {
