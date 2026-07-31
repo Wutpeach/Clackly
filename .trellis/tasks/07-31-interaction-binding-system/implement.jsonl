@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Defines the existing Command Registry, Command Engine, Capability Registry, Config Manager, adapter, and ShortcutManager boundaries that Interaction Binding must preserve."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines the renderer/preload/host command-execution boundary and forbids command-specific or capability-specific UI routing."}
+{"file":".trellis/tasks/07-31-interaction-binding-system/research/current-interaction-boundary.md","reason":"Records repository evidence, the confirmed Command ID contract, existing registry availability, persistence boundary, and excluded double-click behavior."}

@@ -13,6 +13,8 @@ const { createCapabilityRegistry } = require("../capability/registry");
 const { createMarkerCapability } = require("../capability/marker");
 const { ConfigManager } = require("../config/ConfigManager");
 const { ConfigStorage } = require("../config/ConfigStorage");
+const { BindingStorage } = require("../interaction/BindingStorage");
+const { InteractionManager } = require("../interaction/InteractionManager");
 const { createResolveAdapter } = require("../resolve/adapter");
 const { ShortcutManager } = require("../shortcut/ShortcutManager");
 
@@ -132,6 +134,11 @@ async function executeWorkflowCommand(commandId) {
   };
 }
 
+const interactionManager = new InteractionManager({
+  bindingStorage: BindingStorage.fromAppData(app.getPath("appData")),
+  executeCommand: executeWorkflowCommand
+});
+
 function showPalette() {
   showPaletteWindow(paletteWindow);
 }
@@ -155,6 +162,13 @@ function registerIpcHandlers() {
   ipcMain.handle("commands:execute", async (_event, commandId) => {
     const result = await executeWorkflowCommand(commandId);
     hidePalette();
+    return result;
+  });
+  ipcMain.handle("interactions:execute", async (_event, interaction) => {
+    const result = await interactionManager.handle(interaction);
+    if (result.matched) {
+      hidePalette();
+    }
     return result;
   });
   ipcMain.on("palette:set-mode", (_event, mode) => setPaletteWindowMode(paletteWindow, mode));

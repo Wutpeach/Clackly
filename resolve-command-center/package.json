@@ -9,7 +9,7 @@
     "start": "npm run build && electron .",
     "start:electron": "electron .",
     "build": "vite build",
-    "test": "node --test config/*.test.js capability/*.test.js shortcut/*.test.js command-engine/*.test.js execution-adapter/*.test.js resolve/*.test.js electron/renderer/*.test.mjs && python -m unittest discover -s resolve -p \"test_*.py\"",
+    "test": "node --test interaction/*.test.js config/*.test.js capability/*.test.js shortcut/*.test.js command-engine/*.test.js execution-adapter/*.test.js resolve/*.test.js electron/renderer/*.test.mjs && python -m unittest discover -s resolve -p \"test_*.py\"",
     "workflow:install": "powershell -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1"
   },
   "dependencies": {

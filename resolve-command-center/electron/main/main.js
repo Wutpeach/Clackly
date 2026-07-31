@@ -12,6 +12,8 @@ const { createCapabilityRegistry } = require("../../capability/registry");
 const { createMarkerCapability } = require("../../capability/marker");
 const { ConfigManager } = require("../../config/ConfigManager");
 const { ConfigStorage } = require("../../config/ConfigStorage");
+const { BindingStorage } = require("../../interaction/BindingStorage");
+const { InteractionManager } = require("../../interaction/InteractionManager");
 const { createBridgeExecutionAdapter } = require("../../execution-adapter/bridge");
 const { ShortcutManager } = require("../../shortcut/ShortcutManager");
 
@@ -36,6 +38,24 @@ const executeCommand = createCommandExecutor({
   capabilityRegistry,
   configManager
 });
+const interactionManager = new InteractionManager({
+  bindingStorage: BindingStorage.fromAppData(app.getPath("appData")),
+  executeCommand: executeStandaloneCommand
+});
+
+async function executeStandaloneCommand(commandId) {
+  try {
+    return await executeCommand(commandId);
+  } catch (error) {
+    if (String(error && error.message).includes("Resolve scripting API is unavailable")) {
+      throw new Error(
+        `${error.message}. This command was handled by the standalone bridge-backed Electron app, not the Resolve Workflow Integration plugin. Quit any standalone Clackly, npm start/dev, or Utility-script-launched Electron process, then load Clackly from Resolve's Workspace > Workflow Integrations menu.`
+      );
+    }
+
+    throw error;
+  }
+}
 
 function showPalette() {
   showPaletteWindow(paletteWindow);
@@ -58,19 +78,16 @@ function registerIpcHandlers() {
   ipcMain.handle("commands:list", () => getCommands());
   ipcMain.handle("commands:search", (_event, query) => searchCommands(query));
   ipcMain.handle("commands:execute", async (_event, commandId) => {
-    try {
-      const result = await executeCommand(commandId);
+    const result = await executeStandaloneCommand(commandId);
+    hidePalette();
+    return result;
+  });
+  ipcMain.handle("interactions:execute", async (_event, interaction) => {
+    const result = await interactionManager.handle(interaction);
+    if (result.matched) {
       hidePalette();
-      return result;
-    } catch (error) {
-      if (String(error && error.message).includes("Resolve scripting API is unavailable")) {
-        throw new Error(
-          `${error.message}. This command was handled by the standalone bridge-backed Electron app, not the Resolve Workflow Integration plugin. Quit any standalone Clackly, npm start/dev, or Utility-script-launched Electron process, then load Clackly from Resolve's Workspace > Workflow Integrations menu.`
-        );
-      }
-
-      throw error;
     }
+    return result;
   });
   ipcMain.on("palette:set-mode", (_event, mode) => setPaletteWindowMode(paletteWindow, mode));
   ipcMain.on("palette:hide", hidePalette);

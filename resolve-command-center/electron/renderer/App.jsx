@@ -35,8 +35,7 @@ const PREVIEW_COMMANDS = [
   {
     id: "timeline.addMarker",
     name: "Add Marker",
-    keywords: ["marker", "mark", "timeline", "red"],
-    capability: "marker.add"
+    keywords: ["marker", "mark", "timeline", "red"]
   }
 ];
 
@@ -44,6 +43,9 @@ const browserPreview = !window.resolveCommandCenter;
 const api = window.resolveCommandCenter || {
   listCommands: async () => PREVIEW_COMMANDS,
   executeCommand: async () => {
+    throw new Error("Live preview only — open Clackly in Electron to execute commands.");
+  },
+  executeInteraction: async () => {
     throw new Error("Live preview only — open Clackly in Electron to execute commands.");
   },
   hidePalette: () => {},
@@ -260,6 +262,39 @@ function App() {
     }
   }
 
+  async function executeInteraction(command, event) {
+    if (event.type === "contextmenu") {
+      event.preventDefault();
+    }
+    if (event.type === "click" && event.detail === 0) {
+      executeCommand(command);
+      return;
+    }
+    if (!command || isExecuting || !command.available) return;
+
+    setIsExecuting(true);
+    setStatus("");
+    try {
+      const result = await api.executeInteraction({
+        target: command.id,
+        type: "mouse",
+        button: event.button,
+        ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey,
+        altKey: event.altKey
+      });
+      if (result.matched) {
+        setRecentIds((current) => new Set([result.command, ...current]));
+      } else {
+        setIsExecuting(false);
+      }
+    } catch (error) {
+      setStatus(error.message);
+      setIsExecuting(false);
+      requestAnimationFrame(() => (mode === "search" ? searchRef.current : shellRef.current)?.focus());
+    }
+  }
+
   function moveSelection(delta) {
     if (activeCommands.length === 0) return;
     setSelectedIndex((current) => Math.max(0, Math.min(current + delta, activeCommands.length - 1)));
@@ -341,7 +376,8 @@ function App() {
                   setHintedCommand(command);
                 }}
                 onBlur={() => setHintedCommand(null)}
-                onClick={() => executeCommand(command)}
+                onClick={(event) => executeInteraction(command, event)}
+                onContextMenu={(event) => executeInteraction(command, event)}
               >
                 <span className="tile-topline">
                   <kbd aria-hidden="true">{index + 1}</kbd>
@@ -391,7 +427,8 @@ function App() {
                   setHintedCommand(command);
                 }}
                 onBlur={() => setHintedCommand(null)}
-                onClick={() => executeCommand(command)}
+                onClick={(event) => executeInteraction(command, event)}
+                onContextMenu={(event) => executeInteraction(command, event)}
               >
                 <CommandMeta command={command} pinned={pinnedIds.has(command.id)} />
               </button>
@@ -436,7 +473,8 @@ function App() {
                           setHintedCommand(command);
                         }}
                         onBlur={() => setHintedCommand(null)}
-                        onClick={() => executeCommand(command)}
+                        onClick={(event) => executeInteraction(command, event)}
+                        onContextMenu={(event) => executeInteraction(command, event)}
                       >
                         <CommandMeta command={command} pinned={pinnedIds.has(command.id)} />
                       </button>

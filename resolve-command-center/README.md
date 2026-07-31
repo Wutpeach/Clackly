@@ -2,6 +2,18 @@
 
 Architecture-validation MVP for a DaVinci Resolve command palette. Electron owns the desktop UI, the command engine maps command intent to injected capabilities, and `resolve/` is the Resolve Adapter layer. Both the Workflow Integration path and Python fallback delegate project, timeline, timecode, frame-rate, drop-frame conversion, and marker operations to adapters in that directory.
 
+## Interaction Binding
+
+Mouse input is routed separately from command and capability execution:
+
+```text
+command card -> interaction binding -> Command ID -> command registry -> Capability ID -> capability -> execution adapter
+```
+
+`interaction/BindingStorage.js` persists `appData/Clackly/bindings.json`. Each binding maps a target plus an exact left/right mouse-button and `CTRL`/`SHIFT`/`ALT` modifier set to `action.command`; it never stores a Capability ID. A missing file receives the compatibility default that maps an unmodified left click on `timeline.addMarker` back to that Command. Keyboard Enter still executes the selected Command directly.
+
+Interaction Binding does not implement double-clicks, wildcard modifiers, global shortcuts, key synthesis, or Resolve shortcut discovery/mutation. The existing palette hotkey and `ShortcutManager` remain separate systems.
+
 ## Capability Routing
 
 Command metadata describes intent with `capability: "marker.add"`; it does not select Resolve or keyboard implementation details. The runtime chain is:

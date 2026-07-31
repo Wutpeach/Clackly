@@ -331,6 +331,70 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 
 ---
 
+## Scenario: Interaction Binding Dispatch
+
+### 1. Scope / Trigger
+
+- Trigger: adding or changing mouse interaction bindings, persisted binding fields, or host dispatch into the Command Engine.
+- Interaction Binding owns user-operation matching only; Command Registry remains the Command ID -> Capability ID boundary.
+
+### 2. Signatures
+
+- Stored binding: `{ target: string, trigger: { type: "mouse", button: "left" | "right", modifiers: ("CTRL" | "SHIFT" | "ALT")[] }, action: { command: string } }`
+- Renderer/IPC event: `{ target: string, type: "mouse", button: number, ctrlKey: boolean, shiftKey: boolean, altKey: boolean }`
+- Storage: `BindingStorage.fromAppData(appDataPath)`, `load()`, and `save(bindings)`.
+- Manager: `new InteractionManager({ bindingStorage, executeCommand })` and `handle(event) -> Promise<{ matched: false } | { matched: true, command: string, result: unknown }>`.
+
+### 3. Contracts
+
+- Stored bindings map `target` plus an exact mouse `button` and normalized `CTRL`, `SHIFT`, `ALT` set to `action.command`.
+- `BindingStorage` owns validation and `appData/Clackly/bindings.json`; it may compose `ConfigStorage` for atomic JSON persistence but must not store bindings in capability configuration.
+- `InteractionManager` accepts plain target/button/modifier facts, performs one exact match, and delegates only the matched Command ID to the injected command executor.
+- Command Registry remains the only Command ID -> Capability ID mapping owner. Interaction modules do not import command or capability registries.
+- Missing files receive the unmodified `timeline.addMarker` left-click compatibility binding once. An explicitly persisted empty object remains empty.
+- Unsupported mouse buttons return `{ matched: false }`; malformed events and bindings fail clearly; executor errors propagate unchanged.
+- Double-click, global shortcut, key synthesis, shortcut discovery/mutation, priorities, and wildcard modifier matching are outside this boundary.
+
+### 4. Validation & Error Matrix
+
+- Missing bindings file -> persist and return the unmodified `timeline.addMarker` left-click compatibility binding.
+- Malformed root, binding, trigger, action, or unknown/duplicate modifier -> throw `TypeError` before persistence or matching.
+- Two bindings with the same normalized target/button/modifier signature -> reject as an ambiguous duplicate.
+- Unsupported event button such as middle click -> return `{ matched: false }` and do not execute.
+- No exact binding -> return `{ matched: false }` and do not execute.
+- Unknown `action.command`, missing Capability, missing configuration, or adapter failure -> preserve the existing executor error.
+
+### 5. Good/Base/Bad Cases
+
+- Good: `CTRL+SHIFT` modifiers are normalized once and match regardless of stored input order.
+- Base: unmodified left click on target `timeline.addMarker` delegates `timeline.addMarker` to `executeCommand`.
+- Good: a modified click can execute a different Command ID that maps to the same Capability without Interaction Binding knowing that Capability ID.
+- Bad: storing `capability: "marker.add"` in a binding or importing Command/Capability Registry from `interaction/`.
+- Bad: allowing a `CTRL` binding to match a `CTRL+SHIFT` event.
+
+### 6. Tests Required
+
+- Assert first-run creation, persistence, modifier normalization, duplicate normalized-trigger rejection, malformed binding rejection, and defensive results.
+- Assert exact left/right matching, individual and combined modifiers, extra-modifier non-match, unmatched behavior, one-call delegation, and unchanged executor errors.
+- Run the full Node suite and renderer build after host or IPC composition changes.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+if (event.ctrlKey) capabilityRegistry.get("marker.add").execute();
+```
+
+#### Correct
+
+```javascript
+const result = await interactionManager.handle(event);
+// InteractionManager delegates only binding.action.command to executeCommand().
+```
+
+---
+
 ## Forbidden Patterns
 
 - Machine-specific absolute paths in startup scripts.

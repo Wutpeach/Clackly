@@ -91,6 +91,68 @@ window.resolveCommandCenter.setPaletteMode("all-actions");
 
 ---
 
+## Scenario: Command Card Mouse Interaction
+
+### 1. Scope / Trigger
+
+- Trigger: changing command-card mouse handlers, the preload interaction method, or Electron host interaction IPC.
+- Applies to Launcher, Search, and All Actions command cards in both standalone and Workflow Integration hosts.
+
+### 2. Signatures
+
+- Preload API: `window.resolveCommandCenter.executeInteraction(event) -> Promise<InteractionResult>`.
+- Event: `{ target: command.id, type: "mouse", button: event.button, ctrlKey: boolean, shiftKey: boolean, altKey: boolean }`.
+- Result: `{ matched: false }` or `{ matched: true, command: string, result: unknown }`.
+
+### 3. Contracts
+
+- Generic command cards send only `{ target, type: "mouse", button, ctrlKey, shiftKey, altKey }` through the preload interaction method.
+- Left click and suppressed context-menu events share the same interaction route. Cards contain no Command-selection table or Capability ID mapping.
+- Keyboard Enter and keyboard-generated button activation keep the direct `executeCommand(command.id)` route.
+- Successful matched mouse execution is hidden by the host; unmatched interactions execute nothing and leave the palette available.
+- Browser preview keeps its local execution-unavailable behavior and does not emulate persisted bindings.
+- Double-click handlers and global-shortcut behavior are outside renderer interaction binding.
+
+### 4. Validation & Error Matrix
+
+- Physical left/right interaction matches -> host executes the returned Command and hides the palette after success.
+- No binding -> renderer clears the executing state and leaves the palette open.
+- Interaction/executor error -> renderer displays the error and restores focus using the existing command error path.
+- Keyboard Enter or keyboard-generated button click (`event.detail === 0`) -> execute the selected Command directly; do not route it through mouse bindings.
+- Prototype-only command -> do not invoke either execution IPC method.
+
+### 5. Good/Base/Bad Cases
+
+- Good: every command-card view uses the same event projection helper.
+- Base: physical unmodified click sends target `timeline.addMarker` and native mouse facts.
+- Good: recency records `InteractionResult.command`, because a modified click may execute a Command different from the card target.
+- Bad: `if (event.ctrlKey) executeCommand("timeline.addMarkerNote")` inside a card.
+- Bad: treating keyboard-generated `click` as physical mouse input and silently ignoring Space activation.
+
+### 6. Tests Required
+
+- Run Interaction unit tests, `npm test`, and `npm run build`.
+- Search renderer/preload interaction routing for Capability mapping, double-click handlers, and shortcut-manager coupling.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+onClick={(event) => event.ctrlKey
+  ? api.executeCommand("timeline.addMarkerNote")
+  : api.executeCommand(command.id)}
+```
+
+#### Correct
+
+```javascript
+onClick={(event) => executeInteraction(command, event)}
+onContextMenu={(event) => executeInteraction(command, event)}
+```
+
+---
+
 ## Forbidden Patterns
 
 - Command-specific UI branches for execution behavior.
