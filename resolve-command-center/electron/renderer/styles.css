@@ -270,7 +270,7 @@ input:focus-visible {
 
 .command-tile.selected {
   border-color: var(--color-accent);
-  box-shadow: inset 0 0 0 1px var(--color-tile-border-inner), 0 0 0 1px var(--color-tile-border-outer), 0 7px 16px rgba(0, 0, 0, 0.28), 0 0 10px rgba(243, 106, 45, 0.08);
+  box-shadow: inset 0 0 0 1px var(--color-tile-border-inner), 0 7px 16px rgba(0, 0, 0, 0.28);
 }
 
 .command-tile:active {
@@ -449,13 +449,13 @@ kbd {
 .search-view,
 .all-actions-view {
   min-height: 0;
-  background: var(--color-window);
+  background: var(--color-launcher);
   animation: mode-enter var(--motion-mode) cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .search-view {
   display: grid;
-  grid-template-rows: 66px 32px minmax(0, 1fr);
+  grid-template-rows: 66px minmax(0, 1fr);
   padding: 0 12px 12px;
 }
 
@@ -466,12 +466,12 @@ kbd {
   align-self: center;
   gap: 9px;
   height: 42px;
+  margin-right: calc(var(--space-sm) + var(--space-xs));
   padding: 0 11px;
   border: 1px solid var(--color-accent);
   border-radius: var(--radius-control);
   color: var(--color-accent);
   background: var(--color-panel);
-  box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
 
 .search-control input {
@@ -489,24 +489,16 @@ kbd {
   color: var(--color-text-secondary);
 }
 
-.results-heading {
-  color: var(--color-text-secondary);
-  font-size: 13px;
-}
-
-.results-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 8px;
-}
-
 .command-list,
 .grouped-command-list {
   min-height: 0;
   overflow-y: auto;
   scrollbar-color: var(--color-text-muted) transparent;
   scrollbar-width: thin;
+}
+
+.command-list {
+  padding-right: 8px;
 }
 
 .command-row {
@@ -516,51 +508,36 @@ kbd {
   gap: 8px;
   width: 100%;
   min-height: 58px;
+  margin-bottom: 8px;
   padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
+  border: 1px solid var(--color-tile-border-middle);
+  border-radius: var(--radius-tile);
   color: var(--color-text-secondary);
-  background: transparent;
+  background: linear-gradient(180deg, var(--color-tile-top) 0%, var(--color-tile-bottom) 100%);
+  box-shadow: inset 0 0 0 1px var(--color-tile-border-inner), 0 0 0 1px var(--color-tile-border-outer), 0 4px 10px rgba(0, 0, 0, 0.22);
   text-align: left;
   cursor: default;
-  transition: border-color var(--motion-fast), background var(--motion-fast), color var(--motion-fast);
+  transition: border-color var(--motion-fast), background var(--motion-fast), color var(--motion-fast), box-shadow var(--motion-fast);
 }
 
 .command-row:hover {
-  background: var(--color-tile);
+  background: var(--color-tile-hover);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07), 0 0 0 1px rgba(255, 255, 255, 0.16), 0 6px 14px rgba(0, 0, 0, 0.26);
 }
 
 .command-row.selected {
   border-color: var(--color-accent);
   color: var(--color-text-primary);
   background: var(--color-tile-hover);
+  box-shadow: inset 0 0 0 1px var(--color-tile-border-inner), 0 4px 10px rgba(0, 0, 0, 0.24);
 }
 
-.all-actions-view .command-row {
-  margin-bottom: 8px;
-  border-color: var(--color-tile-border-middle);
-  border-radius: var(--radius-tile);
-  background: linear-gradient(180deg, var(--color-tile-top) 0%, var(--color-tile-bottom) 100%);
-  box-shadow: inset 0 0 0 1px var(--color-tile-border-inner), 0 0 0 1px var(--color-tile-border-outer), 0 4px 10px rgba(0, 0, 0, 0.22);
-  transition: border-color var(--motion-fast), background var(--motion-fast), color var(--motion-fast), box-shadow var(--motion-fast);
-}
-
-.all-actions-view .command-row:hover {
-  background: var(--color-tile-hover);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07), 0 0 0 1px rgba(255, 255, 255, 0.16), 0 6px 14px rgba(0, 0, 0, 0.26);
-}
-
-.all-actions-view .command-row.selected {
-  border-color: var(--color-accent);
-  box-shadow: inset 0 0 0 1px var(--color-tile-border-inner), 0 0 0 1px var(--color-tile-border-outer), 0 4px 10px rgba(0, 0, 0, 0.24), 0 0 10px rgba(243, 106, 45, 0.08);
-}
-
-.all-actions-view .command-row:active {
+.command-row:active {
   background: #15191f;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035), inset 0 2px 4px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(255, 255, 255, 0.1), 0 2px 6px rgba(0, 0, 0, 0.24);
 }
 
-.all-actions-view .command-row[aria-disabled="true"] {
+.command-row[aria-disabled="true"] {
   background: linear-gradient(180deg, var(--color-tile-disabled-top) 0%, var(--color-tile-disabled-bottom) 100%);
 }
 
@@ -629,13 +606,6 @@ kbd {
   gap: 7px;
   color: var(--color-text-secondary);
   text-align: center;
-}
-
-.empty-state img {
-  width: 28px;
-  height: 28px;
-  margin-bottom: 5px;
-  opacity: 0.55;
 }
 
 .empty-state strong {

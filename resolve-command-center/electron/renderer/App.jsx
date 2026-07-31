@@ -23,7 +23,6 @@ import {
   Upload
 } from "lucide-react";
 import logoUrl from "./assets/clackly-logo.svg";
-import markUrl from "./assets/clackly-mark.svg";
 import {
   createPresentationCatalog,
   getCommandGroup,
@@ -357,10 +356,6 @@ function App() {
             />
             <kbd>ESC</kbd>
           </div>
-          <div className="results-heading">
-            <span>{query ? "Best matches" : "All commands"}</span>
-            <span>{searchCommands.length}</span>
-          </div>
           <div className="command-list" role="listbox" aria-label="Search results">
             {searchCommands.map((command, index) => (
               <button
@@ -380,7 +375,6 @@ function App() {
             ))}
             {searchCommands.length === 0 && (
               <div className="empty-state">
-                <img src={markUrl} alt="" />
                 <strong>No matching actions</strong>
                 <span>Try a command, page, or editing verb.</span>
               </div>
