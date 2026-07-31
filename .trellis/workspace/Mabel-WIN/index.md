@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
+- **Total Sessions**: 10
 - **Last Active**: 2026-07-31
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~212 | Active |
+| `journal-1.md` | ~233 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-07-31 | Implement command interaction help | `8e2f578` | `main` |
 | 9 | 2026-07-31 | Implement interaction binding system | `2c33bc2` | `main` |
 | 8 | 2026-07-31 | Add capability config schema | `8266fd6` | `main` |
 | 7 | 2026-07-31 | Add capability metadata | `a88fcf5` | `main` |

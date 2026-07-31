@@ -210,3 +210,24 @@ Added persisted left/right mouse interaction bindings with CTRL/SHIFT/ALT exact 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 10: Implement command interaction help
+
+**Date**: 2026-07-31
+**Task**: Implement command interaction help
+**Branch**: `main`
+
+### Summary
+
+Added Command-owned interactionHelp metadata, extracted the shared left/right mouse trigger schema for bindings and help, rendered compact metadata-driven hover/focus guidance in the existing Electron bottom overlay, preserved Command-to-Capability execution boundaries, and explicitly excluded Double Click.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8e2f578` | (see git log) |
+
+### Status
+
+[OK] **Completed**
