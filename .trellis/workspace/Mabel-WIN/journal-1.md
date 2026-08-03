@@ -378,3 +378,24 @@ Implemented and verified the versioned Managed Python Runtime manifest, registry
 ### Status
 
 [OK] **Completed**
+
+
+## Session 18: Isolated Runtime Launcher 6.5B
+
+**Date**: 2026-08-03
+**Task**: Isolated Runtime Launcher 6.5B
+**Branch**: `main`
+
+### Summary
+
+Implemented and verified an absolute-path-only isolated Python launcher with exact environment allowlists, bounded process diagnostics, timeout/overflow termination, close-before-cleanup lifecycle, typed execution failures, a runtime-info Bootstrap protocol, and real crash-isolation tests without production Provider integration.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c910190` | (see git log) |
+
+### Status
+
+[OK] **Completed**
