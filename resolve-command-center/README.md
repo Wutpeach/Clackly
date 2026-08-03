@@ -92,7 +92,7 @@ Scripts are trusted local Feature code, not sandboxed third-party code. Each exe
 
 ## Resolve2AE Export Feature
 
-The bundled `ae.export` Feature sends Resolve timeline media to After Effects through `scripts/resolve2ae_export.py` and the local `resolve2ae_core/`. Configure its required **After Effects Path** to the Windows `AfterFX.exe`; **Composition Prefix** is optional and defaults to `Link`. An invalid or missing executable is reported as a Command error.
+The bundled `ae.export` Feature sends Resolve timeline media to After Effects through `scripts/resolve2ae_export.py` and the local `resolve2ae_core/`. On Windows, Clackly automatically discovers `AfterFX.exe` from a running After Effects process, the per-user or machine App Paths registry entry, then standard Adobe installation directories (highest numeric version first), and persists the first existing file as **After Effects Path**. A valid saved path always wins, so the existing Browse control remains a manual override. If discovery fails, the required field stays empty and the existing Settings recovery remains available. **Composition Prefix** is optional and defaults to `Link`; command execution still rejects an invalid or missing executable.
 
 The primary **Export to After Effects** card uses these exact mouse mappings, and all four Commands are searchable and executable with Enter:
 

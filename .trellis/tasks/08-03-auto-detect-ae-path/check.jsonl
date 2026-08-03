@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Check capability scoping, ConfigStorage ownership, generic Settings/Command Engine boundaries, error behavior, and full quality gates."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check that discovery lives in one shared feature module and no premature lifecycle/global service abstraction was added."}
+{"file":".trellis/tasks/08-03-auto-detect-ae-path/research/current-state.md","reason":"Verify implementation against confirmed host startup points, discovery precedence, persistence behavior, and local platform evidence."}

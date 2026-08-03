@@ -12,6 +12,7 @@ const { createCommandExecutor } = require("../../command-engine/executor");
 const { createCapabilityRegistry } = require("../../capability/registry");
 const { createMarkerCapability } = require("../../capability/marker");
 const { registerScriptCapabilities } = require("../../capability/registerScripts");
+const { initializeAfterEffectsPath } = require("../../capability/afterEffectsPath");
 const { ConfigManager } = require("../../config/ConfigManager");
 const { ConfigStorage } = require("../../config/ConfigStorage");
 const { BindingStorage } = require("../../interaction/BindingStorage");
@@ -137,6 +138,7 @@ if (!hasSingleInstanceLock) {
   });
 
   app.whenReady().then(() => {
+    initializeAfterEffectsPath(configManager);
     paletteWindow = createPaletteWindow();
     registerIpcHandlers();
     registerPaletteHotkey(togglePalette);

@@ -203,7 +203,8 @@ await scriptExecutor.execute(metadata.executor, scriptContext);
 ### 1. Scope / Trigger
 
 - Trigger: adding a capability setting, reading configuration during capability execution, or changing configuration persistence.
-- Capability code declares settings as metadata; it does not build Settings UI or read files.
+- Trigger: auto-initializing a capability-owned setting during host startup.
+- Capability execution code declares settings as metadata; it does not build Settings UI or read configuration files. A capability-owned startup initializer may inspect external dependency candidates through an injected filesystem seam.
 
 ### 2. Signatures
 
@@ -212,6 +213,7 @@ await scriptExecutor.execute(metadata.executor, scriptContext);
 - Schema labels: `resolveSchemaFieldLabel(key, field) -> string` and `withResolvedSchemaLabels(schema) -> cloned schema`.
 - Storage: `new ConfigStorage(filePath)`, `ConfigStorage.fromAppData(appDataPath)`, `load()`, and `save(config)`.
 - Manager: `new ConfigManager({ capabilityRegistry, storage, validator? })` with `save(capabilityId, values, { requireComplete? })`, `get(capabilityId, key?)`, `update(capabilityId, patch)`, `reset(capabilityId)`, `assertConfigured(capabilityId)`, and `forCapability(capabilityId)`.
+- AE initializer: `initializeAfterEffectsPath(configManager, { environment?, execFileSync?, fileSystem?, platform? }?) -> string | null`.
 - Executor context: `capability.execute(command, { config: configManager.forCapability(command.capability) })`.
 
 ### 3. Contracts
@@ -222,6 +224,9 @@ await scriptExecutor.execute(metadata.executor, scriptContext);
 - A non-empty explicit Schema `field.label` wins; otherwise the shared label utility formats camelCase and `.`, `_`, `-` separators. ConfigManager uses it for missing-required projections, and FeatureCatalog returns cloned schemas with resolved labels.
 - String-like types are strings, numbers are finite, booleans are booleans, and select values must match declared options. This layer does not inspect paths/folders or parse colors.
 - Settings IPC calls `save(..., { requireComplete: true })` so missing required fields fail before persistence; non-UI callers may still save partial drafts before `assertConfigured()` gates execution.
+- Both hosts call the same capability-owned initializer after Electron becomes ready and before creating windows or registering IPC. The initializer keeps a valid saved value without discovery or writes; on Windows, a missing or stale `ae.export.aePath` tries the running process, HKCU/HKLM App Paths, then the highest numeric standard Adobe installation, accepting existing files only.
+- Capability-specific discovery never reads or writes `config.json` directly. It updates only `aePath` through `ConfigManager.update()` and, when a stale value has no replacement, removes only that key through partial `ConfigManager.save()` so sibling values and generic missing-config recovery remain intact.
+- Expected process, registry, and directory misses fall through without making startup fatal. ConfigManager/storage errors propagate. PowerShell commands that can return filesystem paths set UTF-8 output explicitly so non-ASCII installations survive Node decoding.
 - `reset(capabilityId)` reloads the shared document, removes only that capability section, preserves unrelated and unknown sections, persists the remainder, and returns `{}`.
 - The executor checks required configuration before capability execution. The original command remains the first argument; the second context exposes only a capability-scoped `config.get(key)` reader.
 - Simultaneous cross-process writes remain last-writer-wins until concurrent Settings writers justify interprocess locking.
@@ -233,6 +238,9 @@ await scriptExecutor.execute(metadata.executor, scriptContext);
 - Invalid JSON or non-object storage root -> ConfigStorage throws clearly and does not replace the file.
 - Unknown capability id or config key -> ConfigManager throws clearly.
 - Stored or submitted type mismatch / invalid select value -> ConfigManager throws `TypeError` before exposing or executing it.
+- Valid saved AE path -> return it without subprocess, scan, or configuration write.
+- Missing/stale AE path with no valid discovery result -> return `null`; remove only a stale stored key, but do not persist an empty or guessed value.
+- Expected Windows strategy failure -> continue in precedence order; configuration read/write failure -> propagate unchanged.
 - Missing or blank required string-like fields -> executor rejects before `capability.execute()` and names the capability plus all missing fields.
 - Empty schema -> execution proceeds without setup.
 
@@ -241,8 +249,11 @@ await scriptExecutor.execute(metadata.executor, scriptContext);
 - Good: capability metadata declares `configSchema`, future UI reads that metadata, and capability execution calls `context.config.get("aePath")`.
 - Base: `marker.add` declares `configSchema: {}` and executes exactly as before.
 - Good: both hosts share the config file but reload before operations, preserving sequential changes made by the other host.
+- Good: a manually selected existing `AfterFX.exe` remains authoritative; a stale path is replaced while `prefix` is preserved.
 - Good: `output_folder` projects as `Output folder` in lifecycle messages and Settings without renderer formatting.
-- Bad: a capability imports `node:fs`, receives ConfigStorage, or reads another capability id.
+- Base: no discoverable AE leaves `aePath` absent so the existing required-field Settings recovery stays accurate.
+- Bad: capability code reads Clackly configuration through `node:fs`, receives ConfigStorage, or reads another capability id.
+- Bad: a host, renderer, or Python feature duplicates AE discovery, or a registry command's localized output is decoded as UTF-8 without controlling the producer encoding.
 - Bad: ConfigManager keeps a startup snapshot of the shared document and later overwrites another host's settings.
 
 ### 6. Tests Required
@@ -251,6 +262,8 @@ await scriptExecutor.execute(metadata.executor, scriptContext);
 - Assert missing-file load, invalid JSON/root errors, atomic replacement, failed-write cleanup, and previous-file preservation.
 - Assert save/get/update/reset copies, unknown ids/keys, invalid stored values, complete-save required validation, missing/blank required values, and scoped reads.
 - Assert two long-running managers observe sequential shared-file changes and preserve unrelated capability sections.
+- Assert startup initialization short-circuits a valid saved path, preserves discovery precedence, compares numeric versions, validates files, preserves sibling settings, removes only stale `aePath`, and is a non-Windows no-op.
+- Assert both hosts initialize before exposing windows/IPC and that process/App Paths discovery preserves non-ASCII paths with explicit UTF-8 output and hive fallback.
 - Assert executor blocks incomplete configuration before execution and otherwise passes the unchanged command plus scoped context.
 - Assert both host composition roots use the common appData path while Workflow Integration retains its userData override.
 - Assert explicit/fallback Schema labels and nested schema immutability in ConfigManager and FeatureCatalog projections.
@@ -262,6 +275,9 @@ await scriptExecutor.execute(metadata.executor, scriptContext);
 ```javascript
 const config = JSON.parse(fs.readFileSync("config.json"));
 await capability.execute(command, config[command.capability]);
+
+// Host/UI-specific discovery duplicates capability rules and bypasses ConfigManager.
+settingsWindow.findAfterEffects().then((aePath) => fs.writeFileSync("config.json", aePath));
 ```
 
 #### Correct
@@ -271,6 +287,9 @@ configManager.assertConfigured(command.capability);
 await capability.execute(command, {
   config: configManager.forCapability(command.capability),
 });
+
+// The capability owns discovery; hosts only choose the startup composition point.
+initializeAfterEffectsPath(configManager);
 ```
 
 ## Scenario: Feature Lifecycle Projection
