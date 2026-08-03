@@ -45,7 +45,10 @@ class PythonProvider {
   execute(scriptDefinition, context = {}) {
     const entry = scriptDefinition?.entry;
     const entryPath = this.resolveEntry(entry);
-    const request = JSON.stringify({ config: context.config || {} });
+    if (typeof context.commandId !== "string" || context.commandId.trim().length === 0) {
+      throw new TypeError("Python provider requires a Command id");
+    }
+    const request = JSON.stringify({ commandId: context.commandId, config: context.config || {} });
 
     // ponytail: one subprocess per execution; add pooling only if measured startup cost matters.
     return new Promise((resolve, reject) => {
@@ -105,11 +108,16 @@ class PythonProvider {
           return;
         }
 
-        for (const log of envelope.logs) {
-          const writer = context.logger?.[log.level]
-            || (log.level === "warning" ? context.logger?.warn : undefined)
-            || context.logger?.log;
-          if (typeof writer === "function") writer.call(context.logger, log.message);
+        try {
+          for (const log of envelope.logs) {
+            const writer = context.logger?.[log.level]
+              || (log.level === "warning" ? context.logger?.warn : undefined)
+              || context.logger?.log;
+            if (typeof writer === "function") writer.call(context.logger, log.message);
+          }
+        } catch (error) {
+          fail(`could not replay logs: ${error.message}`);
+          return;
         }
 
         if (!envelope.ok) {

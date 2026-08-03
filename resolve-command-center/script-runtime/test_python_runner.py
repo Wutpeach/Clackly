@@ -25,7 +25,12 @@ class PythonRunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             entry = pathlib.Path(directory, "feature.py")
             entry.write_text(textwrap.dedent(source), encoding="utf-8")
-            return run_script(str(entry), config or {}, adapter or FakeAdapter())
+            return run_script(
+                str(entry),
+                "feature.command",
+                config or {},
+                adapter or FakeAdapter(),
+            )
 
     def test_supports_async_results_logs_and_exact_public_context(self):
         envelope = self.run_fixture(
@@ -38,7 +43,16 @@ class PythonRunnerTests(unittest.TestCase):
                 print("stdout")
                 print("stderr", file=sys.stderr)
                 public = sorted(name for name in dir(context) if not name.startswith("_"))
-                return {"value": context.config["value"], "context": public}
+                try:
+                    context.command_id = "changed"
+                except AttributeError:
+                    readonly = True
+                return {
+                    "value": context.config["value"],
+                    "command_id": context.command_id,
+                    "readonly": readonly,
+                    "context": public,
+                }
             """,
             {"value": 3},
         )
@@ -46,7 +60,9 @@ class PythonRunnerTests(unittest.TestCase):
         self.assertTrue(envelope["ok"])
         self.assertEqual(envelope["result"], {
             "value": 3,
-            "context": ["config", "logger", "project", "resolve", "timeline"],
+            "command_id": "feature.command",
+            "readonly": True,
+            "context": ["command_id", "config", "logger", "project", "resolve", "timeline"],
         })
         self.assertEqual(envelope["logs"], [
             {"level": "debug", "message": "debug 3"},

@@ -9,6 +9,7 @@ const { createCapabilityRegistry } = require("../capability/registry");
 const { createCommandExecutor } = require("../command-engine/executor");
 const { loadCommands } = require("../command-engine/registry");
 const { FeatureCatalog } = require("../feature-ui/FeatureCatalog");
+const { loadCapabilityDefinitions } = require("../capability/loader");
 
 test("a discovered manifest executes its Python feature through the command path", async () => {
   const appRoot = fs.mkdtempSync(path.join(os.tmpdir(), "clackly-script-integration-"));
@@ -43,7 +44,7 @@ test("a discovered manifest executes its Python feature through the command path
     "async def execute(context):",
     "    context.logger.info('feature log')",
     "    print('stdout log')",
-    "    return {'greeting': context.config['greeting']}"
+    "    return {'commandId': context.command_id, 'greeting': context.config['greeting']}"
   ].join("\n"));
 
   try {
@@ -67,9 +68,52 @@ test("a discovered manifest executes its Python feature through the command path
       findCommand: (commandId) => command.id === commandId ? command : null
     });
 
-    assert.deepEqual(await execute("feature.command"), { greeting: "hello" });
+    assert.deepEqual(await execute("feature.command"), {
+      commandId: "feature.command",
+      greeting: "hello"
+    });
     assert.deepEqual(logs, ["feature log", "stdout log"]);
   } finally {
     fs.rmSync(appRoot, { recursive: true, force: true });
   }
+});
+
+test("bundled After Effects manifests expose one Feature and four Commands", () => {
+  const definitions = loadCapabilityDefinitions();
+  const aeDefinitions = definitions.filter(({ id }) => id === "ae.export");
+  assert.equal(aeDefinitions.length, 1);
+  assert.deepEqual(Object.keys(aeDefinitions[0].configSchema), ["aePath", "prefix"]);
+  assert.equal(aeDefinitions[0].executor.entry, "scripts/resolve2ae_export.py");
+
+  const commands = loadCommands().filter(({ capability }) => capability === "ae.export");
+  assert.equal(commands.length, 4);
+  assert.equal(commands.every((command) => !("mode" in command) && !("runtime" in command)), true);
+
+  const registry = createCapabilityRegistry();
+  registerScriptCapabilities({
+    capabilityRegistry: registry,
+    appRoot: path.resolve(__dirname, "..")
+  });
+  const features = new FeatureCatalog({ capabilityRegistry: registry })
+    .getAllFeatures()
+    .filter(({ id }) => id === "ae.export");
+  assert.equal(features.length, 1);
+  assert.deepEqual(Object.keys(features[0].configSchema), ["aePath", "prefix"]);
+});
+
+test("the bundled After Effects entry runs through the real Python command path", async () => {
+  const registry = createCapabilityRegistry();
+  registerScriptCapabilities({ capabilityRegistry: registry });
+  const execute = createCommandExecutor({
+    capabilityRegistry: registry,
+    configManager: {
+      assertConfigured() {},
+      forCapability: () => ({ get: () => ({ aePath: "Z:/missing/AfterFX.exe" }) })
+    }
+  });
+
+  await assert.rejects(
+    execute("timeline.exportToAfterEffects"),
+    /After Effects path must point to an existing executable file/
+  );
 });

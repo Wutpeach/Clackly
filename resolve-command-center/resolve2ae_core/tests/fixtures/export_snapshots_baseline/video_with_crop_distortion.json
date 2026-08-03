@@ -1,0 +1,20 @@
+{
+  "statuses": [
+    "Analyzing...",
+    "Exporting OTIO...",
+    "Parsing Data...",
+    "Sending...",
+    "✅ Sent 1 Clips"
+  ],
+  "jsx": "// Resolve2AE V1.0.1\napp.beginUndoGroup('Import Resolve Clips');\nvar comp = app.project.items.addComp('Link_Timeline_single_1700000000', 1920, 1080, 1, 1.0, 24.0);\ncomp.openInViewer();\n// Clip: ClipFX\nvar fileItem = null;\nfor (var k=1; k<=app.project.items.length; k++) { if (app.project.items[k].file && app.project.items[k].file.fsName == 'C:/media/clip.mov') { fileItem = app.project.items[k]; break; } }\nif (!fileItem) { fileItem = app.project.importFile(new ImportOptions(File('C:/media/clip.mov'))); }\nif (fileItem.mainSource && fileItem.mainSource.nativeFrameRate) { fileItem.mainSource.conformFrameRate = fileItem.mainSource.nativeFrameRate; }\nvar layer = comp.layers.add(fileItem);\nlayer.name = 'ClipFX';\nlayer.audioEnabled = false;\nlayer.startTime = 0.0 - 0.0;\nlayer.inPoint = 0.0;\nlayer.outPoint = 1.0;\ntry { layer.blendingMode = BlendingMode.NORMAL; } catch(e) {}\nlayer.opacity.setValue(100.0);\nvar compW = 1920.0;\nvar compH = 1080.0;\nvar srcW = layer.width;\nvar srcH = layer.height;\nvar s = 1.0;\nvar r_pan = 0.1;\nvar r_tilt = -0.2;\nvar r_ancX = 0.05;\nvar r_ancY = -0.03;\nvar isNormPan = (Math.abs(r_pan) <= 4.0);\nvar isNormTilt = (Math.abs(r_tilt) <= 4.0);\nvar isNormAncX = (Math.abs(r_ancX) <= 4.0);\nvar isNormAncY = (Math.abs(r_ancY) <= 4.0);\nvar panPx = isNormPan ? (r_pan * compW) : r_pan;\nvar tiltPx = isNormTilt ? (r_tilt * compH) : r_tilt;\nvar ancOffsetX = isNormAncX ? (r_ancX * compW) : r_ancX;\nvar ancOffsetY = isNormAncY ? (r_ancY * compH) : r_ancY;\nvar ae_ancX = (srcW / 2) + (1) * (ancOffsetX / s);\nvar ae_ancY = (srcH / 2) + (-1) * (ancOffsetY / s);\nlayer.property('Anchor Point').setValue([ae_ancX, ae_ancY]);\nvar ae_posX = (compW / 2) + panPx + ancOffsetX;\nvar ae_posY = (compH / 2) - tiltPx - ancOffsetY;\nlayer.property('Position').setValue([ae_posX, ae_posY]);\nlayer.property('Scale').setValue([1.2 * s * 100 * 1, 0.9 * s * 100 * 1]);\nlayer.property('Rotation').setValue(-5.0);\n// Crop Mask\nvar hvw = compW / (2 * s);\nvar hvh = compH / (2 * s);\nvar cx = srcW / 2, cy = srcH / 2;\nvar ml = cx - hvw + 0.1 * compW / s;\nvar mr = cx + hvw - 0.05 * compW / s;\nvar mt = cy - hvh + 0.02 * compH / s;\nvar mb = cy + hvh - 0.03 * compH / s;\nvar cropMask = layer.Masks.addProperty('Mask');\ncropMask.maskMode = MaskMode.ADD;\nvar cropShape = new Shape();\ncropShape.vertices = [[ml,mt],[mr,mt],[mr,mb],[ml,mb]];\ncropShape.closed = true;\ncropMask.property('maskShape').setValue(cropShape);\n// Lens Correction -> Optics Compensation\ntry {\n  var optics = layer.Effects.addProperty('Optics Compensation');\n  optics(1).setValue(52.46600638277029);\n  optics(2).setValue(true);\n} catch(e) {}\napp.endUndoGroup();\nvar jsxFile = new File($.fileName);\nif (jsxFile.exists) jsxFile.remove();",
+  "popen_calls": [
+    {
+      "args": [
+        "C:/Program Files/Adobe/AfterFX.exe",
+        "-r",
+        "C:\\Users\\Administrator\\AppData\\Roaming\\Blackmagic Design\\DaVinci Resolve\\Support\\Fusion\\Scripts\\Utility\\tests\\_tmp_snapshot_runtime\\video_with_crop_distortion\\ToAE_1700000000.jsx"
+      ],
+      "kwargs": {}
+    }
+  ]
+}

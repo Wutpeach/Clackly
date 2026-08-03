@@ -2,6 +2,7 @@ node_modules/
 dist/
 __pycache__/
 *.py[cod]
+resolve-command-center/resolve2ae_core/tests/_tmp_*/
 .vite/
 
 .env

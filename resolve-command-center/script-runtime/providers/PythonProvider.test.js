@@ -59,9 +59,12 @@ test("python provider sends config, replays logs, and returns the result", async
 
     assert.deepEqual(await provider.execute(
       { runtime: "python", entry: "scripts/run.py" },
-      { config: { count: 2 }, logger: { info: (message) => logs.push(message) } }
+      { commandId: "feature.export", config: { count: 2 }, logger: { info: (message) => logs.push(message) } }
     ), { exported: 2 });
-    assert.deepEqual(JSON.parse(child.request), { config: { count: 2 } });
+    assert.deepEqual(JSON.parse(child.request), {
+      commandId: "feature.export",
+      config: { count: 2 }
+    });
     assert.equal(spawnCalls[0][2].shell, false);
     assert.deepEqual(logs, ["done"]);
   })
@@ -85,6 +88,19 @@ test("python provider rejects missing, absolute, and escaping entries", () => wi
   assert.throws(() => provider.resolveEntry("scripts/missing.py"), /not found/);
   assert.throws(() => provider.resolveEntry(path.join(appRoot, "scripts", "run.py")), /relative path/);
   assert.throws(() => provider.resolveEntry("../run.py"), /not found under application root/);
+}));
+
+test("python provider validates the Command id before spawning", () => withApp((appRoot) => {
+  let spawned = false;
+  const provider = new PythonProvider({
+    appRoot,
+    spawnProcess: () => { spawned = true; }
+  });
+  assert.throws(
+    () => provider.execute({ entry: "scripts/run.py" }, { commandId: " " }),
+    /Command id/
+  );
+  assert.equal(spawned, false);
 }));
 
 test("python provider surfaces spawn, exit, protocol, and script errors", async () => (
@@ -113,9 +129,36 @@ test("python provider surfaces spawn, exit, protocol, and script errors", async 
         spawnProcess: () => fakeProcess(processResult)
       });
       await assert.rejects(
-        provider.execute({ runtime: "python", entry: "scripts/run.py" }),
+        provider.execute(
+          { runtime: "python", entry: "scripts/run.py" },
+          { commandId: "feature.run" }
+        ),
         expected
       );
     }
+  })
+));
+
+test("python provider rejects when host log replay fails", async () => (
+  withApp(async (appRoot) => {
+    const provider = new PythonProvider({
+      appRoot,
+      spawnProcess: () => fakeProcess({ stdout: JSON.stringify({
+        ok: true,
+        result: null,
+        logs: [{ level: "info", message: "done" }]
+      }) })
+    });
+
+    await assert.rejects(
+      provider.execute(
+        { entry: "scripts/run.py" },
+        {
+          commandId: "feature.run",
+          logger: { info: () => { throw new Error("logger failed"); } }
+        }
+      ),
+      /could not replay logs: logger failed/
+    );
   })
 ));

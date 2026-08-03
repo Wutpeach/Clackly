@@ -1,0 +1,20 @@
+{
+  "statuses": [
+    "Analyzing...",
+    "Exporting OTIO...",
+    "Parsing Data...",
+    "Sending...",
+    "✅ Sent 1 Clips"
+  ],
+  "jsx": "// Resolve2AE V1.0.1\napp.beginUndoGroup('Import Resolve Clips');\nvar comp = app.project.items.addComp('Link_Timeline_single_1700000000', 1920, 1080, 1, 1.0, 24.0);\ncomp.openInViewer();\n// Clip: ClipA\nvar fileItem = null;\nfor (var k=1; k<=app.project.items.length; k++) { if (app.project.items[k].file && app.project.items[k].file.fsName == 'C:/media/clip.mov') { fileItem = app.project.items[k]; break; } }\nif (!fileItem) { fileItem = app.project.importFile(new ImportOptions(File('C:/media/clip.mov'))); }\nif (fileItem.mainSource && fileItem.mainSource.nativeFrameRate) { fileItem.mainSource.conformFrameRate = fileItem.mainSource.nativeFrameRate; }\nvar layer = comp.layers.add(fileItem);\nlayer.name = 'ClipA';\nlayer.audioEnabled = false;\nlayer.startTime = 0.0 - 0.0;\nlayer.timeRemapEnabled = true;\nvar tr = layer.property('Time Remap');\nvar ourTimes = [];\ntr.setValueAtTime(0.0, 0.0);\nourTimes.push(0.0);\ntr.setValueAtTime(0.5, 0.25);\nourTimes.push(0.5);\ntr.setValueAtTime(1.0, 1.0);\nourTimes.push(1.0);\nfor (var k = tr.numKeys; k >= 1; k--) {\n  var kt = tr.keyTime(k); var keep = false;\n  for (var j = 0; j < ourTimes.length; j++) { if (Math.abs(kt - ourTimes[j]) < 0.001) { keep = true; break; } }\n  if (!keep) tr.removeKey(k);\n}\nlayer.inPoint = 0.0;\nlayer.outPoint = 1.0;\ntry { layer.blendingMode = BlendingMode.NORMAL; } catch(e) {}\nlayer.opacity.setValue(100.0);\nvar compW = 1920.0;\nvar compH = 1080.0;\nvar srcW = layer.width;\nvar srcH = layer.height;\nvar s = 1.0;\nvar r_pan = 0.0;\nvar r_tilt = 0.0;\nvar r_ancX = 0.0;\nvar r_ancY = 0.0;\nvar isNormPan = (Math.abs(r_pan) <= 4.0);\nvar isNormTilt = (Math.abs(r_tilt) <= 4.0);\nvar isNormAncX = (Math.abs(r_ancX) <= 4.0);\nvar isNormAncY = (Math.abs(r_ancY) <= 4.0);\nvar panPx = isNormPan ? (r_pan * compW) : r_pan;\nvar tiltPx = isNormTilt ? (r_tilt * compH) : r_tilt;\nvar ancOffsetX = isNormAncX ? (r_ancX * compW) : r_ancX;\nvar ancOffsetY = isNormAncY ? (r_ancY * compH) : r_ancY;\nvar ae_ancX = (srcW / 2) + (1) * (ancOffsetX / s);\nvar ae_ancY = (srcH / 2) + (-1) * (ancOffsetY / s);\nlayer.property('Anchor Point').setValue([ae_ancX, ae_ancY]);\nvar ae_posX = (compW / 2) + panPx + ancOffsetX;\nvar ae_posY = (compH / 2) - tiltPx - ancOffsetY;\nlayer.property('Position').setValue([ae_posX, ae_posY]);\nlayer.property('Scale').setValue([1.0 * s * 100 * 1, 1.0 * s * 100 * 1]);\nlayer.property('Rotation').setValue(-0.0);\napp.endUndoGroup();\nvar jsxFile = new File($.fileName);\nif (jsxFile.exists) jsxFile.remove();",
+  "popen_calls": [
+    {
+      "args": [
+        "C:/Program Files/Adobe/AfterFX.exe",
+        "-r",
+        "C:\\Users\\Administrator\\AppData\\Roaming\\Blackmagic Design\\DaVinci Resolve\\Support\\Fusion\\Scripts\\Utility\\tests\\_tmp_snapshot_runtime\\video_with_speed_ramp\\ToAE_1700000000.jsx"
+      ],
+      "kwargs": {}
+    }
+  ]
+}

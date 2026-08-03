@@ -1,0 +1,26 @@
+{
+  "id": "ae.export",
+  "name": "Export to After Effects",
+  "description": "Send Resolve timeline clips to After Effects",
+  "category": "Export",
+  "icon": "send",
+  "version": "1.0.0",
+  "type": "command",
+  "providers": ["script"],
+  "executor": {
+    "type": "script",
+    "runtime": "python",
+    "entry": "scripts/resolve2ae_export.py"
+  },
+  "configSchema": {
+    "aePath": {
+      "type": "path",
+      "label": "After Effects Path",
+      "required": true
+    },
+    "prefix": {
+      "type": "string",
+      "label": "Composition Prefix"
+    }
+  }
+}

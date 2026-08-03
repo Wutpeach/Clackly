@@ -77,14 +77,33 @@ The entry must be a relative file path contained by the application root. Python
 async def execute(context):
     context.logger.info("Starting export")
     project_name = context.project.GetName()
-    return {"project": project_name, "output": context.config["output"]}
+    return {
+        "command": context.command_id,
+        "project": project_name,
+        "output": context.config["output"],
+    }
 ```
 
-`context` exposes exactly `resolve`, `config`, `logger`, `project`, and `timeline`. The logger supports `debug`, `info`, `warning`, and `error`. Resolve objects are loaded lazily through `resolve/adapter.py`; configuration is a plain snapshot scoped to the Capability. Script stdout, stderr, and logger calls are captured and replayed without entering the JSON result channel.
+`context` exposes exactly `command_id`, `resolve`, `config`, `logger`, `project`, and `timeline`. `command_id` is read-only and is the stable id of the Command being executed. The logger supports `debug`, `info`, `warning`, and `error`. Resolve objects are loaded lazily through `resolve/adapter.py`; configuration is a plain snapshot scoped to the Capability. Script stdout, stderr, and logger calls are captured and replayed without entering the JSON result channel.
 
 The script runtime invokes the `python` executable from the host `PATH`. `RESOLVE_COMMAND_CENTER_PYTHON_CMD` remains specific to the Utility bridge because it is a full command and may include arguments.
 
 Scripts are trusted local Feature code, not sandboxed third-party code. Each execution starts one Python subprocess. Sandboxing, permissions, process pooling, cancellation, timeouts, streaming, package environments, interpreter discovery UI, and Lua/Node/shell runtimes are deferred until a concrete need justifies them.
+
+## Resolve2AE Export Feature
+
+The bundled `ae.export` Feature sends Resolve timeline media to After Effects through `scripts/resolve2ae_export.py` and the local `resolve2ae_core/`. Configure its required **After Effects Path** to the Windows `AfterFX.exe`; **Composition Prefix** is optional and defaults to `Link`. An invalid or missing executable is reported as a Command error.
+
+The primary **Export to After Effects** card uses these exact mouse mappings, and all four Commands are searchable and executable with Enter:
+
+| Trigger / Command | Selection |
+|---|---|
+| Click / Export to After Effects | Legacy automatic marker-or-playhead selection |
+| Ctrl+Click / Export Current Clip | Topmost enabled clip under the playhead, with audio fallback |
+| Shift+Click / Export Blue Marker Range | Video intersecting the first Blue duration marker |
+| Ctrl+Shift+Click / Export Cyan Marker Range with Audio | Video and de-duplicated audio intersecting the first Cyan duration marker |
+
+Blue and Cyan range Commands fail clearly when their required marker is absent; they do not fall back to the playhead. The release target is Windows with Resolve Studio Workflow Integration and After Effects. The retained macOS core path is not release-qualified. Progress streaming, cancellation, timeouts, and multiple-marker queues are intentionally not included.
 
 ## Feature UI Framework
 

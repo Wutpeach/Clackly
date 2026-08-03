@@ -1,0 +1,38 @@
+[
+  {
+    "id": "timeline.exportToAfterEffects",
+    "name": "Export to After Effects",
+    "description": "Automatically send the current Resolve selection to After Effects",
+    "category": "Export",
+    "icon": "send",
+    "keywords": ["after effects", "ae", "export", "timeline"],
+    "capability": "ae.export"
+  },
+  {
+    "id": "timeline.exportCurrentToAfterEffects",
+    "name": "Export Current Clip to After Effects",
+    "description": "Send the current Resolve clip to After Effects",
+    "category": "Export",
+    "icon": "send",
+    "keywords": ["after effects", "ae", "export", "current", "clip"],
+    "capability": "ae.export"
+  },
+  {
+    "id": "timeline.exportBlueRangeToAfterEffects",
+    "name": "Export Blue Marker Range to After Effects",
+    "description": "Send video in the Blue marker range to After Effects",
+    "category": "Export",
+    "icon": "send",
+    "keywords": ["after effects", "ae", "export", "blue", "marker", "range"],
+    "capability": "ae.export"
+  },
+  {
+    "id": "timeline.exportCyanRangeToAfterEffects",
+    "name": "Export Cyan Marker Range with Audio to After Effects",
+    "description": "Send video and audio in the Cyan marker range to After Effects",
+    "category": "Export",
+    "icon": "send",
+    "keywords": ["after effects", "ae", "export", "cyan", "marker", "range", "audio"],
+    "capability": "ae.export"
+  }
+]

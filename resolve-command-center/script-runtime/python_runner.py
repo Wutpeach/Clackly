@@ -36,12 +36,17 @@ class ScriptLogger:
 
 
 class ScriptContext:
-    def __init__(self, config: dict[str, Any], logger: ScriptLogger, adapter: Any) -> None:
+    def __init__(self, command_id: str, config: dict[str, Any], logger: ScriptLogger, adapter: Any) -> None:
+        self._command_id = command_id
         self.config = dict(config)
         self.logger = logger
         self._adapter = adapter
         self._resolve = None
         self._project_timeline = None
+
+    @property
+    def command_id(self) -> str:
+        return self._command_id
 
     @property
     def resolve(self) -> Any:
@@ -83,12 +88,19 @@ def _capture_stream(logs: list[dict[str, str]], level: str, stream: io.StringIO)
     )
 
 
-def run_script(entry_path: str, config: dict[str, Any], adapter: Any = resolve_adapter) -> dict[str, Any]:
+def run_script(
+    entry_path: str,
+    command_id: str,
+    config: dict[str, Any],
+    adapter: Any = resolve_adapter,
+) -> dict[str, Any]:
     logs: list[dict[str, str]] = []
     stdout = io.StringIO()
     stderr = io.StringIO()
     try:
-        context = ScriptContext(config, ScriptLogger(logs), adapter)
+        if not isinstance(command_id, str) or not command_id.strip():
+            raise TypeError("Script Command id must be a non-empty string")
+        context = ScriptContext(command_id, config, ScriptLogger(logs), adapter)
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             result = _load_execute(pathlib.Path(entry_path))(context)
             if inspect.isawaitable(result):
@@ -110,10 +122,15 @@ def run_script(entry_path: str, config: dict[str, Any], adapter: Any = resolve_a
 def main() -> None:
     try:
         request = json.load(sys.stdin)
+        if not isinstance(request, dict):
+            raise TypeError("Script request must be an object")
+        command_id = request.get("commandId")
+        if not isinstance(command_id, str) or not command_id.strip():
+            raise TypeError("Script Command id must be a non-empty string")
         config = request.get("config", {})
         if not isinstance(config, dict):
             raise TypeError("Script configuration must be an object")
-        envelope = run_script(sys.argv[1], config)
+        envelope = run_script(sys.argv[1], command_id, config)
     except Exception as error:
         envelope = {
             "ok": False,

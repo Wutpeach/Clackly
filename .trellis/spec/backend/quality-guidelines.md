@@ -120,10 +120,10 @@ const executeCommand = createCommandExecutor({
 - Capability executor metadata: `{ type: "script", runtime: "python", entry: string }` where `entry` is relative to the application root.
 - Runtime dispatcher: `new ScriptExecutor(Map<runtime, provider>).execute(scriptDefinition, context)`.
 - Runtime provider: `provider.execute(scriptDefinition, context) -> Promise<JSONValue>`.
-- Script Capability Provider: `execute(scriptDefinition, { config })`, where `config.get()` returns the capability-scoped snapshot.
+- Script Capability Provider: `execute(scriptDefinition, { command, config })`, where `command.id` is the stable execution identity and `config.get()` returns the capability-scoped snapshot.
 - Python feature entry: sync or async `execute(context) -> JSON-serializable result`.
-- Python ScriptContext public attributes: `resolve`, `config`, `logger`, `project`, `timeline`.
-- Python process request: `{ "config": object }` on stdin.
+- Python ScriptContext public attributes: `command_id`, `resolve`, `config`, `logger`, `project`, `timeline`.
+- Python process request: `{ "commandId": string, "config": object }` on stdin.
 - Python process response: `{ "ok": true, "result": JSONValue, "logs": LogRecord[] }` or `{ "ok": false, "error": { "type": string, "message": string }, "logs": LogRecord[] }`.
 
 ### 3. Contracts
@@ -133,10 +133,12 @@ const executeCommand = createCommandExecutor({
 - A script Capability delegates `Capability -> ScriptCapabilityProvider -> ScriptExecutor -> runtime provider`; only the runtime provider knows the interpreter or `node:child_process`.
 - Both Electron hosts call the same script registration helper in the same registry-composition position.
 - Command Engine, Command Metadata, Interaction Binding, renderer, Feature UI, and the fixed-command HTTP bridge contain no script/runtime selection branches.
-- `ScriptCapabilityProvider` converts `ConfigManager.forCapability(id)` into a defensive plain snapshot. Scripts never receive ConfigStorage, ConfigManager, another Capability's settings, Electron, or UI objects.
+- `ScriptCapabilityProvider` forwards only `command.id` plus a defensive plain snapshot from `ConfigManager.forCapability(id)`. Scripts never receive Command presentation metadata, ConfigStorage, ConfigManager, another Capability's settings, Electron, or UI objects.
 - PythonProvider resolves `entry` under the application root, rejects absolute/missing/escaping paths including symlink escapes, spawns with `shell: false`, and reserves process stdout for one JSON envelope.
 - The Python runner captures feature stdout/stderr as log records, supports sync/async `execute(context)`, and requires JSON-serializable results.
 - `context.resolve`, `context.project`, and `context.timeline` are lazy and cached through `resolve.adapter.py`; config-only scripts do not require a live Resolve connection.
+- `context.command_id` is read-only. Both JavaScript producers and the Python runner reject a missing, blank, or non-string Command id before feature execution.
+- Before importing `DaVinciResolveScript`, the shared adapter tries existing importability, then existing `RESOLVE_SCRIPT_API/Modules` and standard Windows ProgramData module directories without duplicating `sys.path` entries.
 - Python scripts are trusted local Capability code. ScriptContext is an API boundary, not an OS/filesystem sandbox.
 - One subprocess is used per execution. Add pooling only after measured startup cost justifies shared runtime state.
 - `RESOLVE_COMMAND_CENTER_PYTHON_CMD` belongs to the legacy bridge launcher and may contain arguments. PythonProvider must not treat it as a single executable; use its executable-only constructor injection when customization is needed.
@@ -146,6 +148,7 @@ const executeCommand = createCommandExecutor({
 - Missing definitions directory -> register zero script Capabilities without error.
 - Invalid manifest root/entry, duplicate discovered id, malformed Capability metadata, or malformed executor -> reject before adding any discovered Capability to the host registry.
 - Unknown `scriptDefinition.runtime` -> ScriptExecutor rejects without invoking a provider.
+- Missing/blank `command.id` or `commandId` -> reject before spawning or executing the feature.
 - Absolute, missing, non-file, or application-root-escaping entry -> PythonProvider rejects before spawning.
 - Python spawn error, stdin failure, non-zero exit, invalid JSON/envelope/log record, or logger replay failure -> reject with a controlled error naming the script entry.
 - Missing/non-callable Python `execute`, import/runtime exception, or non-JSON result -> runner returns a structured error envelope; PythonProvider rejects it.
@@ -166,9 +169,9 @@ const executeCommand = createCommandExecutor({
 - Assert sorted object/array manifest loading, duplicate rejection, defensive definitions, optional-executor compatibility, and atomic registration failure.
 - Assert a temporary Script + Capability manifest + Command manifest executes through the real Command executor and appears through FeatureCatalog.
 - Assert ScriptExecutor dispatches only the named provider and rejects missing/unsupported runtimes.
-- Assert ScriptCapabilityProvider requires scoped config, passes a defensive plain snapshot, and does not forward the Command or ConfigManager.
-- Assert PythonProvider path containment, `shell: false`, config request, result/log replay, spawn/stdin/exit/protocol/logger failures, and executable-only Python customization.
-- Assert the Python runner exposes exactly five public context attributes, keeps Resolve access lazy/cached, supports sync/async scripts, captures stdout/stderr, and rejects missing execute, exceptions, NaN, and other non-JSON results.
+- Assert ScriptCapabilityProvider requires a Command id and scoped config, passes only the id plus a defensive plain snapshot, and does not forward Command metadata or ConfigManager.
+- Assert PythonProvider path containment, `shell: false`, command/config request, result/log replay, spawn/stdin/exit/protocol/logger failures, and executable-only Python customization.
+- Assert the Python runner exposes exactly six public context attributes with read-only `command_id`, keeps Resolve access lazy/cached, supports sync/async scripts, captures stdout/stderr, and rejects missing execute, exceptions, NaN, and other non-JSON results.
 - Run full Node/Python tests, Python compile, production build, `git diff --check`, and boundary searches for process/Command Engine/renderer/Resolve ownership.
 - Record live Resolve/Workflow Integration execution as a manual validation gap when Resolve is unavailable.
 

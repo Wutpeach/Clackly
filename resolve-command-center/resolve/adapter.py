@@ -1,10 +1,31 @@
 import math
+import os
 import re
+import sys
+from pathlib import Path
 from typing import Any, Dict
 
 
 class ResolveAdapterError(RuntimeError):
     """Raised for user-facing Resolve adapter failures."""
+
+
+def _add_resolve_module_paths() -> None:
+    scripting_api = os.environ.get("RESOLVE_SCRIPT_API")
+    program_data = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
+    candidates = [
+        Path(scripting_api) / "Modules" if scripting_api else None,
+        Path(program_data)
+        / "Blackmagic Design"
+        / "DaVinci Resolve"
+        / "Support"
+        / "Developer"
+        / "Scripting"
+        / "Modules",
+    ]
+    for candidate in reversed(candidates):
+        if candidate and candidate.is_dir() and str(candidate) not in sys.path:
+            sys.path.insert(0, str(candidate))
 
 
 def _call_optional(target: Any, method_name: str) -> Any:
@@ -39,14 +60,23 @@ def get_resolve() -> Any:
 
     try:
         import DaVinciResolveScript as dvr_script  # type: ignore
+    except Exception:
+        _add_resolve_module_paths()
+        try:
+            import DaVinciResolveScript as dvr_script  # type: ignore
+        except Exception as exc:
+            raise ResolveAdapterError(
+                "Resolve scripting API is unavailable; run the bridge inside Resolve"
+            ) from exc
 
+    try:
         resolve = dvr_script.scriptapp("Resolve")
-        if resolve is not None:
-            return resolve
     except Exception as exc:
         raise ResolveAdapterError(
             "Resolve scripting API is unavailable; run the bridge inside Resolve"
         ) from exc
+    if resolve is not None:
+        return resolve
 
     raise ResolveAdapterError("Could not connect to Resolve")
 

@@ -45,14 +45,31 @@ test("timeline.addMarker preserves registry search with capability metadata", ()
     keywords: ["marker", "mark", "timeline", "red"],
     capability: "marker.add"
   });
-  assert.deepEqual(searchCommands("marker").map(({ id }) => id), ["timeline.addMarker"]);
+  assert.deepEqual(searchCommands("marker").map(({ id }) => id), [
+    "timeline.exportBlueRangeToAfterEffects",
+    "timeline.exportCyanRangeToAfterEffects",
+    "timeline.addMarker"
+  ]);
   assert.deepEqual(searchCommands("current frame"), []);
 
   command.keywords.push("changed");
   assert.deepEqual(getCommandById("timeline.addMarker").keywords, ["marker", "mark", "timeline", "red"]);
-  const searchResult = searchCommands("marker")[0];
+  const searchResult = searchCommands("marker").find(({ id }) => id === "timeline.addMarker");
   searchResult.keywords[0] = "changed";
-  assert.equal(searchCommands("marker")[0].keywords[0], "marker");
+  assert.equal(getCommandById("timeline.addMarker").keywords[0], "marker");
+});
+
+test("After Effects export Commands share one capability and remain searchable", () => {
+  resetCommandCache();
+  const commands = searchCommands("after effects");
+  assert.deepEqual(commands.map(({ id }) => id), [
+    "timeline.exportToAfterEffects",
+    "timeline.exportCurrentToAfterEffects",
+    "timeline.exportBlueRangeToAfterEffects",
+    "timeline.exportCyanRangeToAfterEffects"
+  ]);
+  assert.deepEqual(new Set(commands.map(({ capability }) => capability)), new Set(["ae.export"]));
+  assert.equal(commands.some((command) => "runtime" in command || "mode" in command), false);
 });
 
 test("command registry requires presentation metadata and drops unsupported fields", (t) => {

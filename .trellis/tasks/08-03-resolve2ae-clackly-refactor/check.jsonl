@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify Script Runtime request symmetry, Command/Capability/config boundaries, Resolve adapter ownership, errors, tests, and forbidden patterns."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify renderer remains generic, keyboard Enter and exact mouse interactions retain their contracts, and no AE-specific UI branches appear."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit every contract hop and both Electron host paths after the shared protocol and manifest additions."}
+{"file":".trellis/tasks/08-03-resolve2ae-clackly-refactor/research/current-state.md","reason":"Check the implementation against confirmed reuse boundaries, platform evidence, and excluded desktop product scope."}
+{"file":".trellis/tasks/08-03-resolve2ae-clackly-refactor/research/interaction-mode-adaptation.md","reason":"Check exact trigger mappings, shared Capability/config ownership, command_id transport, explicit modes, and parity requirements."}

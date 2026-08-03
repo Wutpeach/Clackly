@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend spec routing for Capability, Script Runtime, Resolve adapter, configuration, and Interaction Binding work."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Executable contracts that must be updated and preserved for command dispatch, Python ScriptContext, Resolve ownership, config scoping, lifecycle, and bindings."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Renderer and command-card contracts forbid AE-specific modifier routing and require keyboard and mouse semantics to remain generic."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"The change crosses manifests, registries, bindings, process JSON, Python context, Resolve API, core selection, and AE side effects."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse one Capability/config scope and the existing command/binding/runtime boundaries instead of duplicating plugins or UI."}
+{"file":".trellis/tasks/08-03-resolve2ae-clackly-refactor/research/current-state.md","reason":"Evidence-backed legacy and Clackly architecture, reuse points, Windows Resolve discovery gap, and deliberately deferred runtime features."}
+{"file":".trellis/tasks/08-03-resolve2ae-clackly-refactor/research/interaction-mode-adaptation.md","reason":"Confirmed one-Capability/four-Command interaction design, command_id protocol gap, mode mappings, and required tests."}

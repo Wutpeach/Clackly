@@ -4,11 +4,50 @@ const path = require("node:path");
 const { ConfigStorage } = require("../config/ConfigStorage");
 const { normalizeTrigger } = require("./trigger");
 
-const DEFAULT_BINDINGS = {
+const OLD_DEFAULT_BINDINGS = {
   "timeline.addMarker.left-click": {
     target: "timeline.addMarker",
     trigger: { type: "mouse", button: "left", modifiers: [] },
     action: { command: "timeline.addMarker" }
+  }
+};
+
+const DEFAULT_BINDINGS = {
+  ...OLD_DEFAULT_BINDINGS,
+  "timeline.exportToAfterEffects.left-click": {
+    target: "timeline.exportToAfterEffects",
+    trigger: { type: "mouse", button: "left", modifiers: [] },
+    action: { command: "timeline.exportToAfterEffects" }
+  },
+  "timeline.exportToAfterEffects.ctrl-left-click": {
+    target: "timeline.exportToAfterEffects",
+    trigger: { type: "mouse", button: "left", modifiers: ["CTRL"] },
+    action: { command: "timeline.exportCurrentToAfterEffects" }
+  },
+  "timeline.exportToAfterEffects.shift-left-click": {
+    target: "timeline.exportToAfterEffects",
+    trigger: { type: "mouse", button: "left", modifiers: ["SHIFT"] },
+    action: { command: "timeline.exportBlueRangeToAfterEffects" }
+  },
+  "timeline.exportToAfterEffects.ctrl-shift-left-click": {
+    target: "timeline.exportToAfterEffects",
+    trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT"] },
+    action: { command: "timeline.exportCyanRangeToAfterEffects" }
+  },
+  "timeline.exportCurrentToAfterEffects.left-click": {
+    target: "timeline.exportCurrentToAfterEffects",
+    trigger: { type: "mouse", button: "left", modifiers: [] },
+    action: { command: "timeline.exportCurrentToAfterEffects" }
+  },
+  "timeline.exportBlueRangeToAfterEffects.left-click": {
+    target: "timeline.exportBlueRangeToAfterEffects",
+    trigger: { type: "mouse", button: "left", modifiers: [] },
+    action: { command: "timeline.exportBlueRangeToAfterEffects" }
+  },
+  "timeline.exportCyanRangeToAfterEffects.left-click": {
+    target: "timeline.exportCyanRangeToAfterEffects",
+    trigger: { type: "mouse", button: "left", modifiers: [] },
+    action: { command: "timeline.exportCyanRangeToAfterEffects" }
   }
 };
 
@@ -88,7 +127,11 @@ class BindingStorage {
     if (!fs.existsSync(this.filePath)) {
       return this.save(DEFAULT_BINDINGS);
     }
-    return normalizeBindings(this.storage.load());
+    const bindings = normalizeBindings(this.storage.load());
+    if (JSON.stringify(bindings) === JSON.stringify(normalizeBindings(OLD_DEFAULT_BINDINGS))) {
+      return this.save(DEFAULT_BINDINGS);
+    }
+    return bindings;
   }
 
   save(bindings) {

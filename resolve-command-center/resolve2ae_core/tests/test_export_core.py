@@ -1,0 +1,903 @@
+from __future__ import annotations
+
+from contextlib import ExitStack
+import json
+import shutil
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from resolve2ae_core import export as export_core
+
+
+SNAPSHOT_DIR = Path(__file__).resolve().parent / "fixtures" / "export_snapshots_baseline"
+WORK_DIR = Path(__file__).resolve().parent / "_tmp_export_core"
+FIXED_TIME = 1700000000
+AE_PATH = "C:/Program Files/Adobe/AfterFX.exe"
+
+
+class FakeMediaPoolItem:
+    def __init__(self, file_path: str, resolution: str = "1920x1080", input_lut: str = "") -> None:
+        self._props = {
+            "File Path": file_path,
+            "Resolution": resolution,
+            "Input LUT": input_lut,
+        }
+
+    def GetClipProperty(self, key: str) -> str:
+        return self._props.get(key, "")
+
+
+class FakeAudioItem:
+    def __init__(
+        self,
+        start: int,
+        end: int,
+        *,
+        name: str = "Audio",
+        track_index: int = 1,
+        enabled: bool = True,
+        mapping: dict | None = None,
+    ) -> None:
+        self._start = start
+        self._end = end
+        self._name = name
+        self._track_index = track_index
+        self._enabled = enabled
+        self._mapping = mapping
+
+    def GetStart(self) -> int:
+        return self._start
+
+    def GetEnd(self) -> int:
+        return self._end
+
+    def GetName(self) -> str:
+        return self._name
+
+    def GetTrackTypeAndIndex(self) -> tuple[str, int]:
+        return ("audio", self._track_index)
+
+    def GetClipEnabled(self) -> bool:
+        return self._enabled
+
+    def GetSourceAudioChannelMapping(self):
+        return self._mapping
+
+
+class FakeVideoItem:
+    def __init__(
+        self,
+        *,
+        start: int,
+        end: int,
+        name: str = "Clip",
+        track_index: int = 1,
+        file_path: str = "C:/media/clip.mov",
+        resolution: str = "1920x1080",
+        input_lut: str = "",
+        linked_items: list | None = None,
+        enabled: bool = True,
+        left_offset: int = 0,
+        duration: int | None = None,
+    ) -> None:
+        self._start = start
+        self._end = end
+        self._name = name
+        self._track_index = track_index
+        self._media = FakeMediaPoolItem(file_path, resolution, input_lut)
+        self._linked_items = linked_items or []
+        self._enabled = enabled
+        self._left_offset = left_offset
+        self._duration = duration if duration is not None else (end - start)
+
+    def GetClipEnabled(self) -> bool:
+        return self._enabled
+
+    def GetStart(self) -> int:
+        return self._start
+
+    def GetEnd(self) -> int:
+        return self._end
+
+    def GetName(self) -> str:
+        return self._name
+
+    def GetTrackTypeAndIndex(self) -> tuple[str, int]:
+        return ("video", self._track_index)
+
+    def GetLinkedItems(self) -> list:
+        return list(self._linked_items)
+
+    def GetMediaPoolItem(self) -> FakeMediaPoolItem:
+        return self._media
+
+    def GetLeftOffset(self) -> int:
+        return self._left_offset
+
+    def GetDuration(self) -> int:
+        return self._duration
+
+
+class FakeTimelineAudioItem(FakeAudioItem):
+    def __init__(
+        self,
+        *,
+        start: int,
+        end: int,
+        name: str = "Audio",
+        track_index: int = 1,
+        file_path: str = "C:/media/audio.wav",
+        enabled: bool = True,
+        left_offset: int = 0,
+        duration: int | None = None,
+    ) -> None:
+        super().__init__(start, end, name=name, track_index=track_index, enabled=enabled)
+        self._media = FakeMediaPoolItem(file_path, "0x0", "")
+        self._left_offset = left_offset
+        self._duration = duration if duration is not None else (end - start)
+
+    def GetMediaPoolItem(self) -> FakeMediaPoolItem:
+        return self._media
+
+    def GetLeftOffset(self) -> int:
+        return self._left_offset
+
+    def GetDuration(self) -> int:
+        return self._duration
+
+    def GetLinkedItems(self) -> list:
+        return []
+
+
+class FakeTimeline:
+    def __init__(
+        self,
+        *,
+        video_tracks: dict[int, list],
+        audio_tracks: dict[int, list] | None = None,
+        disabled_tracks: dict[str, set[int]] | None = None,
+        markers: dict | None = None,
+        export_payload: dict | None = None,
+        export_success: bool = True,
+        name: str = "Timeline",
+        fps: str = "24",
+        start_frame: int = 0,
+        resolution: tuple[str, str] = ("1920", "1080"),
+        current_tc: str = "00:00:00:00",
+    ) -> None:
+        self.video_tracks = video_tracks
+        self.audio_tracks = audio_tracks or {}
+        self.disabled_tracks = disabled_tracks or {}
+        self.markers = markers or {}
+        self.export_payload = export_payload
+        self.export_success = export_success
+        self.name = name
+        self.fps = fps
+        self.start_frame = start_frame
+        self.resolution = resolution
+        self.current_tc = current_tc
+
+    def GetSetting(self, key: str) -> str:
+        return {
+            "timelineFrameRate": self.fps,
+            "timelineResolutionWidth": self.resolution[0],
+            "timelineResolutionHeight": self.resolution[1],
+        }.get(key, "")
+
+    def GetStartFrame(self) -> int:
+        return self.start_frame
+
+    def GetMarkers(self) -> dict:
+        return self.markers
+
+    def GetCurrentTimecode(self) -> str:
+        return self.current_tc
+
+    def GetTrackCount(self, track_type: str) -> int:
+        tracks = self.video_tracks if track_type == "video" else self.audio_tracks
+        return max(tracks.keys()) if tracks else 0
+
+    def GetIsTrackEnabled(self, track_type: str, track_index: int) -> bool:
+        return track_index not in self.disabled_tracks.get(track_type, set())
+
+    def GetItemListInTrack(self, track_type: str, track_index: int) -> list:
+        tracks = self.video_tracks if track_type == "video" else self.audio_tracks
+        return list(tracks.get(track_index, []))
+
+    def Export(self, path: str, *_args) -> bool:
+        if not self.export_success:
+            return False
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(self.export_payload or {}, handle, ensure_ascii=False)
+        return True
+
+    def GetName(self) -> str:
+        return self.name
+
+
+class FakeProject:
+    def __init__(self, timeline) -> None:
+        self.timeline = timeline
+
+    def GetCurrentTimeline(self):
+        return self.timeline
+
+
+class FakeResolve:
+    EXPORT_OTIO = 1
+    EXPORT_NONE = 0
+
+
+class FakeMissingMediaVideoItem(FakeVideoItem):
+    def GetMediaPoolItem(self):
+        return None
+
+
+class FakeAudioItemWithoutTrackIndex(FakeAudioItem):
+    def GetTrackTypeAndIndex(self):
+        return ("audio",)
+
+
+class BrokenLinkedInfoItem:
+    def GetTrackTypeAndIndex(self):
+        raise RuntimeError("broken linked item")
+
+
+class BrokenLinkedItemsVideoItem(FakeVideoItem):
+    def GetLinkedItems(self) -> list:
+        raise RuntimeError("linked items unavailable")
+
+
+class CaptureOpen:
+    def __init__(self) -> None:
+        self.writes: dict[str, str] = {}
+
+    def __call__(self, path, mode="r", *args, **kwargs):
+        path = str(path)
+        if "w" in mode and path.endswith(".jsx"):
+            outer = self
+
+            class _Writer:
+                def __enter__(self):
+                    self.parts: list[str] = []
+                    return self
+
+                def write(self, data: str) -> int:
+                    self.parts.append(data)
+                    return len(data)
+
+                def __exit__(self, exc_type, exc, tb) -> bool:
+                    outer.writes[path] = "".join(self.parts)
+                    return False
+
+            return _Writer()
+        return open(path, mode, *args, **kwargs)
+
+
+def build_otio_clip(name: str = "ClipA", *, props: list[dict] | None = None, effects: list[dict] | None = None) -> dict:
+    base_transform = {
+        "OTIO_SCHEMA": "Effect.1",
+        "metadata": {
+            "Resolve_OTIO": {
+                "Effect Name": "Transform",
+                "Parameters": [
+                    {"Parameter ID": "ZoomX", "Parameter Value": 1.0},
+                    {"Parameter ID": "ZoomY", "Parameter Value": 1.0},
+                    {"Parameter ID": "Pan", "Parameter Value": 0.0},
+                    {"Parameter ID": "Tilt", "Parameter Value": 0.0},
+                    {"Parameter ID": "RotationAngle", "Parameter Value": 0.0},
+                    {"Parameter ID": "AnchorPoint", "Parameter Value": [0.0, 0.0]},
+                ],
+            }
+        },
+    }
+    effect_list = [base_transform]
+    if props:
+        effect_list[0]["metadata"]["Resolve_OTIO"]["Parameters"] = props
+    if effects:
+        effect_list.extend(effects)
+    return {
+        "OTIO_SCHEMA": "Clip.2",
+        "name": name,
+        "source_range": {"duration": {"value": 24, "rate": 24}},
+        "effects": effect_list,
+    }
+
+
+def wrap_tracks(*clips: dict) -> dict:
+    return {"tracks": {"children": [{"kind": "Video", "children": list(clips)}]}}
+
+
+def build_props(**overrides) -> dict:
+    props = {
+        "blend_mode": 0,
+        "opacity": 100.0,
+        "pan": 0.0,
+        "tilt": 0.0,
+        "anchor_x": 0.0,
+        "anchor_y": 0.0,
+        "flip_x": False,
+        "flip_y": False,
+        "zoom_x": 1.0,
+        "zoom_y": 1.0,
+        "rotation": 0.0,
+        "crop_left": 0.0,
+        "crop_right": 0.0,
+        "crop_top": 0.0,
+        "crop_bottom": 0.0,
+        "distortion": 0.0,
+        "time_scalar": 1.0,
+        "speed_keyframes": None,
+        "dynamic_zoom_keyframes": None,
+    }
+    props.update(overrides)
+    return props
+
+
+class ExportCoreSnapshotTests(unittest.TestCase):
+    maxDiff = None
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        WORK_DIR.mkdir(parents=True, exist_ok=True)
+
+    def setUp(self) -> None:
+        self.capture_open = CaptureOpen()
+        self.popen_calls: list[dict] = []
+
+    def _case_dir(self, case_name: str) -> Path:
+        case_dir = WORK_DIR / case_name
+        if case_dir.exists():
+            shutil.rmtree(case_dir)
+        case_dir.mkdir(parents=True, exist_ok=True)
+        return case_dir
+
+    def _run_export(
+        self,
+        case_name: str,
+        timeline,
+        config: dict | None,
+        *,
+        ae_running: bool = True,
+        ae_path: str = AE_PATH,
+        lut_lookup: str | None = None,
+        lut_copy: str | None = None,
+        load_config_result: dict | None = None,
+        parse_result: tuple[dict, list] | None = None,
+        props_result: tuple[dict, str] | None = None,
+        platform_name: str = "Windows",
+        print_output: list[str] | None = None,
+        popen_side_effect=None,
+    ) -> dict:
+        case_dir = self._case_dir(case_name)
+        statuses: list[str] = []
+        popen_impl = popen_side_effect
+        if popen_impl is None:
+            popen_impl = lambda args, **kwargs: self.popen_calls.append({"args": list(args), "kwargs": kwargs})
+
+        config_payload = dict(config) if config is not None else None
+
+        with ExitStack() as stack:
+            stack.enter_context(patch("resolve2ae_core.export.time.time", return_value=FIXED_TIME))
+            stack.enter_context(patch("resolve2ae_core.export.platform.system", return_value=platform_name))
+            stack.enter_context(patch("resolve2ae_core.export.get_running_ae_path", return_value=ae_path if ae_running else ""))
+            stack.enter_context(patch("resolve2ae_core.export.find_lut_file", side_effect=lambda _name: lut_lookup))
+            stack.enter_context(patch("resolve2ae_core.export.copy_lut_to_ae", side_effect=lambda _src, _dest: lut_copy))
+            stack.enter_context(patch("resolve2ae_core.export.subprocess.Popen", side_effect=popen_impl))
+            stack.enter_context(patch("resolve2ae_core.export.tempfile.gettempdir", return_value=str(case_dir)))
+            stack.enter_context(patch("resolve2ae_core.export.open", new=self.capture_open, create=True))
+            if load_config_result is not None:
+                stack.enter_context(patch("resolve2ae_core.export.load_config", return_value=load_config_result))
+            if parse_result is not None:
+                stack.enter_context(patch("resolve2ae_core.export.parse_otio_robust", return_value=parse_result))
+            if props_result is not None:
+                stack.enter_context(patch("resolve2ae_core.export.find_props_dual_lock", return_value=props_result))
+            if print_output is not None:
+                stack.enter_context(
+                    patch(
+                        "builtins.print",
+                        side_effect=lambda *args, **kwargs: print_output.append(" ".join(str(arg) for arg in args)),
+                    )
+                )
+
+            result = export_core.process_and_send(
+                FakeResolve(), FakeProject(timeline), ae_path, statuses.append, config_payload
+            )
+
+        jsx = next(iter(self.capture_open.writes.values()), "")
+        return {
+            "statuses": statuses,
+            "jsx": jsx,
+            "popen_calls": self.popen_calls,
+            "result": result,
+        }
+
+    def _normalize_snapshot_payload(self, payload: dict) -> dict:
+        normalized_calls = []
+        for call in payload.get("popen_calls", []):
+            args = list(call.get("args", []))
+            if args and isinstance(args[-1], str) and args[-1].endswith(".jsx"):
+                jsx_path = Path(args[-1])
+                args[-1] = (Path(jsx_path.parent.name) / jsx_path.name).as_posix()
+            normalized_calls.append({"args": args, "kwargs": call.get("kwargs", {})})
+        return {
+            "statuses": payload.get("statuses", []),
+            "jsx": payload.get("jsx", ""),
+            "popen_calls": normalized_calls,
+        }
+
+    def _assert_matches_snapshot(self, snapshot_name: str, actual: dict) -> None:
+        expected = json.loads((SNAPSHOT_DIR / f"{snapshot_name}.json").read_text(encoding="utf-8"))
+        self.assertEqual(self._normalize_snapshot_payload(expected), self._normalize_snapshot_payload(actual))
+
+    def test_single_video_otio_success_matches_snapshot(self) -> None:
+        clip = FakeVideoItem(start=0, end=24, name="ClipA")
+        timeline = FakeTimeline(video_tracks={1: [clip]}, export_payload=wrap_tracks(build_otio_clip()))
+        actual = self._run_export(
+            "single_video_otio_success",
+            timeline,
+            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+        )
+        self._assert_matches_snapshot("single_video_otio_success", actual)
+        self.assertEqual(actual["result"], {
+            "ok": True,
+            "code": "exported",
+            "mode": "auto",
+            "clip_count": 1,
+            "message": "Sent 1 Clips",
+        })
+
+    def test_single_video_otio_fallback_matches_snapshot(self) -> None:
+        clip = FakeVideoItem(start=0, end=24, name="ClipA")
+        timeline = FakeTimeline(video_tracks={1: [clip]}, export_payload=wrap_tracks(build_otio_clip()), export_success=False)
+        actual = self._run_export(
+            "single_video_otio_fallback",
+            timeline,
+            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+        )
+        self._assert_matches_snapshot("single_video_otio_fallback", actual)
+
+    def test_mixed_video_audio_matches_snapshot(self) -> None:
+        linked_audio = FakeAudioItem(0, 24, track_index=1, mapping={"track_mapping": {"1": {"mute": False}}})
+        video_with_audio = FakeVideoItem(start=0, end=24, name="ClipMixV", linked_items=[linked_audio])
+        audio_clip = FakeTimelineAudioItem(start=0, end=24, name="ClipMixA", track_index=1)
+        timeline = FakeTimeline(
+            video_tracks={1: [video_with_audio]},
+            audio_tracks={1: [audio_clip]},
+            markers={0: {"color": "Cyan", "duration": 24}},
+        )
+        actual = self._run_export(
+            "mixed_video_audio",
+            timeline,
+            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+        )
+        self._assert_matches_snapshot("mixed_video_audio", actual)
+
+    def test_video_with_lut_matches_snapshot(self) -> None:
+        clip = FakeVideoItem(start=0, end=24, name="ClipLUT", input_lut="ShowLUT")
+        timeline = FakeTimeline(video_tracks={1: [clip]}, export_payload=wrap_tracks(build_otio_clip("ClipLUT")))
+        actual = self._run_export(
+            "video_with_lut",
+            timeline,
+            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+            lut_lookup="C:/LUTs/ShowLUT.cube",
+            lut_copy="ShowLUT.cube",
+        )
+        self._assert_matches_snapshot("video_with_lut", actual)
+
+    def test_video_with_speed_ramp_matches_snapshot(self) -> None:
+        speed_effect = {
+            "OTIO_SCHEMA": "TimeEffect.1",
+            "metadata": {"Resolve_OTIO": {"Key Frames": [[0.0, 0.0], [0.5, 0.25], [1.0, 1.0]]}},
+        }
+        clip = FakeVideoItem(start=0, end=24, name="ClipA")
+        timeline = FakeTimeline(video_tracks={1: [clip]}, export_payload=wrap_tracks(build_otio_clip("ClipA", effects=[speed_effect])))
+        actual = self._run_export(
+            "video_with_speed_ramp",
+            timeline,
+            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+        )
+        self._assert_matches_snapshot("video_with_speed_ramp", actual)
+
+    def test_video_with_crop_distortion_matches_snapshot(self) -> None:
+        transform_params = [
+            {"Parameter ID": "ZoomX", "Parameter Value": 1.2},
+            {"Parameter ID": "ZoomY", "Parameter Value": 0.9},
+            {"Parameter ID": "Pan", "Parameter Value": 0.1},
+            {"Parameter ID": "Tilt", "Parameter Value": -0.2},
+            {"Parameter ID": "RotationAngle", "Parameter Value": 5.0},
+            {"Parameter ID": "AnchorPoint", "Parameter Value": [0.05, -0.03]},
+        ]
+        crop_effect = {
+            "OTIO_SCHEMA": "Effect.1",
+            "metadata": {
+                "Resolve_OTIO": {
+                    "Effect Name": "Cropping",
+                    "Parameters": [
+                        {"Parameter ID": "CropLeft", "Parameter Value": 0.1},
+                        {"Parameter ID": "CropRight", "Parameter Value": 0.05},
+                        {"Parameter ID": "CropTop", "Parameter Value": 0.02},
+                        {"Parameter ID": "CropBottom", "Parameter Value": 0.03},
+                    ],
+                }
+            },
+        }
+        distortion_effect = {
+            "OTIO_SCHEMA": "Effect.1",
+            "metadata": {
+                "Resolve_OTIO": {
+                    "Effect Name": "Lens Correction",
+                    "Parameters": [{"Parameter ID": "distortionParam", "Parameter Value": 0.2}],
+                }
+            },
+        }
+        clip = FakeVideoItem(start=0, end=24, name="ClipFX")
+        timeline = FakeTimeline(
+            video_tracks={1: [clip]},
+            export_payload=wrap_tracks(build_otio_clip("ClipFX", props=transform_params, effects=[crop_effect, distortion_effect])),
+        )
+        actual = self._run_export(
+            "video_with_crop_distortion",
+            timeline,
+            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+        )
+        self._assert_matches_snapshot("video_with_crop_distortion", actual)
+
+    def test_loads_config_and_debug_speed_ramp_paths(self) -> None:
+        debug_logs: list[str] = []
+        clip = FakeVideoItem(start=0, end=24, name="ClipDebug", input_lut="ShowLUT")
+        timeline = FakeTimeline(video_tracks={1: [clip]}, export_payload=wrap_tracks(build_otio_clip("ClipDebug")))
+        actual = self._run_export(
+            "debug_speed_ramp",
+            timeline,
+            None,
+            load_config_result={"prefix": "Dbg", "debug_mode": True, "last_known_ae_path": ""},
+            parse_result=({}, []),
+            props_result=(
+                build_props(
+                    speed_keyframes=[[-0.25, 0.0], [0.25, 0.1], [0.75, 0.9], [1.25, 1.0]],
+                ),
+                "Patched",
+            ),
+            lut_lookup="C:/LUTs/ShowLUT.cube",
+            lut_copy="ShowLUT.cube",
+            print_output=debug_logs,
+        )
+
+        self.assertEqual(
+            ["Analyzing...", "Exporting OTIO...", "Parsing Data...", "Sending...", "✅ Sent 1 Clips"],
+            actual["statuses"],
+        )
+        self.assertIn("layer.timeRemapEnabled = true;", actual["jsx"])
+        self.assertNotIn("jsxFile.remove", actual["jsx"])
+        self.assertTrue(any("OTIO saved:" in line for line in debug_logs))
+        self.assertTrue(any("Matching Report" in line for line in debug_logs))
+        self.assertTrue(any("LUT: ShowLUT.cube" in line for line in debug_logs))
+        self.assertTrue(any("Speed Ramp:" in line for line in debug_logs))
+
+    def test_constant_speed_error_status_when_send_fails(self) -> None:
+        debug_logs: list[str] = []
+        clip = FakeVideoItem(start=0, end=24, name="ClipConst")
+        timeline = FakeTimeline(video_tracks={1: [clip]}, export_success=False)
+
+        def popen_error(args, **kwargs):
+            self.popen_calls.append({"args": list(args), "kwargs": kwargs})
+            raise RuntimeError("send failed")
+
+        actual = self._run_export(
+            "constant_speed_error",
+            timeline,
+            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+            props_result=(build_props(time_scalar=2.0), "Patched"),
+            popen_side_effect=popen_error,
+            print_output=debug_logs,
+        )
+
+        self.assertEqual(
+            ["Analyzing...", "Exporting OTIO...", "Generating JSX...", "Sending...", "❌ Error"],
+            actual["statuses"],
+        )
+        self.assertIn("layer.stretch = 50.0;", actual["jsx"])
+        self.assertTrue(any("send failed" in line for line in debug_logs))
+        self.assertEqual(actual["result"], {
+            "ok": False,
+            "code": "send-error",
+            "mode": "auto",
+            "clip_count": 1,
+            "message": "send failed",
+        })
+
+    def test_dynamic_zoom_keyframes_are_emitted(self) -> None:
+        debug_logs: list[str] = []
+        clip = FakeVideoItem(start=0, end=24, name="ClipDZ")
+        timeline = FakeTimeline(video_tracks={1: [clip]}, export_success=False)
+        actual = self._run_export(
+            "dynamic_zoom_active",
+            timeline,
+            {"prefix": "Link", "debug_mode": True, "last_known_ae_path": ""},
+            props_result=(
+                build_props(
+                    dynamic_zoom_keyframes={
+                        "scale": {10: 0.5, 20: 1.0},
+                        "center": {10: [0.1, -0.2], 20: [0.0, 0.0]},
+                    }
+                ),
+                "Patched",
+            ),
+            print_output=debug_logs,
+        )
+
+        self.assertIn("// Dynamic Zoom Keyframes", actual["jsx"])
+        self.assertIn("layer.property('Scale').setValueAtTime(", actual["jsx"])
+        self.assertIn("layer.property('Position').setValueAtTime(", actual["jsx"])
+        self.assertTrue(any("Dynamic Zoom:" in line for line in debug_logs))
+
+    def test_default_dynamic_zoom_is_ignored_and_falls_back_to_static_transform(self) -> None:
+        debug_logs: list[str] = []
+        clip = FakeVideoItem(start=0, end=24, name="ClipDZDefault")
+        timeline = FakeTimeline(video_tracks={1: [clip]}, export_success=False)
+        actual = self._run_export(
+            "dynamic_zoom_default",
+            timeline,
+            {"prefix": "Link", "debug_mode": True, "last_known_ae_path": ""},
+            props_result=(
+                build_props(
+                    dynamic_zoom_keyframes={
+                        "scale": {10: 1.0, 20: 1.0},
+                        "center": {10: [0.0, 0.0], 20: [0.0, 0.0]},
+                    }
+                ),
+                "Patched",
+            ),
+            print_output=debug_logs,
+        )
+
+        self.assertNotIn("// Dynamic Zoom Keyframes", actual["jsx"])
+        self.assertIn("layer.property('Position').setValue([ae_posX, ae_posY]);", actual["jsx"])
+        self.assertTrue(any("Dynamic Zoom ignored" in line for line in debug_logs))
+
+    def test_skips_invalid_media_items_and_resolution_fallbacks(self) -> None:
+        invalid_media = FakeMissingMediaVideoItem(start=0, end=24, name="NoMedia")
+        no_path = FakeVideoItem(start=0, end=24, name="NoPath", file_path="")
+        no_resolution = FakeVideoItem(start=0, end=24, name="NoRes", resolution="")
+        timeline = FakeTimeline(video_tracks={1: [invalid_media, no_path, no_resolution]}, export_success=False)
+        actual = self._run_export(
+            "invalid_media_items",
+            timeline,
+            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+            props_result=(build_props(), "Patched"),
+        )
+
+        self.assertNotIn("// Clip: NoMedia", actual["jsx"])
+        self.assertNotIn("// Clip: NoPath", actual["jsx"])
+        self.assertIn("// Clip: NoRes", actual["jsx"])
+
+    def test_filters_invalid_linked_audio_before_auto_muting_video(self) -> None:
+        non_audio = FakeVideoItem(start=0, end=24, name="LinkedVideo")
+        disabled_track = FakeAudioItem(0, 24, name="DisabledTrack", track_index=9)
+        no_track_index = FakeAudioItemWithoutTrackIndex(
+            0,
+            24,
+            name="NoTrackIndex",
+            mapping={"track_mapping": {"1": {"mute": True}}},
+        )
+        disabled_clip = FakeAudioItem(0, 24, name="DisabledClip", track_index=10, enabled=False)
+        muted_clip = FakeAudioItem(
+            0,
+            24,
+            name="MutedClip",
+            track_index=11,
+            mapping={"track_mapping": {"1": {"mute": True}}},
+        )
+        video = FakeVideoItem(
+            start=0,
+            end=24,
+            name="ClipAutoMute",
+            linked_items=[non_audio, disabled_track, no_track_index, disabled_clip, muted_clip, BrokenLinkedInfoItem()],
+        )
+        timeline = FakeTimeline(
+            video_tracks={1: [video]},
+            export_success=False,
+            disabled_tracks={"audio": {9}},
+        )
+        actual = self._run_export(
+            "linked_audio_filters",
+            timeline,
+            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+            props_result=(build_props(), "Patched"),
+        )
+
+        self.assertIn("layer.audioEnabled = false;", actual["jsx"])
+
+    def test_linked_audio_api_failure_preserves_legacy_audio_behavior(self) -> None:
+        video = BrokenLinkedItemsVideoItem(start=0, end=24, name="ClipLegacyAudio")
+        timeline = FakeTimeline(video_tracks={1: [video]}, export_success=False)
+        actual = self._run_export(
+            "linked_audio_outer_exception",
+            timeline,
+            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+            props_result=(build_props(), "Patched"),
+        )
+
+        self.assertNotIn("layer.audioEnabled = false;", actual["jsx"])
+
+    def test_returns_no_timeline_status_when_project_has_no_timeline(self) -> None:
+        project = FakeProject(None)
+        statuses: list[str] = []
+        result = export_core.process_and_send(
+            FakeResolve(), project, AE_PATH, statuses.append, {"prefix": "Link", "debug_mode": False}
+        )
+        self.assertEqual(["❌ No Timeline"], statuses)
+        self.assertEqual(result["code"], "no-timeline")
+
+    def test_returns_no_clips_status_when_timeline_selection_is_empty(self) -> None:
+        timeline = FakeTimeline(video_tracks={})
+        statuses: list[str] = []
+        result = export_core.process_and_send(
+            FakeResolve(),
+            FakeProject(timeline),
+            AE_PATH,
+            statuses.append,
+            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+        )
+        self.assertEqual(["Analyzing...", "⚠️ No Clips"], statuses)
+        self.assertEqual(result["code"], "no-clips")
+
+    def test_explicit_selection_modes_and_audio_deduplication(self) -> None:
+        current = FakeVideoItem(start=0, end=24, name="Current", track_index=1)
+        ranged = FakeVideoItem(start=48, end=72, name="Ranged", track_index=2)
+        blue_timeline = FakeTimeline(
+            video_tracks={1: [current], 2: [ranged]},
+            markers={48: {"color": "Blue", "duration": 24}},
+        )
+
+        mode, clips, _fps, content_type = export_core.get_target_clips_logic(
+            blue_timeline, "single"
+        )
+        self.assertEqual((mode, [clip["item"] for clip in clips], content_type), (
+            "single", [current], "video"
+        ))
+
+        audio_only = FakeTimelineAudioItem(start=0, end=24, name="Audio")
+        audio_timeline = FakeTimeline(
+            video_tracks={},
+            audio_tracks={1: [audio_only]},
+            markers={48: {"color": "Blue", "duration": 24}},
+        )
+        mode, clips, _fps, content_type = export_core.get_target_clips_logic(
+            audio_timeline, "single"
+        )
+        self.assertEqual((mode, [clip["item"] for clip in clips], content_type), (
+            "single", [audio_only], "audio"
+        ))
+
+        mode, clips, _fps, content_type = export_core.get_target_clips_logic(
+            blue_timeline, "video-range"
+        )
+        self.assertEqual((mode, [clip["item"] for clip in clips], content_type), (
+            "batch", [ranged], "video"
+        ))
+
+        linked_audio = FakeTimelineAudioItem(start=48, end=72, name="Linked")
+        standalone_audio = FakeTimelineAudioItem(start=48, end=72, name="Standalone", track_index=2)
+        mixed_video = FakeVideoItem(start=48, end=72, name="Mixed", linked_items=[linked_audio])
+        linked_audio.GetLinkedItems = lambda: [mixed_video]
+        cyan_timeline = FakeTimeline(
+            video_tracks={1: [mixed_video]},
+            audio_tracks={1: [linked_audio], 2: [standalone_audio]},
+            markers={48: {"color": "Cyan", "duration": 24}},
+        )
+        mode, clips, _fps, content_type = export_core.get_target_clips_logic(
+            cyan_timeline, "mixed-range"
+        )
+        self.assertEqual(mode, "batch")
+        self.assertEqual([clip["item"] for clip in clips], [mixed_video, standalone_audio])
+        self.assertEqual(content_type, "mixed")
+
+    def test_explicit_range_requires_the_requested_marker(self) -> None:
+        timeline = FakeTimeline(
+            video_tracks={1: [FakeVideoItem(start=0, end=24)]},
+            markers={0: {"color": "Cyan", "duration": 24}},
+        )
+        statuses: list[str] = []
+        result = export_core.process_and_send(
+            FakeResolve(),
+            FakeProject(timeline),
+            AE_PATH,
+            statuses.append,
+            {"prefix": "Link", "debug_mode": False},
+            "video-range",
+        )
+        self.assertEqual(statuses, ["Analyzing...", "❌ No Blue duration marker found"])
+        self.assertEqual(result, {
+            "ok": False,
+            "code": "missing-marker",
+            "mode": "video-range",
+            "clip_count": 0,
+            "message": "No Blue duration marker found",
+        })
+
+    def test_explicit_range_propagates_marker_api_errors(self) -> None:
+        timeline = FakeTimeline(video_tracks={1: [FakeVideoItem(start=0, end=24)]})
+
+        def fail_marker_read():
+            raise RuntimeError("marker API failed")
+
+        timeline.GetMarkers = fail_marker_read
+
+        with self.assertRaisesRegex(RuntimeError, "marker API failed"):
+            export_core.get_target_clips_logic(timeline, "video-range")
+        self.assertEqual(export_core.get_target_clips_logic(timeline, "auto")[0], "single")
+
+    def test_starts_ae_with_bootstrap_when_after_effects_is_not_running(self) -> None:
+        clip = FakeVideoItem(start=0, end=24, name="ClipA")
+        timeline = FakeTimeline(video_tracks={1: [clip]}, export_payload=wrap_tracks(build_otio_clip()))
+        case_dir = self._case_dir("ae_not_running")
+        ae_path = str(case_dir / "AfterFX.exe")
+        statuses: list[str] = []
+        popen_calls: list[dict] = []
+        with (
+            patch("resolve2ae_core.export.time.time", return_value=FIXED_TIME),
+            patch("resolve2ae_core.export.platform.system", return_value="Windows"),
+            patch("resolve2ae_core.export.get_running_ae_path", return_value=""),
+            patch("resolve2ae_core.export.subprocess.Popen", side_effect=lambda args, **kwargs: popen_calls.append({"args": list(args), "kwargs": kwargs})),
+            patch("resolve2ae_core.export.tempfile.gettempdir", return_value=str(case_dir)),
+        ):
+            export_core.process_and_send(
+                FakeResolve(),
+                FakeProject(timeline),
+                ae_path,
+                statuses.append,
+                {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+            )
+
+        bootstrap_path = Path(ae_path).parent / "Scripts" / "Startup" / "_resolve2ae_bootstrap.jsx"
+        self.assertEqual(
+            ["Analyzing...", "Exporting OTIO...", "Parsing Data...", "Starting AE...", "✅ Sent 1 Clips"],
+            statuses,
+        )
+        self.assertEqual([{"args": [ae_path], "kwargs": {}}], popen_calls)
+        self.assertTrue(bootstrap_path.exists())
+        bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
+        self.assertIn("app.scheduleTask", bootstrap_text)
+        self.assertIn("ToAE_1700000000.jsx", bootstrap_text)
+        bootstrap_path.unlink(missing_ok=True)
+
+    def test_starts_ae_with_darwin_bootstrap_when_after_effects_is_not_running(self) -> None:
+        clip = FakeVideoItem(start=0, end=24, name="ClipMac")
+        timeline = FakeTimeline(video_tracks={1: [clip]}, export_payload=wrap_tracks(build_otio_clip("ClipMac")))
+        case_dir = self._case_dir("ae_not_running_darwin")
+        ae_path = str(case_dir / "After Effects.app" / "Contents" / "MacOS" / "After Effects")
+        statuses: list[str] = []
+        popen_calls: list[dict] = []
+        with (
+            patch("resolve2ae_core.export.time.time", return_value=FIXED_TIME),
+            patch("resolve2ae_core.export.platform.system", return_value="Darwin"),
+            patch("resolve2ae_core.export.get_running_ae_path", return_value=""),
+            patch("resolve2ae_core.export.subprocess.Popen", side_effect=lambda args, **kwargs: popen_calls.append({"args": list(args), "kwargs": kwargs})),
+            patch("resolve2ae_core.export.tempfile.gettempdir", return_value=str(case_dir)),
+        ):
+            export_core.process_and_send(
+                FakeResolve(),
+                FakeProject(timeline),
+                ae_path,
+                statuses.append,
+                {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+            )
+
+        bootstrap_path = case_dir / "After Effects.app" / "Contents" / "Scripts" / "Startup" / "_resolve2ae_bootstrap.jsx"
+        self.assertEqual(
+            ["Analyzing...", "Exporting OTIO...", "Parsing Data...", "Starting AE...", "✅ Sent 1 Clips"],
+            statuses,
+        )
+        self.assertEqual([{"args": [ae_path], "kwargs": {}}], popen_calls)
+        self.assertTrue(bootstrap_path.exists())
+        bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
+        self.assertIn("app.scheduleTask", bootstrap_text)
+        self.assertIn("ToAE_1700000000.jsx", bootstrap_text)
+        bootstrap_path.unlink(missing_ok=True)
+
+
+if __name__ == "__main__":
+    unittest.main()
