@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Managed Runtime selection, Script Runtime process ownership, absolute executable, no fallback, one-process, JSON protocol, and error contracts."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reuse Node/Python standard library process, temp, protocol, and validation patterns without new dependencies or speculative abstractions."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Keep Resolver, Launcher, child environment, Bootstrap request/response, diagnostics, and later Provider integration boundaries explicit."}
+{"file": ".trellis/tasks/08-03-isolated-runtime-launcher-6-5b/research/current-state.md", "reason": "Repository evidence, environment probes, minimal contracts, failure matrix, test-worker strategy, affected files, and validation commands."}

@@ -267,6 +267,87 @@ const resolution = new RuntimeResolver({ registry }).resolve(request);
 // A later composition phase may inject resolution.executable into PythonProvider.
 ```
 
+## Scenario: Isolated Managed Runtime Launch
+
+### 1. Scope / Trigger
+
+- Trigger: launching a short-lived managed interpreter for a Bootstrap operation after Runtime Resolver selection.
+- The Launcher isolates process, environment, protocol, limits, crash diagnostics, and cleanup; Phase 6.5B does not connect it to `PythonProvider`, Resolve, or Capability/host composition.
+
+### 2. Signatures
+
+- Environment: `createRuntimeEnvironment({ parentEnvironment, temporaryDirectory, platform }) -> childEnvironment`.
+- Launcher: `new RuntimeLauncher({ bootstrapPath?, timeoutMs = 10_000, maxStdoutBytes = 1_048_576, maxStderrBytes = 1_048_576, parentEnvironment?, platform?, temporaryRoot?, fileSystem?, spawnProcess? })`.
+- Execute: `launcher.execute({ resolution, request }) -> Promise<{ response, process: RuntimeProcessResult }>`.
+- Bootstrap request: `{ "operation": "runtime-info" }` through stdin EOF.
+- Bootstrap success: `{ "ok": true, "runtime": { "version": "major.minor.patch", "architecture": "64bit", "executable": absolutePath } }` through stdout EOF.
+- Bootstrap failure: `{ "ok": false, "error": { "code": string, "type": string, "message": string } }`.
+- Process result: `{ exitCode, signal, termination, stdout, stderr, stdoutBytes, stderrBytes, durationMs, nativeCrash }`.
+
+### 3. Contracts
+
+- Accept a plain Resolver-shaped resolution with `source: "manifest" | "override"`; revalidate and canonicalize its absolute regular-file executable immediately before spawn. Never accept a bare command or search PATH.
+- Validate a plain JSON-serializable request and an absolute regular-file Bootstrap before creating process state. No request value enters argv.
+- Spawn only `resolution.executable` with fixed `[-I, -u, -X, faulthandler, bootstrapPath]`, `shell: false`, `windowsHide: true`, three pipes, and one temporary cwd per request.
+- Windows environment contains exactly `SystemRoot`, `WINDIR`, and launcher-owned `TEMP`/`TMP`; non-Windows contains exactly launcher-owned `TMPDIR`. Do not spread/delete from `process.env`, pass `PATH`, or retain Python/venv/Conda/uv variables.
+- Exchange one JSON value through stdin/stdout EOF. Bootstrap uses only Python standard library code, imports no Resolve/Feature modules, and writes one UTF-8 response to real stdout.
+- Count stdout/stderr Buffer bytes separately, retain at most each configured limit, and copy retained bytes so an oversized chunk's backing allocation is released. Decode only after process close.
+- The first timeout or stream overflow kills the single stateless worker once with `SIGKILL`/Windows force termination. Always wait for `close` before parsing output, settling the Promise, or deleting cwd.
+- Record asynchronous child `error` and stdin failures, then finalize once on `close`; a specific exit/signal/timeout/overflow dominates a racing stdin error. A synchronous spawn throw is finalized directly.
+- Cleanup runs once after every success/failure path. A cleanup-only failure is typed; when another error already exists, keep its code and append bounded cleanup diagnostics.
+- A process result is defensive and JSON-safe. Windows high-bit statuses include uppercase hex; uninitiated POSIX signals are crashes; Windows Python abort code `3` requires narrow faulthandler fatal evidence. Do not classify arbitrary stderr text or non-Windows high exit codes as native crashes.
+- No retry, runtime fallback, pool, descendant process, Job Object, Probe, Provider switch, or production integration belongs in this boundary.
+
+### 4. Validation & Error Matrix
+
+- Malformed resolution/request/constructor limits/Bootstrap path or non-standard/non-serializable JSON -> `RUNTIME_LAUNCH_REQUEST_INVALID`.
+- Bare, relative, missing, or non-file resolved executable -> `RUNTIME_EXECUTABLE_INVALID`.
+- Synchronous or asynchronous process start failure -> `RUNTIME_SPAWN_FAILED` after applicable close/cleanup ordering.
+- Input pipe failure without a more specific termination -> `RUNTIME_STDIN_FAILED`.
+- Deadline exceeded -> `RUNTIME_TIMEOUT`; stdout/stderr byte limit exceeded -> `RUNTIME_OUTPUT_LIMIT` naming stream and limit.
+- Uninitiated POSIX signal or Windows native-crash evidence -> `RUNTIME_NATIVE_CRASH`; ordinary non-zero exit -> `RUNTIME_PROCESS_EXITED`.
+- Exit 0 plus empty stdout -> `RUNTIME_PROTOCOL_EMPTY`; invalid JSON or malformed success/failure fields -> `RUNTIME_PROTOCOL_INVALID`.
+- Valid `ok: false` response -> `RUNTIME_BOOTSTRAP_FAILED` with the structured Bootstrap error.
+- Cleanup failure with no earlier failure -> `RUNTIME_TEMP_CLEANUP_FAILED`; otherwise append `cleanupError` without changing the primary code.
+
+### 5. Good/Base/Bad Cases
+
+- Good: launch the canonical Resolver executable with fixed flags, pass a nested request only through stdin, and return the exact runtime-info response plus bounded process evidence.
+- Base: a malformed Bootstrap request returns valid `ok: false` and becomes `RUNTIME_BOOTSTRAP_FAILED` while the process itself exits normally.
+- Good: timeout, flood, or `os.abort()` affects only the short-lived worker; the Node parent continues and cwd is gone before rejection.
+- Bad: inherit `process.env`, delete only known Python keys, or set `PATH` to make adjacent tools discoverable.
+- Bad: call `finish()` from child `error`, clean cwd before `close`, retain an oversized Buffer through `subarray()`, or trust `{ ok: true, runtime: {} }`.
+- Bad: switch `PythonProvider` to the Launcher before an explicit integration phase.
+
+### 6. Tests Required
+
+- Assert exact executable, fixed argv/options, stdin-only complex payload, canonical revalidation, Bootstrap file validation, and no spawn/temp creation for invalid input.
+- Assert exact Windows/non-Windows environment keys, case-insensitive Windows source lookup, `WINDIR` fallback, and absence of PATH plus every Python/venv/Conda/uv/unrelated variable.
+- Assert strict success/error envelope fields, canonical dotted version, `64bit`, absolute executable, non-standard JSON rejection, empty/invalid output, and defensive results/errors.
+- Assert byte counts versus retained bytes for stdout and stderr, copied bounded buffers, kill once, Promise pending until close, timeout/overflow precedence, and cleanup before settlement.
+- Assert synchronous/async spawn errors, error-then-close ordering, stdin/exit races, cleanup-only/secondary cleanup errors, safe malformed diagnostics, and single settlement.
+- Run one real worker for success, structured Python exception, explicit exit, empty/invalid output, both floods, timeout, and abort followed by another successful worker. Avoid one platform-specific abort-code assertion.
+- Run the real Bootstrap through absolute `sys.executable` in the isolated environment, focused Runtime/PythonProvider tests, full Node/Python tests, Python compilation, production build, syntax/whitespace checks, and boundary searches proving no production integration or PATH lookup.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+const child = spawn("python", [bootstrap, JSON.stringify(request)], { env: process.env });
+child.once("error", reject); // may settle and clean before close
+```
+
+#### Correct
+
+```javascript
+const { response, process } = await launcher.execute({
+  resolution,
+  request: { operation: "runtime-info" },
+});
+// Launcher owns absolute spawn, stdin JSON, limits, close ordering, and cleanup.
+```
+
 ## Scenario: Capability Configuration
 
 ### 1. Scope / Trigger

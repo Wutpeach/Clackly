@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify process/protocol ownership, absolute executable enforcement, no PATH or backend fallback, bounded diagnostics, and unchanged production wiring."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Check standard-library reuse, minimal module count, and absence of process frameworks or premature pooling/probe abstractions."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Check exact Resolver-to-Launcher and Launcher-to-Bootstrap data flow, validation ownership, and failure propagation."}
+{"file": ".trellis/tasks/08-03-isolated-runtime-launcher-6-5b/research/current-state.md", "reason": "Check exact environment allowlist, lifecycle races, result/error matrix, real crash/timeout/overflow tests, file boundaries, and quality gates."}
