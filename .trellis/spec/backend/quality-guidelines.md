@@ -198,6 +198,75 @@ await capability.execute(command, {
 await scriptExecutor.execute(metadata.executor, scriptContext);
 ```
 
+## Scenario: Managed Script Runtime Selection
+
+### 1. Scope / Trigger
+
+- Trigger: adding managed interpreter metadata, runtime compatibility rules, operator overrides, or selection before a Script Runtime provider is constructed.
+- Selection is metadata-only: it returns one absolute executable or a typed failure and does not launch a process or change provider wiring.
+
+### 2. Signatures
+
+- Manifest envelope: `{ schemaVersion: 1, profiles: RuntimeProfile[] }` in `resources/runtimes/manifest.json`.
+- Runtime profile: `{ id, runtime, implementation, runtimeVersion, platform, architecture, capabilities, host: { application, versionPrefix }, executable, verification: "machine-verified" }`.
+- Loader: `loadRuntimeRegistry({ runtimeRoot?, fileSystem? }?) -> RuntimeRegistry`.
+- Registry: `createRuntimeRegistry({ schemaVersion?, profiles, runtimeRoot }) -> { runtimeRoot, register(profile), get(id), getAll() }`.
+- Resolver: `new RuntimeResolver({ registry, runtimeRoot?, fileSystem? }).resolve({ runtime, platform, architecture, capabilityId, host: { application, version }, overrideExecutable? })`.
+- Error: `new RuntimeError(code, message, { supportStatus?, details? }?)`.
+
+### 3. Contracts
+
+- Manifest values own interpreter versions and compatibility data; Feature, Capability, Provider, and host composition code must not hard-code Python versions.
+- Load and Registry validation are atomic. Profiles use canonical numeric `major.minor.patch` runtime versions, Node platform/architecture names, unique non-empty Capability ids, a numeric host `versionPrefix`, and a contained slash-separated relative executable path.
+- Registry records are defensive clones, profile ids are unique, and `getAll()` is stable by id. Registry construction does not inspect payload files, host state, PATH, or running applications.
+- Normal resolution matches runtime, platform, architecture, Capability, host application, and numeric host-version prefix. It selects the highest numeric runtime version, then the lexically lowest id; it does not retry a lower profile when the chosen payload is missing.
+- Managed payload containment compares canonical executable and canonical runtime-root paths. Manifest validation rejects POSIX and Windows absolute forms on every host.
+- `overrideExecutable`, when present, is authoritative and evaluated before the request or Registry. It must be one absolute existing regular file; success is `overridden`, not compatibility-verified, and failure never falls through.
+- Resolution returns `{ source: "manifest" | "override", supportStatus, executable, profile }`. Manifest success is `machine-verified`; no match is `unsupported`; a missing/non-file/escaping selected payload is `missing-runtime`.
+- Resolver never invokes a process, queries PATH, returns bare `python`/`python3`, probes Resolve, or changes `PythonProvider`. A later composition phase may inject `resolution.executable` through the existing executable-only provider seam.
+
+### 4. Validation & Error Matrix
+
+- Missing/unparseable Manifest, unsupported schema, malformed/sparse profile data, duplicate id, or escaping/absolute executable -> `RUNTIME_MANIFEST_INVALID`.
+- Missing/malformed resolve selectors or non-canonical host version -> `RUNTIME_REQUEST_INVALID`.
+- Non-string, relative, blank, whitespace-padded, argument-bearing, or otherwise malformed Override -> `RUNTIME_OVERRIDE_INVALID`.
+- No compatible profile -> `RUNTIME_UNSUPPORTED` with `supportStatus: "unsupported"`.
+- Missing/non-file Override or selected managed payload, or a managed symlink escaping the canonical root -> `RUNTIME_NOT_FOUND` with `supportStatus: "missing-runtime"`.
+- Error `details` and returned profiles are defensive; malformed diagnostic inputs must not leak `DataCloneError` or another untyped exception.
+
+### 5. Good/Base/Bad Cases
+
+- Good: a Resolve `20.3.2.9` request matches a profile with `versionPrefix: "20.3.2"`, then selects runtime `3.13.10` over `3.13.9` numerically.
+- Base: a valid committed profile may load while its future bundled payload is absent; resolution then returns `RUNTIME_NOT_FOUND`.
+- Good: an explicit existing executable wins and reports `overridden` without claiming machine verification.
+- Bad: use `which`, `where`, `python`, or `python3` after selection fails, or silently try an older profile when the selected payload is absent.
+- Bad: put a Python-version branch in `PythonProvider`, a Feature, or host startup code.
+
+### 6. Tests Required
+
+- Assert versioned Manifest loading, every required field, dense arrays, duplicates, defensive Registry records, and POSIX/Windows path rejection on every test host.
+- Assert every selector mismatch, numeric host-prefix matching, numeric runtime ordering, deterministic id tie-breaking, and no retry after the selected payload is missing.
+- Assert authoritative Override success plus relative, argument-bearing, missing, function, symbol, and array failures with typed errors and no Registry read.
+- Assert regular-file and real-path containment, including symlink escape rejection and a valid payload beneath a symlinked runtime root.
+- Assert all support statuses, the committed missing-payload profile, absence of PATH/process lookup, unchanged provider/host wiring, full Node/Python tests, and production build.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+const executable = process.env.PYTHON || "python";
+return spawn(executable, args);
+```
+
+#### Correct
+
+```javascript
+const registry = loadRuntimeRegistry();
+const resolution = new RuntimeResolver({ registry }).resolve(request);
+// A later composition phase may inject resolution.executable into PythonProvider.
+```
+
 ## Scenario: Capability Configuration
 
 ### 1. Scope / Trigger

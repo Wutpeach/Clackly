@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify Script Runtime boundaries, no PythonProvider/host integration, typed failures, containment, and full quality gates."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Check that existing loader/registry/error/version patterns are reused and no future-phase framework is added."}
+{"file": ".trellis/tasks/08-03-managed-python-runtime-6-5a/research/current-state.md", "reason": "Check exact Phase 6.5A schema, selection order, support statuses, profile evidence, file boundaries, and test caveats."}
