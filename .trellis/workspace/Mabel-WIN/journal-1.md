@@ -399,3 +399,24 @@ Implemented and verified an absolute-path-only isolated Python launcher with exa
 ### Status
 
 [OK] **Completed**
+
+
+## Session 19: Resolve compatibility probe
+
+**Date**: 2026-08-03
+**Task**: Resolve compatibility probe
+**Branch**: `main`
+
+### Summary
+
+Implemented and verified an isolated Resolve Script API compatibility probe with independent Resolver/Probe/effective statuses, fingerprinted atomic success caching, native-crash containment, exact bridge loading, structured diagnostics, and live Resolve 20.3.2.9 plus CPython 3.13.1 acceptance including a no-spawn cache hit.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `55c4baa` | (see git log) |
+
+### Status
+
+[OK] **Completed**

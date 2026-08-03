@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 18
+- **Total Sessions**: 19
 - **Last Active**: 2026-08-03
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~401 | Active |
+| `journal-1.md` | ~422 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 19 | 2026-08-03 | Resolve compatibility probe | `55c4baa` | `main` |
 | 18 | 2026-08-03 | Isolated Runtime Launcher 6.5B | `c910190` | `main` |
 | 17 | 2026-08-03 | Managed Python Runtime 6.5A | `133a99e` | `main` |
 | 16 | 2026-08-03 | Auto-detect After Effects path | `84744f1` | `main` |
