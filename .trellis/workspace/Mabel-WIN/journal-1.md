@@ -315,3 +315,24 @@ Added metadata-discovered Python script capabilities, runtime provider execution
 ### Status
 
 [OK] **Completed**
+
+
+## Session 15: Integrate Resolve2AE export into Clackly
+
+**Date**: 2026-08-03
+**Task**: Integrate Resolve2AE export into Clackly
+**Branch**: `main`
+
+### Summary
+
+Integrated the behavior-tested Resolve2AE core as one ae.export Feature with four Commands and modifier modes; added command_id runtime transport, Windows Resolve module discovery, binding migration, specs, and automated coverage. All automated tests/build/checks passed; real Resolve Studio and AfterFX Windows acceptance remains manual.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `064aad8` | (see git log) |
+
+### Status
+
+[OK] **Completed**
