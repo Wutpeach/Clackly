@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 15
+- **Total Sessions**: 16
 - **Last Active**: 2026-08-03
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~338 | Active |
+| `journal-1.md` | ~359 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 16 | 2026-08-03 | Auto-detect After Effects path | `84744f1` | `main` |
 | 15 | 2026-08-03 | Integrate Resolve2AE export into Clackly | `064aad8` | `main` |
 | 14 | 2026-07-31 | Phase 6 Script Runtime | `4076abb` | `main` |
 | 13 | 2026-07-31 | Phase 5.6 Metadata Cleanup | `1820148` | `main` |

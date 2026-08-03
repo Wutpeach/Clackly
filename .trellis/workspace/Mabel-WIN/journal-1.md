@@ -336,3 +336,24 @@ Integrated the behavior-tested Resolve2AE core as one ae.export Feature with fou
 ### Status
 
 [OK] **Completed**
+
+
+## Session 16: Auto-detect After Effects path
+
+**Date**: 2026-08-03
+**Task**: Auto-detect After Effects path
+**Branch**: `main`
+
+### Summary
+
+Added Windows AfterFX.exe discovery and ConfigManager persistence before both Clackly hosts expose UI/IPC; covered precedence, stale recovery, non-ASCII paths, host ordering, full tests, build, and backend spec contract.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `84744f1` | (see git log) |
+
+### Status
+
+[OK] **Completed**
