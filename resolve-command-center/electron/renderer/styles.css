@@ -230,7 +230,7 @@ select:focus-visible {
 
 .launcher-view {
   display: grid;
-  place-items: center;
+  place-items: start;
   min-height: 0;
   padding: var(--launcher-padding);
   background: var(--color-launcher);

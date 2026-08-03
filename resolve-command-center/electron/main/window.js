@@ -63,6 +63,7 @@ function createPaletteWindow() {
     minimizable: false,
     skipTaskbar: true,
     alwaysOnTop: false,
+    accentColor: false,
     backgroundColor: "#00000000",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
