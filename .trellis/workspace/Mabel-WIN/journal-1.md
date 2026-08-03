@@ -357,3 +357,24 @@ Added Windows AfterFX.exe discovery and ConfigManager persistence before both Cl
 ### Status
 
 [OK] **Completed**
+
+
+## Session 17: Managed Python Runtime 6.5A
+
+**Date**: 2026-08-03
+**Task**: Managed Python Runtime 6.5A
+**Branch**: `main`
+
+### Summary
+
+Implemented and verified the versioned Managed Python Runtime manifest, registry, resolver, authoritative override, typed errors, support statuses, path containment, focused tests, and backend code-spec contract without changing PythonProvider execution.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `133a99e` | (see git log) |
+
+### Status
+
+[OK] **Completed**
