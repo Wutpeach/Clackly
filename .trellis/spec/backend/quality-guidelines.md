@@ -348,6 +348,68 @@ const { response, process } = await launcher.execute({
 // Launcher owns absolute spawn, stdin JSON, limits, close ordering, and cleanup.
 ```
 
+## Scenario: Resolve Runtime Compatibility Probe
+
+### 1. Scope / Trigger
+
+- Trigger: verifying a selected Python Runtime against one Resolve version and bridge installation before a later execution policy consumes it.
+- The Probe diagnoses and caches compatibility only; it does not change Resolver support provenance or wire `PythonProvider`, Capability, hosts, IPC, or UI.
+
+### 2. Signatures
+
+- Probe: `new RuntimeProbe({ launcher?, resolvePythonProbe?, cache?, cachePath?, fileSystem?, platform?, architecture? }).probe({ resolution, clacklyVersion, resolveVersion, modulePath?, libraryPath?, force? })`.
+- Bootstrap request: `{ operation: "resolve-probe", expectedRuntimeVersion: string | null, expectedResolveVersion: string, modulePath: absolutePath, libraryPath: absolutePath }`.
+- Status projection: `RuntimeDiagnostics.derive(supportStatus, probeStatus) -> { ok, supportStatus, probeStatus, effectiveStatus, warnings }`.
+- Cache envelope: `{ schemaVersion: 1, fingerprint, result }`, where `result` is one passed diagnostic snapshot.
+
+### 3. Contracts
+
+- `supportStatus` remains `machine-verified | overridden | unsupported | missing-runtime`; `probeStatus` is independently `not-run | passed | failed | stale`; `effectiveStatus` is derived as `ready | warning | blocked`.
+- A passed machine-verified Runtime is ready. A passed Override is ready with `CUSTOM_RUNTIME_UNVERIFIED`. A passed unsupported Runtime is warning. Missing Runtime, failed, not-run, and stale states are blocked.
+- Each uncached Probe calls `RuntimeLauncher` exactly once. Explicit bridge paths cross stdin JSON, and Bootstrap checks runtime/64-bit/version, module, library, import, connection, and live Resolve version in that order.
+- Bootstrap sets only the child `RESOLVE_SCRIPT_LIB`, loads the exact canonical module file, and verifies that the imported native module came from the supplied canonical library. Python-level bridge output is suppressed so real stdout remains one envelope; a native abort is still contained and diagnosed by the Launcher.
+- Fingerprint schema version 1 contains Clackly version, Runtime id/version/executable mtime, supplied Resolve version, canonical bridge paths/mtimes, platform, architecture, and canonical Override path or `null`. Override cache lookup may reuse the stored observed Python version only while executable path and mtime match.
+- Cache only passed snapshots through `ConfigStorage.save()` atomic replacement. Cached support provenance must agree with the managed/Override fingerprint. Read/schema failures are misses, mismatches are stale, force bypasses hits, and every fresh failure clears reusable state. Cache persistence failures remain subordinate diagnostics.
+
+### 4. Validation & Error Matrix
+
+- Missing module/library -> `RESOLVE_MODULE_NOT_FOUND` / `RESOLVE_LIBRARY_NOT_FOUND` before import.
+- Bridge import failure -> `RESOLVE_IMPORT_FAILED`; `scriptapp()` returns no app -> `RESOLVE_NOT_RUNNING`; `scriptapp()` raises -> `RESOLVE_CONNECTION_FAILED`.
+- Missing, malformed, unreadable, or incompatible live Resolve version -> `RESOLVE_VERSION_UNVERIFIED`.
+- Launcher timeout remains `RUNTIME_TIMEOUT`; native termination during the operation maps to `RUNTIME_NATIVE_BRIDGE_CRASH` with bounded Launcher process evidence.
+- Corrupt/unreadable/incompatible cache -> miss; cache write/delete failure -> keep the real passed/failed Probe result and attach `CACHE_WRITE_FAILED` / `CACHE_CLEAR_FAILED` diagnostics.
+
+### 5. Good/Base/Bad Cases
+
+- Good: an unchanged Override executable, bridge tuple, and fingerprint returns the cached passed result without spawning and retains `supportStatus: overridden` plus its warning.
+- Base: a missing cache launches once, saves a passed result, and reports `cache.status: miss`.
+- Bad: promote an Override to machine-verified, inherit PATH/PYTHONPATH/Resolve variables, import the bridge in Node, or reuse a failed/native-crash result.
+
+### 6. Tests Required
+
+- Assert the complete status table, Override warning, unsupported warning readiness, and unchanged support provenance.
+- Assert every fingerprint field, managed and Override hits, stale reasons, force bypass, corrupt/read failures, atomic saves, clear-on-failure, and subordinate write/delete diagnostics.
+- Exercise every controlled Bootstrap branch with fake modules. Import an aborting fixture only through the real isolated Probe; assert parent survival, cache removal, and a following successful Probe.
+- Run focused Runtime/Launcher/PythonProvider tests, Python discovery and compilation, full project tests/build, syntax/whitespace checks, and boundary searches for PATH lookup, duplicate spawn/cache ownership, and production integration.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+const verified = require(resolution.executable).importResolve();
+if (verified) resolution.supportStatus = "machine-verified";
+```
+
+#### Correct
+
+```javascript
+const result = await runtimeProbe.probe({
+  resolution, clacklyVersion, resolveVersion, modulePath, libraryPath
+});
+// Resolver provenance and isolated Probe state remain independent.
+```
+
 ## Scenario: Capability Configuration
 
 ### 1. Scope / Trigger

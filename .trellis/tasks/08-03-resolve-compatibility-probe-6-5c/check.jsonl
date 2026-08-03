@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify existing Resolver/Launcher ownership, status provenance, error mapping, isolation, and production-boundary compliance."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check reuse of existing Launcher, storage, and protocol code and reject speculative cache/process abstractions."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check exact field mapping and validation ownership across Resolver, Probe, cache, Bootstrap, diagnostics, and future consumers."}
+{"file":".trellis/tasks/08-03-resolve-compatibility-probe-6-5c/research/current-state.md","reason":"Check the agreed three-axis status rules, fingerprint fields, Override behavior, crash containment, current-machine validation, and deferred scope."}

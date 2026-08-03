@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Managed Runtime selection, isolated Launcher, Script Runtime, Resolve adapter, error, and test contracts."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse RuntimeLauncher, Bootstrap framing, ConfigStorage, and standard-library facilities without new dependencies or one-use abstractions."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Keep Resolver provenance, Probe state, effective readiness, Node/Python envelopes, cache records, and later UI/policy consumers distinct."}
+{"file":".trellis/tasks/08-03-resolve-compatibility-probe-6-5c/research/current-state.md","reason":"Repository evidence, settled status model, minimal data flow, fingerprint constraints, current-machine evidence, risks, and affected files."}
