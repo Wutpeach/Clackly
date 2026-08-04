@@ -420,3 +420,29 @@ Implemented and verified an isolated Resolve Script API compatibility probe with
 ### Status
 
 [OK] **Completed**
+
+
+## Session 20: Managed Python Runtime and Resolve-to-AE Integration
+
+**Date**: 2026-08-04
+**Task**: Managed Python Runtime and Resolve-to-AE Integration
+**Branch**: `main`
+
+### Summary
+
+Integrated CPython 3.13.14 managed runtime, packaged Workflow Integration installation, host-owned After Effects launch, successful warm/cold live exports, release promotion to current, and full automated/package validation.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `206fdc1` | (see git log) |
+| `ad77115` | (see git log) |
+| `aa4d0e1` | (see git log) |
+| `5763ae0` | (see git log) |
+| `29647f6` | (see git log) |
+| `a96e31c` | (see git log) |
+
+### Status
+
+[OK] **Completed**
