@@ -15,12 +15,15 @@ class ScriptCapabilityProvider {
     this.logger = logger;
   }
 
-  execute(scriptDefinition, { command, config } = {}) {
+  execute(scriptDefinition, { command, config, capabilityId } = {}) {
     if (typeof command?.id !== "string" || command.id.trim().length === 0) {
       throw new TypeError("Script capability provider requires a Command id");
     }
     if (!config || typeof config.get !== "function") {
       throw new TypeError("Script capability provider requires scoped configuration");
+    }
+    if (typeof capabilityId !== "string" || capabilityId.trim().length === 0) {
+      throw new TypeError("Script capability provider requires a Capability id");
     }
 
     const snapshot = config.get();
@@ -30,6 +33,7 @@ class ScriptCapabilityProvider {
 
     return this.scriptExecutor.execute(scriptDefinition, {
       commandId: command.id,
+      capabilityId,
       config: { ...snapshot },
       logger: this.logger
     });

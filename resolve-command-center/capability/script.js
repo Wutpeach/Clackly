@@ -9,7 +9,11 @@ function createScriptCapability(metadata, scriptCapabilityProvider) {
   return {
     metadata,
     execute(command, { config } = {}) {
-      return scriptCapabilityProvider.execute(metadata.executor, { command, config });
+      return scriptCapabilityProvider.execute(metadata.executor, {
+        command,
+        config,
+        capabilityId: metadata.id
+      });
     }
   };
 }

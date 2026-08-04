@@ -82,6 +82,49 @@ class RuntimeBootstrapTests(unittest.TestCase):
                 self.assertIsInstance(response["error"]["type"], str)
                 self.assertIsInstance(response["error"]["message"], str)
 
+    def test_script_execute_reuses_the_existing_runner_envelope(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            entry = root / "feature.py"
+            entry.write_text(
+                "def execute(context):\n"
+                "    context.logger.info('managed')\n"
+                "    return {'command': context.command_id, 'value': context.config['value']}\n",
+                encoding="utf-8",
+            )
+            response = BOOTSTRAP.handle(json.dumps({
+                "operation": "script-execute",
+                "scriptRoot": str(root),
+                "entry": "feature.py",
+                "commandId": "feature.run",
+                "config": {"value": 3},
+            }).encode("utf-8"))
+
+        self.assertEqual(response["ok"], True)
+        self.assertEqual(response["script"], {
+            "ok": True,
+            "result": {"command": "feature.run", "value": 3},
+            "logs": [{"level": "info", "message": "managed"}],
+        })
+
+    def test_script_execute_rejects_entry_escape(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            outside = root / "outside.py"
+            script_root = root / "scripts"
+            script_root.mkdir()
+            outside.write_text("def execute(context): return None\n", encoding="utf-8")
+            response = BOOTSTRAP.handle(json.dumps({
+                "operation": "script-execute",
+                "scriptRoot": str(script_root),
+                "entry": "../outside.py",
+                "commandId": "feature.run",
+                "config": {},
+            }).encode("utf-8"))
+
+        self.assertEqual(response["ok"], False)
+        self.assertEqual(response["error"]["type"], "FileNotFoundError")
+
     def test_resolve_probe_reports_runtime_resolve_and_canonical_bridge(self):
         response = self.run_fake_module(
             "class App:\n"

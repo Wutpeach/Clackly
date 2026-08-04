@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -10,6 +11,28 @@ const { createCommandExecutor } = require("../command-engine/executor");
 const { loadCommands } = require("../command-engine/registry");
 const { FeatureCatalog } = require("../feature-ui/FeatureCatalog");
 const { loadCapabilityDefinitions } = require("../capability/loader");
+const { RuntimeLauncher } = require("./runtime/launcher");
+const { RuntimeManager } = require("./runtime/manager");
+
+function integrationRuntimeManager(scriptRoot) {
+  const executable = execFileSync("python", ["-c", "import os,sys;print(os.path.realpath(sys.executable))"], {
+    encoding: "utf8"
+  }).trim();
+  const resolution = {
+    source: "override",
+    supportStatus: "overridden",
+    executable,
+    profile: null
+  };
+  return new RuntimeManager({
+    resolver: { resolve: () => resolution },
+    probe: { probe: async () => ({ ok: true, supportStatus: "overridden" }) },
+    launcher: new RuntimeLauncher(),
+    clacklyVersion: "0.1.0",
+    hostContextProvider: async () => ({ application: "davinci-resolve", version: "20.3.2.9" }),
+    scriptRoot
+  });
+}
 
 test("a discovered manifest executes its Python feature through the command path", async () => {
   const appRoot = fs.mkdtempSync(path.join(os.tmpdir(), "clackly-script-integration-"));
@@ -54,6 +77,7 @@ test("a discovered manifest executes its Python feature through the command path
       capabilityRegistry: registry,
       capabilityDir,
       appRoot,
+      runtimeManager: integrationRuntimeManager(appRoot),
       logger: { info: (message) => logs.push(message) }
     });
     const [command] = loadCommands(commandDir);
@@ -92,7 +116,8 @@ test("bundled After Effects manifests expose one Feature and four Commands", () 
   const registry = createCapabilityRegistry();
   registerScriptCapabilities({
     capabilityRegistry: registry,
-    appRoot: path.resolve(__dirname, "..")
+    appRoot: path.resolve(__dirname, ".."),
+    runtimeManager: { execute() {} }
   });
   const features = new FeatureCatalog({ capabilityRegistry: registry })
     .getAllFeatures()
@@ -103,7 +128,12 @@ test("bundled After Effects manifests expose one Feature and four Commands", () 
 
 test("the bundled After Effects entry runs through the real Python command path", async () => {
   const registry = createCapabilityRegistry();
-  registerScriptCapabilities({ capabilityRegistry: registry });
+  const appRoot = path.resolve(__dirname, "..");
+  registerScriptCapabilities({
+    capabilityRegistry: registry,
+    appRoot,
+    runtimeManager: integrationRuntimeManager(appRoot)
+  });
   const execute = createCommandExecutor({
     capabilityRegistry: registry,
     configManager: {

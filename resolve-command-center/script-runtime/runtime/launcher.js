@@ -158,7 +158,7 @@ class RuntimeLauncher {
       }
       serializedRequest = serializeRequest(request);
       bootstrapPath = this.validateFile(
-        this.bootstrapPath,
+        Object.hasOwn(input, "bootstrapPath") ? input.bootstrapPath : this.bootstrapPath,
         "RUNTIME_LAUNCH_REQUEST_INVALID",
         "Bootstrap path"
       );
@@ -408,4 +408,4 @@ class RuntimeLauncher {
   }
 }
 
-module.exports = { RuntimeLauncher };
+module.exports = { RuntimeLauncher, serializeRequest };

@@ -12,7 +12,7 @@ function registerScriptCapabilities({
   capabilityDir = DEFAULT_CAPABILITY_DIR,
   appRoot = path.resolve(__dirname, ".."),
   logger = console,
-  pythonExecutable,
+  runtimeManager,
   scriptCapabilityProvider
 } = {}) {
   if (!capabilityRegistry || typeof capabilityRegistry.register !== "function"
@@ -23,7 +23,7 @@ function registerScriptCapabilities({
   const provider = scriptCapabilityProvider || new ScriptCapabilityProvider({
     logger,
     scriptExecutor: new ScriptExecutor(new Map([
-      ["python", new PythonProvider({ appRoot, pythonExecutable })]
+      ["python", new PythonProvider({ appRoot, runtimeManager })]
     ]))
   });
   const capabilities = loadCapabilityDefinitions(capabilityDir)

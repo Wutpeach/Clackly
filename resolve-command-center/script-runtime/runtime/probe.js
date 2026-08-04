@@ -264,9 +264,10 @@ class ResolvePythonProbe {
     this.launcher = launcher;
   }
 
-  async probe({ resolution, expectedRuntimeVersion, expectedResolveVersion, modulePath, libraryPath }) {
+  async probe({ resolution, expectedRuntimeVersion, expectedResolveVersion, modulePath, libraryPath, bootstrapPath }) {
     const launched = await this.launcher.execute({
       resolution,
+      ...(bootstrapPath !== undefined ? { bootstrapPath } : {}),
       request: {
         operation: "resolve-probe",
         expectedRuntimeVersion,
@@ -394,7 +395,8 @@ class RuntimeProbe {
         expectedRuntimeVersion,
         expectedResolveVersion: input.resolveVersion,
         modulePath: input.modulePath,
-        libraryPath: input.libraryPath
+        libraryPath: input.libraryPath,
+        bootstrapPath: input.bootstrapPath
       });
       const statuses = RuntimeDiagnostics.derive(input.resolution.supportStatus, "passed");
       const result = {

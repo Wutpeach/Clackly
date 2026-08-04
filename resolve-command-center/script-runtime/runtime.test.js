@@ -30,6 +30,7 @@ function profile(overrides = {}) {
     },
     executable: "python/cpython/python.exe",
     verification: "machine-verified",
+    releaseStatus: "candidate",
     ...overrides
   };
   if (Object.hasOwn(overrides, "host")) {
@@ -128,7 +129,7 @@ test("Registry validates every required profile field and rejects duplicate ids 
   const runtimeRoot = tempRoot(t);
   const scalarFields = [
     "id", "runtime", "implementation", "runtimeVersion", "platform",
-    "architecture", "executable", "verification"
+    "architecture", "executable", "verification", "releaseStatus"
   ];
 
   for (const field of scalarFields) {
@@ -180,7 +181,8 @@ test("Registry rejects malformed versions, selectors, capabilities, and executab
     profile({ executable: "C:/Python/python.exe" }),
     profile({ executable: "../python.exe" }),
     profile({ executable: "python\\python.exe" }),
-    profile({ verification: "self-reported" })
+    profile({ verification: "self-reported" }),
+    profile({ releaseStatus: "retired" })
   ];
   const sparseCapabilities = profile();
   sparseCapabilities.capabilities = new Array(1);
@@ -378,7 +380,7 @@ test("Resolver accepts a contained payload when the runtime root is a symlink", 
   assert.equal(resolver.resolve(request()).executable, executable);
 });
 
-test("the committed verified profile is selected but reports its deliberately absent payload", () => {
+test("the committed candidate profile is selected but reports its deliberately absent payload", () => {
   const registry = loadRuntimeRegistry();
   const resolver = new RuntimeResolver({ registry });
   const error = expectRuntimeError(
@@ -388,7 +390,7 @@ test("the committed verified profile is selected but reports its deliberately ab
   );
   assert.equal(
     error.details.profileId,
-    "python-cpython-3.13.1-resolve-20.3.2-win32-x64"
+    "python-cpython-3.13.14-resolve-20.3.2-win32-x64"
   );
 });
 

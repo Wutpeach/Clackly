@@ -5,6 +5,7 @@ import os
 import re
 import struct
 import sys
+from pathlib import Path
 
 
 VERSION = re.compile(r"^(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){2,}$")
@@ -203,6 +204,52 @@ def resolve_probe(request):
     }
 
 
+def script_execute(request):
+    runtime, error = runtime_record()
+    if error:
+        return error
+
+    script_root = request.get("scriptRoot")
+    entry = request.get("entry")
+    command_id = request.get("commandId")
+    config = request.get("config", {})
+    if not isinstance(script_root, str) or not os.path.isabs(script_root) or not os.path.isdir(script_root):
+        return failure("ValueError", "scriptRoot must be an existing absolute directory")
+    if not isinstance(entry, str) or not entry.strip() or os.path.isabs(entry):
+        return failure("ValueError", "entry must be a relative script path")
+    if not isinstance(command_id, str) or not command_id.strip():
+        return failure("ValueError", "commandId must be a non-empty string")
+    if not isinstance(config, dict):
+        return failure("TypeError", "config must be an object")
+
+    root = os.path.realpath(script_root)
+    candidate = os.path.realpath(os.path.join(root, entry))
+    try:
+        contained = os.path.commonpath((root, candidate)) == root
+    except ValueError:
+        contained = False
+    if not contained or not os.path.isfile(candidate):
+        return failure("FileNotFoundError", "entry must be a file contained by scriptRoot")
+
+    bootstrap_root = Path(__file__).resolve().parent
+    runner_path = next(
+        (path for path in (bootstrap_root / "python_runner.py", bootstrap_root.parent / "python_runner.py") if path.is_file()),
+        None,
+    )
+    if runner_path is None:
+        return failure("FileNotFoundError", "Clackly Python runner was not found")
+    spec = importlib.util.spec_from_file_location("clackly_python_runner", runner_path)
+    if spec is None or spec.loader is None:
+        return failure("ImportError", "Clackly Python runner could not be loaded")
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    return {
+        "ok": True,
+        "runtime": runtime,
+        "script": runner.run_script(candidate, command_id, config),
+    }
+
+
 def handle(raw_request):
     try:
         request = json.loads(raw_request, parse_constant=reject_nonstandard_number)
@@ -214,8 +261,10 @@ def handle(raw_request):
     operation = request.get("operation")
     if operation == "resolve-probe":
         return resolve_probe(request)
+    if operation == "script-execute":
+        return script_execute(request)
     if operation != "runtime-info":
-        return failure("ValueError", "Bootstrap operation must be runtime-info or resolve-probe")
+        return failure("ValueError", "Bootstrap operation must be runtime-info, resolve-probe, or script-execute")
 
     runtime, error = runtime_record()
     return error or {"ok": True, "runtime": runtime}

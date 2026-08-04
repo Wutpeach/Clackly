@@ -3,7 +3,7 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional
 
-from resolve_bridge import ResolveBridgeError, execute_command
+from resolve_bridge import ResolveBridgeError, execute_command, get_resolve_version
 
 
 DEFAULT_PORT = 49371
@@ -52,7 +52,10 @@ class CommandRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            _json_response(self, 200, {"ok": True})
+            try:
+                _json_response(self, 200, {"ok": True, "resolveVersion": get_resolve_version()})
+            except ResolveBridgeError as exc:
+                _json_response(self, 503, {"ok": False, "error": str(exc)})
             return
 
         _json_response(self, 404, {"ok": False, "error": "Not found"})

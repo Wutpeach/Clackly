@@ -332,8 +332,8 @@ def _log_resolve_scripting_environment(
     if not environment.get("RESOLVE_SCRIPT_API") and not environment.get("RESOLVE_SCRIPT_LIB"):
         _log(
             "Resolve scripting environment variables are missing. The bridge "
-            "can still report /health, but Resolve commands may fail unless "
-            "the selected Python can import DaVinciResolveScript or bmd. On "
+            "cannot report healthy or run commands unless the selected Python "
+            "can import DaVinciResolveScript or bmd. On "
             "standard Windows installs, Clackly checks ProgramData scripting "
             "modules and Program Files fusionscript.dll automatically."
         )

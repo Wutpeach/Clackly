@@ -8,7 +8,8 @@ import pathlib
 import sys
 from typing import Any
 
-APP_ROOT = pathlib.Path(__file__).resolve().parent.parent
+RUNNER_ROOT = pathlib.Path(__file__).resolve().parent
+APP_ROOT = RUNNER_ROOT if (RUNNER_ROOT / "resolve").is_dir() else RUNNER_ROOT.parent
 if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
 

@@ -63,7 +63,7 @@ function validateProfile(input, runtimeRoot) {
     : "<unknown>";
   for (const field of [
     "id", "runtime", "implementation", "runtimeVersion", "platform",
-    "architecture", "executable", "verification"
+    "architecture", "executable", "verification", "releaseStatus"
   ]) {
     requireString(input, field, profileId);
   }
@@ -142,6 +142,12 @@ function validateProfile(input, runtimeRoot) {
     invalid(`Runtime profile ${input.id} has an unsupported verification`, {
       profileId: input.id,
       field: "verification"
+    });
+  }
+  if (!["candidate", "current", "legacy-pinned"].includes(input.releaseStatus)) {
+    invalid(`Runtime profile ${input.id} has an unsupported releaseStatus`, {
+      profileId: input.id,
+      field: "releaseStatus"
     });
   }
 

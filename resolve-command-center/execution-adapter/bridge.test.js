@@ -9,7 +9,7 @@ test("bridge execution adapter maps marker intent to the existing HTTP command c
     getUrl: () => "http://127.0.0.1:49999",
     checkHealth: async (url) => {
       calls.push({ url });
-      return { ok: true };
+      return { ok: true, resolveVersion: "20.3.2.9" };
     },
     request: async (url, payload) => {
       calls.push({ url, payload });
@@ -18,11 +18,14 @@ test("bridge execution adapter maps marker intent to the existing HTTP command c
   });
 
   assert.equal(await adapter.isAvailable(), true);
+  assert.equal(await adapter.getResolveVersion(), "20.3.2.9");
   assert.deepEqual(await adapter.addMarker(), {
     ok: true,
     command: "timeline.addMarker"
   });
   assert.deepEqual(calls, [{
+    url: "http://127.0.0.1:49999/health"
+  }, {
     url: "http://127.0.0.1:49999/health"
   }, {
     url: "http://127.0.0.1:49999/command",

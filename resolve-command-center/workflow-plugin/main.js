@@ -24,6 +24,8 @@ const { FeatureCatalog } = require("../feature-ui/FeatureCatalog");
 const { registerFeatureUiIpc } = require("../feature-ui/registerIpc");
 const { FeatureStateStorage } = require("../feature-status/FeatureStateStorage");
 const { FeatureStatusManager } = require("../feature-status/FeatureStatusManager");
+const { RuntimeManager } = require("../script-runtime/runtime/manager");
+const packageMetadata = require("../package.json");
 
 const PLUGIN_ID = "com.wutpeach.clackly";
 
@@ -119,7 +121,26 @@ const markerCapability = createMarkerCapability({
 });
 const capabilityRegistry = createCapabilityRegistry();
 capabilityRegistry.register("marker.add", markerCapability);
-registerScriptCapabilities({ capabilityRegistry });
+const appRoot = path.resolve(__dirname, "..");
+const runtimeManager = new RuntimeManager({
+  runtimeRoot: app.isPackaged
+    ? path.join(process.resourcesPath, "runtimes")
+    : path.join(appRoot, "resources", "runtimes"),
+  cachePath: path.join(app.getPath("appData"), "Clackly", "runtime-probe.json"),
+  clacklyVersion: packageMetadata.version,
+  hostContextProvider: async () => {
+    const resolve = await getResolve();
+    const version = typeof resolve.GetVersionString === "function"
+      ? await Promise.resolve(resolve.GetVersionString())
+      : null;
+    return { application: "davinci-resolve", version };
+  },
+  scriptRoot: appRoot,
+  ...(process.env.CLACKLY_PYTHON_EXECUTABLE
+    ? { overrideExecutable: process.env.CLACKLY_PYTHON_EXECUTABLE }
+    : {})
+});
+registerScriptCapabilities({ capabilityRegistry, appRoot, runtimeManager });
 const featureCatalog = new FeatureCatalog({ capabilityRegistry });
 const configManager = new ConfigManager({
   capabilityRegistry,

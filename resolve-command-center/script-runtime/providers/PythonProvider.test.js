@@ -1,5 +1,4 @@
 const assert = require("node:assert/strict");
-const { EventEmitter } = require("node:events");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -18,147 +17,116 @@ async function withApp(callback) {
   }
 }
 
-function fakeProcess({ stdout = "", stderr = "", code = 0, error } = {}) {
-  const child = new EventEmitter();
-  child.stdout = new EventEmitter();
-  child.stderr = new EventEmitter();
-  child.stdout.setEncoding = () => {};
-  child.stderr.setEncoding = () => {};
-  child.stdin = {
-    on() {},
-    end(request) {
-      child.request = request;
-      queueMicrotask(() => {
-        if (error) child.emit("error", error);
-        if (stdout) child.stdout.emit("data", stdout);
-        if (stderr) child.stderr.emit("data", stderr);
-        child.emit("close", code);
-      });
-    }
-  };
-  return child;
-}
-
-test("python provider sends config, replays logs, and returns the result", async () => (
+test("python provider translates the request, replays logs, and returns the result", async () => (
   withApp(async (appRoot) => {
-    const child = fakeProcess({ stdout: JSON.stringify({
-      ok: true,
-      result: { exported: 2 },
-      logs: [{ level: "info", message: "done" }]
-    }) });
-    const spawnCalls = [];
+    const calls = [];
     const logs = [];
     const provider = new PythonProvider({
       appRoot,
-      pythonExecutable: "python-test",
-      spawnProcess(...args) {
-        spawnCalls.push(args);
-        return child;
+      runtimeManager: {
+        async execute(request) {
+          calls.push(request);
+          return {
+            ok: true,
+            result: { exported: 2 },
+            logs: [{ level: "info", message: "done" }]
+          };
+        }
       }
     });
 
     assert.deepEqual(await provider.execute(
       { runtime: "python", entry: "scripts/run.py" },
-      { commandId: "feature.export", config: { count: 2 }, logger: { info: (message) => logs.push(message) } }
+      {
+        capabilityId: "ae.export",
+        commandId: "timeline.export",
+        config: { count: 2 },
+        logger: { info: (message) => logs.push(message) }
+      }
     ), { exported: 2 });
-    assert.deepEqual(JSON.parse(child.request), {
-      commandId: "feature.export",
+    assert.deepEqual(calls, [{
+      runtime: "python",
+      capabilityId: "ae.export",
+      entry: "scripts/run.py",
+      commandId: "timeline.export",
       config: { count: 2 }
-    });
-    assert.equal(spawnCalls[0][2].shell, false);
+    }]);
     assert.deepEqual(logs, ["done"]);
   })
 ));
 
-test("python provider does not treat the bridge Python command as one executable", () => (
-  withApp((appRoot) => {
-    const previous = process.env.RESOLVE_COMMAND_CENTER_PYTHON_CMD;
-    process.env.RESOLVE_COMMAND_CENTER_PYTHON_CMD = "py -3";
-    try {
-      assert.equal(new PythonProvider({ appRoot }).pythonExecutable, "python");
-    } finally {
-      if (previous === undefined) delete process.env.RESOLVE_COMMAND_CENTER_PYTHON_CMD;
-      else process.env.RESOLVE_COMMAND_CENTER_PYTHON_CMD = previous;
-    }
+test("python provider validates entry and execution identity before Runtime Manager", async () => (
+  withApp(async (appRoot) => {
+    let calls = 0;
+    const provider = new PythonProvider({
+      appRoot,
+      runtimeManager: { execute: async () => { calls += 1; } }
+    });
+    assert.throws(() => provider.resolveEntry("scripts/missing.py"), /not found/);
+    assert.throws(() => provider.resolveEntry(path.join(appRoot, "scripts", "run.py")), /relative path/);
+    assert.throws(() => provider.resolveEntry("../run.py"), /not found under application root/);
+    await assert.rejects(provider.execute({ entry: "scripts/run.py" }, { commandId: " " }), /Command id/);
+    await assert.rejects(provider.execute(
+      { entry: "scripts/run.py" }, { commandId: "command", capabilityId: " " }
+    ), /Capability id/);
+    assert.equal(calls, 0);
   })
 ));
 
-test("python provider rejects missing, absolute, and escaping entries", () => withApp((appRoot) => {
-  const provider = new PythonProvider({ appRoot });
-  assert.throws(() => provider.resolveEntry("scripts/missing.py"), /not found/);
-  assert.throws(() => provider.resolveEntry(path.join(appRoot, "scripts", "run.py")), /relative path/);
-  assert.throws(() => provider.resolveEntry("../run.py"), /not found under application root/);
-}));
-
-test("python provider validates the Command id before spawning", () => withApp((appRoot) => {
-  let spawned = false;
-  const provider = new PythonProvider({
-    appRoot,
-    spawnProcess: () => { spawned = true; }
-  });
-  assert.throws(
-    () => provider.execute({ entry: "scripts/run.py" }, { commandId: " " }),
-    /Command id/
-  );
-  assert.equal(spawned, false);
-}));
-
-test("python provider surfaces spawn, exit, protocol, and script errors", async () => (
+test("python provider preserves Runtime fields and existing script errors", async () => (
   withApp(async (appRoot) => {
-    const cases = [
-      [{ error: new Error("missing executable") }, /failed to start: missing executable/],
-      [{ code: 2, stderr: "crashed" }, /exited with code 2: crashed/],
-      [{ stdout: "not-json" }, /invalid protocol output/],
-      [{ stdout: JSON.stringify({ ok: true, logs: "bad" }) }, /invalid protocol envelope/],
-      [{ stdout: JSON.stringify({
-        ok: true,
-        result: null,
-        logs: [{ level: "trace", message: "bad" }]
-      }) }, /invalid log record/],
-      [{ stdout: JSON.stringify({ ok: true, logs: [] }) }, /invalid success envelope/],
-      [{ stdout: JSON.stringify({
+    const runtimeError = Object.assign(new Error("runtime missing"), {
+      code: "RUNTIME_NOT_FOUND",
+      supportStatus: "missing-runtime",
+      details: { profileId: "managed" }
+    });
+    const runtimeProvider = new PythonProvider({
+      appRoot,
+      runtimeManager: { execute: async () => { throw runtimeError; } }
+    });
+    await assert.rejects(
+      runtimeProvider.execute(
+        { entry: "scripts/run.py" }, { commandId: "command", capabilityId: "feature" }
+      ),
+      (error) => error.code === "RUNTIME_NOT_FOUND"
+        && error.supportStatus === "missing-runtime"
+        && error.details.profileId === "managed"
+    );
+
+    const scriptProvider = new PythonProvider({
+      appRoot,
+      runtimeManager: { execute: async () => ({
         ok: false,
         error: { type: "RuntimeError", message: "boom" },
         logs: []
-      }) }, /failed: RuntimeError: boom/]
-    ];
-
-    for (const [processResult, expected] of cases) {
-      const provider = new PythonProvider({
-        appRoot,
-        spawnProcess: () => fakeProcess(processResult)
-      });
-      await assert.rejects(
-        provider.execute(
-          { runtime: "python", entry: "scripts/run.py" },
-          { commandId: "feature.run" }
-        ),
-        expected
-      );
-    }
+      }) }
+    });
+    await assert.rejects(
+      scriptProvider.execute(
+        { entry: "scripts/run.py" }, { commandId: "command", capabilityId: "feature" }
+      ),
+      /failed: RuntimeError: boom/
+    );
   })
 ));
 
-test("python provider rejects when host log replay fails", async () => (
+test("python provider reports host log replay failures", async () => (
   withApp(async (appRoot) => {
     const provider = new PythonProvider({
       appRoot,
-      spawnProcess: () => fakeProcess({ stdout: JSON.stringify({
+      runtimeManager: { execute: async () => ({
         ok: true,
         result: null,
         logs: [{ level: "info", message: "done" }]
-      }) })
+      }) }
     });
-
-    await assert.rejects(
-      provider.execute(
-        { entry: "scripts/run.py" },
-        {
-          commandId: "feature.run",
-          logger: { info: () => { throw new Error("logger failed"); } }
-        }
-      ),
-      /could not replay logs: logger failed/
-    );
+    await assert.rejects(provider.execute(
+      { entry: "scripts/run.py" },
+      {
+        commandId: "command",
+        capabilityId: "feature",
+        logger: { info: () => { throw new Error("logger failed"); } }
+      }
+    ), /could not replay logs: logger failed/);
   })
 ));

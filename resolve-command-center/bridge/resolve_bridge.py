@@ -6,7 +6,7 @@ APP_ROOT = Path(__file__).resolve().parent.parent
 if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
 
-from resolve.adapter import ResolveAdapterError, add_marker
+from resolve.adapter import ResolveAdapterError, add_marker, get_resolve
 
 ResolveBridgeError = ResolveAdapterError
 
@@ -27,3 +27,17 @@ def execute_command(command_id: str) -> Dict[str, Any]:
         "command": command_id,
         **result
     }
+
+
+def get_resolve_version() -> str:
+    resolve = get_resolve()
+    getter = getattr(resolve, "GetVersionString", None)
+    if not callable(getter):
+        raise ResolveBridgeError("Resolve version is unavailable")
+    try:
+        version = getter()
+    except Exception as exc:
+        raise ResolveBridgeError("Resolve version is unavailable") from exc
+    if not isinstance(version, str) or not version.strip():
+        raise ResolveBridgeError("Resolve version is unavailable")
+    return version

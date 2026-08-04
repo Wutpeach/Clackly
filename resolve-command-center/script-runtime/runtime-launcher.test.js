@@ -152,6 +152,10 @@ test("Launcher validates resolution, files, request, and limits before spawning"
       .execute({ resolution: resolution(), request: {} }),
     "RUNTIME_LAUNCH_REQUEST_INVALID"
   );
+  await expectRuntimeError(
+    launcher.execute({ resolution: resolution(), request: {}, bootstrapPath: "" }),
+    "RUNTIME_LAUNCH_REQUEST_INVALID"
+  );
   const circular = {};
   circular.self = circular;
   await expectRuntimeError(

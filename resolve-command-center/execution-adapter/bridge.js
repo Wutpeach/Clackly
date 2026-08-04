@@ -114,6 +114,13 @@ function createBridgeExecutionAdapter({
         return false;
       }
     },
+    getResolveVersion: async () => {
+      const response = await checkHealth(`${getUrl()}/health`);
+      if (!response || response.ok !== true || typeof response.resolveVersion !== "string") {
+        throw new Error("Bridge did not return a Resolve version");
+      }
+      return response.resolveVersion;
+    },
     addMarker: () => request(`${getUrl()}/command`, {
       command: "timeline.addMarker"
     })
