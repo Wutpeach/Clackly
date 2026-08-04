@@ -5,7 +5,8 @@ function registerFeatureUiIpc({
   configManager,
   featureStatusManager,
   interactionManager,
-  openSettings
+  openSettings,
+  closeSettings
 }) {
   ipcMain.handle("interactions:list", () => interactionManager.listBindings());
   ipcMain.handle("features:list", () => featureCatalog.getAllFeatures());
@@ -31,6 +32,7 @@ function registerFeatureUiIpc({
     return result.canceled ? null : result.filePaths[0] || null;
   });
   ipcMain.on("settings:open", (_event, featureId) => openSettings(featureId));
+  ipcMain.on("settings:close", () => closeSettings());
 }
 
 module.exports = { registerFeatureUiIpc };

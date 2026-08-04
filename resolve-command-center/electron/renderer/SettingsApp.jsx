@@ -16,13 +16,21 @@ function mergeStatuses(current, next) {
   return [...byId.values()];
 }
 
-function SettingsTitlebar() {
+function SettingsTitlebar({ api, Icon }) {
   return (
     <header className="settings-titlebar">
       <div className="settings-titlebar-drag">
         <span className="settings-titlebar-brand"><img src={logoUrl} alt="Clackly" /></span>
         <span className="settings-titlebar-label">Settings</span>
       </div>
+      <button
+        className="settings-titlebar-close"
+        type="button"
+        aria-label="Close Settings"
+        onClick={api.closeSettings}
+      >
+        <Icon name="close" size={18} />
+      </button>
     </header>
   );
 }
@@ -206,7 +214,7 @@ function SettingsApp({ api, Icon }) {
   if (loading) {
     return (
       <main className="settings-shell">
-        <SettingsTitlebar />
+        <SettingsTitlebar api={api} Icon={Icon} />
         <div className="settings-state" role="status">Loading features…</div>
       </main>
     );
@@ -216,7 +224,7 @@ function SettingsApp({ api, Icon }) {
     const loadError = status?.kind === "error" ? status.message : null;
     return (
       <main className="settings-shell">
-        <SettingsTitlebar />
+        <SettingsTitlebar api={api} Icon={Icon} />
         <div className="settings-state" role={loadError ? "alert" : undefined}>
           <strong>{loadError ? "Unable to load features" : "No features registered"}</strong>
           <span>{loadError || "Registered capability metadata will appear here automatically."}</span>
@@ -227,7 +235,7 @@ function SettingsApp({ api, Icon }) {
 
   return (
     <main className="settings-shell">
-      <SettingsTitlebar />
+      <SettingsTitlebar api={api} Icon={Icon} />
       <div className="settings-workspace">
         <aside className="feature-sidebar" aria-label="Features">
           <nav className="feature-navigation">

@@ -109,7 +109,7 @@ Blue and Cyan range Commands fail clearly when their required marker is absent; 
 
 ## Feature UI Framework
 
-The Settings button opens a separate `760x560` window (minimum `640x480`) with a Clackly title bar and native window controls, while Launcher, Search, and All Actions remain in the fixed `376x468` palette. `feature-ui/FeatureCatalog.js` projects full defensive metadata records from the existing Capability Registry, so registering a capability automatically adds it to the category-grouped Settings sidebar.
+The Settings button opens a fixed, frameless `760x560` window with a draggable Clackly title bar and accessible custom close button, while Launcher, Search, and All Actions remain in the fixed frameless `376x468` palette. Both windows disable the Windows thick frame so Resolve does not add an active-window accent border; Settings overflow scrolls inside the fixed workspace. `feature-ui/FeatureCatalog.js` projects full defensive metadata records from the existing Capability Registry, so registering a capability automatically adds it to the category-grouped Settings sidebar.
 
 The unified detail panel renders feature identity and resolved schema from Capability Metadata, binding-derived interaction help for associated Commands, and all settings through the generic `SettingsRenderer`. String, number, boolean, color, path, folder, and select fields use native controls. Path/folder selection uses Electron dialogs, drafts remain local until Save, and Save/Reset cross preload IPC into `ConfigManager`; renderer code never reads config files or calls capabilities and Resolve APIs directly.
 
@@ -167,6 +167,8 @@ powershell -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1 -Mo
 The repository intentionally does not commit `WorkflowIntegration.node`; it is a Resolve-provided native module and is ignored by git.
 
 ## Local Development
+
+Resolve 20.3.2.9 with its bundled Electron 36.3.2 is the qualified host baseline. The local Electron dependency is pinned exactly to 36.3.2 so development and automated window-contract tests cannot silently adopt newer APIs. Native window chrome must be validated through the Resolve Workflow Integration plugin: standalone Electron tests and renderer screenshots cannot prove that Resolve-hosted Windows borders are absent.
 
 ```bash
 npm install

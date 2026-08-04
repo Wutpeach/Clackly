@@ -23,7 +23,8 @@ import {
   SkipBack,
   Sparkles,
   TriangleAlert,
-  Upload
+  Upload,
+  X
 } from "lucide-react";
 import logoUrl from "./assets/clackly-logo.svg";
 import SettingsApp from "./SettingsApp.jsx";
@@ -65,6 +66,7 @@ const api = window.resolveCommandCenter || {
   resetConfig: async () => ({}),
   pickPath: async () => null,
   openSettings: () => window.open("?view=settings", "clackly-settings"),
+  closeSettings: () => window.close(),
   hidePalette: () => {},
   setPaletteMode: () => {},
   onPaletteShown: (callback) => {
@@ -93,7 +95,8 @@ const ICONS = {
   grip: Grip,
   arrow: ChevronLeft,
   loading: LoaderCircle,
-  warning: TriangleAlert
+  warning: TriangleAlert,
+  close: X
 };
 
 function Icon({ name, size = 24 }) {

@@ -202,6 +202,10 @@ function openSettings(featureId) {
   }
 }
 
+function closeSettings() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.close();
+}
+
 function togglePalette() {
   if (paletteWindow && paletteWindow.isVisible()) {
     hidePalette();
@@ -235,7 +239,8 @@ function registerIpcHandlers() {
     configManager,
     featureStatusManager,
     interactionManager,
-    openSettings
+    openSettings,
+    closeSettings
   });
 }
 

@@ -22,6 +22,7 @@ test("feature UI IPC exposes semantic catalog, config, picker, and settings oper
   };
   let opened = false;
   let openedFeature = null;
+  let closed = false;
 
   registerFeatureUiIpc({
     ipcMain,
@@ -43,7 +44,8 @@ test("feature UI IPC exposes semantic catalog, config, picker, and settings oper
     interactionManager: {
       listBindings: () => [{ id: "left", target: "timeline.addMarker" }]
     },
-    openSettings: (id) => { opened = true; openedFeature = id; }
+    openSettings: (id) => { opened = true; openedFeature = id; },
+    closeSettings: () => { closed = true; }
   });
 
   assert.deepEqual(await handlers.get("interactions:list")(), [
@@ -78,4 +80,6 @@ test("feature UI IPC exposes semantic catalog, config, picker, and settings oper
   listeners.get("settings:open")(null, "marker.add");
   assert.equal(opened, true);
   assert.equal(openedFeature, "marker.add");
+  listeners.get("settings:close")();
+  assert.equal(closed, true);
 });

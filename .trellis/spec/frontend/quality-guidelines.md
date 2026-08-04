@@ -104,7 +104,7 @@ window.resolveCommandCenter.setPaletteMode("all-actions");
 ### 2. Signatures
 
 - `new FeatureCatalog({ capabilityRegistry }).getAllFeatures() -> CapabilityMetadata[]`.
-- Preload APIs: `listFeatures()`, `listInteractionBindings()`, `getConfig(capabilityId)`, `saveConfig(capabilityId, values)`, `resetConfig(capabilityId)`, `pickPath("path" | "folder")`, and `openSettings()`.
+- Preload APIs: `listFeatures()`, `listInteractionBindings()`, `getConfig(capabilityId)`, `saveConfig(capabilityId, values)`, `resetConfig(capabilityId)`, `pickPath("path" | "folder")`, `openSettings()`, and `closeSettings()`.
 - `SettingsRenderer({ schema, values, onChange, onPick, disabled })`.
 
 ### 3. Contracts
@@ -112,7 +112,9 @@ window.resolveCommandCenter.setPaletteMode("all-actions");
 - One registered Capability is one feature; there is no second feature manifest, registry, feature-id branch, or feature-specific page.
 - Feature identity and schema come from Capability Metadata. Help targets Commands through `command.capability === feature.id` and derives rows from normalized bindings plus action Command descriptions.
 - Standalone Electron and Workflow Integration register the same feature/config/picker channels through the shared IPC helper.
-- Settings is one native-framed, resizable `760x560` window with a `640x480` minimum. Repeated opens reuse and focus it; it does not hide on blur or become always-on-top.
+- Resolve 20.3.2.9 with bundled Electron 36.3.2 is the qualified desktop host; local Electron must remain exactly pinned to that API baseline.
+- Settings is one fixed frameless `760x560` window. Both Settings and the `376x468` palette use the Electron 36-compatible Windows contract `frame: false`, `thickFrame: false`, `resizable: false`, `maximizable: false`, `minimizable: false`, and `fullscreenable: false`; do not use the Electron 37+ `accentColor` API.
+- Repeated Settings opens reuse and focus the singleton; it does not hide on blur or become always-on-top. Its custom drag region and accessible close button replace native title-bar controls, and overflow scrolls inside the fixed workspace.
 - Launcher, Search, and All Actions remain in the frameless fixed `376x468` palette.
 - The existing renderer bundle selects Settings through a main-process-owned `?view=settings` marker. Renderer code never sends dimensions.
 - Draft values remain local until Save. Save and Reset route through ConfigManager; path and folder fields route through Electron native dialogs.
@@ -140,7 +142,7 @@ window.resolveCommandCenter.setPaletteMode("all-actions");
 - Assert catalog ordering, full defensive metadata, exact category filtering, and discovery after registration.
 - Assert all seven schema types map to their native controls, resolved explicit/fallback labels are immutable, and feature category grouping preserves registry order.
 - Assert feature/config/picker IPC semantics, picker cancellation, ConfigManager reset preservation, and complete-save validation.
-- Assert palette dimensions remain `376x468`, Settings dimensions remain main-process-owned, and an existing Settings window is restored/focused instead of duplicated.
+- Assert the exact Electron dependency/lockfile baseline, both complete BrowserWindow option contracts, Settings close IPC, fixed dimensions, and existing-window restore/focus behavior.
 - Run `npm test`, `npm run build`, and boundary searches for renderer Capability/Resolve/storage coupling.
 
 ### 7. Wrong vs Correct

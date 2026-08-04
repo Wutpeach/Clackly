@@ -5,6 +5,7 @@ const test = require("node:test");
 const {
   PALETTE_SIZES,
   SETTINGS_SIZE,
+  createPaletteWindow,
   createSettingsWindow,
   openSettingsWindow,
   setPaletteWindowMode
@@ -36,9 +37,7 @@ test("palette modes retain their fixed footprint and settings owns separate dime
   });
   assert.deepEqual(SETTINGS_SIZE, {
     width: 760,
-    height: 560,
-    minWidth: 640,
-    minHeight: 480
+    height: 560
   });
 
   const calls = [];
@@ -50,6 +49,59 @@ test("palette modes retain their fixed footprint and settings owns separate dime
   assert.equal(setPaletteWindowMode(palette, "search"), true);
   assert.deepEqual(calls, [["setSize", 376, 468, false], ["center"]]);
   assert.equal(setPaletteWindowMode(palette, "settings"), false);
+});
+
+test("Electron dependency and lockfile stay on the Resolve host baseline", () => {
+  const packageMetadata = require("../../package.json");
+  const packageLock = require("../../package-lock.json");
+  assert.equal(packageMetadata.devDependencies.electron, "36.3.2");
+  assert.equal(packageLock.packages[""].devDependencies.electron, "36.3.2");
+  assert.equal(packageLock.packages["node_modules/electron"].version, "36.3.2");
+});
+
+test("palette window uses the complete Electron 36 fixed frameless contract", () => {
+  withoutDevRenderer(() => {
+    class FakeBrowserWindow {
+      constructor(options) {
+        this.options = options;
+        this.listeners = new Map();
+      }
+
+      loadFile(filePath, options) {
+        this.loaded = { filePath, options };
+      }
+
+      on(event, listener) {
+        this.listeners.set(event, listener);
+      }
+    }
+
+    const palette = createPaletteWindow(FakeBrowserWindow);
+    assert.deepEqual(palette.options, {
+      width: 376,
+      height: 468,
+      show: false,
+      frame: false,
+      transparent: true,
+      thickFrame: false,
+      resizable: false,
+      maximizable: false,
+      minimizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      alwaysOnTop: false,
+      backgroundColor: "#00000000",
+      webPreferences: {
+        preload: path.join(__dirname, "preload.js"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false
+      }
+    });
+    assert.equal(palette.loaded.filePath, path.join(__dirname, "../../dist/renderer/index.html"));
+    assert.equal(palette.loaded.options, undefined);
+    assert.equal(typeof palette.listeners.get("blur"), "function");
+  });
 });
 
 test("opening settings reuses, restores, shows, and focuses an existing window", () => {
@@ -79,7 +131,7 @@ test("opening existing settings selects the requested feature", () => {
   assert.deepEqual(messages, [["settings:select-feature", "ae.export"]]);
 });
 
-test("settings window owns native sizing and built renderer routing without a blur listener", () => {
+test("settings window uses the complete Electron 36 fixed frameless contract", () => {
   withoutDevRenderer(() => {
     class FakeBrowserWindow {
       constructor(options) {
@@ -99,16 +151,13 @@ test("settings window owns native sizing and built renderer routing without a bl
     assert.deepEqual(settings.options, {
       width: 760,
       height: 560,
-      minWidth: 640,
-      minHeight: 480,
       show: false,
-      titleBarStyle: "hidden",
-      titleBarOverlay: {
-        color: "#202327",
-        symbolColor: "#EBEBEC",
-        height: 48
-      },
-      resizable: true,
+      frame: false,
+      thickFrame: false,
+      resizable: false,
+      maximizable: false,
+      minimizable: false,
+      fullscreenable: false,
       alwaysOnTop: false,
       autoHideMenuBar: true,
       backgroundColor: "#101216",

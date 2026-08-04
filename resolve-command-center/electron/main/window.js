@@ -9,9 +9,7 @@ const PALETTE_SIZES = Object.freeze({
 });
 const SETTINGS_SIZE = Object.freeze({
   width: 760,
-  height: 560,
-  minWidth: 640,
-  minHeight: 480
+  height: 560
 });
 
 function shouldLoadDevRenderer() {
@@ -50,20 +48,21 @@ function loadRenderer(window, view) {
   );
 }
 
-function createPaletteWindow() {
+function createPaletteWindow(BrowserWindowType = BrowserWindow) {
   const initialSize = PALETTE_SIZES.launcher;
-  const window = new BrowserWindow({
+  const window = new BrowserWindowType({
     width: initialSize.width,
     height: initialSize.height,
     show: false,
     frame: false,
     transparent: true,
+    thickFrame: false,
     resizable: false,
     maximizable: false,
     minimizable: false,
+    fullscreenable: false,
     skipTaskbar: true,
     alwaysOnTop: false,
-    accentColor: false,
     backgroundColor: "#00000000",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -88,16 +87,13 @@ function createSettingsWindow(BrowserWindowType = BrowserWindow) {
   const window = new BrowserWindowType({
     width: SETTINGS_SIZE.width,
     height: SETTINGS_SIZE.height,
-    minWidth: SETTINGS_SIZE.minWidth,
-    minHeight: SETTINGS_SIZE.minHeight,
     show: false,
-    titleBarStyle: "hidden",
-    titleBarOverlay: {
-      color: "#202327",
-      symbolColor: "#EBEBEC",
-      height: 48
-    },
-    resizable: true,
+    frame: false,
+    thickFrame: false,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
     alwaysOnTop: false,
     autoHideMenuBar: true,
     backgroundColor: "#101216",
