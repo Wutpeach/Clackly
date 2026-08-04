@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "profileId": "python-cpython-3.13.14-resolve-20.3.2-win32-x64",
+  "version": "3.13.14",
+  "platform": "win32",
+  "architecture": "x64",
+  "releaseStatus": "candidate",
+  "asset": {
+    "fileName": "python-3.13.14-embed-amd64.zip",
+    "url": "https://www.python.org/ftp/python/3.13.14/python-3.13.14-embed-amd64.zip",
+    "sha256": "90b4e5b9898b72d744650524bff92377c367f44bd5fbd09e3148656c080ad907"
+  },
+  "sigstore": {
+    "fileName": "python-3.13.14-embed-amd64.zip.sigstore",
+    "url": "https://www.python.org/ftp/python/3.13.14/python-3.13.14-embed-amd64.zip.sigstore",
+    "sha256": "ec9e3f2bb3d21f80d17c43b3fbc93aed0abc98e10912e8dbd744c41c3d797597"
+  },
+  "spdx": {
+    "fileName": "python-3.13.14-embed-amd64.zip.spdx.json",
+    "url": "https://www.python.org/ftp/python/3.13.14/python-3.13.14-embed-amd64.zip.spdx.json",
+    "sha256": "ff85d80144dffbd3a3498a4bce568f6ab3fec614842eafda2b562f4c4e9bd247"
+  },
+  "license": {
+    "fileName": "LICENSE-3.13.14.txt",
+    "url": "https://raw.githubusercontent.com/python/cpython/v3.13.14/LICENSE",
+    "sha256": "78b12c3a81360b357002334f0e70ea0e92eebf7a9b358805c03c48484945f3bb"
+  }
+}
