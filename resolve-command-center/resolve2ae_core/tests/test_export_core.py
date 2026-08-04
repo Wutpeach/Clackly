@@ -359,32 +359,22 @@ class ExportCoreSnapshotTests(unittest.TestCase):
         timeline,
         config: dict | None,
         *,
-        ae_running: bool = True,
         ae_path: str = AE_PATH,
         lut_lookup: str | None = None,
         lut_copy: str | None = None,
         load_config_result: dict | None = None,
         parse_result: tuple[dict, list] | None = None,
         props_result: tuple[dict, str] | None = None,
-        platform_name: str = "Windows",
         print_output: list[str] | None = None,
-        popen_side_effect=None,
     ) -> dict:
         case_dir = self._case_dir(case_name)
         statuses: list[str] = []
-        popen_impl = popen_side_effect
-        if popen_impl is None:
-            popen_impl = lambda args, **kwargs: self.popen_calls.append({"args": list(args), "kwargs": kwargs})
-
         config_payload = dict(config) if config is not None else None
 
         with ExitStack() as stack:
             stack.enter_context(patch("resolve2ae_core.export.time.time", return_value=FIXED_TIME))
-            stack.enter_context(patch("resolve2ae_core.export.platform.system", return_value=platform_name))
-            stack.enter_context(patch("resolve2ae_core.export.get_running_ae_path", return_value=ae_path if ae_running else ""))
             stack.enter_context(patch("resolve2ae_core.export.find_lut_file", side_effect=lambda _name: lut_lookup))
             stack.enter_context(patch("resolve2ae_core.export.copy_lut_to_ae", side_effect=lambda _src, _dest: lut_copy))
-            stack.enter_context(patch("resolve2ae_core.export.subprocess.Popen", side_effect=popen_impl))
             stack.enter_context(patch("resolve2ae_core.export.tempfile.gettempdir", return_value=str(case_dir)))
             stack.enter_context(patch("resolve2ae_core.export.open", new=self.capture_open, create=True))
             if load_config_result is not None:
@@ -405,10 +395,10 @@ class ExportCoreSnapshotTests(unittest.TestCase):
                 FakeResolve(), FakeProject(timeline), ae_path, statuses.append, config_payload
             )
 
-        jsx = next(iter(self.capture_open.writes.values()), "")
+        launch = result.get("__clacklyDesktopLaunch", {})
         return {
             "statuses": statuses,
-            "jsx": jsx,
+            "jsx": launch.get("jsx", ""),
             "popen_calls": self.popen_calls,
             "result": result,
         }
@@ -429,7 +419,9 @@ class ExportCoreSnapshotTests(unittest.TestCase):
 
     def _assert_matches_snapshot(self, snapshot_name: str, actual: dict) -> None:
         expected = json.loads((SNAPSHOT_DIR / f"{snapshot_name}.json").read_text(encoding="utf-8"))
-        self.assertEqual(self._normalize_snapshot_payload(expected), self._normalize_snapshot_payload(actual))
+        self.assertEqual(actual["jsx"], expected["jsx"])
+        self.assertEqual(actual["statuses"], expected["statuses"][:-2])
+        self.assertEqual(actual["popen_calls"], [])
 
     def test_single_video_otio_success_matches_snapshot(self) -> None:
         clip = FakeVideoItem(start=0, end=24, name="ClipA")
@@ -440,13 +432,17 @@ class ExportCoreSnapshotTests(unittest.TestCase):
             {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
         )
         self._assert_matches_snapshot("single_video_otio_success", actual)
-        self.assertEqual(actual["result"], {
+        public_result = dict(actual["result"])
+        launch = public_result.pop("__clacklyDesktopLaunch")
+        self.assertEqual(public_result, {
             "ok": True,
             "code": "exported",
             "mode": "auto",
             "clip_count": 1,
             "message": "Sent 1 Clips",
         })
+        self.assertEqual(launch["type"], "after-effects-jsx")
+        self.assertEqual(launch["args"], ["-r", "$CLACKLY_JSX"])
 
     def test_single_video_otio_fallback_matches_snapshot(self) -> None:
         clip = FakeVideoItem(start=0, end=24, name="ClipA")
@@ -566,7 +562,7 @@ class ExportCoreSnapshotTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            ["Analyzing...", "Exporting OTIO...", "Parsing Data...", "Sending...", "✅ Sent 1 Clips"],
+            ["Analyzing...", "Exporting OTIO...", "Parsing Data..."],
             actual["statuses"],
         )
         self.assertIn("layer.timeRemapEnabled = true;", actual["jsx"])
@@ -576,37 +572,26 @@ class ExportCoreSnapshotTests(unittest.TestCase):
         self.assertTrue(any("LUT: ShowLUT.cube" in line for line in debug_logs))
         self.assertTrue(any("Speed Ramp:" in line for line in debug_logs))
 
-    def test_constant_speed_error_status_when_send_fails(self) -> None:
+    def test_constant_speed_returns_a_plan_without_starting_after_effects(self) -> None:
         debug_logs: list[str] = []
         clip = FakeVideoItem(start=0, end=24, name="ClipConst")
         timeline = FakeTimeline(video_tracks={1: [clip]}, export_success=False)
-
-        def popen_error(args, **kwargs):
-            self.popen_calls.append({"args": list(args), "kwargs": kwargs})
-            raise RuntimeError("send failed")
 
         actual = self._run_export(
             "constant_speed_error",
             timeline,
             {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
             props_result=(build_props(time_scalar=2.0), "Patched"),
-            popen_side_effect=popen_error,
             print_output=debug_logs,
         )
 
         self.assertEqual(
-            ["Analyzing...", "Exporting OTIO...", "Generating JSX...", "Sending...", "❌ Error"],
+            ["Analyzing...", "Exporting OTIO...", "Generating JSX..."],
             actual["statuses"],
         )
         self.assertIn("layer.stretch = 50.0;", actual["jsx"])
-        self.assertTrue(any("send failed" in line for line in debug_logs))
-        self.assertEqual(actual["result"], {
-            "ok": False,
-            "code": "send-error",
-            "mode": "auto",
-            "clip_count": 1,
-            "message": "send failed",
-        })
+        self.assertEqual(actual["popen_calls"], [])
+        self.assertEqual(actual["result"]["code"], "exported")
 
     def test_dynamic_zoom_keyframes_are_emitted(self) -> None:
         debug_logs: list[str] = []
@@ -830,73 +815,24 @@ class ExportCoreSnapshotTests(unittest.TestCase):
             export_core.get_target_clips_logic(timeline, "video-range")
         self.assertEqual(export_core.get_target_clips_logic(timeline, "auto")[0], "single")
 
-    def test_starts_ae_with_bootstrap_when_after_effects_is_not_running(self) -> None:
+    def test_returns_desktop_launch_plan_without_starting_after_effects(self) -> None:
         clip = FakeVideoItem(start=0, end=24, name="ClipA")
         timeline = FakeTimeline(video_tracks={1: [clip]}, export_payload=wrap_tracks(build_otio_clip()))
-        case_dir = self._case_dir("ae_not_running")
-        ae_path = str(case_dir / "AfterFX.exe")
-        statuses: list[str] = []
-        popen_calls: list[dict] = []
-        with (
-            patch("resolve2ae_core.export.time.time", return_value=FIXED_TIME),
-            patch("resolve2ae_core.export.platform.system", return_value="Windows"),
-            patch("resolve2ae_core.export.get_running_ae_path", return_value=""),
-            patch("resolve2ae_core.export.subprocess.Popen", side_effect=lambda args, **kwargs: popen_calls.append({"args": list(args), "kwargs": kwargs})),
-            patch("resolve2ae_core.export.tempfile.gettempdir", return_value=str(case_dir)),
-        ):
-            export_core.process_and_send(
-                FakeResolve(),
-                FakeProject(timeline),
-                ae_path,
-                statuses.append,
+        with patch("subprocess.Popen") as popen:
+            actual = self._run_export(
+                "desktop_launch_plan",
+                timeline,
                 {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
             )
+        popen.assert_not_called()
 
-        bootstrap_path = Path(ae_path).parent / "Scripts" / "Startup" / "_resolve2ae_bootstrap.jsx"
-        self.assertEqual(
-            ["Analyzing...", "Exporting OTIO...", "Parsing Data...", "Starting AE...", "✅ Sent 1 Clips"],
-            statuses,
-        )
-        self.assertEqual([{"args": [ae_path], "kwargs": {}}], popen_calls)
-        self.assertTrue(bootstrap_path.exists())
-        bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
-        self.assertIn("app.scheduleTask", bootstrap_text)
-        self.assertIn("ToAE_1700000000.jsx", bootstrap_text)
-        bootstrap_path.unlink(missing_ok=True)
-
-    def test_starts_ae_with_darwin_bootstrap_when_after_effects_is_not_running(self) -> None:
-        clip = FakeVideoItem(start=0, end=24, name="ClipMac")
-        timeline = FakeTimeline(video_tracks={1: [clip]}, export_payload=wrap_tracks(build_otio_clip("ClipMac")))
-        case_dir = self._case_dir("ae_not_running_darwin")
-        ae_path = str(case_dir / "After Effects.app" / "Contents" / "MacOS" / "After Effects")
-        statuses: list[str] = []
-        popen_calls: list[dict] = []
-        with (
-            patch("resolve2ae_core.export.time.time", return_value=FIXED_TIME),
-            patch("resolve2ae_core.export.platform.system", return_value="Darwin"),
-            patch("resolve2ae_core.export.get_running_ae_path", return_value=""),
-            patch("resolve2ae_core.export.subprocess.Popen", side_effect=lambda args, **kwargs: popen_calls.append({"args": list(args), "kwargs": kwargs})),
-            patch("resolve2ae_core.export.tempfile.gettempdir", return_value=str(case_dir)),
-        ):
-            export_core.process_and_send(
-                FakeResolve(),
-                FakeProject(timeline),
-                ae_path,
-                statuses.append,
-                {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
-            )
-
-        bootstrap_path = case_dir / "After Effects.app" / "Contents" / "Scripts" / "Startup" / "_resolve2ae_bootstrap.jsx"
-        self.assertEqual(
-            ["Analyzing...", "Exporting OTIO...", "Parsing Data...", "Starting AE...", "✅ Sent 1 Clips"],
-            statuses,
-        )
-        self.assertEqual([{"args": [ae_path], "kwargs": {}}], popen_calls)
-        self.assertTrue(bootstrap_path.exists())
-        bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
-        self.assertIn("app.scheduleTask", bootstrap_text)
-        self.assertIn("ToAE_1700000000.jsx", bootstrap_text)
-        bootstrap_path.unlink(missing_ok=True)
+        launch = actual["result"]["__clacklyDesktopLaunch"]
+        self.assertEqual(actual["statuses"], ["Analyzing...", "Exporting OTIO...", "Parsing Data..."])
+        self.assertEqual(actual["popen_calls"], [])
+        self.assertEqual(launch["type"], "after-effects-jsx")
+        self.assertEqual(launch["executable"], AE_PATH)
+        self.assertEqual(launch["args"], ["-r", "$CLACKLY_JSX"])
+        self.assertIn("app.beginUndoGroup", launch["jsx"])
 
 
 if __name__ == "__main__":

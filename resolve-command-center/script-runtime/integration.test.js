@@ -13,8 +13,9 @@ const { FeatureCatalog } = require("../feature-ui/FeatureCatalog");
 const { loadCapabilityDefinitions } = require("../capability/loader");
 const { RuntimeLauncher } = require("./runtime/launcher");
 const { RuntimeManager } = require("./runtime/manager");
+const { PythonProvider } = require("./providers/PythonProvider");
 
-function integrationRuntimeManager(scriptRoot) {
+function integrationRuntimeManager(scriptRoot, overrides = {}) {
   const executable = execFileSync("python", ["-c", "import os,sys;print(os.path.realpath(sys.executable))"], {
     encoding: "utf8"
   }).trim();
@@ -30,7 +31,8 @@ function integrationRuntimeManager(scriptRoot) {
     launcher: new RuntimeLauncher(),
     clacklyVersion: "0.1.0",
     hostContextProvider: async () => ({ application: "davinci-resolve", version: "20.3.2.9" }),
-    scriptRoot
+    scriptRoot,
+    ...overrides
   });
 }
 
@@ -146,4 +148,59 @@ test("the bundled After Effects entry runs through the real Python command path"
     execute("timeline.exportToAfterEffects"),
     /After Effects path must point to an existing executable file/
   );
+});
+
+test("the real Python path hands desktop launch to the host and preserves public output", async () => {
+  const appRoot = fs.mkdtempSync(path.join(os.tmpdir(), "clackly-desktop-plan-"));
+  try {
+    const scriptDir = path.join(appRoot, "scripts");
+    const aePath = path.join(appRoot, "AfterFX.exe");
+    fs.mkdirSync(scriptDir);
+    fs.writeFileSync(aePath, "AfterFX");
+    fs.writeFileSync(path.join(scriptDir, "feature.py"), [
+      "def execute(context):",
+      "    return {",
+      "        'ok': True, 'code': 'exported', 'mode': 'single',",
+      "        'clip_count': 1, 'message': 'Sent 1 Clips',",
+      "        '__clacklyDesktopLaunch': {",
+      "            'type': 'after-effects-jsx',",
+      "            'executable': context.config['aePath'],",
+      "            'args': ['-r', '$CLACKLY_JSX'],",
+      "            'jsx': 'app.project.items.addComp(\"test\", 1, 1, 1, 1, 24);'",
+      "        }",
+      "    }"
+    ].join("\n"));
+    const desktopCalls = [];
+    const provider = new PythonProvider({
+      appRoot,
+      runtimeManager: integrationRuntimeManager(appRoot, {
+        desktopLauncher: {
+          async execute(plan, context) {
+            desktopCalls.push([plan, context]);
+            return { mode: "cold" };
+          }
+        }
+      })
+    });
+    const logs = [];
+
+    const result = await provider.execute(
+      { entry: "scripts/feature.py" },
+      {
+        capabilityId: "ae.export",
+        commandId: "timeline.exportCurrentToAfterEffects",
+        config: { aePath },
+        logger: { info: (message) => logs.push(message) }
+      }
+    );
+
+    assert.deepEqual(result, {
+      ok: true, code: "exported", mode: "single", clip_count: 1, message: "Sent 1 Clips"
+    });
+    assert.equal(desktopCalls.length, 1);
+    assert.deepEqual(desktopCalls[0][1], { configuredExecutable: aePath });
+    assert.deepEqual(logs, ["Starting AE...", "✅ Sent 1 Clips"]);
+  } finally {
+    fs.rmSync(appRoot, { recursive: true, force: true });
+  }
 });

@@ -14,6 +14,7 @@ const { createCapabilityRegistry } = require("../capability/registry");
 const { createMarkerCapability } = require("../capability/marker");
 const { registerScriptCapabilities } = require("../capability/registerScripts");
 const { initializeAfterEffectsPath } = require("../capability/afterEffectsPath");
+const { AfterEffectsLauncher } = require("../capability/afterEffectsLaunch");
 const { ConfigManager } = require("../config/ConfigManager");
 const { ConfigStorage } = require("../config/ConfigStorage");
 const { BindingStorage } = require("../interaction/BindingStorage");
@@ -25,6 +26,7 @@ const { registerFeatureUiIpc } = require("../feature-ui/registerIpc");
 const { FeatureStateStorage } = require("../feature-status/FeatureStateStorage");
 const { FeatureStatusManager } = require("../feature-status/FeatureStatusManager");
 const { RuntimeManager } = require("../script-runtime/runtime/manager");
+const { resolveRuntimeRoot } = require("../script-runtime/runtime/paths");
 const packageMetadata = require("../package.json");
 
 const PLUGIN_ID = "com.wutpeach.clackly";
@@ -122,12 +124,17 @@ const markerCapability = createMarkerCapability({
 const capabilityRegistry = createCapabilityRegistry();
 capabilityRegistry.register("marker.add", markerCapability);
 const appRoot = path.resolve(__dirname, "..");
+const desktopLauncher = new AfterEffectsLauncher({
+  hostEnvironment: process.env,
+  temporaryRoot: app.getPath("temp")
+});
 const runtimeManager = new RuntimeManager({
-  runtimeRoot: app.isPackaged
-    ? path.join(process.resourcesPath, "runtimes")
-    : path.join(appRoot, "resources", "runtimes"),
+  runtimeRoot: resolveRuntimeRoot({
+    appRoot
+  }),
   cachePath: path.join(app.getPath("appData"), "Clackly", "runtime-probe.json"),
   clacklyVersion: packageMetadata.version,
+  desktopLauncher,
   hostContextProvider: async () => {
     const resolve = await getResolve();
     const version = typeof resolve.GetVersionString === "function"

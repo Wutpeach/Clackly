@@ -76,7 +76,9 @@ test("both production hosts inject live Resolve version and packaged Runtime pat
   const workflow = fs.readFileSync(path.join(appRoot, "workflow-plugin", "main.js"), "utf8");
   for (const source of [standalone, workflow]) {
     assert.match(source, /new RuntimeManager/);
-    assert.match(source, /process\.resourcesPath, "runtimes"/);
+    assert.match(source, /resolveRuntimeRoot/);
+    assert.match(source, /new AfterEffectsLauncher/);
+    assert.match(source, /hostEnvironment: process\.env/);
     assert.match(source, /runtime-probe\.json/);
   }
   assert.match(standalone, /getResolveVersion/);

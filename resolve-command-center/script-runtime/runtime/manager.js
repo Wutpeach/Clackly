@@ -6,6 +6,7 @@ const { RuntimeProbe } = require("./probe");
 const { RuntimeResolver } = require("./resolver");
 
 const VERSION = /^(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){2,}$/;
+const DESKTOP_LAUNCH_FIELD = "__clacklyDesktopLaunch";
 
 function isPlainObject(value) {
   try {
@@ -44,6 +45,7 @@ class RuntimeManager {
     hostContextProvider,
     scriptRoot,
     bootstrapPath = path.resolve(__dirname, "bootstrap.py"),
+    desktopLauncher,
     modulePath,
     libraryPath
   } = {}) {
@@ -71,6 +73,7 @@ class RuntimeManager {
     this.hostContextProvider = hostContextProvider;
     this.scriptRoot = scriptRoot;
     this.bootstrapPath = bootstrapPath;
+    this.desktopLauncher = desktopLauncher;
     this.modulePath = modulePath;
     this.libraryPath = libraryPath;
   }
@@ -157,7 +160,56 @@ class RuntimeManager {
         details: { reason: "invalid-script-envelope", process: launched?.process }
       });
     }
-    return structuredClone(launched.response.script);
+    const script = structuredClone(launched.response.script);
+    const plan = script.ok && isPlainObject(script.result)
+      ? script.result[DESKTOP_LAUNCH_FIELD]
+      : undefined;
+    if (plan !== undefined) {
+      delete script.result[DESKTOP_LAUNCH_FIELD];
+      if (!this.desktopLauncher || typeof this.desktopLauncher.execute !== "function"
+        || typeof script.result.message !== "string" || !script.result.message.trim()) {
+        throw new RuntimeError(
+          "AFTER_EFFECTS_LAUNCH_INVALID",
+          "Runtime returned an After Effects launch plan without a valid host launcher",
+          { details: { stage: "desktop-launch" } }
+        );
+      }
+      let desktop;
+      try {
+        desktop = await this.desktopLauncher.execute(plan, {
+          configuredExecutable: request.config.aePath
+        });
+      } catch (error) {
+        const controlled = ["AFTER_EFFECTS_LAUNCH_INVALID", "AFTER_EFFECTS_LAUNCH_FAILED"]
+          .includes(error?.code);
+        const code = controlled ? error.code : "AFTER_EFFECTS_LAUNCH_FAILED";
+        throw new RuntimeError(
+          code,
+          controlled && typeof error?.message === "string"
+            ? error.message
+            : "After Effects could not be launched",
+          {
+            details: {
+              stage: "desktop-launch",
+              ...(typeof error?.details?.causeCode === "string"
+                ? { causeCode: error.details.causeCode }
+                : !controlled && typeof error?.code === "string" ? { causeCode: error.code } : {})
+            }
+          }
+        );
+      }
+      if (!desktop || !["running", "cold"].includes(desktop.mode)) {
+        throw new RuntimeError("AFTER_EFFECTS_LAUNCH_FAILED", "After Effects launcher returned an invalid result", {
+          details: { stage: "desktop-launch" }
+        });
+      }
+      script.logs.push({
+        level: "info",
+        message: desktop.mode === "running" ? "Sending..." : "Starting AE..."
+      });
+      script.logs.push({ level: "info", message: `✅ ${script.result.message}` });
+    }
+    return script;
   }
 }
 

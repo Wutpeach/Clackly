@@ -139,3 +139,93 @@ test("Runtime Manager rejects malformed requests and script envelopes", async ()
   });
   await assert.rejects(malformed.manager.execute(request), (error) => error.code === "RUNTIME_PROTOCOL_INVALID");
 });
+
+test("Runtime Manager executes one internal desktop plan and strips it from public output", async () => {
+  const plan = {
+    type: "after-effects-jsx",
+    executable: "C:/AfterFX.exe",
+    args: ["-r", "$CLACKLY_JSX"],
+    jsx: "app.project.items.addComp('test', 1, 1, 1, 1, 24);"
+  };
+  const desktopCalls = [];
+  const { manager } = fixture({
+    desktopLauncher: {
+      async execute(value, context) {
+        desktopCalls.push([value, context]);
+        return { mode: "running" };
+      }
+    },
+    launcher: {
+      async execute() {
+        return {
+          response: {
+            ok: true,
+            runtime: { version: "3.13.14", architecture: "64bit", executable: path.resolve("C:/runtime/python.exe") },
+            script: {
+              ok: true,
+              result: {
+                ok: true,
+                code: "exported",
+                mode: "auto",
+                clip_count: 1,
+                message: "Sent 1 Clips",
+                __clacklyDesktopLaunch: plan
+              },
+              logs: [{ level: "info", message: "Analyzing..." }]
+            }
+          }
+        };
+      }
+    }
+  });
+
+  const result = await manager.execute(request);
+
+  assert.equal(desktopCalls.length, 1);
+  assert.deepEqual(desktopCalls[0], [plan, { configuredExecutable: request.config.aePath }]);
+  assert.equal(Object.hasOwn(result.result, "__clacklyDesktopLaunch"), false);
+  assert.deepEqual(result.logs.map(({ message }) => message), [
+    "Analyzing...", "Sending...", "✅ Sent 1 Clips"
+  ]);
+});
+
+test("Runtime Manager maps desktop launch failures without leaking the internal plan", async () => {
+  const { manager } = fixture({
+    desktopLauncher: {
+      async execute() {
+        throw Object.assign(new Error("After Effects could not be started"), {
+          code: "EACCES"
+        });
+      }
+    },
+    launcher: {
+      async execute() {
+        return {
+          response: {
+            ok: true,
+            script: {
+              ok: true,
+              result: {
+                message: "Sent 1 Clips",
+                __clacklyDesktopLaunch: {
+                  type: "after-effects-jsx",
+                  executable: "C:/AfterFX.exe",
+                  args: ["-r", "$CLACKLY_JSX"],
+                  jsx: "private jsx"
+                }
+              },
+              logs: []
+            }
+          }
+        };
+      }
+    }
+  });
+
+  await assert.rejects(manager.execute(request), (error) => (
+    error.code === "AFTER_EFFECTS_LAUNCH_FAILED"
+      && error.details.stage === "desktop-launch"
+      && error.details.causeCode === "EACCES"
+      && !JSON.stringify(error).includes("private jsx")
+  ));
+});

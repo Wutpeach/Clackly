@@ -14,7 +14,6 @@
 
 import os
 import json
-import subprocess
 import platform
 import time
 import shutil
@@ -56,39 +55,6 @@ def load_config():
                 return {**default_conf, **json.load(f)}
         except: pass
     return default_conf
-
-def get_running_ae_path():
-    system = platform.system()
-    if system == "Windows":
-        try:
-            ps_cmd = ["powershell", "-NoProfile", "-Command",
-                      "(Get-Process AfterFX -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path -First 1)"]
-            si = subprocess.STARTUPINFO()
-            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            output = subprocess.check_output(ps_cmd, startupinfo=si).decode(errors='ignore').strip()
-            if output and os.path.exists(output): return output
-        except: pass
-        try:
-            cmd = 'wmic process where "name=\'AfterFX.exe\'" get ExecutablePath'
-            si = subprocess.STARTUPINFO()
-            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            output = subprocess.check_output(cmd, shell=True, startupinfo=si).decode('utf-8', errors='ignore')
-            lines = [line.strip() for line in output.splitlines() if line.strip()]
-            if len(lines) > 1 and os.path.exists(lines[1]): return lines[1]
-        except: pass
-    elif system == "Darwin":
-        try:
-            cmd = [
-                "osascript", "-e",
-                'tell application "System Events" to POSIX path of (application file of (first process whose name contains "After Effects"))'
-            ]
-            output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode('utf-8', errors='ignore').strip()
-            if output:
-                exe_path = os.path.join(output, "Contents", "MacOS", "After Effects")
-                if os.path.exists(exe_path):
-                    return exe_path
-        except: pass
-    return None
 
 def timecode_to_frames(tc_str, fps):
     try:
@@ -568,10 +534,8 @@ def process_and_send(resolve, project, ae_path, status_callback, config=None, re
     otio_exact_map = {}
     otio_fallback_list = []
 
-    # [FIX] 提前定义路径，防止 Audio 模式下 jsx_path 未定义
     temp_dir = tempfile.gettempdir()
     timestamp = int(time.time())
-    jsx_path = os.path.join(temp_dir, f"ToAE_{timestamp}.jsx")
 
     if content_type == "video":
         temp_otio_path = os.path.join(temp_dir, f"resolve_export_{timestamp}.otio")
@@ -1001,46 +965,17 @@ def process_and_send(resolve, project, ae_path, status_callback, config=None, re
                     jsx.append(f"}} catch(e) {{}}")
 
     jsx.append(f"app.endUndoGroup();")
-    # JSX 自删除：AE 执行完后自己删除临时文件（调试模式下保留）
+    # Host Electron writes this returned JSX into its desktop temp directory.
     if not config.get('debug_mode', False):
         jsx.append(f"var jsxFile = new File($.fileName);")
         jsx.append(f"if (jsxFile.exists) jsxFile.remove();")
 
-    with open(jsx_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(jsx))
-
-    # 检测 AE 是否已在运行
-    ae_running = bool(get_running_ae_path())
-
-    try:
-        if ae_running:
-            # AE 已运行：直接发送脚本
-            status_callback("Sending...")
-            subprocess.Popen([ae_path, "-r", jsx_path])
-        else:
-            # AE 未运行：写入引导脚本到 Startup，延迟执行实际 JSX
-            if platform.system() == "Darwin":
-                startup_dir = os.path.join(os.path.dirname(os.path.dirname(ae_path)), "Scripts", "Startup")
-            else:
-                startup_dir = os.path.join(os.path.dirname(ae_path), "Scripts", "Startup")
-            os.makedirs(startup_dir, exist_ok=True)
-            bootstrap_path = os.path.join(startup_dir, "_resolve2ae_bootstrap.jsx")
-            jsx_path_fwd = jsx_path.replace("\\", "/")
-            bootstrap_code = (
-                '(function(){\n'
-                '  app.scheduleTask(\'var f = new File("' + jsx_path_fwd + '"); if(f.exists) $.evalFile(f);\', 3000, false);\n'
-                '  var me = new File($.fileName); if(me.exists) me.remove();\n'
-                '})();\n'
-            )
-            with open(bootstrap_path, "w", encoding="utf-8") as bf:
-                bf.write(bootstrap_code)
-            subprocess.Popen([ae_path])
-            status_callback("Starting AE...")
-
-        message = f"Sent {len(target_clips)} Clips"
-        status_callback(f"✅ {message}")
-        return _terminal_result(True, "exported", requested_mode, len(target_clips), message)
-    except Exception as e:
-        status_callback("❌ Error")
-        print(e)
-        return _terminal_result(False, "send-error", requested_mode, len(target_clips), str(e))
+    message = f"Sent {len(target_clips)} Clips"
+    result = _terminal_result(True, "exported", requested_mode, len(target_clips), message)
+    result["__clacklyDesktopLaunch"] = {
+        "type": "after-effects-jsx",
+        "executable": ae_path,
+        "args": ["-r", "$CLACKLY_JSX"],
+        "jsx": "\n".join(jsx),
+    }
+    return result

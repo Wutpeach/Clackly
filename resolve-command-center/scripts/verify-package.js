@@ -3,9 +3,10 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { RuntimeLauncher } = require("../script-runtime/runtime/launcher");
+const { resolveRuntimeRoot } = require("../script-runtime/runtime/paths");
 
 const appRoot = path.resolve(__dirname, "..");
-const packageRoot = path.join(appRoot, "release", "win-unpacked");
+const packageRoot = path.resolve(process.argv[2] || path.join(appRoot, "release", "win-unpacked"));
 const runtimeRoot = path.join(packageRoot, "resources", "runtimes");
 const lock = JSON.parse(fs.readFileSync(path.join(runtimeRoot, "python-win32-x64.lock.json"), "utf8"));
 const manifest = JSON.parse(fs.readFileSync(path.join(runtimeRoot, "manifest.json"), "utf8"));
@@ -68,6 +69,9 @@ assert.deepEqual(findPython(packageRoot).map((item) => fs.realpathSync(item)), [
 assert.equal(fs.existsSync(path.join(packageRoot, "resources", "app.asar")), false);
 assert(fs.statSync(path.join(packageRoot, "resources", "app", "manifest.xml")).isFile());
 assert(fs.statSync(path.join(packageRoot, "resources", "app", "workflow-plugin", "WorkflowIntegration.node")).isFile());
+assert.equal(resolveRuntimeRoot({
+  appRoot: path.join(packageRoot, "resources", "app")
+}), runtimeRoot, "Resolve-owned Electron must find the packaged sibling Runtime");
 
 (async () => {
   const launcher = new RuntimeLauncher({
