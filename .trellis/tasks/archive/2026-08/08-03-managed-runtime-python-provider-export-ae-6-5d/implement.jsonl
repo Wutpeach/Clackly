@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Implement the existing Script Runtime, Managed Resolver, isolated Launcher, Resolve Probe/cache, host composition, error propagation, and no-fallback contracts."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse the existing Registry, Resolver, Launcher, Bootstrap, ConfigStorage, Script Context, and protocols; avoid duplicate process/cache/package abstractions."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace Capability id, host version, Runtime request, Probe diagnostics, script envelope, packaged paths, and release metadata across every boundary."}
+{"file":".trellis/tasks/08-03-managed-runtime-python-provider-export-ae-6-5d/research/current-state.md","reason":"Use the confirmed current chain, prior 6.5A-6.5C contracts, packaging gap, official 3.13.14 asset/hash, and release qualification branch."}

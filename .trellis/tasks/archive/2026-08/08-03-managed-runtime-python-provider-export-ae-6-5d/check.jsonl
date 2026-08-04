@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify Runtime ownership, provider/context compatibility, stable errors, live Resolve provenance, isolation, and production host compliance."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reject duplicated process, Probe, cache, version selection, path containment, and protocol logic."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check lossless data/error flow from Feature through packaged Runtime and the complete build-lock-to-artifact contract."}
+{"file":".trellis/tasks/08-03-managed-runtime-python-provider-export-ae-6-5d/research/current-state.md","reason":"Check official asset integrity, packaging assumptions, current-machine compatibility evidence, and the mandatory 3.13.14/legacy fallback gates."}
