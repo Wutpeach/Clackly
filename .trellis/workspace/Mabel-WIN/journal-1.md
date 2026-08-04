@@ -446,3 +446,26 @@ Integrated CPython 3.13.14 managed runtime, packaged Workflow Integration instal
 ### Status
 
 [OK] **Completed**
+
+
+## Session 21: Archive Superseded Resolve2AE Crash Task
+
+**Date**: 2026-08-04
+**Task**: Archive Superseded Resolve2AE Crash Task
+**Branch**: `main`
+
+### Summary
+
+Recorded that the original Resolve2AE native crash was resolved by the managed-runtime integration, then archived the superseded planning task.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `206fdc1` | (see git log) |
+| `5763ae0` | (see git log) |
+| `a96e31c` | (see git log) |
+
+### Status
+
+[OK] **Completed**
