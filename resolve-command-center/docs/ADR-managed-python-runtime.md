@@ -32,8 +32,10 @@ and installer signing are deferred. Add them only with a separate measured requi
 
 ## Current risk and rollback
 
-The packaged Workflow Integration and CPython 3.13.14 Probe have live evidence, but the
-host-owned After Effects launch fix still needs a packaged hostile-environment retest.
-The candidate therefore remains unreleased. Roll back the complete application build;
-never mix a prior application with a different unpacked Runtime or re-enable system-Python
-fallback.
+The packaged Workflow Integration, CPython 3.13.14 Probe, and post-fix warm/cold After
+Effects exports have live evidence without recurrence of the Preferences/CEP errors.
+Hostile Python-parent package verification proves Runtime selection/isolation, while the
+host-owned launch contract and real warm/cold sends independently prove desktop behavior.
+The user approved this composed evidence as the final release gate, so CPython 3.13.14 is
+current. Roll back the complete application build; never mix a prior application with a
+different unpacked Runtime or re-enable system-Python fallback.

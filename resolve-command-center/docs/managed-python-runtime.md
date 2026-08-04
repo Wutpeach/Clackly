@@ -23,7 +23,7 @@ internal declarative plan, the host validates the configured executable, fixed a
 bounded JSX, and temp containment, then launches once with the normal Electron desktop
 environment and strips the plan before `PythonProvider` sees the public result.
 
-## Locked candidate and build
+## Locked current Runtime and build
 
 `resources/runtimes/python-win32-x64.lock.json` pins the official CPython 3.13.14
 Windows x64 Embeddable Package, SHA-256, Sigstore metadata, upstream SPDX, and the
@@ -66,8 +66,10 @@ Failures and native crashes clear reusable state and are never retried automatic
 
 ## Release status
 
-CPython 3.13.14 remains `candidate`. Automated runtime identity, staging, package
-layout, isolation, and packaged execution pass. The pre-fix live Resolve Probe/cache,
-Workflow Integration launch, and export evidence do not replace the required post-fix
-live Export-to-AE matrix. Do not change the lock/Manifest to `current` until that
-complete matrix passes.
+CPython 3.13.14 is `current` for Windows x64 with Resolve 20.3.2.9. Automated runtime
+identity, staging, package layout, isolation, hostile Python-environment verification,
+Probe miss/hit, and Workflow Integration loading passed. The host-owned launch boundary
+proves AE receives Electron's normal desktop environment, and the user confirmed
+post-fix warm and cold exports without the prior Preferences/CEP errors. Per the final
+release decision, those independent proofs make another hostile-parent GUI send
+redundant.

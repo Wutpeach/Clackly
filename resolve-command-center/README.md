@@ -86,7 +86,9 @@ async def execute(context):
 
 `context` exposes exactly `command_id`, `resolve`, `config`, `logger`, `project`, and `timeline`. `command_id` is read-only and is the stable id of the Command being executed. The logger supports `debug`, `info`, `warning`, and `error`. Resolve objects are loaded lazily through `resolve/adapter.py`; configuration is a plain snapshot scoped to the Capability. Script stdout, stderr, and logger calls are captured and replayed without entering the JSON result channel.
 
-The script runtime invokes the `python` executable from the host `PATH`. `RESOLVE_COMMAND_CENTER_PYTHON_CMD` remains specific to the Utility bridge because it is a full command and may include arguments.
+Python Features use the packaged, Probe-gated Managed Runtime and never select an
+interpreter through host `PATH`. `RESOLVE_COMMAND_CENTER_PYTHON_CMD` remains specific
+to the Utility bridge because it is a full command and may include arguments.
 
 Scripts are trusted local Feature code, not sandboxed third-party code. Each execution starts one Python subprocess. Sandboxing, permissions, process pooling, cancellation, timeouts, streaming, package environments, interpreter discovery UI, and Lua/Node/shell runtimes are deferred until a concrete need justifies them.
 
@@ -204,8 +206,8 @@ machine-wide Workflow Integration Plugins directory and carries the verified ext
 Runtime with it. Restart Resolve after installation; `%APPDATA%` is not a Workflow
 Integration plugin scan root on Windows.
 
-The Runtime candidate is intentionally not a released compatibility claim until the
-live Resolve/After Effects matrix passes. See [Managed Python Runtime](docs/managed-python-runtime.md),
+Official CPython 3.13.14 x64 is the current Managed Runtime for the qualified Resolve
+20.3.2 Windows tuple. See [Managed Python Runtime](docs/managed-python-runtime.md),
 [compatibility matrix](docs/resolve-python-matrix.md), and
 [Runtime troubleshooting](docs/resolve-python-runtime-troubleshooting.md).
 Managed Python generates the export JSX under isolation; only the Electron host launches

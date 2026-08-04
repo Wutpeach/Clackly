@@ -17,7 +17,7 @@
       },
       "executable": "python/cpython-3.13.14/win32-x64/python.exe",
       "verification": "machine-verified",
-      "releaseStatus": "candidate"
+      "releaseStatus": "current"
     }
   ]
 }

@@ -4,7 +4,7 @@
   "version": "3.13.14",
   "platform": "win32",
   "architecture": "x64",
-  "releaseStatus": "candidate",
+  "releaseStatus": "current",
   "asset": {
     "fileName": "python-3.13.14-embed-amd64.zip",
     "url": "https://www.python.org/ftp/python/3.13.14/python-3.13.14-embed-amd64.zip",

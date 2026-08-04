@@ -380,8 +380,10 @@ test("Resolver accepts a contained payload when the runtime root is a symlink", 
   assert.equal(resolver.resolve(request()).executable, executable);
 });
 
-test("the committed candidate profile is selected but reports its deliberately absent payload", () => {
+test("the committed current profile is selected but reports its deliberately absent source payload", () => {
   const registry = loadRuntimeRegistry();
+  const profileId = "python-cpython-3.13.14-resolve-20.3.2-win32-x64";
+  assert.equal(registry.get(profileId).releaseStatus, "current");
   const resolver = new RuntimeResolver({ registry });
   const error = expectRuntimeError(
     () => resolver.resolve(request()),
@@ -390,7 +392,7 @@ test("the committed candidate profile is selected but reports its deliberately a
   );
   assert.equal(
     error.details.profileId,
-    "python-cpython-3.13.14-resolve-20.3.2-win32-x64"
+    profileId
   );
 });
 
