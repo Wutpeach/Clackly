@@ -18,6 +18,9 @@ only new packaging dependency.
 - Override is explicit, executable-only, authoritative, Probe-gated, and visibly unverified.
 - Resolve native crashes are contained in short-lived workers; no script or backend retry
   can duplicate an export.
+- The Runtime worker keeps its four-variable isolation allowlist and cannot launch desktop
+  applications. A host-owned launcher validates the internal JSX plan and starts After
+  Effects once with Electron's normal desktop environment.
 - Artifact size, CPython security maintenance, license/SBOM inventory, and live
   Resolve/After Effects release qualification become product responsibilities.
 
@@ -29,8 +32,8 @@ and installer signing are deferred. Add them only with a separate measured requi
 
 ## Current risk and rollback
 
-Resolve may reject the packaged directory/Workflow Integration lifecycle, and CPython
-3.13.14 native bridge compatibility is unknown until the full live matrix passes. The
-candidate therefore remains unreleased. Roll back the complete application build; never
-mix a prior application with a different unpacked Runtime or re-enable system-Python fallback.
-
+The packaged Workflow Integration and CPython 3.13.14 Probe have live evidence, but the
+host-owned After Effects launch fix still needs a packaged hostile-environment retest.
+The candidate therefore remains unreleased. Roll back the complete application build;
+never mix a prior application with a different unpacked Runtime or re-enable system-Python
+fallback.

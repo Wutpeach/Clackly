@@ -17,6 +17,8 @@
 | `RUNTIME_VERSION_MISMATCH` / `RUNTIME_ARCHITECTURE_UNSUPPORTED` | Worker identity differs from the selected profile or is not x64. | Reinstall the locked Runtime; never substitute another Python. |
 | `RUNTIME_NATIVE_BRIDGE_CRASH` | Resolve native bridge terminated only the worker. | Restart Resolve, rerun once, and retain bounded diagnostics. Clackly remains alive. |
 | `RUNTIME_NATIVE_CRASH` | Business execution terminated the isolated worker abnormally. | Retain diagnostics; do not retry an export automatically. |
+| `AFTER_EFFECTS_LAUNCH_INVALID` | The internal launch plan, configured executable, fixed arguments, or JSX boundary failed validation. | Verify `ae.export.aePath` and reinstall matching application/Runtime files; do not run the plan manually. |
+| `AFTER_EFFECTS_LAUNCH_FAILED` | The Electron host could not prepare or start After Effects once. | Check host desktop permissions and the configured AE installation; no automatic retry occurs. |
 | `RUNTIME_TIMEOUT` / `RUNTIME_OUTPUT_LIMIT` | Worker exceeded its process boundary. | Inspect bounded process diagnostics; do not retry an export automatically. |
 | `RUNTIME_PROTOCOL_EMPTY` / `RUNTIME_PROTOCOL_INVALID` | Bootstrap returned no envelope or an incompatible one. | Verify package integrity and matching Clackly sources. |
 | `RUNTIME_BOOTSTRAP_FAILED` / `BOOTSTRAP_REQUEST_INVALID` | Bootstrap rejected the operation or its input. | Inspect the nested Bootstrap error and verify matching application/Runtime files. |
@@ -35,6 +37,7 @@ Build and package failures are also fail-closed:
 | `Runtime staging output must stay under` / `must not traverse a link` | The requested recursive-replacement target is unsafe. | Use the default `build/runtime-staging/runtimes` directory without junctions. |
 | `npm application SBOM generation failed` | The committed npm lock could not produce the required application SBOM. | Repair the npm/lockfile error before packaging. |
 | `package:verify` assertion failure | Runtime inventory, metadata, licenses, source staging, or packaged execution differs. | Discard the artifact, restage, repackage, and rerun verification. |
+| Clackly is absent from `Workspace > Workflow Integrations` | Resolve did not scan a valid plugin module at startup. | Run `npm run workflow:install:package`, confirm `manifest.xml` under `%PROGRAMDATA%\Blackmagic Design\DaVinci Resolve\Support\Workflow Integration Plugins\com.wutpeach.clackly`, then restart Resolve. Do not install under `%APPDATA%`. |
 
 Probe cache deletion is safe: remove `%APPDATA%\Clackly\runtime-probe.json` while
 Clackly is stopped, then the next request will Probe again. Never fix Runtime failures by

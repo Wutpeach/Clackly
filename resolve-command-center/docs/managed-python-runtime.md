@@ -10,13 +10,18 @@ aliases, or `RESOLVE_COMMAND_CENTER_PYTHON_CMD`.
 Feature -> Capability -> ScriptCapabilityProvider -> ScriptExecutor
   -> PythonProvider -> RuntimeManager -> RuntimeResolver
   -> RuntimeProbe/cache -> RuntimeLauncher -> Bootstrap script-execute
-  -> ScriptContext -> Resolve Script API -> After Effects
+  -> ScriptContext -> Resolve Script API -> internal JSX launch plan
+  -> host AfterEffectsLauncher -> After Effects
 ```
 
 `RuntimeManager` alone owns resolution, the required Resolve Probe, and one isolated
 business-script launch. `PythonProvider` validates the trusted relative entry, adapts
 the request/result, replays existing log records, and preserves Runtime error fields.
 The six public `ScriptContext` attributes and script success/error envelopes are unchanged.
+The isolated Python worker never starts After Effects: `RuntimeManager` consumes its
+internal declarative plan, the host validates the configured executable, fixed arguments,
+bounded JSX, and temp containment, then launches once with the normal Electron desktop
+environment and strips the plan before `PythonProvider` sees the public result.
 
 ## Locked candidate and build
 
@@ -29,6 +34,7 @@ npm ci
 npm run runtime:stage
 npm run package:win
 npm run package:verify
+npm run workflow:install:package
 ```
 
 Staging downloads only locked HTTPS URLs (or reuses exact cache filenames), verifies
@@ -36,9 +42,14 @@ every SHA-256 before extraction, writes a no-`site` `python313._pth`, copies pro
 Python sources, and generates `runtime.json` plus an application SPDX SBOM. Packaging
 places that tree at `process.resourcesPath/runtimes`; `package:verify` inventories it
 and executes the packaged interpreter with hostile Python/Conda environment variables.
+The verifier accepts an optional unpacked package root, for example
+`npm run package:verify -- build/package-check/win-unpacked`, so a fresh artifact can
+be checked without replacing an installed or in-use `release` tree.
 The unpacked Workflow Integration files are under `release/win-unpacked/resources/app`
 and the external Runtime is their sibling under `resources/runtimes`. A real Resolve
-launch from that layout remains a mandatory release gate.
+launch installs that app tree beneath `%PROGRAMDATA%\Blackmagic Design\DaVinci Resolve\Support\Workflow Integration Plugins`; Resolve's Electron then locates the exact
+packaged sibling Runtime (or the installed copy) without consulting `PATH`. A live launch
+from that layout remains a mandatory release gate.
 
 ## Selection and Override
 
@@ -56,6 +67,7 @@ Failures and native crashes clear reusable state and are never retried automatic
 ## Release status
 
 CPython 3.13.14 remains `candidate`. Automated runtime identity, staging, package
-layout, isolation, and packaged execution pass, but the required live Resolve Probe,
-cache hit, Workflow Integration launch, and real Export-to-AE send have not all passed.
-Do not change the lock/Manifest to `current` until the complete matrix passes.
+layout, isolation, and packaged execution pass. The pre-fix live Resolve Probe/cache,
+Workflow Integration launch, and export evidence do not replace the required post-fix
+live Export-to-AE matrix. Do not change the lock/Manifest to `current` until that
+complete matrix passes.

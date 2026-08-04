@@ -196,12 +196,21 @@ Build and verify the Windows package with its hash-locked Managed Python Runtime
 npm run runtime:stage
 npm run package:win
 npm run package:verify
+npm run workflow:install:package
 ```
+
+The packaged install copies `release/win-unpacked/resources/app` to Resolve's
+machine-wide Workflow Integration Plugins directory and carries the verified external
+Runtime with it. Restart Resolve after installation; `%APPDATA%` is not a Workflow
+Integration plugin scan root on Windows.
 
 The Runtime candidate is intentionally not a released compatibility claim until the
 live Resolve/After Effects matrix passes. See [Managed Python Runtime](docs/managed-python-runtime.md),
 [compatibility matrix](docs/resolve-python-matrix.md), and
 [Runtime troubleshooting](docs/resolve-python-runtime-troubleshooting.md).
+Managed Python generates the export JSX under isolation; only the Electron host launches
+After Effects with the normal desktop environment, and internal launch metadata is never
+returned through the public Feature result.
 
 The Electron palette starts hidden. Press `Ctrl+Space` on Windows/Linux or `Cmd+Space` on macOS to show it. The default bridge endpoint is `http://127.0.0.1:49371`; override it with `RESOLVE_COMMAND_CENTER_BRIDGE_URL` or set `RESOLVE_COMMAND_CENTER_PORT`.
 

@@ -874,6 +874,7 @@ const help = getInteractionHelp(command, commands, bindings);
 ### 2. Signatures
 
 - Manager: `RuntimeManager.execute({ runtime, capabilityId, entry, commandId, config }) -> ScriptEnvelope`.
+- Internal desktop plan: `{ type: "after-effects-jsx", executable, args: ["-r", "$CLACKLY_JSX"], jsx }`; `AfterEffectsLauncher.execute(plan, { configuredExecutable }) -> { mode: "running" | "cold" }`.
 - Lock: `{ runtimeVersion, platform, architecture, asset, license, sigstore, spdx, releaseStatus }`, with every remote input carrying an HTTPS URL and SHA-256.
 - Packaged metadata: `{ id, runtimeVersion, architecture, executable, assetSha256, releaseStatus, stagedPaths, provenance }` in `runtime.json`.
 
@@ -884,6 +885,8 @@ const help = getInteractionHelp(command, commands, bindings);
 - Managed selection and executable-only Override are authoritative and never search `PATH`, Conda, uv, virtual environments, Store aliases, or the legacy bridge command.
 - Resolve-dependent scripts execute only after a successful success-only cached Probe. Fingerprint changes, failures, and native crashes require a new Probe; business execution is never retried.
 - Bootstrap `script-execute` validates a relative entry under its canonical staged root and returns the existing nested script envelope. `ScriptContext`, log records, script errors, and JSON results stay compatible.
+- An isolated Python Feature may return the reserved internal After Effects JSX launch plan, but it must not inspect desktop process state or start After Effects. `RuntimeManager` delegates that plan once to the host-injected launcher and strips it before the Capability-facing result.
+- The host launcher revalidates `ae.export.aePath`, requires the exact fixed `-r` JSX argument contract, bounds JSX, creates the script inside the canonical host temp root, and starts After Effects with `shell: false` plus the normal host environment. It retains the running/cold bootstrap behavior and never retries.
 - Windows staging verifies the committed lock before extraction, disables ambient `site`, copies production Python sources, and emits Runtime/license/Sigstore/SPDX/application-SBOM inventory.
 - Electron packages the Runtime outside asar at `process.resourcesPath/runtimes`.
 
@@ -893,18 +896,21 @@ const help = getInteractionHelp(command, commands, bindings);
 - Missing payload or invalid authoritative Override -> existing typed Resolver failure without Manifest or PATH fallback.
 - Probe failure/native crash -> typed Probe error; no business launch, reusable failure cache, or retry.
 - Invalid script request/envelope -> `RUNTIME_REQUEST_INVALID` / `RUNTIME_PROTOCOL_INVALID`.
+- Invalid desktop plan/path/arguments/JSX -> `AFTER_EFFECTS_LAUNCH_INVALID`; host preparation or spawn failure -> `AFTER_EFFECTS_LAUNCH_FAILED`. Neither retries or exposes internal JSX in diagnostics.
 - Malformed lock, missing asset, hash mismatch, unsafe staging target, incomplete payload, SBOM failure, or artifact mismatch -> build/package failure before release.
 - `releaseStatus` remains `candidate` until packaged identity, live Probe miss/hit, Workflow Integration launch, and real Export-to-AE send all pass; patch-family inference is forbidden.
 
 ### 5. Good/Base/Bad Cases
 
 - Good: a hostile parent Python environment still executes the single locked packaged interpreter outside asar.
+- Good: Python returns a bounded JSX plan; the host validates it against `ae.export.aePath`, launches once with the desktop environment, and callers receive only the existing result.
 - Base: automated package checks pass while live Resolve is absent; retain `candidate` and report the live gate as blocked.
-- Bad: promote a CPython patch release from version-family assumptions, retry another profile, or use system Python after any managed failure.
+- Bad: start After Effects from the isolated Python worker, copy desktop variables into the Runtime environment, promote from patch-family assumptions, or retry after launch failure.
 
 ### 6. Tests Required
 
 - Assert Manager order is Resolve -> Probe/cache -> one execution launch and preserves ScriptContext/log/error/result contracts.
+- Assert Python never starts After Effects, the host launcher validates and spawns exactly once with the host environment, and internal launch metadata is stripped before Provider output.
 - Assert malformed Override, host context, lock, hashes, staging paths, payloads, and envelopes fail closed.
 - Stage/package the locked Runtime, inventory exactly one interpreter plus notices/SBOM, and execute it under hostile Python environment variables.
 - Record separate live evidence for Probe miss/hit, Workflow Integration launch, and the real Export-to-AE send before promotion.
@@ -915,12 +921,14 @@ const help = getInteractionHelp(command, commands, bindings);
 
 ```javascript
 spawn("python", [entry]); // PATH-selected and unprobed
+spawn(aePath, ["-r", jsxPath]); // inherits the isolated Runtime environment
 ```
 
 #### Correct
 
 ```javascript
 await runtimeManager.execute({ runtime: "python", capabilityId, entry, commandId, config });
+await afterEffectsLauncher.execute(plan, { configuredExecutable: config.aePath });
 ```
 
 ---
