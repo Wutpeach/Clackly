@@ -208,7 +208,7 @@ await scriptExecutor.execute(metadata.executor, scriptContext);
 ### 2. Signatures
 
 - Manifest envelope: `{ schemaVersion: 1, profiles: RuntimeProfile[] }` in `resources/runtimes/manifest.json`.
-- Runtime profile: `{ id, runtime, implementation, runtimeVersion, platform, architecture, capabilities, host: { application, versionPrefix }, executable, verification: "machine-verified" }`.
+- Runtime profile: `{ id, runtime, implementation, runtimeVersion, platform, architecture, capabilities, host: { application, versionPrefix }, executable, verification: "machine-verified", releaseStatus: "candidate" | "current" | "legacy-pinned" }`.
 - Loader: `loadRuntimeRegistry({ runtimeRoot?, fileSystem? }?) -> RuntimeRegistry`.
 - Registry: `createRuntimeRegistry({ schemaVersion?, profiles, runtimeRoot }) -> { runtimeRoot, register(profile), get(id), getAll() }`.
 - Resolver: `new RuntimeResolver({ registry, runtimeRoot?, fileSystem? }).resolve({ runtime, platform, architecture, capabilityId, host: { application, version }, overrideExecutable? })`.
@@ -684,7 +684,7 @@ const handlers = {
 - Missing Resolve project or timeline -> HTTP 400 with an error from the bridge.
 - Unexpected server failure -> HTTP 500 with an error.
 - Invalid port env value -> startup/server raises a clear runtime error.
-- Missing Resolve scripting env plus failed Windows auto-detection -> bridge `/health` may succeed, but Resolve commands can fail with a clear scripting API error; startup logs must show missing `RESOLVE_SCRIPT_API`, `RESOLVE_SCRIPT_LIB`, and `PYTHONPATH` sources.
+- Missing Resolve scripting env plus failed Windows auto-detection -> bridge `/health` returns HTTP 503 because it cannot provide the required live Resolve version; startup logs must show missing `RESOLVE_SCRIPT_API`, `RESOLVE_SCRIPT_LIB`, and `PYTHONPATH` sources.
 
 ### 5. Good/Base/Bad Cases
 
@@ -861,6 +861,66 @@ const help = command.id === "timeline.addMarker"
 ```javascript
 const help = getInteractionHelp(command, commands, bindings);
 // Bindings own triggers; action Command Metadata owns descriptions.
+```
+
+---
+
+## Scenario: Managed Python Runtime Distribution
+
+### 1. Scope / Trigger
+
+- Trigger: packaging a managed Python payload or routing a production Python Capability through it.
+
+### 2. Signatures
+
+- Manager: `RuntimeManager.execute({ runtime, capabilityId, entry, commandId, config }) -> ScriptEnvelope`.
+- Lock: `{ runtimeVersion, platform, architecture, asset, license, sigstore, spdx, releaseStatus }`, with every remote input carrying an HTTPS URL and SHA-256.
+- Packaged metadata: `{ id, runtimeVersion, architecture, executable, assetSha256, releaseStatus, stagedPaths, provenance }` in `runtime.json`.
+
+### 3. Contracts
+
+- Production Python Features route through `PythonProvider -> RuntimeManager -> RuntimeResolver -> RuntimeProbe/cache -> RuntimeLauncher`; only `RuntimeLauncher` starts the process.
+- Hosts supply a canonical live Resolve version. Feature, Capability, Provider, and Manifest code never invent one.
+- Managed selection and executable-only Override are authoritative and never search `PATH`, Conda, uv, virtual environments, Store aliases, or the legacy bridge command.
+- Resolve-dependent scripts execute only after a successful success-only cached Probe. Fingerprint changes, failures, and native crashes require a new Probe; business execution is never retried.
+- Bootstrap `script-execute` validates a relative entry under its canonical staged root and returns the existing nested script envelope. `ScriptContext`, log records, script errors, and JSON results stay compatible.
+- Windows staging verifies the committed lock before extraction, disables ambient `site`, copies production Python sources, and emits Runtime/license/Sigstore/SPDX/application-SBOM inventory.
+- Electron packages the Runtime outside asar at `process.resourcesPath/runtimes`.
+
+### 4. Validation & Error Matrix
+
+- Missing/malformed host version -> `RESOLVE_VERSION_UNVERIFIED` before Manifest selection or launch.
+- Missing payload or invalid authoritative Override -> existing typed Resolver failure without Manifest or PATH fallback.
+- Probe failure/native crash -> typed Probe error; no business launch, reusable failure cache, or retry.
+- Invalid script request/envelope -> `RUNTIME_REQUEST_INVALID` / `RUNTIME_PROTOCOL_INVALID`.
+- Malformed lock, missing asset, hash mismatch, unsafe staging target, incomplete payload, SBOM failure, or artifact mismatch -> build/package failure before release.
+- `releaseStatus` remains `candidate` until packaged identity, live Probe miss/hit, Workflow Integration launch, and real Export-to-AE send all pass; patch-family inference is forbidden.
+
+### 5. Good/Base/Bad Cases
+
+- Good: a hostile parent Python environment still executes the single locked packaged interpreter outside asar.
+- Base: automated package checks pass while live Resolve is absent; retain `candidate` and report the live gate as blocked.
+- Bad: promote a CPython patch release from version-family assumptions, retry another profile, or use system Python after any managed failure.
+
+### 6. Tests Required
+
+- Assert Manager order is Resolve -> Probe/cache -> one execution launch and preserves ScriptContext/log/error/result contracts.
+- Assert malformed Override, host context, lock, hashes, staging paths, payloads, and envelopes fail closed.
+- Stage/package the locked Runtime, inventory exactly one interpreter plus notices/SBOM, and execute it under hostile Python environment variables.
+- Record separate live evidence for Probe miss/hit, Workflow Integration launch, and the real Export-to-AE send before promotion.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+spawn("python", [entry]); // PATH-selected and unprobed
+```
+
+#### Correct
+
+```javascript
+await runtimeManager.execute({ runtime: "python", capabilityId, entry, commandId, config });
 ```
 
 ---
