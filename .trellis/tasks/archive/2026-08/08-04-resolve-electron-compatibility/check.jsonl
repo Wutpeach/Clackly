@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check Electron window, IPC, accessibility, build, and live visual requirements."}
+{"file":".trellis/tasks/08-04-resolve-electron-compatibility/research/electron-36-window-compatibility.md","reason":"Verify implementation against the qualified Electron 36 API surface and DWM trade-offs."}
