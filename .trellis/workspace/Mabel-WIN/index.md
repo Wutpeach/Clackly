@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 21
+- **Total Sessions**: 22
 - **Last Active**: 2026-08-04
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~471 | Active |
+| `journal-1.md` | ~492 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 22 | 2026-08-04 | Resolve Electron 36 compatibility | `a33fd2b` | `main` |
 | 21 | 2026-08-04 | Archive Superseded Resolve2AE Crash Task | `206fdc1`, `5763ae0`, `a96e31c` | `main` |
 | 20 | 2026-08-04 | Managed Python Runtime and Resolve-to-AE Integration | `206fdc1`, `ad77115`, `aa4d0e1`, `5763ae0`, `29647f6`, `a96e31c` | `main` |
 | 19 | 2026-08-03 | Resolve compatibility probe | `55c4baa` | `main` |

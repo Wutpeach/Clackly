@@ -469,3 +469,24 @@ Recorded that the original Resolve2AE native crash was resolved by the managed-r
 ### Status
 
 [OK] **Completed**
+
+
+## Session 22: Resolve Electron 36 compatibility
+
+**Date**: 2026-08-04
+**Task**: Resolve Electron 36 compatibility
+**Branch**: `main`
+
+### Summary
+
+Pinned Electron to Resolve 20.3.2.9's 36.3.2 host, made palette and Settings fixed frameless windows without Windows thick frames, added Settings close IPC/UI and scrolling constraints, and passed automated plus live Workflow Integration validation.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a33fd2b` | (see git log) |
+
+### Status
+
+[OK] **Completed**
