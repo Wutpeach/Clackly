@@ -414,6 +414,7 @@ test("settings window uses the complete Electron 36 fixed frameless contract", (
       height: 560,
       show: false,
       frame: false,
+      transparent: true,
       thickFrame: false,
       resizable: false,
       maximizable: false,
@@ -421,7 +422,7 @@ test("settings window uses the complete Electron 36 fixed frameless contract", (
       fullscreenable: false,
       alwaysOnTop: false,
       autoHideMenuBar: true,
-      backgroundColor: "#101216",
+      backgroundColor: "#00000000",
       title: "Clackly Settings",
       webPreferences: {
         preload: path.join(__dirname, "preload.js"),

@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Preserve the qualified Electron 36 Settings contract, singleton reuse, fixed geometry, custom controls, focus accessibility, and completed palette lifecycle."}
+{"file":".trellis/tasks/08-06-remove-settings-cyan-native-border/research/settings-border-ownership.md","reason":"Use the renderer-versus-DWM ownership gate, supported Windows API, rejected alternatives, and measured managed-runtime cost."}
+{"file":".trellis/tasks/archive/2026-08/08-04-resolve-electron-compatibility/research/electron-36-window-compatibility.md","reason":"Keep implementation inside the verified Resolve 20.3.2.9 and Electron 36.3.2 API boundary."}

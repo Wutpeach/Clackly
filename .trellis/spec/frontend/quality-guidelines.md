@@ -114,7 +114,8 @@ setMode("all-actions");
 - Feature identity and schema come from Capability Metadata. Help targets Commands through `command.capability === feature.id` and derives rows from normalized bindings plus action Command descriptions.
 - Standalone Electron and Workflow Integration register the same feature/config/picker channels through the shared IPC helper.
 - Resolve 20.3.2.9 with bundled Electron 36.3.2 is the qualified desktop host; local Electron must remain exactly pinned to that API baseline.
-- Settings is one fixed frameless `760x560` window. Both Settings and the `376x468` palette use the Electron 36-compatible Windows contract `frame: false`, `thickFrame: false`, `resizable: false`, `maximizable: false`, `minimizable: false`, and `fullscreenable: false`; do not use the Electron 37+ `accentColor` API.
+- Settings is one fixed frameless `760x560` window with the exact Electron 36 BrowserWindow options `show: false`, `frame: false`, `transparent: true`, `thickFrame: false`, `resizable: false`, `maximizable: false`, `minimizable: false`, `fullscreenable: false`, `alwaysOnTop: false`, `autoHideMenuBar: true`, `backgroundColor: "#00000000"`, and `title: "Clackly Settings"`. Its renderer `.settings-shell` must paint the opaque `--color-window` background across the full `100vw x 100vh` viewport so the transparent compositor surface never shows through. Do not use the Electron 37+ `accentColor` API, and do not add DWM/Python/timer/native-hook workarounds for the Resolve-host opaque frameless edge — the verified fix is the transparent surface plus the opaque renderer shell (live-validated 2026-08-06).
+- The `376x468` palette keeps its own separate surface contract — `transparent: true`, `backgroundColor: "#00000000"`, `skipTaskbar: true`, `alwaysOnTop: true`, and the completed conceal/reveal lifecycle. Settings must not adopt palette product behavior: it stays `alwaysOnTop: false` with normal taskbar behavior.
 - Repeated Settings opens reuse and focus the singleton; it does not hide on blur or become always-on-top. Its custom drag region and accessible close button replace native title-bar controls, and overflow scrolls inside the fixed workspace.
 - Launcher, Search, and All Actions remain in the frameless fixed `376x468` palette.
 - The existing renderer bundle selects Settings through a main-process-owned `?view=settings` marker. Renderer code never sends dimensions.
@@ -143,8 +144,9 @@ setMode("all-actions");
 - Assert catalog ordering, full defensive metadata, exact category filtering, and discovery after registration.
 - Assert all seven schema types map to their native controls, resolved explicit/fallback labels are immutable, and feature category grouping preserves registry order.
 - Assert feature/config/picker IPC semantics, picker cancellation, ConfigManager reset preservation, and complete-save validation.
-- Assert the exact Electron dependency/lockfile baseline, both complete BrowserWindow option contracts, Settings close IPC, fixed dimensions, and existing-window restore/focus behavior.
+- Assert the exact Electron dependency/lockfile baseline and both complete BrowserWindow option contracts — the Settings contract test asserts the exact options object including `transparent: true` and `backgroundColor: "#00000000"`, and the palette contract stays separate — plus Settings close IPC, fixed dimensions, and existing-window restore/focus behavior.
 - Run `npm test`, `npm run build`, and boundary searches for renderer Capability/Resolve/storage coupling.
+- After any Settings surface-contract change, package, install, and run the packaged Resolve manual A/B (first open, reopen, titlebar/sidebar/controls focus moves) — no cyan/blue edge and no first-open/reopen flicker; standalone Electron cannot reproduce Resolve-host opaque frameless behavior.
 
 ### 7. Wrong vs Correct
 
@@ -161,6 +163,25 @@ if (feature.id === "marker.add") {
 ```javascript
 const features = await window.resolveCommandCenter.listFeatures();
 return <SettingsRenderer schema={feature.configSchema} values={draft} />;
+```
+
+#### Wrong
+
+```javascript
+// DWM/Python/timer workaround for the Resolve-host Settings edge — failed live,
+// added complexity, forbidden for this known case.
+DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE, ...);
+```
+
+#### Correct
+
+```javascript
+// Transparent compositor surface + opaque renderer shell (verified live fix).
+new BrowserWindow({
+  frame: false,
+  transparent: true,
+  backgroundColor: "#00000000" // .settings-shell paints the opaque 100vw x 100vh UI
+});
 ```
 
 ---

@@ -95,6 +95,7 @@ function createSettingsWindow(BrowserWindowType = BrowserWindow) {
     height: SETTINGS_SIZE.height,
     show: false,
     frame: false,
+    transparent: true,
     thickFrame: false,
     resizable: false,
     maximizable: false,
@@ -102,7 +103,7 @@ function createSettingsWindow(BrowserWindowType = BrowserWindow) {
     fullscreenable: false,
     alwaysOnTop: false,
     autoHideMenuBar: true,
-    backgroundColor: "#101216",
+    backgroundColor: "#00000000",
     title: "Clackly Settings",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
