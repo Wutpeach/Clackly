@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Route the implementation through the project frontend/Electron specification layer."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Follow the shared Electron host, preload IPC, focus, fixed-window, and validation contracts while removing redundant mode resizing."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Search all callers and delete the duplicated mode/window transition path instead of adding a second lifecycle abstraction."}
+{"file":".trellis/tasks/08-06-stabilize-clackly-palette-invocation/research/current-window-lifecycle.md","reason":"Use the confirmed show/reset/focus/blur call chain and renderer-versus-DWM boundary evidence."}
