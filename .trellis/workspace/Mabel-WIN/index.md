@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 24
+- **Total Sessions**: 25
 - **Last Active**: 2026-08-06
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~534 | Active |
+| `journal-1.md` | ~555 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 25 | 2026-08-06 | Fix Resolve Settings cyan border | `20d67d2` | `main` |
 | 24 | 2026-08-06 | Fix repeat palette invocation flicker | `f5f9770` | `main` |
 | 23 | 2026-08-06 | Diagnose Resolve startup freeze | `d43a059` | `main` |
 | 22 | 2026-08-04 | Resolve Electron 36 compatibility | `a33fd2b` | `main` |

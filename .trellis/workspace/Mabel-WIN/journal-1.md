@@ -532,3 +532,24 @@ Preserved the transparent palette native surface across logical hide/show, remov
 ### Status
 
 [OK] **Completed**
+
+
+## Session 25: Fix Resolve Settings cyan border
+
+**Date**: 2026-08-06
+**Task**: Fix Resolve Settings cyan border
+**Branch**: `main`
+
+### Summary
+
+Replaced failed DWM suppression with a transparent Settings compositor surface backed by the existing opaque renderer shell; live Resolve validation confirmed no cyan border or flicker, and the verified contract was added to the frontend quality spec.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `20d67d2` | (see git log) |
+
+### Status
+
+[OK] **Completed**
