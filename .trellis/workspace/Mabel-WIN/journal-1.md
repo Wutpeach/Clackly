@@ -511,3 +511,24 @@ Proved with a strict no-plugin baseline that the post-project whole-GUI stall is
 ### Status
 
 [OK] **Completed**
+
+
+## Session 24: Fix repeat palette invocation flicker
+
+**Date**: 2026-08-06
+**Task**: Fix repeat palette invocation flicker
+**Branch**: `main`
+
+### Summary
+
+Preserved the transparent palette native surface across logical hide/show, removed redundant mode resizing and shell focus outline, added regression coverage, and validated ten repeat invocations in Resolve. Settings cyan native chrome remains a separate follow-up.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f5f9770` | (see git log) |
+
+### Status
+
+[OK] **Completed**
