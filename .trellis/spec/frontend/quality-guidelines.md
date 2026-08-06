@@ -23,7 +23,6 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
   - `window.resolveCommandCenter.executeCommand(commandId: string) -> Promise<object>`
   - `window.resolveCommandCenter.listInteractionBindings() -> Promise<BindingRecord[]>`
   - `window.resolveCommandCenter.hidePalette() -> void`
-  - `window.resolveCommandCenter.setPaletteMode(mode: "launcher" | "search" | "all-actions") -> void`
   - `window.resolveCommandCenter.onPaletteShown(callback: () -> void) -> () -> void`
 - Command shape:
   - `{ id: string, name: string, description: string, category: string, icon: string, keywords: string[], capability: string }`
@@ -35,8 +34,9 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Renderer execution sends only the selected `commandId`.
 - Renderer presentation contains registered Commands only. Browser preview returns an empty catalog, and pinned/recent state starts empty.
 - Command shortcut badges are absent until an authoritative presentation contract exists.
-- Renderer resizing sends a semantic palette mode, never arbitrary width/height values. Both standalone Electron and Workflow Integration route `palette:set-mode` through the shared window helper.
-- Launcher, Search, and All Actions all use the fixed `376x468` window footprint; mode changes replace content without occupying more of the Resolve workspace.
+- Renderer palette modes are content-only state: Launcher, Search, and All Actions share the fixed `376x468` window footprint, and mode changes never cross a renderer-to-main sizing IPC.
+- Palette construction owns the fixed footprint, initial centering, taskbar skipping, and the stable always-on-top policy; showing performs one visibility/focus transition plus a `palette:shown` notification, and hiding conceals the transparent window in place without destroying its native surface.
+- The programmatically focused non-interactive `.palette-shell` suppresses only its own default focus outline; interactive controls keep their `:focus-visible` indicators.
 - Electron hosts delegate command execution to the command engine, which resolves intent through an injected capability registry. External Electron registers a bridge-backed capability; Workflow Plugin registers a Resolve-backed capability. Renderer code still sends only command ids through preload IPC.
 - Functional UI icons use `lucide-react` with the shared optical size/stroke convention. Clackly logo and mark remain project-owned SVG assets rather than Lucide substitutions.
 - Clackly wordmark assets are deterministic vector geometry: use SVG paths/shapes only, never `<text>`, font-family declarations, or external font/image dependencies.
@@ -48,7 +48,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 
 - Unknown command id -> command engine rejects with a user-facing error.
 - Missing capability handler -> command engine rejects with a user-facing error.
-- Unknown palette mode -> shared window helper refuses the resize; the renderer cannot supply dimensions directly.
+- Unknown palette mode -> renderer state only; the shared window footprint never changes because modes are content-only.
 - Empty registered catalog -> Launcher and All Actions render truthful empty states; browser preview does not inject fixtures.
 - Bridge failure -> renderer keeps the palette open, shows the error, and refocuses search.
 - Successful command -> Electron hides the palette.
@@ -59,17 +59,18 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 
 - Good: Adding command intent metadata and registering its capability in each supported host.
 - Base: `marker` query matches `timeline.addMarker` via registry search.
-- Good: Switching to All Actions sends `"all-actions"` while the host keeps the window at `376x468`.
+- Good: Switching to All Actions replaces renderer content while the host keeps the window at `376x468` with no native size, position, or style mutation.
 - Good: registering a Command with declared description/category/icon makes it appear correctly without renderer edits.
 - Bad: UI code checks `if (query === "marker")` or invokes Resolve APIs directly.
-- Bad: searching category labels, adding prototype fixtures, or sending `{ width, height }` from the renderer.
+- Bad: searching category labels, adding prototype fixtures, or sending `{ width, height }` or a semantic mode IPC from the renderer to reapply an identical fixed size.
 
 ### 6. Tests Required
 
 - Assert query matching returns expected command ids for names and keywords.
 - Assert presentation category text alone does not match a command.
 - Assert registered Command presentation is preserved, the empty catalog stays empty, and no shortcut/prototype entries are synthesized.
-- Assert every accepted palette mode maps to `376x468` and standalone/Workflow hosts register the same semantic IPC channel.
+- Assert the palette owns one fixed `376x468` footprint, first show uses native `show`, repeat show reveals a concealed window without native `show`, hide conceals in place, and both hosts toggle on the logical shown predicate.
+- Assert the `.palette-shell` suppresses only its own focus outline while control `:focus-visible` rules remain.
 - Assert renderer uses preload APIs instead of direct Node or Resolve imports.
 - Assert `npm run build` succeeds and file-backed Electron startup has a built renderer target.
 - Assert `clackly-logo.svg` parses as XML and contains no `<text>`, font reference, or external image.
@@ -89,7 +90,7 @@ if (query === "marker") {
 
 ```javascript
 await window.resolveCommandCenter.executeCommand(command.id);
-window.resolveCommandCenter.setPaletteMode("all-actions");
+setMode("all-actions");
 ```
 
 ---
@@ -312,6 +313,7 @@ onContextMenu={(event) => executeInteraction(command, event)}
 - Renderer imports from `WorkflowIntegration.node` or calls Resolve API methods.
 - Implicit dev-server loading for normal Electron startup.
 - Renderer-provided window dimensions or mode-specific expansion beyond the fixed palette footprint.
+- Semantic palette-mode IPC that only reapplies an identical fixed window size.
 - Hand-authored functional icon path libraries when the existing Lucide dependency provides the icon; brand assets are the exception.
 - Font-dependent SVG `<text>` wordmarks or external font/image references inside Clackly brand assets.
 - Zero-offset orange selection halos on launcher tiles; use a crisp orange border with neutral inset separation instead.
@@ -323,7 +325,7 @@ onContextMenu={(event) => executeInteraction(command, event)}
 - Keep renderer access behind `preload.js` with `contextIsolation: true`.
 - Route command execution through command capability metadata and a host-injected capability registry.
 - Keep Command presentation Registry-only; do not add prototype catalogs, browser fixtures, or Command-id overrides.
-- Keep palette sizing in the shared Electron window helper and expose only semantic mode changes through preload.
+- Keep palette sizing, centering, taskbar, and topmost policy in the shared Electron window helper; renderer mode changes are content-only and cross no sizing IPC.
 - Use Lucide for functional controls/command icons and project SVGs for the Clackly identity.
 - Draw the CLACKLY wordmark with project-owned SVG paths/shapes and keep its accessible name on the consuming `<img>`.
 - Keep launcher tile icons and one/two-line labels optically centered as one command unit.
@@ -394,7 +396,7 @@ return { exitCode: 0, stdout: JSON.stringify({ continue: true }) };
 - No Resolve scripting API names appear under Electron UI/main files except Workflow Integration lifecycle calls or documentation strings.
 - Command ids live in command manifests or bridge handler tables, not renderer conditionals.
 - Command manifests describe `capability`, not a Resolve or keyboard execution backend.
-- All palette modes remain `376x468`; both Electron hosts share `palette:set-mode` behavior.
+- All palette modes remain `376x468`; both Electron hosts share the fixed window helper with no renderer mode-resize IPC.
 - Browser preview and empty registries render the normal empty catalog state without fixtures.
 - Functional icons come from Lucide while `clackly-logo.svg` and `clackly-mark.svg` remain custom assets.
 - `npm run dev` and built `npm start` behavior remain distinct.

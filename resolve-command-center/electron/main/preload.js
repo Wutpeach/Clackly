@@ -18,7 +18,6 @@ contextBridge.exposeInMainWorld("resolveCommandCenter", {
   pickPath: (type) => ipcRenderer.invoke("dialog:pick-path", type),
   openSettings: (featureId) => ipcRenderer.send("settings:open", featureId),
   closeSettings: () => ipcRenderer.send("settings:close"),
-  setPaletteMode: (mode) => ipcRenderer.send("palette:set-mode", mode),
   hidePalette: () => ipcRenderer.send("palette:hide"),
   onPaletteShown: (callback) => {
     const listener = () => callback();

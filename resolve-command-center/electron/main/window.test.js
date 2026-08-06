@@ -1,14 +1,17 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
 const {
-  PALETTE_SIZES,
+  PALETTE_SIZE,
   SETTINGS_SIZE,
   createPaletteWindow,
   createSettingsWindow,
   openSettingsWindow,
-  setPaletteWindowMode
+  showPaletteWindow,
+  hidePaletteWindow,
+  isPaletteWindowShown
 } = require("./window");
 
 function withoutDevRenderer(callback) {
@@ -29,26 +32,15 @@ function withoutDevRenderer(callback) {
   }
 }
 
-test("palette modes retain their fixed footprint and settings owns separate dimensions", () => {
-  assert.deepEqual(PALETTE_SIZES, {
-    launcher: { width: 376, height: 468 },
-    search: { width: 376, height: 468 },
-    "all-actions": { width: 376, height: 468 }
+test("palette owns one fixed footprint and settings owns separate dimensions", () => {
+  assert.deepEqual(PALETTE_SIZE, {
+    width: 376,
+    height: 468
   });
   assert.deepEqual(SETTINGS_SIZE, {
     width: 760,
     height: 560
   });
-
-  const calls = [];
-  const palette = {
-    isDestroyed: () => false,
-    setSize: (...args) => calls.push(["setSize", ...args]),
-    center: () => calls.push(["center"])
-  };
-  assert.equal(setPaletteWindowMode(palette, "search"), true);
-  assert.deepEqual(calls, [["setSize", 376, 468, false], ["center"]]);
-  assert.equal(setPaletteWindowMode(palette, "settings"), false);
 });
 
 test("Electron dependency and lockfile stay on the Resolve host baseline", () => {
@@ -71,6 +63,10 @@ test("palette window uses the complete Electron 36 fixed frameless contract", ()
         this.loaded = { filePath, options };
       }
 
+      center() {
+        this.centered = true;
+      }
+
       on(event, listener) {
         this.listeners.set(event, listener);
       }
@@ -89,7 +85,7 @@ test("palette window uses the complete Electron 36 fixed frameless contract", ()
       minimizable: false,
       fullscreenable: false,
       skipTaskbar: true,
-      alwaysOnTop: false,
+      alwaysOnTop: true,
       backgroundColor: "#00000000",
       webPreferences: {
         preload: path.join(__dirname, "preload.js"),
@@ -100,8 +96,273 @@ test("palette window uses the complete Electron 36 fixed frameless contract", ()
     });
     assert.equal(palette.loaded.filePath, path.join(__dirname, "../../dist/renderer/index.html"));
     assert.equal(palette.loaded.options, undefined);
+    assert.equal(palette.centered, true);
     assert.equal(typeof palette.listeners.get("blur"), "function");
   });
+});
+
+test("showing a natively hidden palette restores defaults before native show", () => {
+  const calls = [];
+  const messages = [];
+  const window = {
+    isDestroyed: () => false,
+    isVisible: () => false,
+    isFocused: () => false,
+    getOpacity: () => 1,
+    setFocusable: (...args) => calls.push(["setFocusable", ...args]),
+    setIgnoreMouseEvents: (...args) => calls.push(["setIgnoreMouseEvents", ...args]),
+    setOpacity: (...args) => calls.push(["setOpacity", ...args]),
+    show: () => calls.push("show"),
+    focus: () => calls.push("focus"),
+    webContents: {
+      send: (...args) => messages.push(args)
+    }
+  };
+
+  showPaletteWindow(window);
+
+  assert.deepEqual(calls, [
+    ["setFocusable", true],
+    ["setIgnoreMouseEvents", false],
+    ["setOpacity", 1],
+    "show"
+  ]);
+  assert.deepEqual(messages, [["palette:shown"]]);
+});
+
+test("showing the palette tolerates missing or destroyed windows", () => {
+  assert.doesNotThrow(() => showPaletteWindow(null));
+  assert.doesNotThrow(() => showPaletteWindow({ isDestroyed: () => true }));
+});
+
+test("isPaletteWindowShown requires native visibility and positive opacity", () => {
+  assert.equal(isPaletteWindowShown(null), false);
+  assert.equal(isPaletteWindowShown({ isDestroyed: () => true }), false);
+  assert.equal(
+    isPaletteWindowShown({ isDestroyed: () => false, isVisible: () => true, getOpacity: () => 1 }),
+    true
+  );
+  assert.equal(
+    isPaletteWindowShown({ isDestroyed: () => false, isVisible: () => true, getOpacity: () => 0 }),
+    false
+  );
+  assert.equal(
+    isPaletteWindowShown({ isDestroyed: () => false, isVisible: () => false, getOpacity: () => 1 }),
+    false
+  );
+});
+
+test("hiding a shown palette conceals in place without native hide", () => {
+  const calls = [];
+  let visible = true;
+  let opacity = 1;
+  const window = {
+    isDestroyed: () => false,
+    isVisible: () => visible,
+    isFocused: () => true,
+    getOpacity: () => opacity,
+    setOpacity: (value) => {
+      opacity = value;
+      calls.push(["setOpacity", value]);
+    },
+    setIgnoreMouseEvents: (value) => calls.push(["setIgnoreMouseEvents", value]),
+    setFocusable: (value) => calls.push(["setFocusable", value]),
+    hide: () => calls.push("hide")
+  };
+
+  hidePaletteWindow(window);
+  assert.deepEqual(calls, [
+    ["setOpacity", 0],
+    ["setIgnoreMouseEvents", true],
+    ["setFocusable", false]
+  ]);
+
+  calls.length = 0;
+  hidePaletteWindow(window);
+  assert.deepEqual(calls, []);
+});
+
+test("revealing a concealed palette restores input and focus without native show", () => {
+  const calls = [];
+  let visible = true;
+  let opacity = 0;
+  const window = {
+    isDestroyed: () => false,
+    isVisible: () => visible,
+    isFocused: () => false,
+    getOpacity: () => opacity,
+    setOpacity: (value) => {
+      opacity = value;
+      calls.push(["setOpacity", value]);
+    },
+    setIgnoreMouseEvents: (value) => calls.push(["setIgnoreMouseEvents", value]),
+    setFocusable: (value) => calls.push(["setFocusable", value]),
+    focus: () => calls.push("focus"),
+    show: () => {
+      visible = true;
+      calls.push("show");
+    },
+    webContents: { send: () => {} }
+  };
+
+  showPaletteWindow(window);
+
+  assert.deepEqual(calls, [
+    ["setFocusable", true],
+    ["setIgnoreMouseEvents", false],
+    ["setOpacity", 1],
+    "focus"
+  ]);
+  assert.equal(opacity, 1);
+});
+
+test("natively hidden concealed palette restores input and opacity before native show", () => {
+  const calls = [];
+  let visible = false;
+  let opacity = 0;
+  let focusable = false;
+  let ignoreMouse = true;
+  const window = {
+    isDestroyed: () => false,
+    isVisible: () => visible,
+    isFocused: () => false,
+    getOpacity: () => opacity,
+    setFocusable: (value) => {
+      focusable = value;
+      calls.push(["setFocusable", value]);
+    },
+    setIgnoreMouseEvents: (value) => {
+      ignoreMouse = value;
+      calls.push(["setIgnoreMouseEvents", value]);
+    },
+    setOpacity: (value) => {
+      opacity = value;
+      calls.push(["setOpacity", value]);
+    },
+    show: () => {
+      visible = true;
+      calls.push("show");
+    },
+    focus: () => calls.push("focus"),
+    webContents: { send: () => {} }
+  };
+
+  showPaletteWindow(window);
+
+  assert.deepEqual(calls, [
+    ["setFocusable", true],
+    ["setIgnoreMouseEvents", false],
+    ["setOpacity", 1],
+    "show"
+  ]);
+  assert.equal(focusable, true);
+  assert.equal(ignoreMouse, false);
+  assert.equal(opacity, 1);
+  assert.equal(visible, true);
+});
+
+test("hiding the palette tolerates missing or destroyed windows", () => {
+  assert.doesNotThrow(() => hidePaletteWindow(null));
+  assert.doesNotThrow(() => hidePaletteWindow({ isDestroyed: () => true }));
+});
+
+test("palette blur conceals once while logically shown", () => {
+  withoutDevRenderer(() => {
+    const calls = [];
+    let visible = true;
+    let opacity = 1;
+    class FakeBrowserWindow {
+      constructor(options) {
+        this.options = options;
+        this.listeners = new Map();
+      }
+
+      loadFile() {}
+
+      center() {}
+
+      on(event, listener) {
+        this.listeners.set(event, listener);
+      }
+
+      isVisible() {
+        return visible;
+      }
+
+      isDestroyed() {
+        return false;
+      }
+
+      getOpacity() {
+        return opacity;
+      }
+
+      setOpacity(value) {
+        opacity = value;
+        calls.push(["setOpacity", value]);
+      }
+
+      setIgnoreMouseEvents(value) {
+        calls.push(["setIgnoreMouseEvents", value]);
+      }
+
+      setFocusable(value) {
+        calls.push(["setFocusable", value]);
+      }
+    }
+
+    const palette = createPaletteWindow(FakeBrowserWindow);
+    const blurListener = palette.listeners.get("blur");
+
+    blurListener();
+    assert.deepEqual(calls, [
+      ["setOpacity", 0],
+      ["setIgnoreMouseEvents", true],
+      ["setFocusable", false]
+    ]);
+
+    calls.length = 0;
+    blurListener();
+    assert.deepEqual(calls, []);
+  });
+});
+
+test("both hosts share the fixed palette helper and drop the mode-resize IPC", () => {
+  const hostPaths = [
+    path.join(__dirname, "main.js"),
+    path.join(__dirname, "../../workflow-plugin/main.js")
+  ];
+  for (const hostPath of hostPaths) {
+    const source = fs.readFileSync(hostPath, "utf8");
+    assert.match(source, /showPaletteWindow/);
+    assert.match(source, /hidePaletteWindow/);
+    assert.match(source, /isPaletteWindowShown/);
+    assert.doesNotMatch(source, /setPaletteWindowMode/);
+    assert.doesNotMatch(source, /palette:set-mode/);
+  }
+});
+
+test("both hosts toggle on the logical shown predicate", () => {
+  for (const hostPath of [
+    path.join(__dirname, "main.js"),
+    path.join(__dirname, "../../workflow-plugin/main.js")
+  ]) {
+    const source = fs.readFileSync(hostPath, "utf8");
+    assert.match(source, /isPaletteWindowShown\(paletteWindow\)/);
+    assert.doesNotMatch(source, /paletteWindow\.isVisible\(\)/);
+  }
+});
+
+test("preload and renderer stop exposing the semantic mode resize channel", () => {
+  const preload = fs.readFileSync(path.join(__dirname, "preload.js"), "utf8");
+  const app = fs.readFileSync(path.join(__dirname, "../renderer/App.jsx"), "utf8");
+  const styles = fs.readFileSync(path.join(__dirname, "../renderer/styles.css"), "utf8");
+
+  assert.doesNotMatch(preload, /setPaletteMode/);
+  assert.doesNotMatch(preload, /palette:set-mode/);
+  assert.doesNotMatch(app, /setPaletteMode/);
+  assert.match(styles, /\.palette-shell:focus/);
+  assert.match(styles, /outline:\s*none/);
 });
 
 test("opening settings reuses, restores, shows, and focuses an existing window", () => {

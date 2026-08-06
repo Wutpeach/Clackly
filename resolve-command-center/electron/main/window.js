@@ -2,10 +2,9 @@ const path = require("node:path");
 const { BrowserWindow } = require("electron");
 
 const DEFAULT_DEV_SERVER_PORT = "5173";
-const PALETTE_SIZES = Object.freeze({
-  launcher: { width: 376, height: 468 },
-  search: { width: 376, height: 468 },
-  "all-actions": { width: 376, height: 468 }
+const PALETTE_SIZE = Object.freeze({
+  width: 376,
+  height: 468
 });
 const SETTINGS_SIZE = Object.freeze({
   width: 760,
@@ -48,11 +47,17 @@ function loadRenderer(window, view) {
   );
 }
 
+function isPaletteWindowShown(window) {
+  if (!window || window.isDestroyed()) {
+    return false;
+  }
+  return window.isVisible() && window.getOpacity() > 0;
+}
+
 function createPaletteWindow(BrowserWindowType = BrowserWindow) {
-  const initialSize = PALETTE_SIZES.launcher;
   const window = new BrowserWindowType({
-    width: initialSize.width,
-    height: initialSize.height,
+    width: PALETTE_SIZE.width,
+    height: PALETTE_SIZE.height,
     show: false,
     frame: false,
     transparent: true,
@@ -62,7 +67,7 @@ function createPaletteWindow(BrowserWindowType = BrowserWindow) {
     minimizable: false,
     fullscreenable: false,
     skipTaskbar: true,
-    alwaysOnTop: false,
+    alwaysOnTop: true,
     backgroundColor: "#00000000",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -73,9 +78,10 @@ function createPaletteWindow(BrowserWindowType = BrowserWindow) {
   });
 
   loadRenderer(window);
+  window.center();
 
   window.on("blur", () => {
-    if (window.isVisible()) {
+    if (isPaletteWindowShown(window)) {
       hidePaletteWindow(window);
     }
   });
@@ -125,27 +131,19 @@ function openSettingsWindow(window, featureId) {
   return settingsWindow;
 }
 
-function setPaletteWindowMode(window, mode) {
-  const size = PALETTE_SIZES[mode];
-  if (!window || window.isDestroyed() || !size) {
-    return false;
-  }
-
-  window.setSize(size.width, size.height, false);
-  window.center();
-  return true;
-}
-
 function showPaletteWindow(window) {
   if (!window || window.isDestroyed()) {
     return;
   }
 
-  setPaletteWindowMode(window, "launcher");
-  window.setSkipTaskbar(true);
-  window.setAlwaysOnTop(true, "floating");
-  window.show();
-  window.focus();
+  window.setFocusable(true);
+  window.setIgnoreMouseEvents(false);
+  window.setOpacity(1);
+  if (window.isVisible()) {
+    window.focus();
+  } else {
+    window.show();
+  }
   window.webContents.send("palette:shown");
 }
 
@@ -154,17 +152,22 @@ function hidePaletteWindow(window) {
     return;
   }
 
-  window.hide();
-  window.setAlwaysOnTop(false);
+  if (!isPaletteWindowShown(window)) {
+    return;
+  }
+
+  window.setOpacity(0);
+  window.setIgnoreMouseEvents(true);
+  window.setFocusable(false);
 }
 
 module.exports = {
-  PALETTE_SIZES,
+  PALETTE_SIZE,
   SETTINGS_SIZE,
   createPaletteWindow,
   createSettingsWindow,
   openSettingsWindow,
   showPaletteWindow,
   hidePaletteWindow,
-  setPaletteWindowMode
+  isPaletteWindowShown
 };

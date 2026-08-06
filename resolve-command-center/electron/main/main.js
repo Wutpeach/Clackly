@@ -5,7 +5,7 @@ const {
   openSettingsWindow,
   showPaletteWindow,
   hidePaletteWindow,
-  setPaletteWindowMode
+  isPaletteWindowShown
 } = require("./window");
 const { registerPaletteHotkey } = require("./hotkey");
 const { getCommands, searchCommands } = require("../../command-engine/registry");
@@ -123,7 +123,7 @@ function closeSettings() {
 }
 
 function togglePalette() {
-  if (paletteWindow && paletteWindow.isVisible()) {
+  if (paletteWindow && isPaletteWindowShown(paletteWindow)) {
     hidePalette();
     return;
   }
@@ -146,7 +146,6 @@ function registerIpcHandlers() {
     }
     return result;
   });
-  ipcMain.on("palette:set-mode", (_event, mode) => setPaletteWindowMode(paletteWindow, mode));
   ipcMain.on("palette:hide", hidePalette);
   registerFeatureUiIpc({
     ipcMain,

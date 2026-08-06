@@ -68,7 +68,6 @@ const api = window.resolveCommandCenter || {
   openSettings: () => window.open("?view=settings", "clackly-settings"),
   closeSettings: () => window.close(),
   hidePalette: () => {},
-  setPaletteMode: () => {},
   onPaletteShown: (callback) => {
     requestAnimationFrame(callback);
     return () => {};
@@ -243,7 +242,6 @@ function PaletteApp() {
   }, []);
 
   useEffect(() => {
-    api.setPaletteMode?.(mode);
     setSelectedIndex(0);
     setStatus("");
     setHintedCommand(null);

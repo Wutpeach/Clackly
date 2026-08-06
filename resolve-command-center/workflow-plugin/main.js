@@ -5,7 +5,7 @@ const {
   openSettingsWindow,
   hidePaletteWindow,
   showPaletteWindow,
-  setPaletteWindowMode
+  isPaletteWindowShown
 } = require("../electron/main/window");
 const { getPaletteAccelerator, registerPaletteHotkey } = require("../electron/main/hotkey");
 const { getCommandById, getCommands, searchCommands } = require("../command-engine/registry");
@@ -207,7 +207,7 @@ function closeSettings() {
 }
 
 function togglePalette() {
-  if (paletteWindow && paletteWindow.isVisible()) {
+  if (paletteWindow && isPaletteWindowShown(paletteWindow)) {
     hidePalette();
     return;
   }
@@ -230,7 +230,6 @@ function registerIpcHandlers() {
     }
     return result;
   });
-  ipcMain.on("palette:set-mode", (_event, mode) => setPaletteWindowMode(paletteWindow, mode));
   ipcMain.on("palette:hide", hidePalette);
   registerFeatureUiIpc({
     ipcMain,
