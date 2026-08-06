@@ -490,3 +490,24 @@ Pinned Electron to Resolve 20.3.2.9's 36.3.2 host, made palette and Settings fix
 ### Status
 
 [OK] **Completed**
+
+
+## Session 23: Diagnose Resolve startup freeze
+
+**Date**: 2026-08-06
+**Task**: Diagnose Resolve startup freeze
+**Branch**: `main`
+
+### Summary
+
+Proved with a strict no-plugin baseline that the post-project whole-GUI stall is not caused by Clackly; restored original installed plugin, reverted all product candidates, retained evidence, and documented the absent-plugin diagnostic gate.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d43a059` | (see git log) |
+
+### Status
+
+[OK] **Completed**
