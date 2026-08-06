@@ -123,6 +123,32 @@ After implementation:
 
 ---
 
+## Host / Plugin Causal Isolation
+
+When a host application stalls near plugin startup, the host and plugin are a
+causal boundary. Do not begin by binary-searching plugin internals.
+
+### Diagnostic order
+
+- [ ] Reproduce with the current plugin and record the host-visible symptom.
+- [ ] Run the same project and steps with the entire plugin absent from the
+      host's scan/registration root.
+- [ ] Confirm absence using both registration inventory and process/module
+      evidence; disabling one plugin feature is not an absent-plugin control.
+- [ ] Only if the absent-plugin control removes the symptom, isolate plugin
+      startup phases such as native initialization, windows/renderers, and
+      subprocesses.
+- [ ] If the absent-plugin control still reproduces, stop shipping plugin
+      candidates and move investigation to host configuration, storage,
+      drivers, or other external dependencies.
+
+**Why**: temporal proximity is not causality. A host may launch a plugin and
+independently begin cache, save, GPU, or network work in the same startup
+window. The absent-plugin baseline prevents an expensive search in the wrong
+layer.
+
+---
+
 ## Cross-Platform Template Consistency
 
 In Trellis, command templates (e.g., `record-session.md`) exist in **multiple platforms** with identical or near-identical content. This is a cross-layer boundary.
