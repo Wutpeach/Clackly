@@ -1,0 +1,18 @@
+{
+  "responding": {
+    "requestedMs": 100,
+    "sampleCount": 49,
+    "intervalCount": 48,
+    "minMs": 79.598,
+    "medianMs": 94.946,
+    "maxMs": 121.948
+  },
+  "cim": {
+    "requestedMs": 500,
+    "sampleCount": 6,
+    "intervalCount": 5,
+    "minMs": 802.22,
+    "medianMs": 822.374,
+    "maxMs": 956.252
+  }
+}

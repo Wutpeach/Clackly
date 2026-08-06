@@ -1,0 +1,12 @@
+{
+  "run": "U0",
+  "startedAt": "2026-08-04T20:22:29.8354284+08:00",
+  "endedAt": "2026-08-04T20:24:00.8033477+08:00",
+  "durationSeconds": 90,
+  "targetProcessId": 88548,
+  "targetProcessName": "Resolve",
+  "targetStartTime": "2026-08-04T20:22:29.8182779+08:00",
+  "resolveLog": "C:\\Users\\Administrator\\AppData\\Roaming\\Blackmagic Design\\DaVinci Resolve\\Support\\logs\\davinci_resolve.log",
+  "resolveLogOffset": 1870083,
+  "outputDirectory": "D:\\Clackly\\.trellis\\tasks\\08-04-fix-resolve-startup-freeze\\research\\20260804-200820-U0"
+}

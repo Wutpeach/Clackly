@@ -1,0 +1,15 @@
+{
+  "run": "A1",
+  "startedAt": "2026-08-04T20:46:01.2970133+08:00",
+  "endedAt": "2026-08-04T20:47:32.2217891+08:00",
+  "durationSeconds": 90,
+  "targetProcessId": 84256,
+  "targetProcessName": "Resolve",
+  "targetStartTime": "2026-08-04T20:46:01.2606412+08:00",
+  "resolveLog": "C:\\Users\\Administrator\\AppData\\Roaming\\Blackmagic Design\\DaVinci Resolve\\Support\\logs\\davinci_resolve.log",
+  "resolveLogOffset": 15718,
+  "traceFiles": [
+    "clackly-startup-v1-96016.jsonl"
+  ],
+  "outputDirectory": "D:\\Clackly\\.trellis\\tasks\\08-04-fix-resolve-startup-freeze\\research\\20260804-204533-A1"
+}

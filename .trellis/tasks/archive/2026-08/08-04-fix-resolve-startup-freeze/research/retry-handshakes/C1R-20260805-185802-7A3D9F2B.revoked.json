@@ -1,0 +1,16 @@
+{
+    "schema":  1,
+    "status":  "ready",
+    "run":  "C1R",
+    "token":  "20260805-185802-7A3D9F2B",
+    "expectedProfileState":  "Absent",
+    "expectedProfileIdentity":  null,
+    "runDirectory":  "D:\\Clackly\\.trellis\\tasks\\08-04-fix-resolve-startup-freeze\\research\\20260805-190102-C1R",
+    "samplerPid":  18792,
+    "samplerStartTime":  "2026-08-05T19:01:01.8472128+08:00",
+    "readyAt":  "2026-08-05T19:01:05.9519034+08:00",
+    "waitDeadline":  "2026-08-05T19:11:05.9519034+08:00",
+    "durationSeconds":  300,
+    "respondingIntervalMs":  100,
+    "cimIntervalMs":  2000
+}

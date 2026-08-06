@@ -1,0 +1,9 @@
+{
+  "runLabel": "B1",
+  "installedAt": "2026-08-05T10:44:11.2752357+08:00",
+  "artifactRoot": "D:\\Clackly-Trellis-Artifacts\\08-04-fix-resolve-startup-freeze\\B1-traced-lazy\\win-unpacked",
+  "pluginPath": "C:\\ProgramData\\Blackmagic Design\\DaVinci Resolve\\Support\\Workflow Integration Plugins\\com.wutpeach.clackly",
+  "backupPath": "C:\\ProgramData\\Clackly-Trellis-Hold\\08-04-fix-resolve-startup-freeze\\20260805-104351-before-B1\\com.wutpeach.clackly",
+  "installedFileCount": 4312,
+  "mainJsSha256": "B6C6E80AD3299857CF0E505C7335901664815834F01AD1935A9B5EEAC2AD21F9"
+}

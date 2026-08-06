@@ -1,0 +1,3 @@
+{"file":".trellis/tasks/08-04-fix-resolve-startup-freeze/research/current-evidence.md","reason":"Captures the archived A/B conclusion, current installed shape, live timing, and evidence limits for implementation decisions."}
+{"file":".trellis/tasks/archive/2026-07/07-29-resolve-startup-freeze/research/root-cause-report.md","reason":"Provides the prior controlled run matrix, rejected hypotheses, and non-reproducible conclusion that the new task must not contradict without fresh evidence."}
+{"file":".trellis/tasks/08-04-fix-resolve-startup-freeze/design.md","reason":"Defines the evidence gate, single lazy-window candidate, first-show contract, compatibility boundary, and rollback rules."}

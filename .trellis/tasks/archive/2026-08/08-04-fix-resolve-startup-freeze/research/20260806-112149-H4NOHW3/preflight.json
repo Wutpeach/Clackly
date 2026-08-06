@@ -1,0 +1,15 @@
+{
+  "capturedAt": "2026-08-06T11:21:49.8465414+08:00",
+  "scanRoot": "C:\\ProgramData\\Blackmagic Design\\DaVinci Resolve\\Support\\Workflow Integration Plugins",
+  "pluginPath": "C:\\ProgramData\\Blackmagic Design\\DaVinci Resolve\\Support\\Workflow Integration Plugins\\com.wutpeach.clackly",
+  "pluginAttributes": "Directory, NotContentIndexed",
+  "pluginIsReparsePoint": false,
+  "pluginLinkType": null,
+  "pluginTarget": [
+    null
+  ],
+  "clacklyManifests": [
+    "C:\\ProgramData\\Blackmagic Design\\DaVinci Resolve\\Support\\Workflow Integration Plugins\\com.wutpeach.clackly\\manifest.xml"
+  ],
+  "canonicalManifest": "C:\\ProgramData\\Blackmagic Design\\DaVinci Resolve\\Support\\Workflow Integration Plugins\\com.wutpeach.clackly\\manifest.xml"
+}

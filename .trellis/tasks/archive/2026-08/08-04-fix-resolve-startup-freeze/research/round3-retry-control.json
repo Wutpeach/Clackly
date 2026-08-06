@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "transactionState": "C:\\Users\\Administrator\\AppData\\Roaming\\Clackly Workflow Plugin.trellis-round3-retry-state-20260805-185801.json",
+  "baseline": {
+    "sha256": "F8929578946217BA6BCFDF977DF9F50DA39F70B0241506EF4BFD3A86DFFCD64C",
+    "files": 53,
+    "directories": 20,
+    "bytes": 8880285
+  },
+  "phase": "restored",
+  "run": "C1R",
+  "token": "20260805-185802-7A3D9F2B",
+  "handshakeRoot": "D:\\Clackly\\.trellis\\tasks\\08-04-fix-resolve-startup-freeze\\research\\retry-handshakes",
+  "classification": "inconclusive-not-positive",
+  "evidence": "research/round3-retry-c1r-invalid.md"
+}

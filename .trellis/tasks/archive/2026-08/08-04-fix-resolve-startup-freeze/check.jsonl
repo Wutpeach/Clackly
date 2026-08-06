@@ -1,0 +1,4 @@
+{"file":".trellis/tasks/08-04-fix-resolve-startup-freeze/prd.md","reason":"Check that evidence, implementation, and live acceptance satisfy the whole-GUI stall requirements without expanding into timeline stutter."}
+{"file":".trellis/tasks/08-04-fix-resolve-startup-freeze/design.md","reason":"Check decision gates, lazy-window contract, first-show UX, compatibility, and rollback safety."}
+{"file":".trellis/tasks/08-04-fix-resolve-startup-freeze/research/current-evidence.md","reason":"Check every causal claim against current timing, installed state, and documented evidence limits."}
+{"file":".trellis/tasks/archive/2026-07/07-29-resolve-startup-freeze/research/root-cause-report.md","reason":"Ensure the final result explains why the earlier freeze-negative matrix is superseded or remains controlling evidence."}

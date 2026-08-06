@@ -1,0 +1,26 @@
+{
+  "schema": 2,
+  "status": "complete",
+  "run": "H6NOPLUGIN",
+  "readinessToken": null,
+  "samplerPid": 37116,
+  "samplerStartTime": "2026-08-06T11:43:06.1424824+08:00",
+  "startedAt": "2026-08-06T11:44:27.7849680+08:00",
+  "endedAt": "2026-08-06T11:47:29.0719348+08:00",
+  "durationSeconds": 180,
+  "targetProcessId": 38568,
+  "targetProcessName": "Resolve",
+  "targetStartTime": "2026-08-06T11:44:27.7038020+08:00",
+  "readinessPublishedAt": null,
+  "readinessWaitDeadline": null,
+  "expectedProfileState": null,
+  "expectedProfileIdentity": null,
+  "respondingIntervalMs": 100,
+  "cimIntervalMs": 2000,
+  "resolveLog": "C:\\Users\\Administrator\\AppData\\Roaming\\Blackmagic Design\\DaVinci Resolve\\Support\\logs\\davinci_resolve.log",
+  "resolveLogOffset": 1597693,
+  "traceFiles": [
+    null
+  ],
+  "outputDirectory": "D:\\Clackly\\.trellis\\tasks\\08-04-fix-resolve-startup-freeze\\research\\20260806-114306-H6NOPLUGIN"
+}

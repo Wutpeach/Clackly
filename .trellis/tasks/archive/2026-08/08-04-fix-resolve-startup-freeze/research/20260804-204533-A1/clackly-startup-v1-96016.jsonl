@@ -1,0 +1,12 @@
+{"schema":"clackly-startup-v1","processId":96016,"event":"js-entry","wallTime":"2026-08-04T12:46:17.443Z","monotonicNs":"1939323581799500","capturedWallTime":"2026-08-04T12:46:17.383Z","capturedMonotonicNs":"1939323523689700"}
+{"schema":"clackly-startup-v1","processId":96016,"event":"composition-complete","wallTime":"2026-08-04T12:46:17.454Z","monotonicNs":"1939323592766200"}
+{"schema":"clackly-startup-v1","processId":96016,"event":"app-ready-callback-start","wallTime":"2026-08-04T12:46:17.536Z","monotonicNs":"1939323674088100"}
+{"schema":"clackly-startup-v1","processId":96016,"event":"workflow-initialize-start","wallTime":"2026-08-04T12:46:17.538Z","monotonicNs":"1939323675955600"}
+{"schema":"clackly-startup-v1","processId":96016,"event":"workflow-initialize-end","wallTime":"2026-08-04T12:46:17.554Z","monotonicNs":"1939323692088100"}
+{"schema":"clackly-startup-v1","processId":96016,"event":"ae-check-start","wallTime":"2026-08-04T12:46:17.558Z","monotonicNs":"1939323695942800"}
+{"schema":"clackly-startup-v1","processId":96016,"event":"ae-check-end","wallTime":"2026-08-04T12:46:17.560Z","monotonicNs":"1939323698207300"}
+{"schema":"clackly-startup-v1","processId":96016,"event":"browser-window-constructor-start","wallTime":"2026-08-04T12:46:17.561Z","monotonicNs":"1939323699041900"}
+{"schema":"clackly-startup-v1","processId":96016,"event":"browser-window-constructor-end","wallTime":"2026-08-04T12:46:17.615Z","monotonicNs":"1939323753260200"}
+{"schema":"clackly-startup-v1","processId":96016,"event":"ipc-ready","wallTime":"2026-08-04T12:46:17.645Z","monotonicNs":"1939323783545500"}
+{"schema":"clackly-startup-v1","processId":96016,"event":"shortcut-result","wallTime":"2026-08-04T12:46:17.647Z","monotonicNs":"1939323784967300","accelerator":"CommandOrControl+Space","registered":true}
+{"schema":"clackly-startup-v1","processId":96016,"event":"renderer-ready-to-show","wallTime":"2026-08-04T12:46:17.971Z","monotonicNs":"1939324109379300"}

@@ -1,0 +1,26 @@
+{
+  "schema": 2,
+  "status": "complete",
+  "run": "H4NOHW3",
+  "readinessToken": null,
+  "samplerPid": 932,
+  "samplerStartTime": "2026-08-06T11:21:49.1871395+08:00",
+  "startedAt": "2026-08-06T11:22:29.3221034+08:00",
+  "endedAt": "2026-08-06T11:25:30.6354283+08:00",
+  "durationSeconds": 180,
+  "targetProcessId": 21692,
+  "targetProcessName": "Resolve",
+  "targetStartTime": "2026-08-06T11:22:29.2013875+08:00",
+  "readinessPublishedAt": null,
+  "readinessWaitDeadline": null,
+  "expectedProfileState": null,
+  "expectedProfileIdentity": null,
+  "respondingIntervalMs": 100,
+  "cimIntervalMs": 2000,
+  "resolveLog": "C:\\Users\\Administrator\\AppData\\Roaming\\Blackmagic Design\\DaVinci Resolve\\Support\\logs\\davinci_resolve.log",
+  "resolveLogOffset": 1503907,
+  "traceFiles": [
+    null
+  ],
+  "outputDirectory": "D:\\Clackly\\.trellis\\tasks\\08-04-fix-resolve-startup-freeze\\research\\20260806-112149-H4NOHW3"
+}
