@@ -1,0 +1,9 @@
+{"file":".trellis/spec/backend/index.md","reason":"Verify all relevant backend executable-contract guides were routed into the check."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify execution boundaries, async subprocess semantics, error handling, test coverage, Resolve baseline, and no keyboard synthesis."}
+{"file":".trellis/spec/frontend/index.md","reason":"Verify all relevant renderer/presentation guides were routed into the check."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify exactly one visible/searchable card, generic internal presentation, exact modifiers, Interaction Help, and no AE renderer branches."}
+{"file":".trellis/spec/guides/index.md","reason":"Verify shared cross-layer/reuse guidance selection."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit every contract hop and both Electron host paths after registry, binding, Python, and async probe changes."}
+{"file":".trellis/tasks/08-07-refactor-export-to-ae-interaction/research/current-state.md","reason":"Verify implementation against current evidence and superseded historical assumptions."}
+{"file":".trellis/tasks/archive/2026-08/08-03-resolve2ae-clackly-refactor/research/interaction-mode-adaptation.md","reason":"Compare internal action design with historical rationale without restoring superseded visibility/bindings."}
+{"file":".trellis/tasks/archive/2026-08/08-03-auto-detect-ae-path/research/current-state.md","reason":"Verify retained discovery precedence/config ownership while rejecting the superseded blocking startup order."}

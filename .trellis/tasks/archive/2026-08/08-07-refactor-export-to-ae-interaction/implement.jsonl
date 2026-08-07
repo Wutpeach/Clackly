@@ -1,0 +1,11 @@
+{"file":".trellis/spec/backend/index.md","reason":"Required backend spec routing index; identifies the executable contract owner for Commands, config, Interaction, and desktop launch."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Owns Command, Interaction, Resolve2AE runtime, AE configuration, desktop launch, shortcut prohibition, and child-process contracts."}
+{"file":".trellis/spec/frontend/index.md","reason":"Required frontend spec routing index for renderer catalog, Settings help, and Command-card work."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Owns generic Command-card presentation, mouse interaction, search/catalog behavior, and renderer boundary rules."}
+{"file":".trellis/spec/guides/index.md","reason":"Required shared-guide index for cross-layer and reuse review."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"The change crosses manifests, registry, renderer catalog, bindings, Python wrapper/core, Electron hosts, config, and desktop launch."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse one Capability, existing Interaction routing, existing export pipeline, and Node child-process facilities without AE-specific UI branches."}
+{"file":".trellis/tasks/08-07-refactor-export-to-ae-interaction/research/current-state.md","reason":"Current evidence, fixed user decisions, and explicit supersession of the archived four-card and blocking-startup assumptions."}
+{"file":".trellis/tasks/archive/2026-08/08-03-resolve2ae-clackly-refactor/research/current-state.md","reason":"Historical integrated-core ownership and retained export behavior; its four-public-Command presentation is superseded by current task research."}
+{"file":".trellis/tasks/archive/2026-08/08-03-resolve2ae-clackly-refactor/research/interaction-mode-adaptation.md","reason":"Historical rationale for action identities and modifier routing; its exact four-mode bindings/search visibility are superseded."}
+{"file":".trellis/tasks/archive/2026-08/08-03-auto-detect-ae-path/research/current-state.md","reason":"Historical discovery precedence/config ownership; its requirement to block window/IPC readiness is superseded."}
