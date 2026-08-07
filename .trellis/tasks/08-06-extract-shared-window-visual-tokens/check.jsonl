@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check the exact roundedCorners:false BrowserWindow contracts, rectangular outer shell, preserved internal radii, and the setShape prohibition."}
+{"file":".trellis/tasks/08-06-extract-shared-window-visual-tokens/research/bug-analysis.md","reason":"Verify every failed experiment and the final rectangular decision against the user-accepted packaged Resolve result."}

@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Follow the shared Electron window helper, exact BrowserWindow option contracts, and package/install/manual validation requirements while implementing the rectangular surface."}
+{"file":".trellis/tasks/08-06-extract-shared-window-visual-tokens/research/bug-analysis.md","reason":"Use the experiment history and final rectangular decision to keep the production change minimal."}

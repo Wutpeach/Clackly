@@ -61,7 +61,7 @@ typography:
     fontWeight: 600
     lineHeight: 1
 rounded:
-  window: "8px"
+  window: "0px"
   control: "6px"
   tile: "2px"
   rail: "3px"
@@ -145,7 +145,7 @@ Depth comes from tonal layering, precise hairlines and shallow physical separati
 
 ## Shapes
 
-The silhouette is precise and lightly softened: `8px` for the window, `2px` for launcher tiles, and `6px` for inputs and buttons. Corners above `16px` are prohibited because they shift the product toward consumer-app softness. Interface icons come from `lucide-react`, use a fixed `1.9px` absolute stroke width and retain matched optical sizes; the Clackly logo and mark remain custom SVG assets.
+The outer window silhouette is a precise rectangle (`border-radius: 0`), because rounded transparent window surfaces are not paint-safe under the qualified Windows 11 build 26200 host compositor; all rounding lives inside content controls: `2px` for launcher tiles and `6px` for inputs and buttons. Corners above `16px` are prohibited because they shift the product toward consumer-app softness. Interface icons come from `lucide-react`, use a fixed `1.9px` absolute stroke width and retain matched optical sizes; the Clackly logo and mark remain custom SVG assets.
 
 ## Components
 

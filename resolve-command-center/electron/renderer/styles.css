@@ -34,7 +34,6 @@
   --color-border-strong: rgba(255, 255, 255, 0.13);
   --color-shadow: rgba(0, 0, 0, 0.35);
   --surface-inset: inset 0 1px rgba(255, 255, 255, 0.055), inset 0 -1px rgba(0, 0, 0, 0.38);
-  --radius-window: 4px;
   --radius-control: 6px;
   --radius-tile: 2px;
   --radius-rail: 3px;
@@ -97,18 +96,22 @@ select:focus-visible {
   outline: none;
 }
 
-.palette-shell {
-  position: relative;
+.palette-shell,
+.settings-shell {
   display: grid;
-  grid-template-rows: var(--header-height) minmax(0, 1fr);
   width: 100vw;
   height: 100vh;
   overflow: hidden;
   border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-window);
+  border-radius: 0;
+  color: var(--color-text-primary);
   background: var(--color-window);
   box-shadow: 0 18px 44px var(--color-shadow), inset 0 1px rgba(255, 255, 255, 0.045);
-  animation: palette-enter 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.palette-shell {
+  position: relative;
+  grid-template-rows: var(--header-height) minmax(0, 1fr);
 }
 
 .palette-shell[data-mode="launcher"] {
@@ -140,26 +143,36 @@ select:focus-visible {
   overflow: hidden;
   border: 0;
   border-radius: 4px;
+}
+
+.header-surface,
+.settings-titlebar {
   background: linear-gradient(180deg, var(--color-launcher) 0%, var(--color-header-bottom) 100%);
   box-shadow: var(--header-surface-shadow);
 }
 
 .brand-lockup,
-.header-actions {
+.header-actions,
+.settings-titlebar-brand {
   display: flex;
   align-items: center;
+}
+
+.brand-lockup,
+.settings-titlebar-brand {
+  gap: 11px;
 }
 
 .brand-lockup {
   height: 100%;
   flex: 1 1 auto;
   min-width: 0;
-  gap: 11px;
   padding: 0 12px;
   overflow: hidden;
 }
 
-.brand-lockup::before {
+.brand-lockup::before,
+.settings-titlebar-brand::before {
   width: 2px;
   height: 24px;
   flex: 0 0 auto;
@@ -187,10 +200,14 @@ select:focus-visible {
   content: "";
 }
 
-.clackly-logo {
-  display: block;
+.clackly-logo,
+.settings-titlebar-brand img {
   width: 118px;
   height: 18px;
+}
+
+.clackly-logo {
+  display: block;
 }
 
 .icon-button {
@@ -752,23 +769,15 @@ kbd {
 }
 
 .settings-shell {
-  display: grid;
-  grid-template-rows: 48px minmax(0, 1fr);
-  width: 100vw;
-  height: 100vh;
+  grid-template-rows: var(--header-height) minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
-  color: var(--color-text-primary);
-  background: var(--color-window);
 }
 
 .settings-titlebar {
   position: relative;
   z-index: 10;
   min-width: 0;
-  background: linear-gradient(180deg, var(--color-launcher) 0%, var(--color-header-bottom) 100%);
-  box-shadow: var(--header-surface-shadow);
 }
 
 .settings-titlebar-drag {
@@ -778,26 +787,10 @@ kbd {
   display: flex;
   align-items: center;
   width: env(titlebar-area-width, 100%);
-  height: env(titlebar-area-height, 48px);
+  height: env(titlebar-area-height, var(--header-height));
   min-width: 0;
   padding: 0 14px;
   -webkit-app-region: drag;
-}
-
-.settings-titlebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-}
-
-.settings-titlebar-brand::before {
-  width: 2px;
-  height: 24px;
-  flex: 0 0 auto;
-  border-radius: 2px;
-  background: var(--color-accent);
-  box-shadow: 1px 0 5px rgba(243, 106, 45, 0.18);
-  content: "";
 }
 
 .settings-titlebar-brand::after {
@@ -806,11 +799,6 @@ kbd {
   margin-left: 3px;
   background: var(--color-border);
   content: "";
-}
-
-.settings-titlebar-brand img {
-  width: 118px;
-  height: 18px;
 }
 
 .settings-titlebar-label {
@@ -826,8 +814,8 @@ kbd {
   right: 0;
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: var(--header-height);
+  height: var(--header-height);
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -1303,13 +1291,6 @@ kbd {
   }
 }
 
-@keyframes palette-enter {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-}
-
 @keyframes mode-enter {
   from {
     opacity: 0;
@@ -1324,7 +1305,6 @@ kbd {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .palette-shell,
   .search-view,
   .all-actions-view {
     animation: none;

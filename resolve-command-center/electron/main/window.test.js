@@ -78,6 +78,7 @@ test("palette window uses the complete Electron 36 fixed frameless contract", ()
       height: 468,
       show: false,
       frame: false,
+      roundedCorners: false,
       transparent: true,
       thickFrame: false,
       resizable: false,
@@ -365,6 +366,17 @@ test("preload and renderer stop exposing the semantic mode resize channel", () =
   assert.match(styles, /outline:\s*none/);
 });
 
+test("palette and settings share the renderer window treatment without window entry motion", () => {
+  const styles = fs.readFileSync(path.join(__dirname, "../renderer/styles.css"), "utf8");
+
+  assert.match(styles, /\.palette-shell,\s*\.settings-shell\s*\{[^}]*border:\s*1px solid var\(--color-border-strong\)[^}]*border-radius:\s*0[^}]*box-shadow:/s);
+  assert.doesNotMatch(styles, /--radius-window/);
+  assert.match(styles, /\.header-surface,\s*\.settings-titlebar\s*\{[^}]*var\(--header-surface-shadow\)/s);
+  assert.match(styles, /\.brand-lockup::before,\s*\.settings-titlebar-brand::before\s*\{/s);
+  assert.match(styles, /\.clackly-logo,\s*\.settings-titlebar-brand img\s*\{/s);
+  assert.doesNotMatch(styles, /palette-enter/);
+});
+
 test("opening settings reuses, restores, shows, and focuses an existing window", () => {
   const calls = [];
   const settings = {
@@ -414,6 +426,7 @@ test("settings window uses the complete Electron 36 fixed frameless contract", (
       height: 560,
       show: false,
       frame: false,
+      roundedCorners: false,
       transparent: true,
       thickFrame: false,
       resizable: false,

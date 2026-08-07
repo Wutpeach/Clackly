@@ -40,7 +40,8 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Electron hosts delegate command execution to the command engine, which resolves intent through an injected capability registry. External Electron registers a bridge-backed capability; Workflow Plugin registers a Resolve-backed capability. Renderer code still sends only command ids through preload IPC.
 - Functional UI icons use `lucide-react` with the shared optical size/stroke convention. Clackly logo and mark remain project-owned SVG assets rather than Lucide substitutions.
 - Clackly wordmark assets are deterministic vector geometry: use SVG paths/shapes only, never `<text>`, font-family declarations, or external font/image dependencies.
-- The launcher visual contract uses an `8px` window radius and `6px` control/tile radius. Launcher tiles separate through layered hairlines and shallow offset/inset depth; selection uses a crisp orange edge without a zero-offset orange halo.
+- The outer window silhouette is rectangular: the shared `.palette-shell`/`.settings-shell` uses `border-radius: 0`, so all rounding lives inside content surfaces. Internal radii remain `6px` control/tile, `2px` launcher-tile, `3px` rail, and `4px` toolbar; Launcher tiles separate through layered hairlines and shallow offset/inset depth; selection uses a crisp orange edge without a zero-offset orange halo.
+- Both Palette (`376x468`) and Settings (`760x560`) BrowserWindows set `roundedCorners: false` beside the transparent compositor contract (`frame: false`, `transparent: true`, `thickFrame: false`, `backgroundColor: "#00000000"`). Do not use `setShape` for this qualified Windows 11 build 26200 case: it removes DWM-composed white corner pixels but Electron 36 accepts only rectangle shapes, which alias along the stepped silhouette; the rectangular native+renderer surface is the verified fix (user-accepted 2026-08-07).
 - Development renderer loading must be explicit, for example `--dev-renderer` or `RESOLVE_COMMAND_CENTER_RENDERER_URL`.
 - Default non-packaged startup should load built renderer files so Resolve-launched Electron does not depend on a Vite dev server.
 
@@ -114,8 +115,8 @@ setMode("all-actions");
 - Feature identity and schema come from Capability Metadata. Help targets Commands through `command.capability === feature.id` and derives rows from normalized bindings plus action Command descriptions.
 - Standalone Electron and Workflow Integration register the same feature/config/picker channels through the shared IPC helper.
 - Resolve 20.3.2.9 with bundled Electron 36.3.2 is the qualified desktop host; local Electron must remain exactly pinned to that API baseline.
-- Settings is one fixed frameless `760x560` window with the exact Electron 36 BrowserWindow options `show: false`, `frame: false`, `transparent: true`, `thickFrame: false`, `resizable: false`, `maximizable: false`, `minimizable: false`, `fullscreenable: false`, `alwaysOnTop: false`, `autoHideMenuBar: true`, `backgroundColor: "#00000000"`, and `title: "Clackly Settings"`. Its renderer `.settings-shell` must paint the opaque `--color-window` background across the full `100vw x 100vh` viewport so the transparent compositor surface never shows through. Do not use the Electron 37+ `accentColor` API, and do not add DWM/Python/timer/native-hook workarounds for the Resolve-host opaque frameless edge — the verified fix is the transparent surface plus the opaque renderer shell (live-validated 2026-08-06).
-- The `376x468` palette keeps its own separate surface contract — `transparent: true`, `backgroundColor: "#00000000"`, `skipTaskbar: true`, `alwaysOnTop: true`, and the completed conceal/reveal lifecycle. Settings must not adopt palette product behavior: it stays `alwaysOnTop: false` with normal taskbar behavior.
+- Settings is one fixed frameless `760x560` window with the exact Electron 36 BrowserWindow options `show: false`, `frame: false`, `roundedCorners: false`, `transparent: true`, `thickFrame: false`, `resizable: false`, `maximizable: false`, `minimizable: false`, `fullscreenable: false`, `alwaysOnTop: false`, `autoHideMenuBar: true`, `backgroundColor: "#00000000"`, and `title: "Clackly Settings"`. Its renderer `.settings-shell` must paint the opaque `--color-window` background across the full `100vw x 100vh` viewport so the transparent compositor surface never shows through. Do not use the Electron 37+ `accentColor` API, and do not add DWM/Python/timer/native-hook workarounds for the Resolve-host opaque frameless edge — the verified fix is the transparent surface plus the opaque renderer shell (live-validated 2026-08-06).
+- The `376x468` palette keeps its own separate surface contract — `transparent: true`, `backgroundColor: "#00000000"`, `roundedCorners: false`, `skipTaskbar: true`, `alwaysOnTop: true`, and the completed conceal/reveal lifecycle. Settings must not adopt palette product behavior: it stays `alwaysOnTop: false` with normal taskbar behavior.
 - Repeated Settings opens reuse and focus the singleton; it does not hide on blur or become always-on-top. Its custom drag region and accessible close button replace native title-bar controls, and overflow scrolls inside the fixed workspace.
 - Launcher, Search, and All Actions remain in the frameless fixed `376x468` palette.
 - The existing renderer bundle selects Settings through a main-process-owned `?view=settings` marker. Renderer code never sends dimensions.
@@ -335,6 +336,7 @@ onContextMenu={(event) => executeInteraction(command, event)}
 - Implicit dev-server loading for normal Electron startup.
 - Renderer-provided window dimensions or mode-specific expansion beyond the fixed palette footprint.
 - Semantic palette-mode IPC that only reapplies an identical fixed window size.
+- `setShape` on Clackly BrowserWindows (qualified Windows 11 build 26200 case): Electron 36 rectangle-only shapes alias; the verified fix is `roundedCorners: false` plus a rectangular renderer shell.
 - Hand-authored functional icon path libraries when the existing Lucide dependency provides the icon; brand assets are the exception.
 - Font-dependent SVG `<text>` wordmarks or external font/image references inside Clackly brand assets.
 - Zero-offset orange selection halos on launcher tiles; use a crisp orange border with neutral inset separation instead.
@@ -347,6 +349,7 @@ onContextMenu={(event) => executeInteraction(command, event)}
 - Route command execution through command capability metadata and a host-injected capability registry.
 - Keep Command presentation Registry-only; do not add prototype catalogs, browser fixtures, or Command-id overrides.
 - Keep palette sizing, centering, taskbar, and topmost policy in the shared Electron window helper; renderer mode changes are content-only and cross no sizing IPC.
+- Set `roundedCorners: false` on both Palette and Settings BrowserWindows and keep the shared outer renderer shell at `border-radius: 0`; express all rounding inside content controls.
 - Use Lucide for functional controls/command icons and project SVGs for the Clackly identity.
 - Draw the CLACKLY wordmark with project-owned SVG paths/shapes and keep its accessible name on the consuming `<img>`.
 - Keep launcher tile icons and one/two-line labels optically centered as one command unit.
@@ -357,6 +360,7 @@ onContextMenu={(event) => executeInteraction(command, event)}
 ## Testing Requirements
 
 - Run the package build after frontend changes: `npm run build`.
+- After any outer-window surface change, run `npm run package:win`, `npm run package:verify`, and `npm run workflow:install:package`, then require packaged Resolve manual validation of first open, repeated Palette reveals, and Settings open — unit tests cannot observe DWM composition.
 - For command search changes, run a Node-level registry assertion for the changed query and command id.
 - For renderer catalog/ranking changes, run the renderer model tests covering search boundaries, grouping, ordering, and unavailable fixtures.
 
