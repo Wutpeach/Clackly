@@ -553,3 +553,38 @@ Replaced failed DWM suppression with a transparent Settings compositor surface b
 ### Status
 
 [OK] **Completed**
+
+
+## Session 26: Extract shared window visual tokens
+
+**Date**: 2026-08-07
+**Task**: Extract shared window visual tokens
+**Branch**: `main`
+
+### Summary
+
+Finished the shared outer-window treatment: both Palette and Settings BrowserWindows now set roundedCorners:false, the shared .palette-shell/.settings-shell is rectangular (border-radius:0, --radius-window token removed), and the setShape A/B was removed after proving it aliases under Electron 36 rectangle-only shapes. Packaged Workflow package installed and user-accepted (2026-08-07): white points, aliasing, and colored edges all gone.
+
+### Main Changes
+
+- Added roundedCorners:false to both BrowserWindow contracts in window.js and pinned them in both exact option-contract tests; removed the complete setShape path and its shape test doubles.
+- Removed the one-purpose --radius-window token and set the shared outer shell border-radius:0 in styles.css; internal control/tile/rail/toolbar radii unchanged.
+- Captured the debugging retrospective in task research/bug-analysis.md (E+D root cause), updated the task PRD with experiment history and user acceptance, corrected the outer-window radius in DESIGN.md, and recorded the exact native+renderer contracts plus setShape prohibition in the frontend quality spec.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7e439a9d5cce5e08fb046879548507213e04f4df` | (see git log) |
+
+### Testing
+
+- [OK] git diff --check clean; focused window tests 19/19; full npm test 169 JS + 54 Python; npm run build; npm run package:win; npm run package:verify; npm run workflow:install:package; source/packaged/installed window.js SHA-256 match.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- User manually validated the installed package in Resolve (2026-08-07) and accepted it; task archived and journal recorded.

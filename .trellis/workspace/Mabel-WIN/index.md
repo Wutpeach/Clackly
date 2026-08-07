@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 25
-- **Last Active**: 2026-08-06
+- **Total Sessions**: 26
+- **Last Active**: 2026-08-07
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~555 | Active |
+| `journal-1.md` | ~590 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 26 | 2026-08-07 | Extract shared window visual tokens | `7e439a9d5cce5e08fb046879548507213e04f4df` | `main` |
 | 25 | 2026-08-06 | Fix Resolve Settings cyan border | `20d67d2` | `main` |
 | 24 | 2026-08-06 | Fix repeat palette invocation flicker | `f5f9770` | `main` |
 | 23 | 2026-08-06 | Diagnose Resolve startup freeze | `d43a059` | `main` |
