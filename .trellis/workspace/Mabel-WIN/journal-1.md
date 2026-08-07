@@ -588,3 +588,24 @@ Finished the shared outer-window treatment: both Palette and Settings BrowserWin
 ### Next Steps
 
 - User manually validated the installed package in Resolve (2026-08-07) and accepted it; task archived and journal recorded.
+
+
+## Session 27: Refactor Export to AE interaction and async probes
+
+**Date**: 2026-08-07
+**Task**: Refactor Export to AE interaction and async probes
+**Branch**: `main`
+
+### Summary
+
+Delivered one visible Export to After Effects card with mixed/audio/video modifier bindings, Blue-marker batch compatibility, Cyan removal, and bounded asynchronous AE path/running-state PowerShell probes. Added migration, cross-layer regression coverage, packaged and installed the Workflow plugin, and completed user validation in Resolve.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b961f30` | (see git log) |
+
+### Status
+
+[OK] **Completed**
