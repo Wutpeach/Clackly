@@ -1,11 +1,12 @@
 const path = require("node:path");
-const { BrowserWindow } = require("electron");
+const { BrowserWindow, screen } = require("electron");
 
 const DEFAULT_DEV_SERVER_PORT = "5173";
 const PALETTE_SIZE = Object.freeze({
   width: 376,
   height: 468
 });
+const PALETTE_CURSOR_GAP = 12;
 const SETTINGS_SIZE = Object.freeze({
   width: 760,
   height: 560
@@ -52,6 +53,27 @@ function isPaletteWindowShown(window) {
     return false;
   }
   return window.isVisible() && window.getOpacity() > 0;
+}
+
+function positionPaletteNearCursor(window, screenApi) {
+  const cursorPoint = screenApi.getCursorScreenPoint();
+  const workArea = screenApi.getDisplayNearestPoint(cursorPoint).workArea;
+  const { width, height } = PALETTE_SIZE;
+
+  let x = cursorPoint.x + PALETTE_CURSOR_GAP;
+  let y = cursorPoint.y + PALETTE_CURSOR_GAP;
+
+  if (x + width > workArea.x + workArea.width) {
+    x = cursorPoint.x - PALETTE_CURSOR_GAP - width;
+  }
+  if (y + height > workArea.y + workArea.height) {
+    y = cursorPoint.y - PALETTE_CURSOR_GAP - height;
+  }
+
+  x = Math.min(Math.max(x, workArea.x), workArea.x + workArea.width - width);
+  y = Math.min(Math.max(y, workArea.y), workArea.y + workArea.height - height);
+
+  window.setPosition(x, y);
 }
 
 function createPaletteWindow(BrowserWindowType = BrowserWindow) {
@@ -134,9 +156,14 @@ function openSettingsWindow(window, featureId) {
   return settingsWindow;
 }
 
-function showPaletteWindow(window) {
+function showPaletteWindow(window, options = {}) {
   if (!window || window.isDestroyed()) {
     return;
+  }
+
+  const screenApi = options.screen || screen;
+  if (screenApi) {
+    positionPaletteNearCursor(window, screenApi);
   }
 
   window.setFocusable(true);

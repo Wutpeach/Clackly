@@ -32,6 +32,21 @@ function withoutDevRenderer(callback) {
   }
 }
 
+function createShowPaletteWindow(calls) {
+  return {
+    isDestroyed: () => false,
+    isVisible: () => false,
+    getOpacity: () => 1,
+    setFocusable: (value) => calls.push(["setFocusable", value]),
+    setIgnoreMouseEvents: (value) => calls.push(["setIgnoreMouseEvents", value]),
+    setOpacity: (value) => calls.push(["setOpacity", value]),
+    setPosition: (x, y) => calls.push(["setPosition", x, y]),
+    show: () => calls.push("show"),
+    focus: () => calls.push("focus"),
+    webContents: { send: () => {} }
+  };
+}
+
 test("palette owns one fixed footprint and settings owns separate dimensions", () => {
   assert.deepEqual(PALETTE_SIZE, {
     width: 376,
@@ -134,6 +149,64 @@ test("showing a natively hidden palette restores defaults before native show", (
 test("showing the palette tolerates missing or destroyed windows", () => {
   assert.doesNotThrow(() => showPaletteWindow(null));
   assert.doesNotThrow(() => showPaletteWindow({ isDestroyed: () => true }));
+});
+
+test("palette positions below-right of the cursor before restoring visibility", () => {
+  const calls = [];
+  const window = createShowPaletteWindow(calls);
+  const screenApi = {
+    getCursorScreenPoint: () => ({ x: 100, y: 100 }),
+    getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })
+  };
+
+  showPaletteWindow(window, { screen: screenApi });
+
+  assert.deepEqual(calls, [
+    ["setPosition", 112, 112],
+    ["setFocusable", true],
+    ["setIgnoreMouseEvents", false],
+    ["setOpacity", 1],
+    "show"
+  ]);
+});
+
+test("palette flips above-left when the display would overflow right or bottom", () => {
+  const calls = [];
+  const window = createShowPaletteWindow(calls);
+  const screenApi = {
+    getCursorScreenPoint: () => ({ x: 1800, y: 900 }),
+    getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })
+  };
+
+  showPaletteWindow(window, { screen: screenApi });
+
+  assert.deepEqual(calls[0], ["setPosition", 1412, 420]);
+});
+
+test("palette clamps into a negative-coordinate display work area", () => {
+  const calls = [];
+  const window = createShowPaletteWindow(calls);
+  const screenApi = {
+    getCursorScreenPoint: () => ({ x: -100, y: 50 }),
+    getDisplayNearestPoint: () => ({ workArea: { x: -1920, y: 0, width: 1920, height: 1080 } })
+  };
+
+  showPaletteWindow(window, { screen: screenApi });
+
+  assert.deepEqual(calls[0], ["setPosition", -488, 62]);
+});
+
+test("palette clamps into the work area when flipped placement would overflow", () => {
+  const calls = [];
+  const window = createShowPaletteWindow(calls);
+  const screenApi = {
+    getCursorScreenPoint: () => ({ x: 0, y: 500 }),
+    getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 376, height: 1080 } })
+  };
+
+  showPaletteWindow(window, { screen: screenApi });
+
+  assert.deepEqual(calls[0], ["setPosition", 0, 512]);
 });
 
 test("isPaletteWindowShown requires native visibility and positive opacity", () => {
