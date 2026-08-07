@@ -35,13 +35,27 @@ export function canExecuteCommand(command) {
   return canExecuteFeature(command.featureStatus);
 }
 
+export function isCommandPresentable(command) {
+  return Boolean(command) && command.presentation !== "internal";
+}
+
 export function createPresentationCatalog(realCommands, statuses = []) {
   return joinFeatureStatuses(realCommands, statuses)
+    .filter((command) => isCommandPresentable(command))
     .filter((command) => isFeatureVisible(command.featureStatus))
     .map((command) => ({
     ...command,
     available: true
   }));
+}
+
+export function getInteractionHelpCommands(commands, capabilityId, bindings) {
+  return commands
+    .filter((command) => (
+      command.capability === capabilityId && isCommandPresentable(command)
+    ))
+    .map((command) => ({ ...command, help: getInteractionHelp(command, commands, bindings) }))
+    .filter((command) => command.help.length > 0);
 }
 
 export function getCommandHint(command) {

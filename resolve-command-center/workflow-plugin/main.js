@@ -8,6 +8,7 @@ const {
   isPaletteWindowShown
 } = require("../electron/main/window");
 const { getPaletteAccelerator, registerPaletteHotkey } = require("../electron/main/hotkey");
+const { composeStartup } = require("../electron/main/composeStartup");
 const { getCommandById, getCommands, searchCommands } = require("../command-engine/registry");
 const { createCommandExecutor } = require("../command-engine/executor");
 const { createCapabilityRegistry } = require("../capability/registry");
@@ -294,13 +295,14 @@ if (!hasSingleInstanceLock) {
       dialog.showErrorBox("Clackly", error.message);
     }
 
-    initializeAfterEffectsPath(configManager);
-    paletteWindow = createPaletteWindow();
-    registerIpcHandlers();
-    const hotkeyRegistered = registerPaletteHotkey(togglePalette);
-    if (!hotkeyRegistered) {
-      handleHotkeyRegistrationFailure();
-    }
+    paletteWindow = composeStartup({
+      initializeAfterEffectsPath: () => initializeAfterEffectsPath(configManager),
+      createPaletteWindow,
+      registerIpcHandlers,
+      registerPaletteHotkey: () => registerPaletteHotkey(togglePalette),
+      reportInitializationError: (error) => dialog.showErrorBox("Clackly", error.message),
+      handleHotkeyRegistrationFailure
+    }).paletteWindow;
   });
 
   app.on("will-quit", () => {

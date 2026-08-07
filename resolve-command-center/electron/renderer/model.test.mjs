@@ -7,10 +7,12 @@ import {
   getCommandHint,
   getFeatureWarning,
   getInteractionHelp,
+  getInteractionHelpCommands,
   getRecoveryAction,
   getSettingsControl,
   groupFeaturesByCategory,
   groupCommands,
+  isCommandPresentable,
   isFeatureVisible,
   joinFeatureStatuses,
   rankCommands
@@ -74,6 +76,77 @@ test("presentation catalog preserves registered command metadata only", () => {
   assert.equal(catalog[0].category, "Timeline");
   assert.equal(catalog[0].icon, "marker");
   assert.equal(Object.hasOwn(catalog[0], "shortcut"), false);
+});
+
+test("presentation catalog hides internal Commands from every palette surface", () => {
+  const visible = {
+    id: "timeline.exportToAfterEffects",
+    capability: "ae.export",
+    name: "Export to After Effects",
+    description: "Automatically send the current Resolve selection to After Effects",
+    category: "Export",
+    icon: "send",
+    keywords: ["after effects"],
+    presentation: "visible"
+  };
+  const internal = {
+    ...visible,
+    id: "timeline.exportAudioToAfterEffects",
+    name: "Export Audio to After Effects",
+    description: "Send the current Resolve audio selection to After Effects",
+    keywords: ["audio"],
+    presentation: "internal"
+  };
+  const status = {
+    id: "ae.export",
+    installed: true,
+    enabled: true,
+    status: "ready",
+    message: null,
+    details: { missing: [], action: null }
+  };
+
+  assert.equal(isCommandPresentable(visible), true);
+  assert.equal(isCommandPresentable(internal), false);
+  assert.equal(isCommandPresentable(null), false);
+  assert.deepEqual(
+    createPresentationCatalog([visible, internal], [status]).map(({ id }) => id),
+    ["timeline.exportToAfterEffects"]
+  );
+});
+
+test("internal action descriptions resolve under visible targets but never create help headings", () => {
+  const target = {
+    id: "timeline.exportToAfterEffects",
+    capability: "ae.export",
+    name: "Export to After Effects",
+    description: "Automatically send the current Resolve selection to After Effects",
+    presentation: "visible"
+  };
+  const audioAction = {
+    id: "timeline.exportAudioToAfterEffects",
+    capability: "ae.export",
+    name: "Export Audio to After Effects",
+    description: "Send the current Resolve audio selection to After Effects",
+    presentation: "internal"
+  };
+  const commands = [target, audioAction];
+  const bindings = [{
+    id: "audio",
+    target: target.id,
+    trigger: { type: "mouse", button: "left", modifiers: ["CTRL"] },
+    action: { command: audioAction.id }
+  }];
+
+  assert.deepEqual(getInteractionHelp(target, commands, bindings), [
+    { label: "Ctrl + Click", description: "Send the current Resolve audio selection to After Effects" }
+  ]);
+  assert.deepEqual(getInteractionHelpCommands(commands, "ae.export", bindings).map(({ id }) => id), [
+    "timeline.exportToAfterEffects"
+  ]);
+  assert.deepEqual(getInteractionHelpCommands(commands, "ae.export", []), []);
+  assert.deepEqual(getInteractionHelpCommands([audioAction], "ae.export", bindings), []);
+  assert.deepEqual(getInteractionHelpCommands(commands, "other.capability", bindings), []);
 });
 
 test("feature lifecycle projection drives visibility, execution, warning, and recovery", () => {

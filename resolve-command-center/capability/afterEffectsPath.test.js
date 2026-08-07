@@ -6,10 +6,10 @@ const test = require("node:test");
 
 const { initializeAfterEffectsPath } = require("./afterEffectsPath");
 
-function withTempDir(callback) {
+async function withTempDir(callback) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "clackly-ae-path-"));
   try {
-    return callback(directory);
+    return await callback(directory);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
@@ -48,16 +48,40 @@ function createConfig(initial = {}) {
   };
 }
 
+function strategyMiss(executable, args, options, callback) {
+  callback(Object.assign(new Error("strategy miss"), { code: 1 }));
+}
+
+function deferredProbe(result) {
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  return {
+    execFile: (executable, args, options, callback) => {
+      gate.then(() => callback(null, result));
+    },
+    release: () => release()
+  };
+}
+
 test("a valid saved path short-circuits discovery and configuration writes", () => (
   withTempDir((directory) => {
     const saved = createFile(path.join(directory, "manual", "AfterFX.exe"));
     const config = createConfig({ aePath: saved, prefix: "Manual" });
+    const calls = [];
 
-    assert.equal(initializeAfterEffectsPath(config.manager, {
+    return initializeAfterEffectsPath(config.manager, {
       platform: "win32",
-      execFileSync: () => assert.fail("discovery must not run")
-    }), saved);
-    assert.deepEqual(config.getMutations(), []);
+      execFile: (...args) => {
+        calls.push(args);
+        return Promise.resolve("");
+      }
+    }).then((result) => {
+      assert.equal(result, saved);
+      assert.deepEqual(calls, []);
+      assert.deepEqual(config.getMutations(), []);
+    });
   })
 ));
 
@@ -67,16 +91,22 @@ test("a running After Effects process wins over registry and standard installs",
     createFile(path.join(directory, "Adobe", "Adobe After Effects 2099", "Support Files", "AfterFX.exe"));
     const config = createConfig();
 
-    assert.equal(initializeAfterEffectsPath(config.manager, {
+    return initializeAfterEffectsPath(config.manager, {
       environment: { ProgramFiles: directory },
       platform: "win32",
-      execFileSync: (executable, args) => {
+      execFile: (executable, args, options, callback) => {
         assert.equal(executable, "powershell.exe");
+        assert.equal(options.timeout, 5000);
+        assert.equal(options.shell, false);
+        assert.equal(options.windowsHide, true);
+        assert.equal(options.encoding, "utf8");
         assert.match(args.at(-1), /OutputEncoding=.*UTF8Encoding/);
-        return `\n${running}\n`;
+        callback(null, `\n${running}\n`);
       }
-    }), running);
-    assert.deepEqual(config.getMutations(), [["update", { aePath: running }]]);
+    }).then((result) => {
+      assert.equal(result, running);
+      assert.deepEqual(config.getMutations(), [["update", { aePath: running }]]);
+    });
   })
 ));
 
@@ -88,24 +118,27 @@ test("process failure falls back through App Paths hives", () => (
     const calls = [];
     const config = createConfig();
 
-    assert.equal(initializeAfterEffectsPath(config.manager, {
+    return initializeAfterEffectsPath(config.manager, {
       environment: { ae_test_root: registeredRoot, ProgramFiles: directory },
       platform: "win32",
-      execFileSync: (executable, args) => {
+      execFile: (executable, args, options, callback) => {
         calls.push([executable, ...args]);
         const command = args.at(-1);
-        if (command.includes("Get-Process")) throw new Error("not running");
-        if (command.includes("HKEY_CURRENT_USER")) throw new Error("missing key");
+        if (command.includes("Get-Process")) return callback(Object.assign(new Error("not running"), { code: 1 }));
+        if (command.includes("HKEY_CURRENT_USER")) return callback(Object.assign(new Error("missing key"), { code: 1 }));
         assert.match(command, /HKEY_LOCAL_MACHINE/);
         assert.match(command, /OutputEncoding=.*UTF8Encoding/);
-        return `"%AE_TEST_ROOT%${path.sep}AfterFX.exe"\r\n`;
+        assert.equal(options.timeout, 5000);
+        callback(null, `"%AE_TEST_ROOT%${path.sep}AfterFX.exe"\r\n`);
       }
-    }), registered);
-    assert.deepEqual(calls.map(([executable]) => executable), [
-      "powershell.exe",
-      "powershell.exe",
-      "powershell.exe"
-    ]);
+    }).then((result) => {
+      assert.equal(result, registered);
+      assert.deepEqual(calls.map(([executable]) => executable), [
+        "powershell.exe",
+        "powershell.exe",
+        "powershell.exe"
+      ]);
+    });
   })
 ));
 
@@ -128,11 +161,13 @@ test("standard discovery chooses the highest numeric After Effects version", () 
     const config = createConfig();
 
     assert.notEqual(older, newest);
-    assert.equal(initializeAfterEffectsPath(config.manager, {
+    return initializeAfterEffectsPath(config.manager, {
       environment: { ProgramW6432: directory },
       platform: "win32",
-      execFileSync: () => { throw new Error("strategy miss"); }
-    }), newest);
+      execFile: strategyMiss
+    }).then((result) => {
+      assert.equal(result, newest);
+    });
   })
 ));
 
@@ -141,50 +176,56 @@ test("a stale saved path is replaced while sibling settings are preserved", () =
     const replacement = createFile(path.join(directory, "AfterFX.exe"));
     const config = createConfig({ aePath: path.join(directory, "missing.exe"), prefix: "Keep" });
 
-    initializeAfterEffectsPath(config.manager, {
+    return initializeAfterEffectsPath(config.manager, {
       platform: "win32",
-      execFileSync: (executable) => {
-        if (executable === "powershell.exe") return replacement;
+      execFile: (executable, args, options, callback) => {
+        if (executable === "powershell.exe") return callback(null, replacement);
         throw new Error("unexpected registry query");
       }
+    }).then(() => {
+      assert.deepEqual(config.getValues(), { aePath: replacement, prefix: "Keep" });
+      assert.deepEqual(config.getMutations(), [["update", { aePath: replacement }]]);
     });
-
-    assert.deepEqual(config.getValues(), { aePath: replacement, prefix: "Keep" });
-    assert.deepEqual(config.getMutations(), [["update", { aePath: replacement }]]);
   })
 ));
 
 test("a stale path with no replacement is removed without clearing sibling settings", () => {
   const config = createConfig({ aePath: "Z:/missing/AfterFX.exe", prefix: "Keep" });
 
-  assert.equal(initializeAfterEffectsPath(config.manager, {
+  return initializeAfterEffectsPath(config.manager, {
     environment: {},
     platform: "win32",
-    execFileSync: () => { throw new Error("strategy miss"); }
-  }), null);
-  assert.deepEqual(config.getValues(), { prefix: "Keep" });
-  assert.deepEqual(config.getMutations(), [["save", { prefix: "Keep" }]]);
+    execFile: strategyMiss
+  }).then((result) => {
+    assert.equal(result, null);
+    assert.deepEqual(config.getValues(), { prefix: "Keep" });
+    assert.deepEqual(config.getMutations(), [["save", { prefix: "Keep" }]]);
+  });
 });
 
 test("no discovery result is a no-op when no path was configured", () => {
   const config = createConfig({ prefix: "Keep" });
 
-  initializeAfterEffectsPath(config.manager, {
+  return initializeAfterEffectsPath(config.manager, {
     environment: {},
     platform: "win32",
-    execFileSync: () => { throw new Error("strategy miss"); }
+    execFile: strategyMiss
+  }).then((result) => {
+    assert.equal(result, null);
+    assert.deepEqual(config.getMutations(), []);
   });
-  assert.deepEqual(config.getMutations(), []);
 });
 
 test("non-Windows startup does not discover or mutate a stale path", () => {
   const config = createConfig({ aePath: "/missing/AfterFX", prefix: "Keep" });
 
-  assert.equal(initializeAfterEffectsPath(config.manager, {
+  return initializeAfterEffectsPath(config.manager, {
     platform: "darwin",
-    execFileSync: () => assert.fail("discovery must not run")
-  }), null);
-  assert.deepEqual(config.getMutations(), []);
+    execFile: () => assert.fail("discovery must not run")
+  }).then((result) => {
+    assert.equal(result, null);
+    assert.deepEqual(config.getMutations(), []);
+  });
 });
 
 test("configuration write failures remain visible", () => (
@@ -192,27 +233,106 @@ test("configuration write failures remain visible", () => (
     const discovered = createFile(path.join(directory, "AfterFX.exe"));
     const configManager = {
       get: () => ({}),
-      update: () => { throw new Error("configuration write failed"); }
+      update: () => {
+        throw new Error("configuration write failed");
+      }
     };
 
-    assert.throws(() => initializeAfterEffectsPath(configManager, {
-      platform: "win32",
-      execFileSync: () => discovered
-    }), /configuration write failed/);
+    return assert.rejects(
+      initializeAfterEffectsPath(configManager, {
+        platform: "win32",
+        execFile: (executable, args, options, callback) => callback(null, discovered)
+      }),
+      /configuration write failed/
+    );
   })
 ));
 
-test("both hosts initialize the path before exposing palette and IPC", () => {
-  const standalone = fs.readFileSync(path.join(__dirname, "../electron/main/main.js"), "utf8");
-  const workflow = fs.readFileSync(path.join(__dirname, "../workflow-plugin/main.js"), "utf8");
-  const assertOrder = (source, after = "app.whenReady()") => {
-    const ready = source.indexOf(after);
-    const initialize = source.indexOf("initializeAfterEffectsPath(configManager);", ready);
-    assert.ok(ready >= 0 && initialize > ready);
-    assert.ok(initialize < source.indexOf("paletteWindow = createPaletteWindow();", ready));
-    assert.ok(initialize < source.indexOf("registerIpcHandlers();", ready));
-  };
+test("a deferred valid manual save wins over a discovered path", () => (
+  withTempDir((directory) => {
+    const discovered = createFile(path.join(directory, "discovered", "AfterFX.exe"));
+    const manual = createFile(path.join(directory, "manual", "AfterFX.exe"));
+    const probe = deferredProbe(discovered);
+    const config = createConfig({ prefix: "Keep" });
 
-  assertOrder(standalone);
-  assertOrder(workflow, "await initializeWorkflowIntegration();");
-});
+    const initialization = initializeAfterEffectsPath(config.manager, {
+      platform: "win32",
+      execFile: probe.execFile
+    });
+    config.manager.update("ae.export", { aePath: manual, prefix: "Keep" });
+    probe.release();
+
+    return initialization.then((result) => {
+      assert.equal(result, manual);
+      assert.deepEqual(config.getValues(), { aePath: manual, prefix: "Keep" });
+      assert.deepEqual(config.getMutations(), [["update", { aePath: manual, prefix: "Keep" }]]);
+    });
+  })
+));
+
+test("a deferred reset that keeps the field absent still writes auto-discovery", () => (
+  withTempDir((directory) => {
+    const discovered = createFile(path.join(directory, "discovered", "AfterFX.exe"));
+    const probe = deferredProbe(discovered);
+    const config = createConfig({ prefix: "Keep" });
+
+    const initialization = initializeAfterEffectsPath(config.manager, {
+      platform: "win32",
+      execFile: probe.execFile
+    });
+    config.manager.save("ae.export", { prefix: "Keep" });
+    probe.release();
+
+    return initialization.then((result) => {
+      assert.equal(result, discovered);
+      assert.deepEqual(config.getValues(), { aePath: discovered, prefix: "Keep" });
+      assert.deepEqual(config.getMutations(), [
+        ["save", { prefix: "Keep" }],
+        ["update", { aePath: discovered }]
+      ]);
+    });
+  })
+));
+
+test("a deferred reset that removed an initially stale path stays reset", () => (
+  withTempDir((directory) => {
+    const discovered = createFile(path.join(directory, "discovered", "AfterFX.exe"));
+    const probe = deferredProbe(discovered);
+    const config = createConfig({ aePath: "Z:/missing/AfterFX.exe", prefix: "Keep" });
+
+    const initialization = initializeAfterEffectsPath(config.manager, {
+      platform: "win32",
+      execFile: probe.execFile
+    });
+    config.manager.save("ae.export", { prefix: "Keep" });
+    probe.release();
+
+    return initialization.then((result) => {
+      assert.equal(result, null);
+      assert.deepEqual(config.getValues(), { prefix: "Keep" });
+      assert.deepEqual(config.getMutations(), [["save", { prefix: "Keep" }]]);
+    });
+  })
+));
+
+test("a deferred valid manual replacement of a stale path is preserved", () => (
+  withTempDir((directory) => {
+    const discovered = createFile(path.join(directory, "discovered", "AfterFX.exe"));
+    const manual = createFile(path.join(directory, "manual", "AfterFX.exe"));
+    const probe = deferredProbe(discovered);
+    const config = createConfig({ aePath: "Z:/missing/AfterFX.exe", prefix: "Keep" });
+
+    const initialization = initializeAfterEffectsPath(config.manager, {
+      platform: "win32",
+      execFile: probe.execFile
+    });
+    config.manager.update("ae.export", { aePath: manual, prefix: "Keep" });
+    probe.release();
+
+    return initialization.then((result) => {
+      assert.equal(result, manual);
+      assert.deepEqual(config.getValues(), { aePath: manual, prefix: "Keep" });
+      assert.deepEqual(config.getMutations(), [["update", { aePath: manual, prefix: "Keep" }]]);
+    });
+  })
+));

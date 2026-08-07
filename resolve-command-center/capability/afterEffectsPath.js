@@ -1,6 +1,7 @@
 const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const { runExecFile } = require("./powerShell");
 
 const CAPABILITY_ID = "ae.export";
 
@@ -17,26 +18,19 @@ function isFile(filePath, fileSystem) {
   }
 }
 
-function run(executable, args, execFileSync) {
-  return String(execFileSync(executable, args, {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-    windowsHide: true
-  }));
-}
-
-function findRunningPath({ execFileSync, fileSystem }) {
+async function findRunningPath({ execFile, fileSystem }) {
   try {
-    const output = run("powershell.exe", [
+    const output = await runExecFile(execFile, "powershell.exe", [
       "-NoProfile",
       "-NonInteractive",
       "-Command",
       "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); $ErrorActionPreference='SilentlyContinue'; Get-Process -Name AfterFX | ForEach-Object { $_.Path }"
-    ], execFileSync);
+    ]);
     return output.split(/\r?\n/).map(cleanPath).find((candidate) => (
       isFile(candidate, fileSystem)
     )) || null;
   } catch (_error) {
+    // A missing process, timeout, or malformed candidate is an expected miss.
     return null;
   }
 }
@@ -48,17 +42,17 @@ function findEnvironmentValue(environment, name) {
   return key ? environment[key] : undefined;
 }
 
-function findAppPath({ environment, execFileSync, fileSystem }) {
+async function findAppPath({ environment, execFile, fileSystem }) {
   const key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\AfterFX.exe";
   for (const hive of ["HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE"]) {
     try {
       const registryPath = `Registry::${hive}\\${key}`;
-      const output = run("powershell.exe", [
+      const output = await runExecFile(execFile, "powershell.exe", [
         "-NoProfile",
         "-NonInteractive",
         "-Command",
         `[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); (Get-Item -LiteralPath '${registryPath}' -ErrorAction Stop).GetValue('', $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)`
-      ], execFileSync);
+      ]);
       const candidate = cleanPath(output).replace(/%([^%]+)%/g, (token, name) => (
         findEnvironmentValue(environment, name) || token
       ));
@@ -112,15 +106,17 @@ function findStandardPath({ environment, fileSystem }) {
   return candidates[0] ? candidates[0].filePath : null;
 }
 
-function discoverAfterEffectsPath(options) {
-  return findRunningPath(options)
-    || findAppPath(options)
-    || findStandardPath(options);
+async function discoverAfterEffectsPath(options) {
+  const running = await findRunningPath(options);
+  if (running) return running;
+  const registered = await findAppPath(options);
+  if (registered) return registered;
+  return findStandardPath(options);
 }
 
-function initializeAfterEffectsPath(configManager, {
+async function initializeAfterEffectsPath(configManager, {
   environment = process.env,
-  execFileSync = childProcess.execFileSync,
+  execFile = childProcess.execFile,
   fileSystem = fs,
   platform = process.platform
 } = {}) {
@@ -128,14 +124,29 @@ function initializeAfterEffectsPath(configManager, {
   if (isFile(values.aePath, fileSystem)) return values.aePath;
   if (platform !== "win32") return null;
 
-  const aePath = discoverAfterEffectsPath({ environment, execFileSync, fileSystem });
+  const hadAePath = Object.hasOwn(values, "aePath");
+  const startingAePath = hadAePath ? values.aePath : null;
+
+  const aePath = await discoverAfterEffectsPath({ environment, execFile, fileSystem });
+  const current = configManager.get(CAPABILITY_ID);
+
   if (aePath) {
-    configManager.update(CAPABILITY_ID, { aePath });
-    return aePath;
+    if (hadAePath) {
+      if (Object.hasOwn(current, "aePath") && current.aePath === startingAePath) {
+        configManager.update(CAPABILITY_ID, { aePath });
+        return aePath;
+      }
+      return isFile(current.aePath, fileSystem) ? current.aePath : null;
+    }
+    if (!Object.hasOwn(current, "aePath")) {
+      configManager.update(CAPABILITY_ID, { aePath });
+      return aePath;
+    }
+    return isFile(current.aePath, fileSystem) ? current.aePath : null;
   }
 
-  if (Object.hasOwn(values, "aePath")) {
-    const remaining = { ...values };
+  if (hadAePath && Object.hasOwn(current, "aePath") && current.aePath === startingAePath) {
+    const remaining = { ...current };
     delete remaining.aePath;
     configManager.save(CAPABILITY_ID, remaining);
   }

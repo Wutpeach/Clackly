@@ -104,7 +104,7 @@ test("a discovered manifest executes its Python feature through the command path
   }
 });
 
-test("bundled After Effects manifests expose one Feature and four Commands", () => {
+test("bundled After Effects manifests expose one Feature, one visible Command, and five internal actions", () => {
   const definitions = loadCapabilityDefinitions();
   const aeDefinitions = definitions.filter(({ id }) => id === "ae.export");
   assert.equal(aeDefinitions.length, 1);
@@ -112,7 +112,9 @@ test("bundled After Effects manifests expose one Feature and four Commands", () 
   assert.equal(aeDefinitions[0].executor.entry, "scripts/resolve2ae_export.py");
 
   const commands = loadCommands().filter(({ capability }) => capability === "ae.export");
-  assert.equal(commands.length, 4);
+  assert.equal(commands.length, 6);
+  assert.equal(commands.filter((command) => command.presentation === "internal").length, 5);
+  assert.equal(commands.filter((command) => command.presentation !== "internal").length, 1);
   assert.equal(commands.every((command) => !("mode" in command) && !("runtime" in command)), true);
 
   const registry = createCapabilityRegistry();

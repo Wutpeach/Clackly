@@ -25,14 +25,15 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
   - `window.resolveCommandCenter.hidePalette() -> void`
   - `window.resolveCommandCenter.onPaletteShown(callback: () -> void) -> () -> void`
 - Command shape:
-  - `{ id: string, name: string, description: string, category: string, icon: string, keywords: string[], capability: string }`
+  - `{ id: string, name: string, description: string, category: string, icon: string, keywords: string[], capability: string, presentation?: "visible" | "internal" }`
 
 ### 3. Contracts
 
 - Renderer search uses command metadata only: `id`, `name`, and `keywords`.
+- `presentation` defaults to `visible`; internal Commands stay executable and resolvable for action descriptions but never appear in Launcher, Search, All Actions, or Settings help targets. One shared `isCommandPresentable()` predicate owns that filter in both the command registry and the renderer presentation model; no renderer branch names a Command id or capability.
+- Renderer presentation contains registered Commands only. Browser preview returns an empty catalog, and pinned/recent state starts empty.
 - Launcher, Search, All Actions, ranking, icons, accessibility names, and generic hints preserve registered Command Metadata; renderer code contains no Command-id presentation override.
 - Renderer execution sends only the selected `commandId`.
-- Renderer presentation contains registered Commands only. Browser preview returns an empty catalog, and pinned/recent state starts empty.
 - Command shortcut badges are absent until an authoritative presentation contract exists.
 - Renderer palette modes are content-only state: Launcher, Search, and All Actions share the fixed `376x468` window footprint, and mode changes never cross a renderer-to-main sizing IPC.
 - Palette construction owns the fixed footprint, initial centering, taskbar skipping, and the stable always-on-top policy; showing performs one visibility/focus transition plus a `palette:shown` notification, and hiding conceals the transparent window in place without destroying its native surface.
@@ -70,6 +71,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Assert query matching returns expected command ids for names and keywords.
 - Assert presentation category text alone does not match a command.
 - Assert registered Command presentation is preserved, the empty catalog stays empty, and no shortcut/prototype entries are synthesized.
+- Assert Launcher, Search, and All Actions exclude `presentation: "internal"` Commands while `listCommands()`/`getCommandById()` still return them, and that the shared presentability predicate has no Command-id branches.
 - Assert the palette owns one fixed `376x468` footprint, first show uses native `show`, repeat show reveals a concealed window without native `show`, hide conceals in place, and both hosts toggle on the logical shown predicate.
 - Assert the `.palette-shell` suppresses only its own focus outline while control `:focus-visible` rules remain.
 - Assert renderer uses preload APIs instead of direct Node or Resolve imports.
@@ -308,6 +310,7 @@ if (!canExecuteCommand(command)) {
 - Run Interaction unit tests, `npm test`, and `npm run build`.
 - Search renderer/preload interaction routing for Capability mapping, double-click handlers, and shortcut-manager coupling.
 - Assert the renderer model joins target bindings to remapped action Command descriptions, preserves normalized left/right/modifier order, and handles empty/unresolved bindings.
+- Assert visible targets resolve internal action Command descriptions for interaction help while help targets themselves never include internal Commands.
 
 ### 7. Wrong vs Correct
 

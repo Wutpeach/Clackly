@@ -9,30 +9,53 @@
     "capability": "ae.export"
   },
   {
-    "id": "timeline.exportCurrentToAfterEffects",
-    "name": "Export Current Clip to After Effects",
-    "description": "Send the current Resolve clip to After Effects",
+    "id": "timeline.exportAudioToAfterEffects",
+    "name": "Export Audio to After Effects",
+    "description": "Send the current Resolve audio selection to After Effects",
     "category": "Export",
     "icon": "send",
-    "keywords": ["after effects", "ae", "export", "current", "clip"],
-    "capability": "ae.export"
+    "keywords": ["after effects", "ae", "export", "audio"],
+    "capability": "ae.export",
+    "presentation": "internal"
+  },
+  {
+    "id": "timeline.exportVideoToAfterEffects",
+    "name": "Export Video to After Effects",
+    "description": "Send the current Resolve video selection to After Effects",
+    "category": "Export",
+    "icon": "send",
+    "keywords": ["after effects", "ae", "export", "video"],
+    "capability": "ae.export",
+    "presentation": "internal"
+  },
+  {
+    "id": "timeline.exportCurrentToAfterEffects",
+    "name": "Export Playhead Clip to After Effects",
+    "description": "Send the topmost clip under the playhead with its audio to After Effects",
+    "category": "Export",
+    "icon": "send",
+    "keywords": ["after effects", "ae", "export", "playhead", "clip"],
+    "capability": "ae.export",
+    "presentation": "internal"
   },
   {
     "id": "timeline.exportBlueRangeToAfterEffects",
-    "name": "Export Blue Marker Range to After Effects",
+    "name": "Export Blue Marker Range Video to After Effects",
     "description": "Send video in the Blue marker range to After Effects",
     "category": "Export",
     "icon": "send",
-    "keywords": ["after effects", "ae", "export", "blue", "marker", "range"],
-    "capability": "ae.export"
+    "keywords": ["after effects", "ae", "export", "blue", "marker", "range", "video"],
+    "capability": "ae.export",
+    "presentation": "internal"
   },
   {
     "id": "timeline.exportCyanRangeToAfterEffects",
-    "name": "Export Cyan Marker Range with Audio to After Effects",
-    "description": "Send video and audio in the Cyan marker range to After Effects",
+    "name": "Export Blue Marker Range with Audio to After Effects",
+    "description": "Send video and audio in the Blue marker range to After Effects",
     "category": "Export",
     "icon": "send",
-    "keywords": ["after effects", "ae", "export", "cyan", "marker", "range", "audio"],
-    "capability": "ae.export"
+    "keywords": ["after effects", "ae", "export", "blue", "marker", "range", "audio"],
+    "capability": "ae.export",
+    "presentation": "internal"
   }
 ]

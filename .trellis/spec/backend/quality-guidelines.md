@@ -17,10 +17,11 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 
 ### 2. Signatures
 
-- Command manifest: `{ id: string, name: string, description: string, category: string, icon: string, keywords: string[], capability: string }`
+- Command manifest: `{ id: string, name: string, description: string, category: string, icon: string, keywords: string[], capability: string, presentation?: "visible" | "internal" }`
 - Capability metadata: `{ id: string, name: string, description: string, category: string, icon: string, version: string, type: string, providers: string[], executor?: { type: "script", runtime: string, entry: string }, configSchema: object }`
 - Capability registry: `createCapabilityRegistry() -> { register(capabilityId, capability), get(capabilityId), getMetadata(capabilityId), getAllCapabilities() }`
 - Command executor: `createCommandExecutor({ capabilityRegistry, configManager, findCommand? }) -> executeCommand(commandId)`
+- Command registry lookup: `getCommands() -> Command[]`, `getCommandById(id) -> Command | null`, `searchCommands(query) -> Command[]`, and `isCommandPresentable(command) -> boolean`.
 - Capability execution: `capability.execute(command, { config })`, where `config.get(key)` is scoped to that capability.
 - Marker capability: `createMarkerCapability(backends) -> { metadata, add(options?), execute(command, context?), selectBackend() }`
 - Unavailable error: `CapabilityUnavailableError(capability, attemptedBackends)`
@@ -30,6 +31,8 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 
 - `command-engine/` validates and routes the `capability` string only. It must not import Resolve APIs, bridge transport, or keyboard implementations.
 - Command Registry requires non-empty `description`, `category`, and `icon`, returns only the fixed Command shape, and keeps search limited to id/name/keywords.
+- `presentation` defaults to `visible`. `getCommands()` and `getCommandById()` return every installed Command including internal ones, so Interaction dispatch and help can resolve internal action descriptions.
+- `searchCommands()` and every target presentation surface exclude `presentation: "internal"`. One generic `isCommandPresentable()` predicate owns that filter; no layer branches on Command ids or capabilities.
 - Each host creates a capability registry, registers its host-backed capability objects, and injects the registry into the command executor.
 - Registered capabilities keep descriptive data under `capability.metadata`; `register(capabilityId, capability)` and `get(capabilityId)` retain their existing execution-object behavior.
 - Every capability declares `metadata.configSchema`; use `{}` when it has no settings. Registry registration validates the schema before storing the capability.
@@ -80,6 +83,7 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - Assert missing, malformed, id-mismatched, and sparse-provider metadata cannot register.
 - Assert handwritten capabilities without `executor` remain valid and malformed script executor metadata cannot register.
 - Assert command registry preserves search while returning capability metadata.
+- Assert exact default-visible, list/search/internal filtering, and one generic presentability predicate with no Command-id branches.
 - Assert Command Registry requires presentation fields, defensively clones keywords, and omits unsupported help/executor fields.
 - Assert ShortcutManager mapping, no-executor behavior, and injected-executor request shape.
 - Assert bridge availability uses `/health` and marker execution preserves the existing command-id HTTP payload.
@@ -425,7 +429,7 @@ const result = await runtimeProbe.probe({
 - Schema labels: `resolveSchemaFieldLabel(key, field) -> string` and `withResolvedSchemaLabels(schema) -> cloned schema`.
 - Storage: `new ConfigStorage(filePath)`, `ConfigStorage.fromAppData(appDataPath)`, `load()`, and `save(config)`.
 - Manager: `new ConfigManager({ capabilityRegistry, storage, validator? })` with `save(capabilityId, values, { requireComplete? })`, `get(capabilityId, key?)`, `update(capabilityId, patch)`, `reset(capabilityId)`, `assertConfigured(capabilityId)`, and `forCapability(capabilityId)`.
-- AE initializer: `initializeAfterEffectsPath(configManager, { environment?, execFileSync?, fileSystem?, platform? }?) -> string | null`.
+- AE initializer: `initializeAfterEffectsPath(configManager, { environment?, execFile?, fileSystem?, platform? }?) -> Promise<string | null>`.
 - Executor context: `capability.execute(command, { config: configManager.forCapability(command.capability) })`.
 
 ### 3. Contracts
@@ -436,7 +440,11 @@ const result = await runtimeProbe.probe({
 - A non-empty explicit Schema `field.label` wins; otherwise the shared label utility formats camelCase and `.`, `_`, `-` separators. ConfigManager uses it for missing-required projections, and FeatureCatalog returns cloned schemas with resolved labels.
 - String-like types are strings, numbers are finite, booleans are booleans, and select values must match declared options. This layer does not inspect paths/folders or parse colors.
 - Settings IPC calls `save(..., { requireComplete: true })` so missing required fields fail before persistence; non-UI callers may still save partial drafts before `assertConfigured()` gates execution.
-- Both hosts call the same capability-owned initializer after Electron becomes ready and before creating windows or registering IPC. The initializer keeps a valid saved value without discovery or writes; on Windows, a missing or stale `ae.export.aePath` tries the running process, HKCU/HKLM App Paths, then the highest numeric standard Adobe installation, accepting existing files only.
+- Each host starts a named initialization Promise during `app.whenReady()` and attaches its rejection handler immediately; palette creation and IPC/hotkey registration never await it, so first-run discovery never gates readiness and no background Promise goes unobserved.
+- The initializer keeps a valid saved value without discovery or writes; on Windows, a missing or stale `ae.export.aePath` awaits the running process and HKCU/HKLM App Paths strategies in precedence order, then the synchronous highest-numeric standard Adobe scan, accepting existing files only.
+- Every PowerShell strategy runs through the shared bounded `execFile` helper with a 5,000 ms timeout, `shell: false`, `windowsHide: true`, explicit UTF-8 output, and injected seams so tests never start real PowerShell. Expected non-zero exit, timeout, missing process/key, and malformed candidate are strategy misses that continue the chain.
+- The initializer snapshots whether `aePath` existed and its exact starting value; after every awaited subprocess and immediately before update/removal it re-reads the capability values and applies compare-before-write: initially absent -> write if still absent (an indistinguishable Reset intentionally keeps auto-discovery); initially stale -> write/remove only if the same stale value is still present; a new/different valid manual value -> return it without mutation; a reset that removed an initially stale value -> preserved without repopulation.
+- Same-host compare-before-write reduces configuration races; cross-host persistence remains the existing last-writer-wins ceiling with no CAS, locking, or tombstones. Unexpected ConfigManager/storage failure propagates once to the host error-dialog/log surface; expected discovery misses resolve normally.
 - Capability-specific discovery never reads or writes `config.json` directly. It updates only `aePath` through `ConfigManager.update()` and, when a stale value has no replacement, removes only that key through partial `ConfigManager.save()` so sibling values and generic missing-config recovery remain intact.
 - Expected process, registry, and directory misses fall through without making startup fatal. ConfigManager/storage errors propagate. PowerShell commands that can return filesystem paths set UTF-8 output explicitly so non-ASCII installations survive Node decoding.
 - `reset(capabilityId)` reloads the shared document, removes only that capability section, preserves unrelated and unknown sections, persists the remainder, and returns `{}`.
@@ -451,6 +459,8 @@ const result = await runtimeProbe.probe({
 - Unknown capability id or config key -> ConfigManager throws clearly.
 - Stored or submitted type mismatch / invalid select value -> ConfigManager throws `TypeError` before exposing or executing it.
 - Valid saved AE path -> return it without subprocess, scan, or configuration write.
+- PowerShell strategy timeout/error/malformed candidate -> strategy miss; continue discovery without guessing a configuration.
+- Deferred manual save/reset races -> obey the compare-before-write rules above and preserve the winner's value.
 - Missing/stale AE path with no valid discovery result -> return `null`; remove only a stale stored key, but do not persist an empty or guessed value.
 - Expected Windows strategy failure -> continue in precedence order; configuration read/write failure -> propagate unchanged.
 - Missing or blank required string-like fields -> executor rejects before `capability.execute()` and names the capability plus all missing fields.
@@ -474,8 +484,9 @@ const result = await runtimeProbe.probe({
 - Assert missing-file load, invalid JSON/root errors, atomic replacement, failed-write cleanup, and previous-file preservation.
 - Assert save/get/update/reset copies, unknown ids/keys, invalid stored values, complete-save required validation, missing/blank required values, and scoped reads.
 - Assert two long-running managers observe sequential shared-file changes and preserve unrelated capability sections.
-- Assert startup initialization short-circuits a valid saved path, preserves discovery precedence, compares numeric versions, validates files, preserves sibling settings, removes only stale `aePath`, and is a non-Windows no-op.
-- Assert both hosts initialize before exposing windows/IPC and that process/App Paths discovery preserves non-ASCII paths with explicit UTF-8 output and hive fallback.
+- Assert startup initialization short-circuits a valid saved path, awaits discovery in precedence order with the exact bounded `execFile` options, compares numeric versions, validates files, preserves sibling settings, removes only stale `aePath`, preserves non-ASCII paths with explicit UTF-8 output, and is a non-Windows no-op.
+- Assert deferred manual-save and reset races obey compare-before-write (initially absent, stale-present, and reset-removed stale cases) and that no test starts real PowerShell.
+- Assert both hosts start a named initialization Promise, observe rejection immediately, and never await it before palette/IPC/hotkey readiness through injectable composition tests; source-order string assertions alone are insufficient.
 - Assert executor blocks incomplete configuration before execution and otherwise passes the unchanged command plus scoped context.
 - Assert both host composition roots use the common appData path while Workflow Integration retains its userData override.
 - Assert explicit/fallback Schema labels and nested schema immutability in ConfigManager and FeatureCatalog projections.
@@ -503,6 +514,131 @@ await capability.execute(command, {
 // The capability owns discovery; hosts only choose the startup composition point.
 initializeAfterEffectsPath(configManager);
 ```
+
+## Scenario: Resolve2AE Selection and Export
+
+### 1. Scope / Trigger
+
+- Trigger: mapping a Resolve timeline selection to target clips for After Effects export, or converting an export Command id into a selection/media policy before Resolve access.
+- Selection primitives and Command policy mapping stay in `resolve2ae_core/export.py` and `scripts/resolve2ae_export.py`; OTIO/formula/JSX behavior is shared and never duplicated.
+
+### 2. Signatures
+
+- Selection: `get_target_clips_logic(timeline, target_policy = "auto", media_policy = "mixed") -> list[record]`, where `target_policy` is `auto | single | blue-range` and `media_policy` is `mixed | audio | video`.
+- Execution: `process_and_send(..., mode, target_policy, media_policy)`, `_terminal_result(ok, code, mode, target_policy, media_policy, clip_count, message)`.
+- Supported execution triples: exactly `("auto", "auto", "mixed")`, `("audio-only", "auto", "audio")`, `("video-only", "auto", "video")`, `("single", "single", "mixed")`, `("video-range", "blue-range", "video")`, `("mixed-range", "blue-range", "mixed")`.
+- Wrapper mapping: `scripts/resolve2ae_export.py` maps the six AE Command ids to their triples and passes all three arguments.
+
+### 3. Contracts
+
+- `auto` targets scan only Blue duration markers, sort by numeric frame (never lexical), and take the lowest as a batch range; with no Blue marker, `auto` falls back to the playhead single. Cyan markers are ignored and never encode scope or media.
+- `single` selects the independent topmost enabled video and audio records; mixed de-duplicates linked audio against the video record, and each requested class falls back to the available counterpart when absent.
+- `blue-range` targets include video intersecting the Blue range plus de-duplicated linked audio for mixed; explicit compatibility aliases fail with the existing missing-marker terminal when no Blue marker exists.
+- OTIO enrichment runs whenever any target record has `track_type == "video"` (`has_video`); `content_type` remains a display projection and never suppresses video processing. Video-only export writes `layer.audioEnabled = false;` for every video layer including linked audio.
+- Result contracts are layer-specific: Core success carries the seven public keys plus the private `__clacklyDesktopLaunch` directive; Core controlled failure emits exactly the seven keys; the Wrapper converts `ok: false` into a script error; RuntimeManager strips the launch directive from successful public output.
+- Rejection of any triple outside the six supported ones happens before Resolve access.
+
+### 4. Validation & Error Matrix
+
+- Unsupported `(mode, target_policy, media_policy)` triple -> rejected before Resolve access.
+- Missing Blue for an explicit compatibility alias -> existing `missing-marker` terminal result; auto without Blue -> playhead, not an error.
+- No target clips for the requested media -> existing controlled no-clips failure with a media-appropriate message.
+
+### 5. Good/Base/Bad Cases
+
+- Good: two Blue markers at frames `100` and `20` select the `20` marker (numeric ordering) regardless of API enumeration order.
+- Good: mixed single with a disabled top video track falls back to the next enabled video while retaining linked-audio de-duplication.
+- Base: one visible Command with no Blue marker exports the topmost playhead video plus its linked audio.
+- Bad: gating OTIO/video-property enrichment on `content_type == "video"` so a mixed selection skips video processing.
+- Bad: exporting video-only with embedded/linked audio still enabled on a video layer.
+
+### 6. Tests Required
+
+- Assert the full 3x3 selection matrix, numeric-vs-lexical Blue keys (`"100"`/`"20"`), Cyan ignore, Blue absence, explicit missing Blue, independent topmost fallback, and mixed de-duplication.
+- Assert the six supported and rejected execution triples, exact Core failure/success transport, Wrapper script error, RuntimeManager stripped success/typed failure, and multiple video layers all muted in video-only coverage.
+- Assert mixed-single and mixed-Blue transformed/speed/crop/lens/blend/LUT regressions that prove OTIO enrichment still runs, plus linked-A/V video-only silence assertions.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```python
+if content_type == "video":
+    enrich_otio(target_clips)
+```
+
+#### Correct
+
+```python
+has_video = any(record["track_type"] == "video" for record in target_clips)
+if has_video:
+    enrich_otio(target_clips)
+```
+
+---
+
+## Scenario: After Effects Desktop Launch
+
+### 1. Scope / Trigger
+
+- Trigger: probing whether the configured After Effects executable is running, or launching it with a temporary JSX plan.
+- Running-state detection is a fresh bounded probe; it never polls or caches process state.
+
+### 2. Signatures
+
+- Launcher: `new AfterEffectsLauncher({ execFile?, fileSystem?, hostEnvironment?, isRunning?, platform?, spawnProcess?, temporaryRoot? })`.
+- Running detection: `detectRunning(executable) -> Promise<boolean>`; launch: `execute(plan, { configuredExecutable }) -> Promise<{ mode: "running" | "cold" }>`.
+- Probe payload: PowerShell emits one structured JSON object `{ ProcessCount: number, Records: Array<{ Path: string | null, Error: string | null }> }` with exactly one record per AfterFX process.
+
+### 3. Contracts
+
+- `detectRunning()` is asynchronous, runs only on Windows, and executes PowerShell through the shared bounded helper with a 5,000 ms timeout, `shell: false`, `windowsHide: true`, explicit UTF-8 output, and the desktop environment; missing SystemRoot is a prerequisite failure, not a confirmed stop.
+- The consumer validates object shape and record count before deciding, canonicalizes every path, and applies tri-state detection: any canonical path matching the configured executable -> `true`; no match plus any unresolved/null/inaccessible record -> controlled `AFTER_EFFECTS_LAUNCH_FAILED`; zero processes or all-valid nonmatches -> `false`.
+- Timeout, subprocess/decoding failure, inconsistent count, malformed JSON/path, and unresolved no-match are controlled unknown failures that clean up the temporary JSX, create no bootstrap, perform zero spawn, and never retry. Only confirmed `false` may enter the cold branch, which writes the existing startup bootstrap and spawns exactly once.
+- `execute()` already awaits `isRunning`, so upstream RuntimeManager/Capability contracts do not change.
+
+### 4. Validation & Error Matrix
+
+- Zero processes -> `false`; all-valid nonmatch -> `false`; non-first match -> `true`.
+- Null/inaccessible record without a match -> `AFTER_EFFECTS_LAUNCH_FAILED`; mixed match+invalid -> `true`; mixed nonmatch+invalid -> `AFTER_EFFECTS_LAUNCH_FAILED`.
+- Missing prerequisite, timeout/process/decoding error, inconsistent count, malformed JSON or record -> `AFTER_EFFECTS_LAUNCH_FAILED`.
+- Non-Windows -> `false` without probing; existing darwin cold-launch bootstrap remains unchanged.
+
+### 5. Good/Base/Bad Cases
+
+- Good: a validated configured-path match wins even when another record is unresolved.
+- Base: a successful non-match is a confirmed stopped state and cold-launches exactly once.
+- Bad: collapsing an unknown timeout/error into `false`, which would enter the cold branch from an unknown state.
+- Bad: polling, caching, or retrying process state instead of probing once at export time.
+
+### 6. Tests Required
+
+- Assert zero process, all-valid nonmatch, non-first match, null/inaccessible record, mixed match+invalid, mixed nonmatch+invalid, missing prerequisite, inconsistent count, timeout/process/decoding/malformed error, and non-Windows behavior.
+- Assert unknown-state cleanup performs zero spawn and bootstrap and confirmed-false cold launch spawns exactly once.
+- Run launcher/RuntimeManager integration tests to prove no caller contract drift.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+try {
+  const found = execFileSync(powershell, [...]).trim();
+  return Boolean(found);
+} catch (_error) {
+  return false; // unknown state enters the cold branch
+}
+```
+
+#### Correct
+
+```javascript
+const running = await detectRunning(executable);
+if (running) return { mode: "running" };
+// Only confirmed false may cold launch; unknown throws AFTER_EFFECTS_LAUNCH_FAILED.
+```
+
+---
 
 ## Scenario: Feature Lifecycle Projection
 
@@ -751,6 +887,7 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 - Stored binding: `{ target: string, trigger: { type: "mouse", button: "left" | "right", modifiers: ("CTRL" | "SHIFT" | "ALT")[] }, action: { command: string } }`
 - Renderer/IPC event: `{ target: string, type: "mouse", button: number, ctrlKey: boolean, shiftKey: boolean, altKey: boolean }`
 - Storage: `BindingStorage.fromAppData(appDataPath)`, `load()`, and `save(bindings)`.
+- Shipped binding shapes: `OLD_DEFAULT_BINDINGS` (marker only), `SHIPPED_AE_DEFAULT_BINDINGS` (marker plus the legacy four-card AE records), and `DEFAULT_BINDINGS` (marker plus three primary-target AE triggers: left -> mixed, Ctrl+left -> audio, Ctrl+Shift+left -> video).
 - Manager: `new InteractionManager({ bindingStorage, executeCommand })`, `listBindings() -> Array<{ id, target, trigger, action: { command } }>`, and `handle(event) -> Promise<{ matched: false } | { matched: true, command: string, result: unknown }>`.
 - Shared trigger helpers: `normalizeTrigger(trigger)`, `normalizeMouseEventTrigger(event)`, and `triggersEqual(left, right)`.
 
@@ -763,12 +900,14 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 - `listBindings()` returns normalized defensive records in BindingStorage order; both hosts expose the same read-only semantic IPC and no mutation IPC.
 - Command Registry remains the only Command ID -> Capability ID mapping owner. Interaction modules do not import command or capability registries.
 - Missing files receive the unmodified `timeline.addMarker` left-click compatibility binding once. An explicitly persisted empty object remains empty.
+- Exact-default migration compares canonical binding-id-sorted entries: a file equal to `OLD_DEFAULT_BINDINGS` or `SHIPPED_AE_DEFAULT_BINDINGS` is rewritten as `DEFAULT_BINDINGS`. Customized roots containing legacy AE targets are structurally retargeted to `timeline.exportToAfterEffects` with a `bindings.json.backup` written first, the original-primary binding winning each trigger collision (else the lexical-id winner), same-action losers de-duplicated silently, and one migration warning emitted through the injected `onMigrationWarning` only for different-action collisions.
 - Unsupported mouse buttons return `{ matched: false }`; malformed events and bindings fail clearly; executor errors propagate unchanged.
 - Double-click, global shortcut, key synthesis, shortcut discovery/mutation, priorities, and wildcard modifier matching are outside this boundary.
 
 ### 4. Validation & Error Matrix
 
 - Missing bindings file -> persist and return the unmodified `timeline.addMarker` left-click compatibility binding.
+- Exact-default file -> rewrite as `DEFAULT_BINDINGS`; customized root with legacy AE targets -> backup and structural retarget; unrelated customized bindings -> preserved unchanged.
 - Malformed root, binding, trigger, action, or unknown/duplicate modifier -> throw `TypeError` before persistence or matching.
 - Two bindings with the same normalized target/button/modifier signature -> reject as an ambiguous duplicate.
 - Unsupported event button such as middle click -> return `{ matched: false }` and do not execute.
@@ -786,6 +925,7 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 ### 6. Tests Required
 
 - Assert first-run creation, persistence, modifier normalization, duplicate normalized-trigger rejection, malformed binding rejection, and defensive results.
+- Assert both shipped default shapes migrate to the three-trigger primary-target default, customized legacy targets retarget with backup/collision rules, and same-action losers never warn.
 - Assert exact left/right matching, individual and combined modifiers, extra-modifier non-match, unmatched behavior, one-call delegation, and unchanged executor errors.
 - Assert binding listing includes ids, preserves normalized order, and cannot mutate storage through returned nested objects.
 - Run the full Node suite and renderer build after host or IPC composition changes.
@@ -825,6 +965,7 @@ const result = await interactionManager.handle(event);
 - The renderer selects bindings by `binding.target === targetCommand.id`, resolves `binding.action.command` against loaded Command Metadata, and uses that action Command's `description`.
 - Trigger labels are generic: canonical modifiers render in `Ctrl`, `Shift`, `Alt` order followed by `Click` or `Right Click`.
 - Palette and Settings call the same pure projection. No layer infers a Capability ID or changes execution routing.
+- Help targets (`getInteractionHelpCommands`) contain only presentable Commands for the capability, so `presentation: "internal"` actions never become help targets; `getInteractionHelp` still resolves each binding's `action.command` against the raw loaded Command list so internal action descriptions render under visible targets.
 
 ### 4. Validation & Error Matrix
 
@@ -844,6 +985,7 @@ const result = await interactionManager.handle(event);
 ### 6. Tests Required
 
 - Assert left/right labels, canonical modifier order, remapped action Commands, empty bindings, unresolved action Commands, defensive listing, and unchanged Command ID -> Capability ID mapping.
+- Assert help targets exclude internal Commands while their action descriptions still resolve for visible targets.
 - Assert standalone and Workflow Integration compose the same `interactions:list` preload/IPC operation.
 
 ### 7. Wrong vs Correct

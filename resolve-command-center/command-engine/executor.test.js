@@ -107,6 +107,27 @@ test("command execution blocks missing required configuration before capability 
   assert.equal(executed, false);
 });
 
+test("internal command ids execute through the default command lookup", async () => {
+  const received = [];
+  const executeCommand = createCommandExecutor({
+    capabilityRegistry: {
+      get: () => ({
+        execute: async (command) => {
+          received.push(command.id);
+          return { ok: true };
+        }
+      })
+    },
+    configManager: {
+      assertConfigured() {},
+      forCapability: () => ({ get: () => null })
+    }
+  });
+
+  assert.deepEqual(await executeCommand("timeline.exportAudioToAfterEffects"), { ok: true });
+  assert.deepEqual(received, ["timeline.exportAudioToAfterEffects"]);
+});
+
 test("command executor requires configuration composition", () => {
   assert.throws(
     () => createCommandExecutor({ capabilityRegistry: { get() {} } }),

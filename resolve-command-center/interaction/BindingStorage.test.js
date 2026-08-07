@@ -26,7 +26,7 @@ test("binding storage initializes, normalizes, persists, and validates bindings"
   assert.deepEqual(defaultBindings["timeline.exportToAfterEffects.ctrl-shift-left-click"], {
     target: "timeline.exportToAfterEffects",
     trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT"] },
-    action: { command: "timeline.exportCyanRangeToAfterEffects" }
+    action: { command: "timeline.exportVideoToAfterEffects" }
   });
   assert.deepEqual(Object.fromEntries(
     Object.entries(defaultBindings).map(([id, binding]) => [id, {
@@ -42,25 +42,13 @@ test("binding storage initializes, normalizes, persists, and validates bindings"
       target: "timeline.exportToAfterEffects", modifiers: [], action: "timeline.exportToAfterEffects"
     },
     "timeline.exportToAfterEffects.ctrl-left-click": {
-      target: "timeline.exportToAfterEffects", modifiers: ["CTRL"], action: "timeline.exportCurrentToAfterEffects"
-    },
-    "timeline.exportToAfterEffects.shift-left-click": {
-      target: "timeline.exportToAfterEffects", modifiers: ["SHIFT"], action: "timeline.exportBlueRangeToAfterEffects"
+      target: "timeline.exportToAfterEffects", modifiers: ["CTRL"], action: "timeline.exportAudioToAfterEffects"
     },
     "timeline.exportToAfterEffects.ctrl-shift-left-click": {
-      target: "timeline.exportToAfterEffects", modifiers: ["CTRL", "SHIFT"], action: "timeline.exportCyanRangeToAfterEffects"
-    },
-    "timeline.exportCurrentToAfterEffects.left-click": {
-      target: "timeline.exportCurrentToAfterEffects", modifiers: [], action: "timeline.exportCurrentToAfterEffects"
-    },
-    "timeline.exportBlueRangeToAfterEffects.left-click": {
-      target: "timeline.exportBlueRangeToAfterEffects", modifiers: [], action: "timeline.exportBlueRangeToAfterEffects"
-    },
-    "timeline.exportCyanRangeToAfterEffects.left-click": {
-      target: "timeline.exportCyanRangeToAfterEffects", modifiers: [], action: "timeline.exportCyanRangeToAfterEffects"
+      target: "timeline.exportToAfterEffects", modifiers: ["CTRL", "SHIFT"], action: "timeline.exportVideoToAfterEffects"
     }
   });
-  assert.equal(Object.keys(defaultBindings).length, 8);
+  assert.equal(Object.keys(defaultBindings).length, 4);
   assert.deepEqual(JSON.parse(fs.readFileSync(storage.filePath, "utf8")), defaultBindings);
 
   const oldDefault = {
@@ -138,15 +126,209 @@ test("default After Effects bindings generate interaction help from Command desc
     },
     {
       label: "Ctrl + Click",
-      description: "Send the current Resolve clip to After Effects"
-    },
-    {
-      label: "Shift + Click",
-      description: "Send video in the Blue marker range to After Effects"
+      description: "Send the current Resolve audio selection to After Effects"
     },
     {
       label: "Ctrl + Shift + Click",
-      description: "Send video and audio in the Cyan marker range to After Effects"
+      description: "Send the current Resolve video selection to After Effects"
     }
   ]);
+});
+
+function shippedAeDefaultBindings() {
+  return {
+    "timeline.addMarker.left-click": {
+      target: "timeline.addMarker",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.addMarker" }
+    },
+    "timeline.exportToAfterEffects.left-click": {
+      target: "timeline.exportToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.exportToAfterEffects" }
+    },
+    "timeline.exportToAfterEffects.ctrl-left-click": {
+      target: "timeline.exportToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: ["CTRL"] },
+      action: { command: "timeline.exportCurrentToAfterEffects" }
+    },
+    "timeline.exportToAfterEffects.shift-left-click": {
+      target: "timeline.exportToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: ["SHIFT"] },
+      action: { command: "timeline.exportBlueRangeToAfterEffects" }
+    },
+    "timeline.exportToAfterEffects.ctrl-shift-left-click": {
+      target: "timeline.exportToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT"] },
+      action: { command: "timeline.exportCyanRangeToAfterEffects" }
+    },
+    "timeline.exportCurrentToAfterEffects.left-click": {
+      target: "timeline.exportCurrentToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.exportCurrentToAfterEffects" }
+    },
+    "timeline.exportBlueRangeToAfterEffects.left-click": {
+      target: "timeline.exportBlueRangeToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.exportBlueRangeToAfterEffects" }
+    },
+    "timeline.exportCyanRangeToAfterEffects.left-click": {
+      target: "timeline.exportCyanRangeToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.exportCyanRangeToAfterEffects" }
+    }
+  };
+}
+
+function shuffled(obj) {
+  return Object.fromEntries(Object.entries(obj).reverse());
+}
+
+function writeBindings(storage, bindings) {
+  fs.mkdirSync(path.dirname(storage.filePath), { recursive: true });
+  fs.writeFileSync(storage.filePath, JSON.stringify(bindings), "utf8");
+}
+
+test("the shipped marker-plus-seven-AE default fingerprint migrates regardless of outer key order", (t) => {
+  const storage = createStorage(t);
+  writeBindings(storage, shuffled(shippedAeDefaultBindings()));
+
+  const loaded = storage.load();
+  assert.deepEqual(loaded, {
+    "timeline.addMarker.left-click": {
+      target: "timeline.addMarker",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.addMarker" }
+    },
+    "timeline.exportToAfterEffects.left-click": {
+      target: "timeline.exportToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.exportToAfterEffects" }
+    },
+    "timeline.exportToAfterEffects.ctrl-left-click": {
+      target: "timeline.exportToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: ["CTRL"] },
+      action: { command: "timeline.exportAudioToAfterEffects" }
+    },
+    "timeline.exportToAfterEffects.ctrl-shift-left-click": {
+      target: "timeline.exportToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT"] },
+      action: { command: "timeline.exportVideoToAfterEffects" }
+    }
+  });
+  assert.equal(fs.existsSync(`${storage.filePath}.backup`), false);
+});
+
+test("a one-field customization does not take the wholesale default path", (t) => {
+  const storage = createStorage(t);
+  const customized = shippedAeDefaultBindings();
+  customized["timeline.exportToAfterEffects.ctrl-left-click"].action.command = "custom.audio";
+  writeBindings(storage, shuffled(customized));
+
+  const loaded = storage.load();
+  assert.equal(loaded["timeline.exportToAfterEffects.ctrl-left-click"].action.command, "custom.audio");
+  assert.equal(loaded["timeline.exportToAfterEffects.left-click"].action.command, "timeline.exportToAfterEffects");
+  assert.equal(Object.keys(loaded).length, 5);
+  assert.equal(JSON.parse(fs.readFileSync(`${storage.filePath}.backup`, "utf8"))["timeline.exportToAfterEffects.ctrl-left-click"].action.command, "custom.audio");
+});
+
+test("structural migration prefers original primary targets and warns once with diagnostics", (t) => {
+  const storage = createStorage(t);
+  const warnings = [];
+  storage.onMigrationWarning = (message) => warnings.push(message);
+  writeBindings(storage, {
+    "timeline.exportCyanRangeToAfterEffects.left-click": {
+      target: "timeline.exportCyanRangeToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.exportCyanRangeToAfterEffects" }
+    },
+    "timeline.exportToAfterEffects.left-click": {
+      target: "timeline.exportToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.exportToAfterEffects" }
+    },
+    "timeline.exportToAfterEffects.ctrl-left-click": {
+      target: "timeline.exportToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: ["CTRL"] },
+      action: { command: "timeline.exportCurrentToAfterEffects" }
+    }
+  });
+
+  const loaded = storage.load();
+  assert.equal(loaded["timeline.exportToAfterEffects.left-click"].action.command, "timeline.exportToAfterEffects");
+  assert.equal(Object.hasOwn(loaded, "timeline.exportCyanRangeToAfterEffects.left-click"), false);
+  assert.equal(loaded["timeline.exportToAfterEffects.ctrl-left-click"].action.command, "timeline.exportCurrentToAfterEffects");
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /kept timeline\.exportToAfterEffects\.left-click \(timeline\.exportToAfterEffects\)/);
+  assert.match(warnings[0], /skipped timeline\.exportCyanRangeToAfterEffects\.left-click \(timeline\.exportCyanRangeToAfterEffects\)/);
+  assert.match(warnings[0], /Backup written to .*bindings\.json\.backup/);
+
+  // Idempotent reload: no re-migration, no second warning.
+  assert.deepEqual(storage.load(), loaded);
+  assert.equal(warnings.length, 1);
+});
+
+test("structural migration uses lexical precedence when no original primary exists", (t) => {
+  const storage = createStorage(t);
+  const warnings = [];
+  storage.onMigrationWarning = (message) => warnings.push(message);
+  writeBindings(storage, {
+    "z.legacy.left-click": {
+      target: "timeline.exportCyanRangeToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.exportCyanRangeToAfterEffects" }
+    },
+    "a.legacy.left-click": {
+      target: "timeline.exportBlueRangeToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.exportBlueRangeToAfterEffects" }
+    }
+  });
+
+  const loaded = storage.load();
+  assert.deepEqual(Object.keys(loaded), ["a.legacy.left-click"]);
+  assert.equal(loaded["a.legacy.left-click"].target, "timeline.exportToAfterEffects");
+  assert.equal(loaded["a.legacy.left-click"].action.command, "timeline.exportBlueRangeToAfterEffects");
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /kept a\.legacy\.left-click/);
+  assert.match(warnings[0], /skipped z\.legacy\.left-click/);
+});
+
+test("structural migration drops same-action losers without a warning", (t) => {
+  const storage = createStorage(t);
+  const warnings = [];
+  storage.onMigrationWarning = (message) => warnings.push(message);
+  writeBindings(storage, {
+    "a.legacy.left-click": {
+      target: "timeline.exportBlueRangeToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.exportBlueRangeToAfterEffects" }
+    },
+    "b.legacy.left-click": {
+      target: "timeline.exportCyanRangeToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.exportBlueRangeToAfterEffects" }
+    }
+  });
+
+  const loaded = storage.load();
+  assert.deepEqual(Object.keys(loaded), ["a.legacy.left-click"]);
+  assert.equal(warnings.length, 0);
+  assert.equal(fs.existsSync(`${storage.filePath}.backup`), true);
+});
+
+test("structural migration backup failures abort before changing the active file", (t) => {
+  const storage = createStorage(t);
+  writeBindings(storage, {
+    "legacy.only": {
+      target: "timeline.exportBlueRangeToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.exportBlueRangeToAfterEffects" }
+    }
+  });
+  const original = fs.readFileSync(storage.filePath, "utf8");
+  fs.mkdirSync(`${storage.filePath}.backup`);
+
+  assert.throws(() => storage.load(), /EISDIR|EEXIST|ENOTDIR|EPERM|failed/i);
+  assert.equal(fs.readFileSync(storage.filePath, "utf8"), original);
 });

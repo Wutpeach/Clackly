@@ -28,13 +28,15 @@ class Resolve2AEExportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             ae_path = Path(directory, "AfterFX.exe")
             ae_path.touch()
-            for command_id, mode in resolve2ae_export.COMMAND_MODES.items():
+            for command_id, (mode, target_policy, media_policy) in resolve2ae_export.COMMAND_POLICIES.items():
                 with self.subTest(command_id=command_id):
                     context = Context(command_id, str(ae_path), "  Shot  ")
                     success = {
                         "ok": True,
                         "code": "exported",
                         "mode": mode,
+                        "target_policy": target_policy,
+                        "media_policy": media_policy,
                         "clip_count": 2,
                         "message": "Sent 2 Clips",
                     }
@@ -48,7 +50,7 @@ class Resolve2AEExportTests(unittest.TestCase):
                     self.assertEqual(process.call_args.args[4], {
                         "prefix": "Shot", "debug_mode": False
                     })
-                    self.assertEqual(process.call_args.args[5], mode)
+                    self.assertEqual(process.call_args.args[5:], (mode, target_policy, media_policy))
 
     def test_uses_default_prefix_and_propagates_controlled_failures(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -59,6 +61,8 @@ class Resolve2AEExportTests(unittest.TestCase):
                 "ok": False,
                 "code": "no-clips",
                 "mode": "auto",
+                "target_policy": "auto",
+                "media_policy": "mixed",
                 "clip_count": 0,
                 "message": "No Clips",
             }

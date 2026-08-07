@@ -8,6 +8,7 @@ const {
   isPaletteWindowShown
 } = require("./window");
 const { registerPaletteHotkey } = require("./hotkey");
+const { composeStartup } = require("./composeStartup");
 const { getCommands, searchCommands } = require("../../command-engine/registry");
 const { createCommandExecutor } = require("../../command-engine/executor");
 const { createCapabilityRegistry } = require("../../capability/registry");
@@ -168,10 +169,13 @@ if (!hasSingleInstanceLock) {
   });
 
   app.whenReady().then(() => {
-    initializeAfterEffectsPath(configManager);
-    paletteWindow = createPaletteWindow();
-    registerIpcHandlers();
-    registerPaletteHotkey(togglePalette);
+    paletteWindow = composeStartup({
+      initializeAfterEffectsPath: () => initializeAfterEffectsPath(configManager),
+      createPaletteWindow,
+      registerIpcHandlers,
+      registerPaletteHotkey: () => registerPaletteHotkey(togglePalette),
+      reportInitializationError: (error) => dialog.showErrorBox("Clackly", error.message)
+    }).paletteWindow;
 
     app.on("activate", () => {
       if (!paletteWindow || paletteWindow.isDestroyed()) {

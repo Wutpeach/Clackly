@@ -4,6 +4,13 @@ const path = require("node:path");
 const { ConfigStorage } = require("../config/ConfigStorage");
 const { normalizeTrigger } = require("./trigger");
 
+const PRIMARY_AE_TARGET = "timeline.exportToAfterEffects";
+const LEGACY_AE_TARGETS = new Set([
+  "timeline.exportCurrentToAfterEffects",
+  "timeline.exportBlueRangeToAfterEffects",
+  "timeline.exportCyanRangeToAfterEffects"
+]);
+
 const OLD_DEFAULT_BINDINGS = {
   "timeline.addMarker.left-click": {
     target: "timeline.addMarker",
@@ -12,25 +19,25 @@ const OLD_DEFAULT_BINDINGS = {
   }
 };
 
-const DEFAULT_BINDINGS = {
+const SHIPPED_AE_DEFAULT_BINDINGS = {
   ...OLD_DEFAULT_BINDINGS,
   "timeline.exportToAfterEffects.left-click": {
-    target: "timeline.exportToAfterEffects",
+    target: PRIMARY_AE_TARGET,
     trigger: { type: "mouse", button: "left", modifiers: [] },
-    action: { command: "timeline.exportToAfterEffects" }
+    action: { command: PRIMARY_AE_TARGET }
   },
   "timeline.exportToAfterEffects.ctrl-left-click": {
-    target: "timeline.exportToAfterEffects",
+    target: PRIMARY_AE_TARGET,
     trigger: { type: "mouse", button: "left", modifiers: ["CTRL"] },
     action: { command: "timeline.exportCurrentToAfterEffects" }
   },
   "timeline.exportToAfterEffects.shift-left-click": {
-    target: "timeline.exportToAfterEffects",
+    target: PRIMARY_AE_TARGET,
     trigger: { type: "mouse", button: "left", modifiers: ["SHIFT"] },
     action: { command: "timeline.exportBlueRangeToAfterEffects" }
   },
   "timeline.exportToAfterEffects.ctrl-shift-left-click": {
-    target: "timeline.exportToAfterEffects",
+    target: PRIMARY_AE_TARGET,
     trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT"] },
     action: { command: "timeline.exportCyanRangeToAfterEffects" }
   },
@@ -48,6 +55,25 @@ const DEFAULT_BINDINGS = {
     target: "timeline.exportCyanRangeToAfterEffects",
     trigger: { type: "mouse", button: "left", modifiers: [] },
     action: { command: "timeline.exportCyanRangeToAfterEffects" }
+  }
+};
+
+const DEFAULT_BINDINGS = {
+  ...OLD_DEFAULT_BINDINGS,
+  "timeline.exportToAfterEffects.left-click": {
+    target: PRIMARY_AE_TARGET,
+    trigger: { type: "mouse", button: "left", modifiers: [] },
+    action: { command: PRIMARY_AE_TARGET }
+  },
+  "timeline.exportToAfterEffects.ctrl-left-click": {
+    target: PRIMARY_AE_TARGET,
+    trigger: { type: "mouse", button: "left", modifiers: ["CTRL"] },
+    action: { command: "timeline.exportAudioToAfterEffects" }
+  },
+  "timeline.exportToAfterEffects.ctrl-shift-left-click": {
+    target: PRIMARY_AE_TARGET,
+    trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT"] },
+    action: { command: "timeline.exportVideoToAfterEffects" }
   }
 };
 
@@ -109,10 +135,43 @@ function normalizeBindings(bindings) {
   return Object.fromEntries(normalized);
 }
 
+function canonicalEntries(bindings) {
+  return Object.entries(normalizeBindings(bindings))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([id, binding]) => [
+      id,
+      binding.target,
+      binding.trigger.type,
+      binding.trigger.button,
+      ...binding.trigger.modifiers,
+      binding.action.command
+    ]);
+}
+
+function sameBindings(left, right) {
+  const leftEntries = canonicalEntries(left);
+  const rightEntries = canonicalEntries(right);
+  if (leftEntries.length !== rightEntries.length) return false;
+  return leftEntries.every((entry, index) => {
+    const other = rightEntries[index];
+    return entry.length === other.length
+      && entry.every((value, valueIndex) => value === other[valueIndex]);
+  });
+}
+
+function hasLegacyAeTargets(bindings) {
+  return Object.values(bindings).some((binding) => LEGACY_AE_TARGETS.has(binding.target));
+}
+
+function defaultMigrationWarning(message) {
+  console.warn(message);
+}
+
 class BindingStorage {
-  constructor(filePath) {
+  constructor(filePath, { onMigrationWarning = defaultMigrationWarning } = {}) {
     this.storage = new ConfigStorage(filePath);
     this.filePath = this.storage.filePath;
+    this.onMigrationWarning = onMigrationWarning;
   }
 
   static fromAppData(appDataPath) {
@@ -128,8 +187,12 @@ class BindingStorage {
       return this.save(DEFAULT_BINDINGS);
     }
     const bindings = normalizeBindings(this.storage.load());
-    if (JSON.stringify(bindings) === JSON.stringify(normalizeBindings(OLD_DEFAULT_BINDINGS))) {
+    if (sameBindings(bindings, OLD_DEFAULT_BINDINGS)
+      || sameBindings(bindings, SHIPPED_AE_DEFAULT_BINDINGS)) {
       return this.save(DEFAULT_BINDINGS);
+    }
+    if (hasLegacyAeTargets(bindings)) {
+      return this.migrateCustomizedRoot(bindings);
     }
     return bindings;
   }
@@ -138,6 +201,68 @@ class BindingStorage {
     const normalized = normalizeBindings(bindings);
     this.storage.save(normalized);
     return normalized;
+  }
+
+  migrateCustomizedRoot(bindings) {
+    const backupPath = `${this.filePath}.backup`;
+    const entries = Object.entries(bindings).map(([id, binding]) => ({
+      id,
+      binding,
+      originallyPrimary: binding.target === PRIMARY_AE_TARGET
+    }));
+
+    const groups = new Map();
+    for (const entry of entries) {
+      const binding = LEGACY_AE_TARGETS.has(entry.binding.target)
+        ? { ...entry.binding, target: PRIMARY_AE_TARGET }
+        : entry.binding;
+      const signature = JSON.stringify([
+        binding.target,
+        binding.trigger.type,
+        binding.trigger.button,
+        ...binding.trigger.modifiers
+      ]);
+      const group = groups.get(signature) || [];
+      group.push({ ...entry, binding });
+      groups.set(signature, group);
+    }
+
+    const kept = [];
+    const collisions = [];
+    for (const group of groups.values()) {
+      if (group.length === 1) {
+        kept.push(group[0]);
+        continue;
+      }
+      const winner = group.find((entry) => entry.originallyPrimary)
+        || group.slice().sort((left, right) => left.id.localeCompare(right.id))[0];
+      kept.push(winner);
+      for (const loser of group) {
+        if (loser.id === winner.id) continue;
+        if (loser.binding.action.command !== winner.binding.action.command) {
+          collisions.push({ kept: winner, skipped: loser });
+        }
+      }
+    }
+
+    const migrated = Object.fromEntries(kept.map(({ id, binding }) => [id, binding]));
+    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+    fs.writeFileSync(backupPath, `${JSON.stringify(bindings, null, 2)}\n`, "utf8");
+    const saved = this.save(migrated);
+    if (collisions.length > 0) {
+      const details = collisions.map(({ kept: winner, skipped: loser }) => ({
+        kept: { id: winner.id, action: winner.binding.action.command },
+        skipped: { id: loser.id, action: loser.binding.action.command }
+      }));
+      this.onMigrationWarning([
+        "Clackly migrated customized After Effects bindings to the single Export to After Effects card.",
+        `Backup written to ${backupPath}.`,
+        `Collisions: ${details.map(({ kept: winner, skipped: loser }) => (
+          `kept ${winner.id} (${winner.action}); skipped ${loser.id} (${loser.action})`
+        )).join("; ")}`
+      ].join(" "));
+    }
+    return saved;
   }
 }
 

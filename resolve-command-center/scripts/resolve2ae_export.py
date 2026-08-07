@@ -3,17 +3,19 @@ from pathlib import Path
 from resolve2ae_core.export import process_and_send
 
 
-COMMAND_MODES = {
-    "timeline.exportToAfterEffects": "auto",
-    "timeline.exportCurrentToAfterEffects": "single",
-    "timeline.exportBlueRangeToAfterEffects": "video-range",
-    "timeline.exportCyanRangeToAfterEffects": "mixed-range",
+COMMAND_POLICIES = {
+    "timeline.exportToAfterEffects": ("auto", "auto", "mixed"),
+    "timeline.exportAudioToAfterEffects": ("audio-only", "auto", "audio"),
+    "timeline.exportVideoToAfterEffects": ("video-only", "auto", "video"),
+    "timeline.exportCurrentToAfterEffects": ("single", "single", "mixed"),
+    "timeline.exportBlueRangeToAfterEffects": ("video-range", "blue-range", "video"),
+    "timeline.exportCyanRangeToAfterEffects": ("mixed-range", "blue-range", "mixed"),
 }
 
 
 def execute(context):
     try:
-        requested_mode = COMMAND_MODES[context.command_id]
+        requested_mode, target_policy, media_policy = COMMAND_POLICIES[context.command_id]
     except KeyError as error:
         raise ValueError(f"Unsupported After Effects export Command: {context.command_id}") from error
 
@@ -33,6 +35,8 @@ def execute(context):
         context.logger.info,
         config,
         requested_mode,
+        target_policy,
+        media_policy,
     )
     if not result["ok"]:
         raise RuntimeError(result["message"])

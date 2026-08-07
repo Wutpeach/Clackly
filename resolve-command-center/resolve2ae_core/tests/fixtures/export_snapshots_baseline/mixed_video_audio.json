@@ -1,18 +1,11 @@
 {
   "statuses": [
     "Analyzing...",
+    "Exporting OTIO...",
+    "Parsing Data...",
     "Sending...",
     "✅ Sent 2 Clips"
   ],
   "jsx": "// Resolve2AE V1.0.1\napp.beginUndoGroup('Import Resolve Clips');\nvar comp = app.project.items.addComp('Link_Timeline_batch_1700000000', 1920, 1080, 1, 1.0, 24.0);\ncomp.openInViewer();\n// Clip: ClipMixA\nvar fileItem = null;\nfor (var k=1; k<=app.project.items.length; k++) { if (app.project.items[k].file && app.project.items[k].file.fsName == 'C:/media/audio.wav') { fileItem = app.project.items[k]; break; } }\nif (!fileItem) { fileItem = app.project.importFile(new ImportOptions(File('C:/media/audio.wav'))); }\nif (fileItem.mainSource && fileItem.mainSource.nativeFrameRate) { fileItem.mainSource.conformFrameRate = fileItem.mainSource.nativeFrameRate; }\nvar layer = comp.layers.add(fileItem);\nlayer.name = 'ClipMixA';\nlayer.enabled = false;\nlayer.audioEnabled = true;\nlayer.label = 11;\nlayer.name = '[Audio] ' + layer.name;\nlayer.startTime = 0.0 - 0.0;\nlayer.inPoint = 0.0;\nlayer.outPoint = 1.0;\n// Clip: ClipMixV\nvar fileItem = null;\nfor (var k=1; k<=app.project.items.length; k++) { if (app.project.items[k].file && app.project.items[k].file.fsName == 'C:/media/clip.mov') { fileItem = app.project.items[k]; break; } }\nif (!fileItem) { fileItem = app.project.importFile(new ImportOptions(File('C:/media/clip.mov'))); }\nif (fileItem.mainSource && fileItem.mainSource.nativeFrameRate) { fileItem.mainSource.conformFrameRate = fileItem.mainSource.nativeFrameRate; }\nvar layer = comp.layers.add(fileItem);\nlayer.name = 'ClipMixV';\nlayer.startTime = 0.0 - 0.0;\nlayer.inPoint = 0.0;\nlayer.outPoint = 1.0;\napp.endUndoGroup();\nvar jsxFile = new File($.fileName);\nif (jsxFile.exists) jsxFile.remove();",
-  "popen_calls": [
-    {
-      "args": [
-        "C:/Program Files/Adobe/AfterFX.exe",
-        "-r",
-        "C:\\Users\\Administrator\\AppData\\Roaming\\Blackmagic Design\\DaVinci Resolve\\Support\\Fusion\\Scripts\\Utility\\tests\\_tmp_snapshot_runtime\\mixed_video_audio\\ToAE_1700000000.jsx"
-      ],
-      "kwargs": {}
-    }
-  ]
+  "popen_calls": []
 }

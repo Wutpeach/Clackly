@@ -7,6 +7,7 @@ const test = require("node:test");
 const {
   getCommands,
   getCommandById,
+  isCommandPresentable,
   loadCommands,
   resetCommandCache,
   searchCommands
@@ -43,13 +44,10 @@ test("timeline.addMarker preserves registry search with capability metadata", ()
     category: "Timeline",
     icon: "marker",
     keywords: ["marker", "mark", "timeline", "red"],
-    capability: "marker.add"
+    capability: "marker.add",
+    presentation: "visible"
   });
-  assert.deepEqual(searchCommands("marker").map(({ id }) => id), [
-    "timeline.exportBlueRangeToAfterEffects",
-    "timeline.exportCyanRangeToAfterEffects",
-    "timeline.addMarker"
-  ]);
+  assert.deepEqual(searchCommands("marker").map(({ id }) => id), ["timeline.addMarker"]);
   assert.deepEqual(searchCommands("current frame"), []);
 
   command.keywords.push("changed");
@@ -59,17 +57,68 @@ test("timeline.addMarker preserves registry search with capability metadata", ()
   assert.equal(getCommandById("timeline.addMarker").keywords[0], "marker");
 });
 
-test("After Effects export Commands share one capability and remain searchable", () => {
+test("only the visible After Effects export Command is searchable while internal actions stay executable", () => {
   resetCommandCache();
   const commands = searchCommands("after effects");
-  assert.deepEqual(commands.map(({ id }) => id), [
+  assert.deepEqual(commands.map(({ id }) => id), ["timeline.exportToAfterEffects"]);
+  assert.equal(commands.some((command) => "runtime" in command || "mode" in command), false);
+
+  const all = getCommands();
+  const aeIds = all.filter(({ capability }) => capability === "ae.export").map(({ id }) => id);
+  assert.deepEqual(aeIds, [
     "timeline.exportToAfterEffects",
+    "timeline.exportAudioToAfterEffects",
+    "timeline.exportVideoToAfterEffects",
     "timeline.exportCurrentToAfterEffects",
     "timeline.exportBlueRangeToAfterEffects",
     "timeline.exportCyanRangeToAfterEffects"
   ]);
-  assert.deepEqual(new Set(commands.map(({ capability }) => capability)), new Set(["ae.export"]));
-  assert.equal(commands.some((command) => "runtime" in command || "mode" in command), false);
+  assert.equal(all.every((command) => command.presentation === "visible" || command.presentation === "internal"), true);
+  assert.equal(getCommandById("timeline.exportAudioToAfterEffects").presentation, "internal");
+});
+
+test("internal Commands execute and resolve by id but never appear in search", () => {
+  resetCommandCache();
+  assert.deepEqual(searchCommands(""), getCommands().filter((command) => command.presentation !== "internal"));
+  for (const query of ["", "audio", "video", "blue", "cyan", "after effects", "export"]) {
+    assert.equal(
+      searchCommands(query).some((command) => command.presentation === "internal"),
+      false,
+      `internal Command leaked into search for ${JSON.stringify(query)}`
+    );
+  }
+  assert.equal(isCommandPresentable(getCommandById("timeline.exportToAfterEffects")), true);
+  assert.equal(isCommandPresentable(getCommandById("timeline.exportAudioToAfterEffects")), false);
+  assert.equal(isCommandPresentable(null), false);
+});
+
+test("isCommandPresentable defaults to visible and rejects invalid presentation values", (t) => {
+  const [visible] = loadFixture(t, fixture({ id: "test.visible", name: "Visible" }));
+  assert.equal(visible.presentation, "visible");
+  assert.equal(isCommandPresentable(visible), true);
+  const [internal] = loadFixture(t, fixture({
+    id: "test.internal",
+    name: "Internal",
+    presentation: "internal"
+  }));
+  assert.equal(internal.presentation, "internal");
+  assert.equal(isCommandPresentable(internal), false);
+  assert.throws(
+    () => loadFixture(t, fixture({ id: "test.bad", name: "Bad", presentation: "hidden" })),
+    /visible or internal presentation/
+  );
+
+  const [cloned] = loadFixture(t, fixture({
+    id: "test.clone",
+    name: "Clone",
+    presentation: "internal"
+  }));
+  cloned.presentation = "visible";
+  assert.equal(loadFixture(t, fixture({
+    id: "test.clone",
+    name: "Clone",
+    presentation: "internal"
+  }))[0].presentation, "internal");
 });
 
 test("command registry requires presentation metadata and drops unsupported fields", (t) => {

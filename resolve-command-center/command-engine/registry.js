@@ -31,7 +31,16 @@ function normalizeCommand(command, filePath) {
     throw new Error(`Invalid command entry in ${filePath}`);
   }
 
-  const { id, name, description, category, icon, keywords = [], capability } = command;
+  const {
+    id,
+    name,
+    description,
+    category,
+    icon,
+    keywords = [],
+    capability,
+    presentation = "visible"
+  } = command;
   if (typeof id !== "string" || id.trim().length === 0) {
     throw new Error(`Command in ${filePath} is missing a non-empty string id`);
   }
@@ -45,6 +54,9 @@ function normalizeCommand(command, filePath) {
   if (!Array.isArray(keywords) || keywords.some((keyword) => typeof keyword !== "string")) {
     throw new Error(`Command ${id} in ${filePath} must define string keywords`);
   }
+  if (presentation !== "visible" && presentation !== "internal") {
+    throw new Error(`Command ${id} in ${filePath} must define a visible or internal presentation`);
+  }
 
   return {
     id,
@@ -53,7 +65,8 @@ function normalizeCommand(command, filePath) {
     category,
     icon,
     keywords: [...keywords],
-    capability
+    capability,
+    presentation
   };
 }
 
@@ -65,7 +78,8 @@ function cloneCommand(command) {
     category: command.category,
     icon: command.icon,
     keywords: [...command.keywords],
-    capability: command.capability
+    capability: command.capability,
+    presentation: command.presentation
   };
 }
 
@@ -128,11 +142,17 @@ function commandMatches(command, query) {
 
 function searchCommands(query) {
   const text = typeof query === "string" ? query : "";
-  return getCommands().filter((command) => commandMatches(command, text));
+  return getCommands().filter((command) => (
+    isCommandPresentable(command) && commandMatches(command, text)
+  ));
 }
 
 function getCommandById(commandId) {
   return getCommands().find((command) => command.id === commandId) || null;
+}
+
+function isCommandPresentable(command) {
+  return Boolean(command) && command.presentation !== "internal";
 }
 
 module.exports = {
@@ -140,5 +160,6 @@ module.exports = {
   getCommands,
   resetCommandCache,
   searchCommands,
-  getCommandById
+  getCommandById,
+  isCommandPresentable
 };

@@ -3,7 +3,7 @@ import logoUrl from "./assets/clackly-logo.svg";
 import SettingsRenderer from "./SettingsRenderer.jsx";
 import {
   getFeatureWarning,
-  getInteractionHelp,
+  getInteractionHelpCommands,
   groupFeaturesByCategory,
   isFeatureVisible,
   joinFeatureStatuses
@@ -53,10 +53,11 @@ function SettingsApp({ api, Icon }) {
   const selectedFeatureStatus = selectedFeature?.featureStatus || null;
   const selectedWarning = getFeatureWarning(selectedFeatureStatus);
   const groupedFeatures = useMemo(() => groupFeaturesByCategory(visibleFeatures), [visibleFeatures]);
-  const helpCommands = useMemo(() => commands
-    .filter((command) => command.capability === selectedId)
-    .map((command) => ({ ...command, help: getInteractionHelp(command, commands, bindings) }))
-    .filter((command) => command.help.length > 0), [bindings, commands, selectedId]);
+  const helpCommands = useMemo(() => getInteractionHelpCommands(commands, selectedId, bindings), [
+    bindings,
+    commands,
+    selectedId
+  ]);
   const hasSchema = Boolean(selectedFeature && Object.keys(selectedFeature.configSchema).length);
   const hasSavedValues = Object.keys(savedValues).length > 0;
 

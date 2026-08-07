@@ -146,9 +146,11 @@ class MissingMarkerError(ValueError):
     pass
 
 
-def get_target_clips_logic(timeline, requested_mode="auto"):
-    if requested_mode not in {"auto", "single", "video-range", "mixed-range"}:
-        raise ValueError(f"Unsupported export mode: {requested_mode}")
+def get_target_clips_logic(timeline, target_policy="auto", media_policy="mixed"):
+    if target_policy not in {"auto", "single", "blue-range"}:
+        raise ValueError(f"Unsupported target policy: {target_policy}")
+    if media_policy not in {"mixed", "audio", "video"}:
+        raise ValueError(f"Unsupported media policy: {media_policy}")
     try:
         fps_str = timeline.GetSetting("timelineFrameRate")
         fps = float(fps_str) if fps_str else 24.0
@@ -157,33 +159,35 @@ def get_target_clips_logic(timeline, requested_mode="auto"):
     start_frame = 0
     end_frame = 0
     mode = "single"
-    include_audio = False  # [V28.1] 是否同时包含音频
 
     tl_start_frame = timeline.GetStartFrame()
     if tl_start_frame is None: tl_start_frame = 86400
 
-    if requested_mode != "single":
+    if target_policy in {"auto", "blue-range"}:
+        blue_ranges = []
         try:
             markers = timeline.GetMarkers()
             if markers:
                 for frame_idx, info in markers.items():
-                    color = info['color']
-                    duration = info['duration']
-                    wants_cyan = requested_mode in {"auto", "mixed-range"} and color == 'Cyan'
-                    wants_blue = requested_mode in {"auto", "video-range"} and color == 'Blue'
-                    if duration > 1 and (wants_cyan or wants_blue):
-                        start_frame = int(frame_idx) + tl_start_frame
-                        end_frame = start_frame + int(duration)
-                        mode = "batch"
-                        include_audio = wants_cyan
-                        break
+                    try:
+                        color = info.get("color")
+                        duration = int(info.get("duration", 0))
+                    except Exception:
+                        continue
+                    if color == "Blue" and duration > 1:
+                        blue_ranges.append((int(frame_idx), duration))
         except Exception:
-            if requested_mode != "auto":
+            if target_policy != "auto":
                 raise
-
-        if requested_mode in {"video-range", "mixed-range"} and mode == "single":
-            color = "Blue" if requested_mode == "video-range" else "Cyan"
-            raise MissingMarkerError(f"No {color} duration marker found")
+        if blue_ranges:
+            # [FIX] 数字帧排序，选择数值最小的 Blue 时长标记；枚举顺序不影响结果
+            blue_ranges.sort(key=lambda entry: entry[0])
+            frame_idx, duration = blue_ranges[0]
+            start_frame = frame_idx + tl_start_frame
+            end_frame = start_frame + duration
+            mode = "batch"
+        elif target_policy == "blue-range":
+            raise MissingMarkerError("No Blue duration marker found")
 
     if mode == "single":
         current_tc = timeline.GetCurrentTimecode()
@@ -246,46 +250,68 @@ def get_target_clips_logic(timeline, requested_mode="auto"):
 
         return (track_type, track_index, i_start, i_end, i_name)
 
-    target_clips = collect_clips("video")
-    content_type = "video"
+    def topmost(clips):
+        if not clips:
+            return []
+        max_track = max(c['track_index'] for c in clips)
+        return [c for c in clips if c['track_index'] == max_track]
 
-    # [V28.6] Cyan标记模式：收集所有音频轨道（包含轨道1）
-    # [V28.8] 青色模式：去重已链接视频音频，避免 AE 重复音频层
-    if include_audio:
-        audio_candidates = collect_clips("audio")
-        video_keys = set()
-        for clip in target_clips:
-            video_keys.add(build_item_key(clip['item'], "video", clip['track_index']))
+    video_clips = collect_clips("video")
+    audio_clips = collect_clips("audio")
 
-        audio_clips = []
-        for clip in audio_candidates:
-            is_linked_to_selected_video = False
-            try:
-                linked_items = clip['item'].GetLinkedItems()
-                if linked_items:
-                    for linked_item in linked_items:
-                        linked_key = build_item_key(linked_item)
-                        if linked_key[0] == "video" and linked_key in video_keys:
-                            is_linked_to_selected_video = True
-                            break
-            except:
-                pass
+    def is_linked_to_video(audio_clip, video_keys):
+        try:
+            linked_items = audio_clip['item'].GetLinkedItems()
+            if linked_items:
+                for linked_item in linked_items:
+                    linked_key = build_item_key(linked_item)
+                    if linked_key[0] == "video" and linked_key in video_keys:
+                        return True
+        except Exception:
+            pass
+        return False
 
-            if not is_linked_to_selected_video:
-                audio_clips.append(clip)
-
-        if audio_clips:
-            target_clips.extend(audio_clips)
-            content_type = "mixed"  # 混合模式
-    # 原有逻辑：视频为空时才收集音频
-    elif mode == "single" and not target_clips:
-        target_clips = collect_clips("audio")
+    if media_policy == "video":
+        target_clips = video_clips if mode == "batch" else topmost(video_clips)
+        content_type = "video"
+    elif media_policy == "audio":
+        target_clips = audio_clips if mode == "batch" else topmost(audio_clips)
         content_type = "audio"
-
-    # [FIX] 单点模式下只保留最上层轨道的片段
-    if mode == "single" and target_clips:
-        max_track = max(c['track_index'] for c in target_clips)
-        target_clips = [c for c in target_clips if c['track_index'] == max_track]
+    elif mode == "batch":
+        # [V28.8] 混合批量：收集重叠视频与音频，去重已链接视频的音频层
+        target_clips = list(video_clips)
+        content_type = "video"
+        video_keys = set(
+            build_item_key(clip['item'], "video", clip['track_index'])
+            for clip in video_clips
+        )
+        kept_audio = [
+            clip for clip in audio_clips
+            if not is_linked_to_video(clip, video_keys)
+        ]
+        if kept_audio:
+            target_clips.extend(kept_audio)
+            content_type = "mixed" if video_clips else "audio"
+    else:
+        # 单点混合：独立选择最上层视频与最上层音频，丢弃被该视频代表的链接音频
+        top_video = topmost(video_clips)
+        top_audio = topmost(audio_clips)
+        if not top_video:
+            target_clips = top_audio
+            content_type = "audio"
+        elif not top_audio:
+            target_clips = top_video
+            content_type = "video"
+        else:
+            video_key = build_item_key(
+                top_video[0]['item'], "video", top_video[0]['track_index']
+            )
+            if is_linked_to_video(top_audio[0], {video_key}):
+                target_clips = top_video
+                content_type = "video"
+            else:
+                target_clips = top_video + top_audio
+                content_type = "mixed"
 
     return mode, target_clips, fps, content_type
 
@@ -491,19 +517,45 @@ def find_props_dual_lock(t_idx, item_start, item_name, exact_map, fallback_list)
 
 # ================= [4. 核心执行 (V27.0 Anchor Position Fix)] =================
 
-def _terminal_result(ok, code, mode, clip_count, message):
+SUPPORTED_COMMAND_TRIPLES = {
+    ("auto", "auto", "mixed"),
+    ("audio-only", "auto", "audio"),
+    ("video-only", "auto", "video"),
+    ("single", "single", "mixed"),
+    ("video-range", "blue-range", "video"),
+    ("mixed-range", "blue-range", "mixed"),
+}
+
+
+def _terminal_result(ok, code, mode, target_policy, media_policy, clip_count, message):
     return {
         "ok": ok,
         "code": code,
         "mode": mode,
+        "target_policy": target_policy,
+        "media_policy": media_policy,
         "clip_count": clip_count,
         "message": message,
     }
 
 
-def process_and_send(resolve, project, ae_path, status_callback, config=None, requested_mode="auto"):
+def process_and_send(
+    resolve,
+    project,
+    ae_path,
+    status_callback,
+    config=None,
+    mode="auto",
+    target_policy="auto",
+    media_policy="mixed",
+):
     if config is None:
         config = load_config()
+    if (mode, target_policy, media_policy) not in SUPPORTED_COMMAND_TRIPLES:
+        raise ValueError(
+            "Unsupported export triple: "
+            f"mode={mode!r} target_policy={target_policy!r} media_policy={media_policy!r}"
+        )
 
     ae_lut_dir = get_ae_lut_dir(ae_path)
 
@@ -511,18 +563,20 @@ def process_and_send(resolve, project, ae_path, status_callback, config=None, re
     if not timeline:
         message = "No Timeline"
         status_callback(f"❌ {message}")
-        return _terminal_result(False, "no-timeline", requested_mode, 0, message)
+        return _terminal_result(False, "no-timeline", mode, target_policy, media_policy, 0, message)
 
     status_callback("Analyzing...")
     try:
-        mode, target_clips, fps, content_type = get_target_clips_logic(timeline, requested_mode)
+        scope_mode, target_clips, fps, content_type = get_target_clips_logic(
+            timeline, target_policy, media_policy
+        )
     except MissingMarkerError as error:
         status_callback(f"❌ {error}")
-        return _terminal_result(False, "missing-marker", requested_mode, 0, str(error))
+        return _terminal_result(False, "missing-marker", mode, target_policy, media_policy, 0, str(error))
     if not target_clips:
         message = "No Clips"
         status_callback(f"⚠️ {message}")
-        return _terminal_result(False, "no-clips", requested_mode, 0, message)
+        return _terminal_result(False, "no-clips", mode, target_policy, media_policy, 0, message)
 
     timeline_name = timeline.GetName()
     tl_width = float(timeline.GetSetting("timelineResolutionWidth"))
@@ -537,7 +591,8 @@ def process_and_send(resolve, project, ae_path, status_callback, config=None, re
     temp_dir = tempfile.gettempdir()
     timestamp = int(time.time())
 
-    if content_type == "video":
+    has_video = any(clip["track_type"] == "video" for clip in target_clips)
+    if has_video:
         temp_otio_path = os.path.join(temp_dir, f"resolve_export_{timestamp}.otio")
 
         status_callback("Exporting OTIO...")
@@ -562,7 +617,7 @@ def process_and_send(resolve, project, ae_path, status_callback, config=None, re
     min_start = min([c['item'].GetStart() for c in target_clips])
     max_end = max([c['item'].GetEnd() for c in target_clips])
     comp_duration_sec = (max_end - min_start) / fps
-    comp_name = f"{prefix}_{timeline_name}_{mode}_{timestamp}"
+    comp_name = f"{prefix}_{timeline_name}_{scope_mode}_{timestamp}"
     jsx.append(f"var comp = app.project.items.addComp('{comp_name}', {int(tl_width)}, {int(tl_height)}, 1, {comp_duration_sec}, {fps});")
 
     # 根据配置决定是否打开 Viewer
@@ -677,8 +732,8 @@ def process_and_send(resolve, project, ae_path, status_callback, config=None, re
             jsx.append(f"layer.audioEnabled = true;")
             jsx.append(f"layer.label = 11;")
             jsx.append(f"layer.name = '[Audio] ' + layer.name;")
-        elif clip_track_type == "video" and not video_has_linked_audio:
-            # [V28.7] 视频片段在时间线无关联音频时，导入 AE 后自动静音
+        elif clip_track_type == "video" and (media_policy == "video" or not video_has_linked_audio):
+            # [V28.7] 视频片段无关联音频时自动静音；纯视频导出强制静音每个视频层
             jsx.append(f"layer.audioEnabled = false;")
 
         # 提前获取 props 以读取 time_scalar（需在时间设置之前）
@@ -971,7 +1026,9 @@ def process_and_send(resolve, project, ae_path, status_callback, config=None, re
         jsx.append(f"if (jsxFile.exists) jsxFile.remove();")
 
     message = f"Sent {len(target_clips)} Clips"
-    result = _terminal_result(True, "exported", requested_mode, len(target_clips), message)
+    result = _terminal_result(
+        True, "exported", mode, target_policy, media_policy, len(target_clips), message
+    )
     result["__clacklyDesktopLaunch"] = {
         "type": "after-effects-jsx",
         "executable": ae_path,

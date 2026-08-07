@@ -96,16 +96,17 @@ Scripts are trusted local Feature code, not sandboxed third-party code. Each exe
 
 The bundled `ae.export` Feature sends Resolve timeline media to After Effects through `scripts/resolve2ae_export.py` and the local `resolve2ae_core/`. On Windows, Clackly automatically discovers `AfterFX.exe` from a running After Effects process, the per-user or machine App Paths registry entry, then standard Adobe installation directories (highest numeric version first), and persists the first existing file as **After Effects Path**. A valid saved path always wins, so the existing Browse control remains a manual override. If discovery fails, the required field stays empty and the existing Settings recovery remains available. **Composition Prefix** is optional and defaults to `Link`; command execution still rejects an invalid or missing executable.
 
-The primary **Export to After Effects** card uses these exact mouse mappings, and all four Commands are searchable and executable with Enter:
+Both PowerShell probes are bounded asynchronous operations with a 5-second timeout and hidden no-shell UTF-8 execution: startup path discovery never blocks palette/IPC/hotkey readiness and a valid saved path short-circuits discovery entirely, while export-time running-state detection fails closed on any timeout or unresolved result. Clackly never polls or caches process state.
 
-| Trigger / Command | Selection |
+Exactly one **Export to After Effects** card is visible and searchable; binding-only action aliases stay executable but never appear in the palette. The card uses these exact mouse mappings (Enter matches a plain click):
+
+| Trigger | Media selection |
 |---|---|
-| Click / Export to After Effects | Legacy automatic marker-or-playhead selection |
-| Ctrl+Click / Export Current Clip | Topmost enabled clip under the playhead, with audio fallback |
-| Shift+Click / Export Blue Marker Range | Video intersecting the first Blue duration marker |
-| Ctrl+Shift+Click / Export Cyan Marker Range with Audio | Video and de-duplicated audio intersecting the first Cyan duration marker |
+| Click | Mixed audio and video |
+| Ctrl+Click | Audio only |
+| Ctrl+Shift+Click | Video only |
 
-Blue and Cyan range Commands fail clearly when their required marker is absent; they do not fall back to the playhead. The release target is Windows with Resolve Studio Workflow Integration and After Effects. The retained macOS core path is not release-qualified. Progress streaming, cancellation, timeouts, and multiple-marker queues are intentionally not included.
+Selection scope comes from Resolve state: the lowest numeric Blue duration marker produces a batch range (all video, plus linked audio for mixed), and with no Blue marker the card falls back to the independent topmost video and audio clips under the playhead. Cyan markers are ignored. Legacy binding names remain executable as internal actions: Export Current Clip maps to playhead mixed, Export Blue Marker Range maps to Blue-range video, and Export Cyan Marker Range maps to Blue-range mixed without any Cyan-marker behavior. The release target is Windows with Resolve Studio Workflow Integration and After Effects. The retained macOS core path is not release-qualified. Progress streaming, cancellation, timeouts, and multiple-marker queues are intentionally not included.
 
 ## Feature UI Framework
 
