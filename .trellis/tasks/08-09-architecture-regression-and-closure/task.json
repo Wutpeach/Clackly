@@ -3,7 +3,7 @@
   "name": "architecture-regression-and-closure",
   "title": "Phase 3 — 架构回归、去重与封板",
   "description": "检查依赖方向、重复注册、循环依赖与完整质量基线，更新文档并封板本轮架构收口。",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

@@ -4,6 +4,72 @@ Architecture-validation MVP for a DaVinci Resolve command palette. Electron owns
 
 Four existing sources own UI metadata: Capability Metadata owns Feature identity and schema, Command Metadata owns Command presentation, Interaction Binding owns executable mouse triggers, and Config Schema owns field labels and validation. Renderer code projects these records and contains no Command-id presentation table, prototype catalog, or shortcut badge fixture.
 
+## Shared Application Composition
+
+Both Electron hosts build the shared Application Core through one plain factory, `app/createClacklyCore.js`:
+
+```text
+Host Bootstrap (Electron app)
+  └→ createClacklyCore({ appRoot, appDataPath, temporaryRoot, hostContextProvider, markerBackends })
+       → capabilityRegistry, configManager, featureStatusManager,
+         featureCatalog, executeCommand, runtimeManager
+```
+
+`createClacklyCore` is the **only** production source of shared Application wiring: capability registry, marker capability, ConfigManager, FeatureStatusManager, FeatureCatalog, Command executor, ShortcutManager, and the RuntimeManager with its Probe/cache. It is an ordinary factory, not a DI framework — no container, service locator, or plugin lifecycle. Its plain parameters change only when a real shared dependency requires it; nothing in the Core imports Electron.
+
+**Host responsibilities** (both `workflow-plugin/main.js` and `electron/main/main.js` keep these): Electron lifecycle and windows, IPC surface, Resolve bootstrap/bridge adapters (`createResolveAdapter` / `createBridgeExecutionAdapter`), `hostContextProvider` semantics (including its throw/failure policy), hotkey registration, InteractionManager, and startup sequence. **Core responsibilities**: capability/command/config/feature-status services and runtime execution/readiness — no window, IPC, or Resolve startup policy.
+
+### Command execution chain
+
+```text
+Command ID → Command Registry → Capability ID → enabled + configuration gates
+  → Capability.execute(command, { config }) → Provider / Adapter → Host API / Runtime
+```
+
+The Command Engine only looks up commands, resolves the Capability, applies the enablement/configuration gates, and orchestrates execution. It never imports Electron, Resolve implementations, PythonProvider, RuntimeManager, or Feature UI.
+
+### Script execution chain
+
+```text
+Script Capability → ScriptCapabilityProvider → ScriptExecutor (single providers Map)
+  → PythonProvider → RuntimeManager.execute
+      (validate → override → host context → Resolver → Probe → launcher → desktop plan)
+```
+
+`ScriptExecutor` keeps one private `providers` Map (`python → PythonProvider`) that serves **both** execution and readiness — there is no second runtime registry. An unknown runtime still throws the existing `Unsupported script runtime: <x>` on execute.
+
+### Script readiness chain
+
+```text
+FeatureStatusManager.refreshOne → Capability.checkAvailability()
+  → ScriptCapabilityProvider → ScriptExecutor → PythonProvider (normalizes evidence)
+  → RuntimeManager.checkAvailability
+      (validate → host context → Resolver → Probe/cache)
+```
+
+FeatureStatusManager only consumes the `Capability.checkAvailability()` contract and never sees Python, the executable, the resolver, or the Probe. Readiness statuses: `loading` and `missing-config` are derived by the FeatureStatusManager lifecycle; the Probe produces `ready` / `missing-dependency` / `unavailable`; unexpected errors become `error`. Runtime evidence is normalized once in PythonProvider (missing runtime, missing Resolve scripting module/library, unsupported runtime, Resolve not running, missing script entry).
+
+Readiness is **not** execute-time validation: availability may pass and execution may still fail (TOCTOU accepted); `execute` always re-runs its full validation. First readiness check on a cache miss uses RuntimeLauncher to spawn one bounded async `resolve-probe` subprocess (10 s cap) — never `spawnSync`/busy wait — but does not run `script-execute` or launch After Effects. Passed results are cached at `%APPDATA%/Clackly/runtime-probe.json` (schemaVersion 1); cache hits do not spawn; failures clear the cache so the next refresh re-probes. Startup never probes: `createClacklyCore` and both Host startup paths make zero runtime/Probe/feature/AE launches; readiness only runs on explicit status refresh.
+
+### Adding a real Python Feature
+
+A new Script-backed Feature needs these artifacts (verified against current code):
+
+1. A Python feature script under the application root (e.g. `scripts/export.py`) exporting `execute(context)`.
+2. A Capability manifest in `capability/definitions/` — full metadata plus `configSchema` and `executor: { "type": "script", "runtime": "python", "entry": "scripts/export.py" }`. This is what registers the Feature in the catalog and drives Settings UI.
+3. A Command manifest in `command-engine/commands/` naming the Capability id.
+4. Add the Capability id to the matching runtime profile's `capabilities` array in `resources/runtimes/manifest.json`. The Resolver only matches profiles whose `capabilities` include the requesting Capability id; without this step both execution and readiness resolve to `RUNTIME_UNSUPPORTED` (readiness shows `unavailable`).
+
+No changes are needed to the Command Engine, either Host `main.js`, the renderer, or RuntimeManager. Configuration/UI metadata comes from the Capability's `configSchema` automatically.
+
+### Architecture Freeze
+
+**Stable now**: Composition Root as the single shared-wiring source; Host/Core boundary; Script execute/readiness sharing one providers Map; Probe/cache path, schema, fingerprint, failure recovery and last-writer-wins; readiness status contract; Marker backend precedence with no fallback once execution starts.
+
+**Intentionally flexible**: Composition Root plain parameters may grow when a real shared dependency requires it; the runtime provider Map is the extension point until a second runtime appears; Feature manifests stay the extension mechanism until third-party packages exist; `checkAvailability` remains an optional Capability contract.
+
+**Future triggers (not implemented)**: a second runtime → evaluate a Runtime Provider registration abstraction; third-party Feature packages → packaging/permissions/versioning/signature; reproducible cross-host cache conflicts → cache ownership/locking; untrusted code execution → sandbox/isolation.
+
 ## Command Metadata
 
 Command manifests require `id`, `name`, `description`, `category`, `icon`, `keywords`, and `capability`. The Command Registry validates and defensively projects that fixed shape through list, search, and lookup. Launcher, Search, and All Actions use those registered records directly; the browser preview intentionally returns an empty catalog and renders the normal empty state.
@@ -42,11 +108,12 @@ Capability metadata also owns a plain `configSchema`. `config/SchemaValidator.js
 
 ## Python Script Capabilities
 
-Script-backed Features use the normal Command and Capability path. Add three artifacts without editing either Electron host, the renderer, or Command Engine:
+Script-backed Features use the normal Command and Capability path. Add four artifacts without editing either Electron host, the renderer, or Command Engine (see [Adding a real Python Feature](#adding-a-real-python-feature) for the full verified list):
 
 1. A Python feature script under the application root.
 2. A Capability JSON manifest in `capability/definitions/`.
 3. A Command JSON manifest in `command-engine/commands/` that names the Capability id.
+4. The Capability id in the matching profile's `capabilities` array of `resources/runtimes/manifest.json` — the Runtime Resolver only matches profiles that list the requesting Capability id, for both execution and readiness.
 
 The Capability manifest keeps the existing metadata and `configSchema`, and adds:
 
@@ -124,7 +191,7 @@ Command execution keeps the existing boundary and adds one gate:
 Command ID -> Capability ID -> enabled assertion -> configuration assertion -> Capability.execute()
 ```
 
-Capabilities may optionally expose a side-effect-free `checkAvailability()` returning `ready`, named `missing-dependency`, or `unavailable` data. Capabilities without a probe remain ready after configuration is complete. The marker probe reuses backend selection but never executes a marker action.
+Capabilities may optionally expose a `checkAvailability()` returning `ready`, `missing-dependency`, or `unavailable` data; it never executes the Capability action. Capabilities without a probe remain ready after configuration is complete. The marker probe reuses backend selection but never executes a marker action; the script probe follows the [runtime readiness chain](#script-readiness-chain) and may spawn one bounded resolve-probe subprocess on its first cache miss.
 
 `shortcut/shortcuts.json` currently maps `CREATE_FUSION_CLIP` to `CTRL+ALT+F` and `ADD_MARKER` to `CTRL+M`. `ShortcutManager` supports lookup, introspection, and an injected future keyboard executor. It does not bind shortcuts, expose shortcut presentation metadata, or perform keyboard/UI automation in this MVP. The palette therefore shows no Command shortcut badge. The `Ctrl+Space` palette hotkey remains separate Electron window behavior.
 

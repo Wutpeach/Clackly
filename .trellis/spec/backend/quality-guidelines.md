@@ -33,7 +33,7 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - Command Registry requires non-empty `description`, `category`, and `icon`, returns only the fixed Command shape, and keeps search limited to id/name/keywords.
 - `presentation` defaults to `visible`. `getCommands()` and `getCommandById()` return every installed Command including internal ones, so Interaction dispatch and help can resolve internal action descriptions.
 - `searchCommands()` and every target presentation surface exclude `presentation: "internal"`. One generic `isCommandPresentable()` predicate owns that filter; no layer branches on Command ids or capabilities.
-- Each host creates a capability registry, registers its host-backed capability objects, and injects the registry into the command executor.
+- Both hosts inject their adapters, paths, and `hostContextProvider` into `createClacklyCore()`. That shared Composition Root creates the Capability Registry, registers shared capabilities, and constructs the Command executor once; Host lifecycle, window/IPC, recovery, and InteractionManager remain outside the Root.
 - Registered capabilities keep descriptive data under `capability.metadata`; `register(capabilityId, capability)` and `get(capabilityId)` retain their existing execution-object behavior.
 - Every capability declares `metadata.configSchema`; use `{}` when it has no settings. Registry registration validates the schema before storing the capability.
 - Handwritten capabilities may omit `metadata.executor`. Metadata-discovered script capabilities declare `executor.type = "script"`; Command metadata never declares an executor or runtime.
@@ -122,8 +122,9 @@ const executeCommand = createCommandExecutor({
 ### 2. Signatures
 
 - Capability executor metadata: `{ type: "script", runtime: "python", entry: string }` where `entry` is relative to the application root.
-- Runtime dispatcher: `new ScriptExecutor(Map<runtime, provider>).execute(scriptDefinition, context)`.
-- Runtime provider: `provider.execute(scriptDefinition, context) -> Promise<JSONValue>`.
+- Runtime dispatcher: `new ScriptExecutor(Map<runtime, provider>)` with `execute(scriptDefinition, context)` and `checkAvailability(scriptDefinition, context)` using the same providers Map.
+- Runtime provider: `provider.execute(scriptDefinition, context) -> Promise<JSONValue>` and `provider.checkAvailability(scriptDefinition, context) -> Promise<{ status, message, details }>` when that runtime exposes readiness.
+- Runtime readiness: `RuntimeManager.checkAvailability({ runtime, capabilityId }) -> Promise<ProbeResult>`; it resolves and probes but does not run `script-execute` or launch a desktop integration.
 - Script Capability Provider: `execute(scriptDefinition, { command, config })`, where `command.id` is the stable execution identity and `config.get()` returns the capability-scoped snapshot.
 - Python feature entry: sync or async `execute(context) -> JSON-serializable result`.
 - Python ScriptContext public attributes: `command_id`, `resolve`, `config`, `logger`, `project`, `timeline`.
@@ -135,7 +136,9 @@ const executeCommand = createCommandExecutor({
 - Capability definitions are discovered from sorted JSON manifests and converted into ordinary executable Capability objects before FeatureCatalog and ConfigManager are created.
 - The existing Capability Registry remains the only Feature registry. Registration validates all discovered definitions before mutating the host registry, preventing partial registration.
 - A script Capability delegates `Capability -> ScriptCapabilityProvider -> ScriptExecutor -> runtime provider`; only the runtime provider knows the interpreter or `node:child_process`.
-- Both Electron hosts call the same script registration helper in the same registry-composition position.
+- Both Electron hosts call the same `createClacklyCore()` factory; the Root calls the script registration helper once in the shared registry-composition position.
+- Script execution and readiness resolve `executor.runtime` through the same private `ScriptExecutor.providers` Map. Do not register a second Feature-status or Python-readiness provider map.
+- Application/Host startup constructs the RuntimeManager but does not call readiness or start a Runtime. An explicit Feature-status refresh may run one bounded asynchronous `resolve-probe` subprocess on a cache miss; it never runs the Feature action. Passed results reuse the existing schemaVersion 1 cache and failures clear reusable state.
 - Command Engine, Command Metadata, Interaction Binding, renderer, Feature UI, and the fixed-command HTTP bridge contain no script/runtime selection branches.
 - `ScriptCapabilityProvider` forwards only `command.id` plus a defensive plain snapshot from `ConfigManager.forCapability(id)`. Scripts never receive Command presentation metadata, ConfigStorage, ConfigManager, another Capability's settings, Electron, or UI objects.
 - PythonProvider resolves `entry` under the application root, rejects absolute/missing/escaping paths including symlink escapes, spawns with `shell: false`, and reserves process stdout for one JSON envelope.
@@ -161,7 +164,7 @@ const executeCommand = createCommandExecutor({
 
 ### 5. Good/Base/Bad Cases
 
-- Good: adding `scripts/export.py`, one Capability manifest with `configSchema` and executor metadata, and one Command manifest makes the Feature discoverable and executable without host/UI/Command Engine edits.
+- Good: adding `scripts/export.py`, one Capability manifest with `configSchema` and executor metadata, one Command manifest, and the Capability id in a compatible `resources/runtimes/manifest.json` profile makes the Feature discoverable, resolvable, and executable without host/UI/Command Engine/RuntimeManager edits.
 - Base: a config-only Python script reads `context.config`, logs through `context.logger`, and returns a JSON object without connecting to Resolve.
 - Good: a Resolve script reads `context.project` and `context.timeline`; only the runtime-owned adapter resolves them.
 - Bad: a Command manifest contains `runtime: "python"`, renderer calls a script IPC method, or Capability code imports `node:child_process`.
@@ -665,7 +668,7 @@ if (running) return { mode: "running" };
 - Missing enablement means enabled. Reads and writes reload the file and preserve unrelated feature sections.
 - Persisted feature entries contain exactly `{ enabled: boolean }`; reject derived or unknown fields instead of silently retaining them.
 - Refresh checks configuration before a probe. Missing required config returns schema keys, label-based text, and `open-settings` without probing.
-- A Capability without `checkAvailability()` is ready when configured. Probes must be side-effect free and cannot return manager-owned `loading` or `error`.
+- A Capability without `checkAvailability()` is ready when configured. A probe must not execute the Capability action and cannot return manager-owned `loading` or `error`; a runtime-backed probe may perform bounded provider-owned readiness I/O/process work and must reuse its existing cache.
 - Unexpected storage/config/probe failures become a sanitized in-memory `error`; derived status is never persisted and can recover on refresh.
 - An error refresh preserves the last known `enabled` dimension instead of resetting a known disabled feature to the default.
 - Command execution remains Command ID -> Capability ID -> Capability. `assertEnabled()` runs before existing configuration and execution steps.
