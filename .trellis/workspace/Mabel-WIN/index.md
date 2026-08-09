@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 27
-- **Last Active**: 2026-08-07
+- **Total Sessions**: 28
+- **Last Active**: 2026-08-09
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~611 | Active |
+| `journal-1.md` | ~632 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 28 | 2026-08-09 | Clackly architecture convergence Phase 0 | `19868a3` | `main` |
 | 27 | 2026-08-07 | Refactor Export to AE interaction and async probes | `b961f30` | `main` |
 | 26 | 2026-08-07 | Extract shared window visual tokens | `7e439a9d5cce5e08fb046879548507213e04f4df` | `main` |
 | 25 | 2026-08-06 | Fix Resolve Settings cyan border | `20d67d2` | `main` |
