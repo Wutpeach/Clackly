@@ -651,3 +651,24 @@ Centralized shared application composition for both Electron hosts while preserv
 ### Status
 
 [OK] **Completed**
+
+
+## Session 30: Clackly architecture convergence Phase 2
+
+**Date**: 2026-08-09
+**Task**: Clackly architecture convergence Phase 2
+**Branch**: `main`
+
+### Summary
+
+Connected Script Capability availability to the existing runtime provider/probe/cache chain while preserving lazy startup, execute-time validation, Host wiring, and cache semantics.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1c091ea` | (see git log) |
+
+### Status
+
+[OK] **Completed**
