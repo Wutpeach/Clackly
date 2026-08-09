@@ -693,3 +693,24 @@ Completed the Phase 3 dependency, composition, runtime-readiness, Host-boundary,
 ### Status
 
 [OK] **Completed**
+
+
+## Session 32: Seal TimelineRange architecture
+
+**Date**: 2026-08-09
+**Task**: Seal TimelineRange architecture
+**Branch**: `main`
+
+### Summary
+
+Extracted Blue duration-marker resolution into TimelineRange, migrated Export-to-AE with compatibility tests, completed accepted Resolve/AE smoke, passed 315 tests, and sealed the architecture after R3 audit.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9d0a4048a099c1e82bc00f423d4508c40ba7037b` | (see git log) |
+
+### Status
+
+[OK] **Completed**
