@@ -71,16 +71,21 @@ test("Runtime staging source contains no interpreter or PATH lookup", () => {
   ]) assert.doesNotMatch(source, forbidden);
 });
 
-test("both production hosts inject live Resolve version and packaged Runtime paths", () => {
+test("production hosts inject live Resolve version and Core owns packaged Runtime wiring", () => {
   const standalone = fs.readFileSync(path.join(appRoot, "electron", "main", "main.js"), "utf8");
   const workflow = fs.readFileSync(path.join(appRoot, "workflow-plugin", "main.js"), "utf8");
-  for (const source of [standalone, workflow]) {
-    assert.match(source, /new RuntimeManager/);
-    assert.match(source, /resolveRuntimeRoot/);
-    assert.match(source, /new AfterEffectsLauncher/);
-    assert.match(source, /hostEnvironment: process\.env/);
-    assert.match(source, /runtime-probe\.json/);
+  const core = fs.readFileSync(path.join(appRoot, "app", "createClacklyCore.js"), "utf8");
+  for (const pattern of [
+    /new RuntimeManager/,
+    /resolveRuntimeRoot/,
+    /new AfterEffectsLauncher/,
+    /hostEnvironment: process\.env/,
+    /runtime-probe\.json/
+  ]) {
+    assert.match(core, pattern);
   }
   assert.match(standalone, /getResolveVersion/);
   assert.match(workflow, /GetVersionString/);
+  assert.doesNotMatch(standalone, /new RuntimeManager/);
+  assert.doesNotMatch(workflow, /new RuntimeManager/);
 });

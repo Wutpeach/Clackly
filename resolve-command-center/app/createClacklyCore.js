@@ -1,0 +1,103 @@
+const path = require("node:path");
+
+const { AfterEffectsLauncher } = require("../capability/afterEffectsLaunch");
+const { createCapabilityRegistry } = require("../capability/registry");
+const { createMarkerCapability } = require("../capability/marker");
+const { registerScriptCapabilities } = require("../capability/registerScripts");
+const { createCommandExecutor } = require("../command-engine/executor");
+const { ConfigManager } = require("../config/ConfigManager");
+const { ConfigStorage } = require("../config/ConfigStorage");
+const { FeatureCatalog } = require("../feature-ui/FeatureCatalog");
+const { FeatureStateStorage } = require("../feature-status/FeatureStateStorage");
+const { FeatureStatusManager } = require("../feature-status/FeatureStatusManager");
+const { ShortcutManager } = require("../shortcut/ShortcutManager");
+const { RuntimeManager } = require("../script-runtime/runtime/manager");
+const { resolveRuntimeRoot } = require("../script-runtime/runtime/paths");
+const packageMetadata = require("../package.json");
+
+/**
+ * Application Composition Root: the single source of truth for wiring the
+ * application-level services shared by the Workflow Plugin and standalone
+ * Electron hosts. Hosts inject their Resolve access adapters and paths; the
+ * Root owns every shared construction and registration.
+ */
+function createClacklyCore({
+  appRoot,
+  appDataPath,
+  temporaryRoot,
+  hostContextProvider,
+  markerBackends
+} = {}) {
+  if (typeof appRoot !== "string" || appRoot.trim().length === 0) {
+    throw new TypeError("Clackly Core requires an application root");
+  }
+  if (typeof appDataPath !== "string" || appDataPath.trim().length === 0) {
+    throw new TypeError("Clackly Core requires an app data path");
+  }
+  if (typeof temporaryRoot !== "string" || temporaryRoot.trim().length === 0) {
+    throw new TypeError("Clackly Core requires a temporary root");
+  }
+  if (typeof hostContextProvider !== "function") {
+    throw new TypeError("Clackly Core requires a host context provider");
+  }
+  if (!markerBackends || typeof markerBackends !== "object" || Array.isArray(markerBackends)) {
+    throw new TypeError("Clackly Core requires marker backends");
+  }
+
+  const shortcutManager = new ShortcutManager();
+  const markerCapability = createMarkerCapability({
+    ...markerBackends,
+    keyboardShortcut: {
+      isAvailable: () => shortcutManager.canExecute("ADD_MARKER"),
+      addMarker: (context) => shortcutManager.execute("ADD_MARKER", context)
+    }
+  });
+  const capabilityRegistry = createCapabilityRegistry();
+  capabilityRegistry.register("marker.add", markerCapability);
+
+  const desktopLauncher = new AfterEffectsLauncher({
+    hostEnvironment: process.env,
+    temporaryRoot
+  });
+  const runtimeManager = new RuntimeManager({
+    runtimeRoot: resolveRuntimeRoot({
+      appRoot
+    }),
+    cachePath: path.join(appDataPath, "Clackly", "runtime-probe.json"),
+    clacklyVersion: packageMetadata.version,
+    desktopLauncher,
+    hostContextProvider,
+    scriptRoot: appRoot,
+    ...(process.env.CLACKLY_PYTHON_EXECUTABLE
+      ? { overrideExecutable: process.env.CLACKLY_PYTHON_EXECUTABLE }
+      : {})
+  });
+  registerScriptCapabilities({ capabilityRegistry, appRoot, runtimeManager });
+
+  const featureCatalog = new FeatureCatalog({ capabilityRegistry });
+  const configManager = new ConfigManager({
+    capabilityRegistry,
+    storage: ConfigStorage.fromAppData(appDataPath)
+  });
+  const featureStatusManager = new FeatureStatusManager({
+    capabilityRegistry,
+    configManager,
+    stateStorage: FeatureStateStorage.fromAppData(appDataPath)
+  });
+  const executeCommand = createCommandExecutor({
+    capabilityRegistry,
+    configManager,
+    featureStatusManager
+  });
+
+  return {
+    capabilityRegistry,
+    configManager,
+    featureStatusManager,
+    featureCatalog,
+    executeCommand,
+    runtimeManager
+  };
+}
+
+module.exports = { createClacklyCore };

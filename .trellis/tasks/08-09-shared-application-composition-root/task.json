@@ -3,7 +3,7 @@
   "name": "shared-application-composition-root",
   "title": "Phase 1 — 抽离共享 Application Composition Root",
   "description": "基于 Phase 0 证据抽离轻量共享 Application Composition Root，消除 Host 间主要 wiring 重复。",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

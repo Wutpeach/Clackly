@@ -22,3 +22,9 @@
 ## Review Gate
 
 确认 shared registration 只有一个主要来源，Core 模块静态/运行时均不依赖 electron、window 或 Resolve Workflow globals；两个 Host 失败语义、Marker precedence、cache/runtime lifecycle 和 startup behavior 均由回归测试证明不变。
+
+## Final Ownership（Phase 1 完成记录，2026-08-09）
+
+- `InteractionManager` 构造保留在 Host：它消费 Host-specific wrapper（`executeWorkflowCommand` / `executeStandaloneCommand`），而 wrapper 依赖 Root 输出的 `executeCommand`（构造循环）。**不采用 wrapper-factory/间接层**将其塞入 Root；除非未来出现真实需求，保持现状。
+- Root 返回 `runtimeManager` 项保留，作为完整 script service 与兼容性观察点。
+- `createClacklyCore({ appRoot, appDataPath, temporaryRoot, hostContextProvider, markerBackends })` → `{ capabilityRegistry, configManager, featureStatusManager, featureCatalog, executeCommand, runtimeManager }`，Phase 1 定稿。

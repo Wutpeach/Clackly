@@ -10,76 +10,29 @@ const {
 const { registerPaletteHotkey } = require("./hotkey");
 const { composeStartup } = require("./composeStartup");
 const { getCommands, searchCommands } = require("../../command-engine/registry");
-const { createCommandExecutor } = require("../../command-engine/executor");
-const { createCapabilityRegistry } = require("../../capability/registry");
-const { createMarkerCapability } = require("../../capability/marker");
-const { registerScriptCapabilities } = require("../../capability/registerScripts");
 const { initializeAfterEffectsPath } = require("../../capability/afterEffectsPath");
-const { AfterEffectsLauncher } = require("../../capability/afterEffectsLaunch");
-const { ConfigManager } = require("../../config/ConfigManager");
-const { ConfigStorage } = require("../../config/ConfigStorage");
 const { BindingStorage } = require("../../interaction/BindingStorage");
 const { InteractionManager } = require("../../interaction/InteractionManager");
 const { createBridgeExecutionAdapter } = require("../../execution-adapter/bridge");
-const { ShortcutManager } = require("../../shortcut/ShortcutManager");
-const { FeatureCatalog } = require("../../feature-ui/FeatureCatalog");
 const { registerFeatureUiIpc } = require("../../feature-ui/registerIpc");
-const { FeatureStateStorage } = require("../../feature-status/FeatureStateStorage");
-const { FeatureStatusManager } = require("../../feature-status/FeatureStatusManager");
-const { RuntimeManager } = require("../../script-runtime/runtime/manager");
-const { resolveRuntimeRoot } = require("../../script-runtime/runtime/paths");
-const packageMetadata = require("../../package.json");
+const { createClacklyCore } = require("../../app/createClacklyCore");
 
 let paletteWindow = null;
 let settingsWindow = null;
 
 const bridgeExecutionAdapter = createBridgeExecutionAdapter();
-const shortcutManager = new ShortcutManager();
-const markerCapability = createMarkerCapability({
-  resolveScriptApi: bridgeExecutionAdapter,
-  keyboardShortcut: {
-    isAvailable: () => shortcutManager.canExecute("ADD_MARKER"),
-    addMarker: (context) => shortcutManager.execute("ADD_MARKER", context)
-  }
-});
-const capabilityRegistry = createCapabilityRegistry();
-capabilityRegistry.register("marker.add", markerCapability);
 const appRoot = path.resolve(__dirname, "../..");
-const desktopLauncher = new AfterEffectsLauncher({
-  hostEnvironment: process.env,
-  temporaryRoot: app.getPath("temp")
-});
-const runtimeManager = new RuntimeManager({
-  runtimeRoot: resolveRuntimeRoot({
-    appRoot
-  }),
-  cachePath: path.join(app.getPath("appData"), "Clackly", "runtime-probe.json"),
-  clacklyVersion: packageMetadata.version,
-  desktopLauncher,
+const core = createClacklyCore({
+  appRoot,
+  appDataPath: app.getPath("appData"),
+  temporaryRoot: app.getPath("temp"),
   hostContextProvider: async () => ({
     application: "davinci-resolve",
     version: await bridgeExecutionAdapter.getResolveVersion()
   }),
-  scriptRoot: appRoot,
-  ...(process.env.CLACKLY_PYTHON_EXECUTABLE
-    ? { overrideExecutable: process.env.CLACKLY_PYTHON_EXECUTABLE }
-    : {})
-});
-registerScriptCapabilities({ capabilityRegistry, appRoot, runtimeManager });
-const featureCatalog = new FeatureCatalog({ capabilityRegistry });
-const configManager = new ConfigManager({
-  capabilityRegistry,
-  storage: ConfigStorage.fromAppData(app.getPath("appData"))
-});
-const featureStatusManager = new FeatureStatusManager({
-  capabilityRegistry,
-  configManager,
-  stateStorage: FeatureStateStorage.fromAppData(app.getPath("appData"))
-});
-const executeCommand = createCommandExecutor({
-  capabilityRegistry,
-  configManager,
-  featureStatusManager
+  markerBackends: {
+    resolveScriptApi: bridgeExecutionAdapter
+  }
 });
 const interactionManager = new InteractionManager({
   bindingStorage: BindingStorage.fromAppData(app.getPath("appData")),
@@ -88,7 +41,7 @@ const interactionManager = new InteractionManager({
 
 async function executeStandaloneCommand(commandId) {
   try {
-    return await executeCommand(commandId);
+    return await core.executeCommand(commandId);
   } catch (error) {
     if (String(error && error.message).includes("Resolve scripting API is unavailable")) {
       throw new Error(
@@ -151,9 +104,9 @@ function registerIpcHandlers() {
   registerFeatureUiIpc({
     ipcMain,
     dialog,
-    featureCatalog,
-    configManager,
-    featureStatusManager,
+    featureCatalog: core.featureCatalog,
+    configManager: core.configManager,
+    featureStatusManager: core.featureStatusManager,
     interactionManager,
     openSettings,
     closeSettings
@@ -170,7 +123,7 @@ if (!hasSingleInstanceLock) {
 
   app.whenReady().then(() => {
     paletteWindow = composeStartup({
-      initializeAfterEffectsPath: () => initializeAfterEffectsPath(configManager),
+      initializeAfterEffectsPath: () => initializeAfterEffectsPath(core.configManager),
       createPaletteWindow,
       registerIpcHandlers,
       registerPaletteHotkey: () => registerPaletteHotkey(togglePalette),

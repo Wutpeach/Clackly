@@ -95,8 +95,8 @@ test("both hosts wire real readiness functions into the shared composition", () 
     assert.match(source, /createPaletteWindow,/);
     assert.match(source, /registerIpcHandlers,/);
     assert.match(source, /registerPaletteHotkey:\s*\(\)\s*=>\s*registerPaletteHotkey\(togglePalette\)/);
-    assert.match(source, /initializeAfterEffectsPath:\s*\(\)\s*=>\s*initializeAfterEffectsPath\(configManager\)/);
+    assert.match(source, /initializeAfterEffectsPath:\s*\(\)\s*=>\s*initializeAfterEffectsPath\(core\.configManager\)/);
     assert.match(source, /reportInitializationError:/);
-    assert.doesNotMatch(source, /initializeAfterEffectsPath\(configManager\);/);
+    assert.doesNotMatch(source, /initializeAfterEffectsPath\(core\.configManager\);/);
   }
 });

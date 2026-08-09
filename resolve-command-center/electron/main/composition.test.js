@@ -6,13 +6,32 @@ const test = require("node:test");
 const appRoot = path.resolve(__dirname, "../..");
 const standalone = fs.readFileSync(path.join(appRoot, "electron", "main", "main.js"), "utf8");
 const workflow = fs.readFileSync(path.join(appRoot, "workflow-plugin", "main.js"), "utf8");
+const coreSource = fs.readFileSync(path.join(appRoot, "app", "createClacklyCore.js"), "utf8");
 
-// Characterization of the current two-Host composition: both hosts duplicate the
-// application-level wiring below; only the Resolve access path and Host lifecycle differ.
-// Phase 1 moves the shared inventory into a Composition Root and updates this canary.
-test("both hosts duplicate the same application-level composition", () => {
-  const shared = [
-    /composeStartup/,
+// Architecture canary: hosts delegate shared application wiring to the Composition
+// Root; the Root owns the shared constructions and never imports Electron.
+test("both hosts call the shared Composition Root and no longer construct shared wiring", () => {
+  for (const source of [standalone, workflow]) {
+    assert.match(source, /createClacklyCore\(/);
+    assert.match(source, /app\/createClacklyCore/);
+    for (const pattern of [
+      /new ShortcutManager\(\)/,
+      /createCapabilityRegistry\(\)/,
+      /registerScriptCapabilities/,
+      /new AfterEffectsLauncher/,
+      /new RuntimeManager/,
+      /new ConfigManager/,
+      /new FeatureCatalog/,
+      /new FeatureStatusManager/,
+      /createCommandExecutor/
+    ]) {
+      assert.doesNotMatch(source, pattern);
+    }
+  }
+});
+
+test("Core owns the shared application wiring without Electron or Resolve globals", () => {
+  for (const pattern of [
     /new ShortcutManager\(\)/,
     /createCapabilityRegistry\(\)/,
     /createMarkerCapability/,
@@ -26,29 +45,23 @@ test("both hosts duplicate the same application-level composition", () => {
     /new FeatureStatusManager/,
     /FeatureStateStorage\.fromAppData/,
     /createCommandExecutor/,
-    /new InteractionManager/,
-    /BindingStorage\.fromAppData/,
-    /registerFeatureUiIpc/,
-    /capabilityRegistry\.register\("marker\.add"/,
     /runtime-probe\.json/,
     /CLACKLY_PYTHON_EXECUTABLE/
-  ];
-  for (const source of [standalone, workflow]) {
-    for (const pattern of shared) {
-      assert.match(source, pattern);
-    }
+  ]) {
+    assert.match(coreSource, pattern);
   }
+  assert.doesNotMatch(coreSource, /require\(["']electron["']\)/);
+  assert.doesNotMatch(coreSource, /ipcMain|dialog|BrowserWindow|globalShortcut/);
+  assert.doesNotMatch(coreSource, /WorkflowIntegration/);
 });
 
 test("workflow host injects the in-process Resolve adapter; standalone injects the bridge", () => {
   assert.match(workflow, /createResolveAdapter\(\{ getResolve \}\)/);
-  assert.match(workflow, /require\("\.\.\/resolve\/adapter"\)/);
   assert.match(workflow, /workflowPluginApi/);
   assert.match(workflow, /GetVersionString/);
   assert.match(workflow, /WorkflowIntegration/);
 
   assert.match(standalone, /createBridgeExecutionAdapter\(\)/);
-  assert.match(standalone, /require\("\.\.\/\.\.\/execution-adapter\/bridge"\)/);
   assert.match(standalone, /resolveScriptApi/);
   assert.match(standalone, /getResolveVersion/);
   assert.doesNotMatch(standalone, /WorkflowIntegration/);
@@ -67,8 +80,11 @@ test("host-specific lifecycle differences remain in each Host", () => {
   assert.doesNotMatch(standalone, /app\.setPath\("userData"/);
 });
 
-test("both hosts register the same IPC surface through shared handlers", () => {
+test("both hosts keep the IPC surface and host bootstrap", () => {
   for (const source of [standalone, workflow]) {
+    assert.match(source, /registerFeatureUiIpc/);
+    assert.match(source, /composeStartup/);
+    assert.match(source, /new InteractionManager/);
     for (const channel of [
       "commands:list", "commands:search", "commands:execute",
       "interactions:execute", "palette:hide"
