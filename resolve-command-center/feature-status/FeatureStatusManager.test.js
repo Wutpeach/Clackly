@@ -178,6 +178,24 @@ test("config and storage failures stay sanitized and preserve last known enablem
   });
 });
 
+test("an in-flight refresh keeps the loading record visible and settles once", async () => {
+  let probeCalls = 0;
+  let resolveProbe;
+  const gate = new Promise((resolve) => { resolveProbe = resolve; });
+  const { manager } = createManager({
+    probe: async () => {
+      probeCalls += 1;
+      return gate;
+    }
+  });
+
+  const pending = manager.refresh("ae.export");
+  assert.equal(manager.get("ae.export").status, "loading");
+  resolveProbe({ status: "ready", message: null, details: { missing: [], action: null } });
+  assert.equal((await pending).status, "ready");
+  assert.equal(probeCalls, 1);
+});
+
 test("enablement persists, refreshes readiness, and gates execution synchronously", async () => {
   const { manager, getEnabled } = createManager();
   assert.equal((await manager.setEnabled("ae.export", false)).enabled, false);

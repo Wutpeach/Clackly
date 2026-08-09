@@ -18,14 +18,34 @@ function scriptMetadata(id = "ae.export", entry = "scripts/resolve2ae_export.py"
   };
 }
 
-test("script capabilities expose only metadata and execute today", () => {
-  const provider = { execute() {} };
+test("script capabilities expose metadata, execute, and availability", () => {
+  const provider = { execute() {}, checkAvailability() {} };
   const capability = createScriptCapability(scriptMetadata(), provider);
 
-  assert.deepEqual(Object.keys(capability).sort(), ["execute", "metadata"]);
-  assert.equal(capability.checkAvailability, undefined);
+  assert.deepEqual(Object.keys(capability).sort(), ["checkAvailability", "execute", "metadata"]);
+  assert.equal(typeof capability.checkAvailability, "function");
   assert.equal(capability.metadata.id, "ae.export");
   assert.equal(capability.metadata.executor.runtime, "python");
+});
+
+test("script capability delegates availability with executor metadata and capability id", async () => {
+  const calls = [];
+  const capability = createScriptCapability(scriptMetadata(), {
+    execute() {},
+    checkAvailability(definition, context) {
+      calls.push({ definition, context });
+      return { status: "unavailable", message: null, details: { missing: [], action: null } };
+    }
+  });
+
+  assert.deepEqual(await capability.checkAvailability(), {
+    status: "unavailable",
+    message: null,
+    details: { missing: [], action: null }
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].definition.entry, "scripts/resolve2ae_export.py");
+  assert.deepEqual(calls[0].context, { capabilityId: "ae.export" });
 });
 
 test("script capability execute delegates to the provider with command and capability ids", () => {
@@ -34,7 +54,8 @@ test("script capability execute delegates to the provider with command and capab
     execute(definition, context) {
       calls.push({ definition, context });
       return { ok: true, value: 42 };
-    }
+    },
+    checkAvailability() {}
   });
 
   const command = { id: "timeline.exportToAfterEffects" };
@@ -54,6 +75,17 @@ test("script capabilities reject non-script metadata and missing providers", () 
   );
   assert.throws(
     () => createScriptCapability(scriptMetadata()),
+    /requires a script capability provider/
+  );
+});
+
+test("script capabilities require a provider with the full execute and availability contract", () => {
+  assert.throws(
+    () => createScriptCapability(scriptMetadata(), { execute() {} }),
+    /requires a script capability provider/
+  );
+  assert.throws(
+    () => createScriptCapability(scriptMetadata(), { checkAvailability() {} }),
     /requires a script capability provider/
   );
 });

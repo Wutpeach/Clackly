@@ -121,7 +121,7 @@ test("bundled After Effects manifests expose one Feature, one visible Command, a
   registerScriptCapabilities({
     capabilityRegistry: registry,
     appRoot: path.resolve(__dirname, ".."),
-    runtimeManager: { execute() {} }
+    runtimeManager: { execute() {}, checkAvailability() {} }
   });
   const features = new FeatureCatalog({ capabilityRegistry: registry })
     .getAllFeatures()

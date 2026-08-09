@@ -49,13 +49,17 @@ test("Core returns working application services with marker and script capabilit
   assert.deepEqual(core.featureCatalog.getAllFeatures().map(({ id }) => id).sort(), ["ae.export", "marker.add"]);
   assert.deepEqual(core.configManager.get("marker.add"), {});
   core.configManager.save("ae.export", { aePath: "C:\\fake\\AfterFX.exe" });
+
+  // The bundled runtime manifest declares a managed python, but the executable is
+  // never shipped in the repository, so availability resolves to a stable
+  // missing-dependency before any Probe spawns.
   assert.deepEqual(await core.featureStatusManager.refresh("ae.export"), {
     id: "ae.export",
     installed: true,
     enabled: true,
-    status: "ready",
-    message: null,
-    details: { missing: [], action: null }
+    status: "missing-dependency",
+    message: "Python runtime executable is missing",
+    details: { missing: ["python-runtime"], action: null }
   });
 });
 

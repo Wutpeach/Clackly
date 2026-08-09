@@ -3,7 +3,7 @@
   "name": "script-runtime-readiness",
   "title": "Phase 2 — Script Capability 接入 Runtime Readiness",
   "description": "复用现有 Runtime probe，让 Script Capability 在执行前向 FeatureStatusManager 暴露稳定 readiness。",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

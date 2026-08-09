@@ -2,7 +2,7 @@
 
 ## Boundary
 
-Availability 沿现有执行关系反向查询，但不建立反向模块依赖：FeatureStatusManager 只调用 Capability 契约；Script Capability 将请求委托给其现有 provider/executor；Runtime Provider 复用 RuntimeManager probe。
+Availability 沿现有执行关系查询，但不建立反向模块依赖：FeatureStatusManager 只调用 Capability 契约；Script Capability 将请求委托给其现有 provider/executor；Runtime Provider 负责 runtime-specific 归一化并复用 RuntimeManager probe/cache。
 
 ```text
 FeatureStatusManager
@@ -14,7 +14,7 @@ FeatureStatusManager
   → stable availability result
 ```
 
-最终方法名和返回结构由 Phase 0 记录的现有 API 决定。只有缺少最小委托点时才新增 API，不要求 RuntimeManager 暴露新的公共 `probe()`。
+最终方法名和返回结构由实现前取证决定。只有缺少最小委托点时才新增 API，不要求 RuntimeManager 暴露新的公共 `probe()`，也不把 provider map 暴露给 FeatureStatus。
 
 ## Status Mapping Contract
 
@@ -27,7 +27,7 @@ FeatureStatusManager
 | 当前 Host/runtime 不支持 | `unavailable` |
 | probe 意外失败 | `error` |
 
-Phase 0 必须把此意图表替换/补充为实际字段、reason/details 和错误类别，并标明 probe contract 与 manager lifecycle state 的分工。
+实现前 mapping gate 必须把此意图表替换为实际字段、reason/details 和错误类别，并标明 probe contract 与 manager lifecycle state 的分工。不得创造新的 Feature Status enum。
 
 ## Error Ownership
 
@@ -38,6 +38,19 @@ Phase 0 必须把此意图表替换/补充为实际字段、reason/details 和�
 ## Performance
 
 优先读取现有 probe cache/runtime state/initialization state。若必须缓存，缓存放在已负责 runtime state 的最低合适层，采用最小失效机制，不增加 timer 或 polling。
+
+## Lazy and Cache Invariants
+
+- createClacklyCore/application startup 不启动 Python、不 probe Resolve/runtime。
+- availability probe 与 runtime initialization/start 明确区分；若现有实现无法区分则先汇报。
+- 首次必要时 probe，重复读取复用既有 cache；失败不得永久 stale。
+- 现有 `%APPDATA%/Clackly/runtime-probe.json` path、schema、writer count 与 invalidation 保持不变。
+- 不新增 FeatureStatus cache、Host-specific cache、watcher、poller、locking、namespace 或 daemon。
+- availability 不提供 TOCTOU 保证；execute 始终保留原 runtime resolve/probe/error handling。
+
+## Composition Boundary
+
+Phase 1 Root API 已封板。Readiness wiring 应在 Root 已创建的共享 Script/runtime chain 内自然生效；不增加 runtimeProviderRegistry 参数、dependency bag 或 plugins array。
 
 ## Compatibility and Rollback
 

@@ -8,29 +8,59 @@ function isContained(root, target) {
     && relative !== "..");
 }
 
+// Stable internal code for entry errors the provider itself controls. Accidental
+// filesystem errors (permissions, races) keep their native codes and rethrow.
+function entryError(message) {
+  const error = new Error(message);
+  error.code = "PYTHON_ENTRY_INVALID";
+  return error;
+}
+
+// Runtime evidence -> stable Feature Status availability. Every other error
+// (override invalid, host unverified, Probe/launcher failures) is rethrown and
+// surfaces as a Feature Status error through the manager's catch.
+const AVAILABILITY_MESSAGES = {
+  RUNTIME_NOT_FOUND: ["missing-dependency", "Python runtime executable is missing", ["python-runtime"]],
+  RESOLVE_MODULE_NOT_FOUND: ["missing-dependency", "DaVinci Resolve scripting module or library is missing", ["resolve-scripting"]],
+  RESOLVE_LIBRARY_NOT_FOUND: ["missing-dependency", "DaVinci Resolve scripting module or library is missing", ["resolve-scripting"]],
+  RUNTIME_UNSUPPORTED: ["unavailable", "No compatible managed Python runtime for this Resolve version", []],
+  RUNTIME_ARCHITECTURE_UNSUPPORTED: ["unavailable", "Python runtime architecture is not supported for this Resolve version", []],
+  RUNTIME_VERSION_MISMATCH: ["unavailable", "Python runtime version does not match the expected profile", []],
+  RESOLVE_NOT_RUNNING: ["unavailable", "DaVinci Resolve is not running or scripting is unavailable", []]
+};
+
+function availabilityFor(error) {
+  const mapped = AVAILABILITY_MESSAGES[error?.code];
+  if (!mapped) return null;
+  const [status, message, missing] = mapped;
+  return { status, message, details: { missing, action: null } };
+}
+
 class PythonProvider {
-  constructor({ appRoot, runtimeManager } = {}) {
+  constructor({ appRoot, runtimeManager, fileSystem = fs } = {}) {
     if (typeof appRoot !== "string" || appRoot.trim().length === 0) {
       throw new TypeError("Python provider requires an application root");
     }
-    if (!runtimeManager || typeof runtimeManager.execute !== "function") {
+    if (!runtimeManager || typeof runtimeManager.execute !== "function"
+      || typeof runtimeManager.checkAvailability !== "function") {
       throw new TypeError("Python provider requires a Runtime Manager");
     }
-    this.appRoot = fs.realpathSync(appRoot);
+    this.appRoot = fileSystem.realpathSync(appRoot);
     this.runtimeManager = runtimeManager;
+    this.fileSystem = fileSystem;
   }
 
   resolveEntry(entry) {
     if (typeof entry !== "string" || entry.trim().length === 0 || path.isAbsolute(entry)) {
-      throw new Error(`Python script entry must be a relative path under the application root: ${entry}`);
+      throw entryError(`Python script entry must be a relative path under the application root: ${entry}`);
     }
     const candidate = path.resolve(this.appRoot, entry);
-    if (!isContained(this.appRoot, candidate) || !fs.existsSync(candidate)) {
-      throw new Error(`Python script entry not found under application root: ${entry}`);
+    if (!isContained(this.appRoot, candidate) || !this.fileSystem.existsSync(candidate)) {
+      throw entryError(`Python script entry not found under application root: ${entry}`);
     }
-    const resolved = fs.realpathSync(candidate);
-    if (!isContained(this.appRoot, resolved) || !fs.statSync(resolved).isFile()) {
-      throw new Error(`Python script entry escapes application root: ${entry}`);
+    const resolved = this.fileSystem.realpathSync(candidate);
+    if (!isContained(this.appRoot, resolved) || !this.fileSystem.statSync(resolved).isFile()) {
+      throw entryError(`Python script entry escapes application root: ${entry}`);
     }
     return resolved;
   }
@@ -80,6 +110,34 @@ class PythonProvider {
       throw new Error(`Python script ${entry} failed: ${envelope.error.type}: ${envelope.error.message}`);
     }
     return envelope.result;
+  }
+
+  async checkAvailability(scriptDefinition, context = {}) {
+    try {
+      this.resolveEntry(scriptDefinition?.entry);
+    } catch (error) {
+      if (error?.code !== "PYTHON_ENTRY_INVALID") throw error;
+      return {
+        status: "missing-dependency",
+        message: "Script entry is not available",
+        details: { missing: ["script-entry"], action: null }
+      };
+    }
+    if (typeof context.capabilityId !== "string" || !context.capabilityId.trim()) {
+      throw new TypeError("Python provider requires a Capability id");
+    }
+
+    try {
+      await this.runtimeManager.checkAvailability({
+        runtime: "python",
+        capabilityId: context.capabilityId
+      });
+    } catch (error) {
+      const availability = availabilityFor(error);
+      if (availability) return availability;
+      throw error;
+    }
+    return { status: "ready", message: null, details: { missing: [], action: null } };
   }
 }
 

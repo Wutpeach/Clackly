@@ -97,52 +97,11 @@ class RuntimeManager {
       invalid("Runtime Manager config must contain only JSON values", "config");
     }
 
-    let resolution = null;
-    if (this.overrideExecutable !== undefined) {
-      resolution = this.resolver.resolve({ overrideExecutable: this.overrideExecutable });
-    }
-
-    let host;
-    try {
-      host = await this.hostContextProvider();
-    } catch (error) {
-      throw new RuntimeError("RESOLVE_VERSION_UNVERIFIED", "DaVinci Resolve version could not be read", {
-        details: { cause: typeof error?.message === "string" ? error.message : String(error) }
-      });
-    }
-    if (!isPlainObject(host) || host.application !== "davinci-resolve" || !VERSION.test(host.version || "")) {
-      throw new RuntimeError("RESOLVE_VERSION_UNVERIFIED", "DaVinci Resolve version could not be verified", {
-        details: { reason: "invalid-host-context" }
-      });
-    }
-
-    if (!resolution) {
-      resolution = this.resolver.resolve({
-        runtime: request.runtime,
-        platform: this.platform,
-        architecture: this.architecture,
-        capabilityId: request.capabilityId,
-        host
-      });
-    }
-    const managed = resolution.source === "manifest";
-    const stagedRoot = managed ? path.join(path.dirname(resolution.executable), "clackly") : this.scriptRoot;
-    const selectedBootstrap = managed ? path.join(stagedRoot, "bootstrap.py") : this.bootstrapPath;
-    const readiness = await this.probe.probe({
-      resolution,
-      clacklyVersion: this.clacklyVersion,
-      resolveVersion: host.version,
-      bootstrapPath: selectedBootstrap,
-      ...(this.modulePath ? { modulePath: this.modulePath } : {}),
-      ...(this.libraryPath ? { libraryPath: this.libraryPath } : {})
+    const prepared = await this.resolveAndProbe({
+      runtime: request.runtime,
+      capabilityId: request.capabilityId
     });
-    if (!readiness?.ok) {
-      throw new RuntimeError(
-        readiness?.error?.code || "RUNTIME_PROBE_FAILED",
-        readiness?.error?.message || "Runtime Probe failed",
-        { supportStatus: readiness?.supportStatus || resolution.supportStatus, details: { probe: readiness } }
-      );
-    }
+    const { resolution, stagedRoot, selectedBootstrap } = prepared;
 
     const launched = await this.launcher.execute({
       resolution,
@@ -210,6 +169,75 @@ class RuntimeManager {
       script.logs.push({ level: "info", message: `✅ ${script.result.message}` });
     }
     return script;
+  }
+
+  // Shared preparation pipeline for execute and availability checks: Override,
+  // host context, Resolver, then the isolated resolve Probe. It never touches
+  // the script launcher or the desktop plan, so availability stops at Probe.
+  async resolveAndProbe({ runtime, capabilityId }) {
+    let resolution = null;
+    if (this.overrideExecutable !== undefined) {
+      resolution = this.resolver.resolve({ overrideExecutable: this.overrideExecutable });
+    }
+
+    let host;
+    try {
+      host = await this.hostContextProvider();
+    } catch (error) {
+      throw new RuntimeError("RESOLVE_VERSION_UNVERIFIED", "DaVinci Resolve version could not be read", {
+        details: { cause: typeof error?.message === "string" ? error.message : String(error) }
+      });
+    }
+    if (!isPlainObject(host) || host.application !== "davinci-resolve" || !VERSION.test(host.version || "")) {
+      throw new RuntimeError("RESOLVE_VERSION_UNVERIFIED", "DaVinci Resolve version could not be verified", {
+        details: { reason: "invalid-host-context" }
+      });
+    }
+
+    if (!resolution) {
+      resolution = this.resolver.resolve({
+        runtime,
+        platform: this.platform,
+        architecture: this.architecture,
+        capabilityId,
+        host
+      });
+    }
+    const managed = resolution.source === "manifest";
+    const stagedRoot = managed ? path.join(path.dirname(resolution.executable), "clackly") : this.scriptRoot;
+    const selectedBootstrap = managed ? path.join(stagedRoot, "bootstrap.py") : this.bootstrapPath;
+    const readiness = await this.probe.probe({
+      resolution,
+      clacklyVersion: this.clacklyVersion,
+      resolveVersion: host.version,
+      bootstrapPath: selectedBootstrap,
+      ...(this.modulePath ? { modulePath: this.modulePath } : {}),
+      ...(this.libraryPath ? { libraryPath: this.libraryPath } : {})
+    });
+    if (!readiness?.ok) {
+      throw new RuntimeError(
+        readiness?.error?.code || "RUNTIME_PROBE_FAILED",
+        readiness?.error?.message || "Runtime Probe failed",
+        { supportStatus: readiness?.supportStatus || resolution.supportStatus, details: { probe: readiness } }
+      );
+    }
+
+    return { resolution, stagedRoot, selectedBootstrap, readiness };
+  }
+
+  async checkAvailability(request) {
+    if (!isPlainObject(request)) invalid("Runtime Manager requires a request object", "request");
+    for (const field of ["runtime", "capabilityId"]) {
+      if (typeof request[field] !== "string" || !request[field].trim()) {
+        invalid(`Runtime Manager requires a non-empty ${field}`, field);
+      }
+    }
+
+    const { readiness } = await this.resolveAndProbe({
+      runtime: request.runtime,
+      capabilityId: request.capabilityId
+    });
+    return readiness;
   }
 }
 

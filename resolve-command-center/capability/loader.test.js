@@ -60,7 +60,7 @@ test("script registration validates every manifest before changing the host regi
     assert.throws(() => registerScriptCapabilities({
       capabilityRegistry: registry,
       capabilityDir: directory,
-      scriptCapabilityProvider: { execute() {} }
+      scriptCapabilityProvider: { execute() {}, checkAvailability() {} }
     }), /non-empty entry/);
     assert.equal(registry.get("valid"), null);
   })
@@ -79,7 +79,8 @@ test("script registration discovers a new capability without host-specific edits
         execute(definition, context) {
           calls.push({ definition, context });
           return { ok: true };
-        }
+        },
+        checkAvailability() {}
       }
     });
 

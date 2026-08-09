@@ -8,7 +8,8 @@ function isPlainObject(value) {
 
 class ScriptCapabilityProvider {
   constructor({ scriptExecutor, logger = console } = {}) {
-    if (!scriptExecutor || typeof scriptExecutor.execute !== "function") {
+    if (!scriptExecutor || typeof scriptExecutor.execute !== "function"
+      || typeof scriptExecutor.checkAvailability !== "function") {
       throw new TypeError("Script capability provider requires a script executor");
     }
     this.scriptExecutor = scriptExecutor;
@@ -37,6 +38,13 @@ class ScriptCapabilityProvider {
       config: { ...snapshot },
       logger: this.logger
     });
+  }
+
+  checkAvailability(scriptDefinition, { capabilityId } = {}) {
+    if (typeof capabilityId !== "string" || capabilityId.trim().length === 0) {
+      throw new TypeError("Script capability provider requires a Capability id");
+    }
+    return this.scriptExecutor.checkAvailability(scriptDefinition, { capabilityId });
   }
 }
 
