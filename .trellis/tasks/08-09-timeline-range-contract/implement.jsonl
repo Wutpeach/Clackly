@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Owns Resolve adapter, Resolve2AE selection/export, script runtime, error, and test contracts that R2 must preserve."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Guides extracting the existing marker-to-range logic into one shared owner without speculative abstractions."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Defines data-flow, validation, and error ownership checks across Resolve facts, range resolution, and Export consumption."}
+{"file":".trellis/tasks/08-09-timeline-range-contract/design.md","reason":"Approved R1 contract, extraction boundary, and compatibility matrix for R2."}
+{"file":".trellis/tasks/08-09-timeline-range-contract/research/export-to-ae-range-flow.md","reason":"Exact current call chain, coordinate/end semantics, fallback, malformed data, FPS/timecode, and error evidence."}
+{"file":".trellis/tasks/08-09-timeline-range-contract/research/marker-architecture-and-regressions.md","reason":"Marker consumer inventory and the two independent precedence contracts."}
+{"file":".trellis/tasks/08-09-timeline-range-contract/research/extraction-boundary-evidence.md","reason":"Evidence-backed minimal ownership and dependency boundary."}

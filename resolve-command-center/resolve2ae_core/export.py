@@ -20,6 +20,9 @@ import shutil
 import tempfile
 import math
 
+from resolve.adapter import read_timeline_markers, read_timeline_start_frame
+from resolve.timeline_range import TimelineRangeScanError, resolve_timeline_range
+
 # ================= [1. 常量与配置] =================
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".resolve_to_ae_config.json")
 
@@ -160,31 +163,25 @@ def get_target_clips_logic(timeline, target_policy="auto", media_policy="mixed")
     end_frame = 0
     mode = "single"
 
-    tl_start_frame = timeline.GetStartFrame()
-    if tl_start_frame is None: tl_start_frame = 86400
+    tl_start_frame = read_timeline_start_frame(timeline)
 
     if target_policy in {"auto", "blue-range"}:
-        blue_ranges = []
+        timeline_range = None
         try:
-            markers = timeline.GetMarkers()
-            if markers:
-                for frame_idx, info in markers.items():
-                    try:
-                        color = info.get("color")
-                        duration = int(info.get("duration", 0))
-                    except Exception:
-                        continue
-                    if color == "Blue" and duration > 1:
-                        blue_ranges.append((int(frame_idx), duration))
+            markers = read_timeline_markers(timeline)
         except Exception:
             if target_policy != "auto":
                 raise
-        if blue_ranges:
-            # [FIX] 数字帧排序，选择数值最小的 Blue 时长标记；枚举顺序不影响结果
-            blue_ranges.sort(key=lambda entry: entry[0])
-            frame_idx, duration = blue_ranges[0]
-            start_frame = frame_idx + tl_start_frame
-            end_frame = start_frame + duration
+        else:
+            try:
+                timeline_range = resolve_timeline_range(tl_start_frame, markers)
+            except TimelineRangeScanError as error:
+                if target_policy != "auto":
+                    raise error.cause from None
+                timeline_range = error.resolve_partial(tl_start_frame)
+        if timeline_range is not None:
+            start_frame = timeline_range.start_frame
+            end_frame = timeline_range.end_frame_exclusive
             mode = "batch"
         elif target_policy == "blue-range":
             raise MissingMarkerError("No Blue duration marker found")

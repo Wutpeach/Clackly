@@ -909,6 +909,120 @@ class ExportCoreSnapshotTests(unittest.TestCase):
         )
         self.assertEqual([clip["item"] for clip in clips], [at_20])
 
+    def test_malformed_marker_info_and_duration_are_skipped(self) -> None:
+        current = FakeVideoItem(start=0, end=24, name="Current")
+        timeline = FakeTimeline(
+            video_tracks={1: [current]},
+            markers={
+                "bad-info": None,
+                "bad-duration": {"color": "Blue", "duration": "not-a-number"},
+                "point": {"color": "Blue", "duration": 1},
+                "cyan": {"color": "Cyan", "duration": 24},
+                "red": {"color": "Red", "duration": 24},
+            },
+        )
+
+        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(
+            timeline, "auto", "video"
+        )
+        self.assertEqual(mode, "single")
+        self.assertEqual([clip["item"] for clip in clips], [current])
+        with self.assertRaisesRegex(export_core.MissingMarkerError, "No Blue duration marker found"):
+            export_core.get_target_clips_logic(timeline, "blue-range", "video")
+
+    def test_malformed_qualifying_frame_keeps_current_partial_scan_behavior(self) -> None:
+        current = FakeVideoItem(start=0, end=10, name="Current")
+        ranged = FakeVideoItem(start=20, end=44, name="Ranged")
+        timeline = FakeTimeline(
+            video_tracks={1: [current, ranged]},
+            markers={
+                "20": {"color": "Blue", "duration": 24},
+                "bad-frame": {"color": "Blue", "duration": 24},
+            },
+        )
+
+        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(
+            timeline, "auto", "video"
+        )
+        self.assertEqual(mode, "batch")
+        self.assertEqual([clip["item"] for clip in clips], [ranged])
+        with self.assertRaisesRegex(ValueError, "invalid literal"):
+            export_core.get_target_clips_logic(timeline, "blue-range", "video")
+
+        timeline.markers = dict(reversed(list(timeline.markers.items())))
+        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(
+            timeline, "auto", "video"
+        )
+        self.assertEqual(mode, "single")
+        self.assertEqual([clip["item"] for clip in clips], [current])
+
+    def test_marker_range_uses_absolute_half_open_coordinates_without_trimming(self) -> None:
+        ends_at_start = FakeVideoItem(start=1000, end=1010, name="EndsAtStart")
+        overlaps_first_frame = FakeVideoItem(start=1009, end=1011, name="FirstFrame")
+        inside = FakeVideoItem(start=1010, end=1015, name="Inside")
+        overlaps_last_frame = FakeVideoItem(start=1014, end=1016, name="LastFrame")
+        starts_at_end = FakeVideoItem(start=1015, end=1020, name="StartsAtEnd")
+        timeline = FakeTimeline(
+            video_tracks={1: [
+                ends_at_start,
+                overlaps_first_frame,
+                inside,
+                overlaps_last_frame,
+                starts_at_end,
+            ]},
+            markers={"10": {"color": "Blue", "duration": 5}},
+            start_frame=1000,
+        )
+
+        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(
+            timeline, "auto", "video"
+        )
+        selected = [clip["item"] for clip in clips]
+        self.assertEqual(mode, "batch")
+        self.assertEqual(selected, [overlaps_first_frame, inside, overlaps_last_frame])
+        self.assertEqual(
+            [(item.GetStart(), item.GetEnd()) for item in selected],
+            [(1009, 1011), (1010, 1015), (1014, 1016)],
+        )
+
+    def test_missing_timeline_start_uses_legacy_86400_marker_offset(self) -> None:
+        ranged = FakeVideoItem(start=86410, end=86412, name="Ranged")
+        timeline = FakeTimeline(
+            video_tracks={1: [ranged]},
+            markers={"10": {"color": "Blue", "duration": 2}},
+            start_frame=None,
+        )
+
+        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(
+            timeline, "auto", "video"
+        )
+        self.assertEqual(mode, "batch")
+        self.assertEqual([clip["item"] for clip in clips], [ranged])
+
+    def test_single_policy_does_not_read_markers(self) -> None:
+        current = FakeVideoItem(start=0, end=24, name="Current")
+        timeline = FakeTimeline(video_tracks={1: [current]})
+
+        def fail_marker_read():
+            raise AssertionError("single policy must not read markers")
+
+        timeline.GetMarkers = fail_marker_read
+        self.assertEqual(self._clips(timeline, "single", "video"), [current])
+
+    def test_timeline_start_errors_propagate_before_every_policy(self) -> None:
+        timeline = FakeTimeline(video_tracks={})
+        start_error = RuntimeError("start frame API failed")
+
+        def fail_start_read():
+            raise start_error
+
+        timeline.GetStartFrame = fail_start_read
+        for target_policy in ("single", "auto", "blue-range"):
+            with self.subTest(target_policy=target_policy):
+                with self.assertRaises(RuntimeError) as raised:
+                    export_core.get_target_clips_logic(timeline, target_policy, "video")
+                self.assertIs(raised.exception, start_error)
+
     def test_single_scope_selects_topmost_video_and_audio_independently(self) -> None:
         lower_video = FakeVideoItem(start=0, end=24, name="V1", track_index=1)
         upper_video = FakeVideoItem(start=0, end=24, name="V2", track_index=2)

@@ -522,19 +522,27 @@ initializeAfterEffectsPath(configManager);
 
 ### 1. Scope / Trigger
 
-- Trigger: mapping a Resolve timeline selection to target clips for After Effects export, or converting an export Command id into a selection/media policy before Resolve access.
-- Selection primitives and Command policy mapping stay in `resolve2ae_core/export.py` and `scripts/resolve2ae_export.py`; OTIO/formula/JSX behavior is shared and never duplicated.
+- Trigger: resolving the currently supported Resolve timeline range, mapping it to target clips for After Effects export, or converting an export Command id into a selection/media policy before Resolve access.
+- Raw timeline facts stay in `resolve/adapter.py`; Blue duration-marker qualification and range construction stay in `resolve/timeline_range.py`; Export policy stays in `resolve2ae_core/export.py`; Command policy mapping stays in `scripts/resolve2ae_export.py`.
 
 ### 2. Signatures
 
 - Selection: `get_target_clips_logic(timeline, target_policy = "auto", media_policy = "mixed") -> list[record]`, where `target_policy` is `auto | single | blue-range` and `media_policy` is `mixed | audio | video`.
+- Range value: `TimelineRange(start_frame: int, end_frame_exclusive: int, source: Literal["resolve-duration-marker"])` in absolute Resolve timeline-item frame coordinates.
+- Range resolution: `resolve_timeline_range(timeline_start_frame, markers) -> TimelineRange | None` from already acquired raw Resolve facts.
+- Raw facts: `read_timeline_start_frame(timeline)` and `read_timeline_markers(timeline)` call the matching Resolve API directly and preserve its raw result or error.
 - Execution: `process_and_send(..., mode, target_policy, media_policy)`, `_terminal_result(ok, code, mode, target_policy, media_policy, clip_count, message)`.
 - Supported execution triples: exactly `("auto", "auto", "mixed")`, `("audio-only", "auto", "audio")`, `("video-only", "auto", "video")`, `("single", "single", "mixed")`, `("video-range", "blue-range", "video")`, `("mixed-range", "blue-range", "mixed")`.
 - Wrapper mapping: `scripts/resolve2ae_export.py` maps the six AE Command ids to their triples and passes all three arguments.
 
 ### 3. Contracts
 
-- `auto` targets scan only Blue duration markers, sort by numeric frame (never lexical), and take the lowest as a batch range; with no Blue marker, `auto` falls back to the playhead single. Cyan markers are ignored and never encode scope or media.
+- The resolver accepts only exact-color Blue markers with `int(duration) > 1`, chooses the lowest numeric marker frame independently of enumeration order, adds the timeline start offset once, and returns a half-open absolute range. A missing start fact uses the legacy `86400`; Cyan, point, malformed-info, and malformed-duration markers are ignored.
+- `TimelineRange` owns exact integer start/end frames, `end_frame_exclusive > start_frame`, and the only current source token. It does not reject negative frames, clamp to timeline bounds, or validate FPS.
+- `auto` consumes the resolved range when present and otherwise falls back to the playhead single. `single` does not read markers. `blue-range` requires a resolved range. These policies, `MissingMarkerError`, FPS/timecode behavior, and clip overlap remain Export concerns; consumers do not branch on `range.source`.
+- Marker API/scan errors retain their compatibility boundary: `auto` falls back, including retaining a valid candidate accumulated before a malformed qualifying frame; `blue-range` propagates the original error. Start-frame API errors propagate for every policy.
+- `TimelineRangeScanError` is an internal extraction-compatibility detail, not a Range result or consumer contract. Only the resolver, Export's legacy catch boundary, and focused tests may reference it; upstream runtime, Command, Capability, and future generic consumers must not depend on it.
+- Batch membership is the half-open overlap `clip_start < range.end_frame_exclusive and clip_end > range.start_frame`. The range controls membership only and never trims selected clips.
 - `single` selects the independent topmost enabled video and audio records; mixed de-duplicates linked audio against the video record, and each requested class falls back to the available counterpart when absent.
 - `blue-range` targets include video intersecting the Blue range plus de-duplicated linked audio for mixed; explicit compatibility aliases fail with the existing missing-marker terminal when no Blue marker exists.
 - OTIO enrichment runs whenever any target record has `track_type == "video"` (`has_video`); `content_type` remains a display projection and never suppresses video processing. Video-only export writes `layer.audioEnabled = false;` for every video layer including linked audio.
@@ -545,19 +553,26 @@ initializeAfterEffectsPath(configManager);
 
 - Unsupported `(mode, target_policy, media_policy)` triple -> rejected before Resolve access.
 - Missing Blue for an explicit compatibility alias -> existing `missing-marker` terminal result; auto without Blue -> playhead, not an error.
+- Malformed marker info/duration -> skip the entry; malformed qualifying frame -> preserve the existing policy-specific scan failure and any earlier candidate.
+- `GetMarkers()` failure -> auto playhead fallback, explicit propagation; `GetStartFrame()` failure -> propagation for every policy.
+- Non-integer or empty `TimelineRange` -> constructor `TypeError`/`ValueError`; negative but increasing ranges remain valid.
 - No target clips for the requested media -> existing controlled no-clips failure with a media-appropriate message.
 
 ### 5. Good/Base/Bad Cases
 
 - Good: two Blue markers at frames `100` and `20` select the `20` marker (numeric ordering) regardless of API enumeration order.
+- Good: marker frame `10`, timeline start `1000`, and duration `5` resolves to `[1010, 1015)`; clips touching only `1010` or `1015` are excluded.
 - Good: mixed single with a disabled top video track falls back to the next enabled video while retaining linked-audio de-duplication.
 - Base: one visible Command with no Blue marker exports the topmost playhead video plus its linked audio.
+- Bad: catch every resolver exception and return `None`; this changes explicit errors and can hide range-construction failures.
+- Bad: make Export branch on `TimelineRange.source` or move playhead fallback into the resolver.
 - Bad: gating OTIO/video-property enrichment on `content_type == "video"` so a mixed selection skips video processing.
 - Bad: exporting video-only with embedded/linked audio still enabled on a video layer.
 
 ### 6. Tests Required
 
-- Assert the full 3x3 selection matrix, numeric-vs-lexical Blue keys (`"100"`/`"20"`), Cyan ignore, Blue absence, explicit missing Blue, independent topmost fallback, and mixed de-duplication.
+- Assert TimelineRange invariants, exact Blue/duration qualification, numeric-vs-lexical keys (`"100"`/`"20"`), enumeration independence, malformed facts, absolute offset, `86400`, and end-exclusive construction.
+- Assert the full 3x3 selection matrix, Cyan ignore, Blue absence, explicit missing Blue, policy-specific API/scan errors, half-open overlap with no trimming, independent topmost fallback, and mixed de-duplication.
 - Assert the six supported and rejected execution triples, exact Core failure/success transport, Wrapper script error, RuntimeManager stripped success/typed failure, and multiple video layers all muted in video-only coverage.
 - Assert mixed-single and mixed-Blue transformed/speed/crop/lens/blend/LUT regressions that prove OTIO enrichment still runs, plus linked-A/V video-only silence assertions.
 
@@ -576,6 +591,11 @@ if content_type == "video":
 has_video = any(record["track_type"] == "video" for record in target_clips)
 if has_video:
     enrich_otio(target_clips)
+
+timeline_start = read_timeline_start_frame(timeline)
+markers = read_timeline_markers(timeline)
+timeline_range = resolve_timeline_range(timeline_start, markers)
+# Export decides whether None means playhead fallback or MissingMarkerError.
 ```
 
 ---

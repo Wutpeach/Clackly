@@ -13,6 +13,8 @@ from resolve.adapter import (
     add_marker,
     current_timeline_frame,
     parse_frame_rate,
+    read_timeline_markers,
+    read_timeline_start_frame,
     timecode_to_frames,
     get_resolve,
 )
@@ -60,6 +62,27 @@ class FakeMarkerTimeline(FakeTimeline):
 
 
 class ResolveAdapterTests(unittest.TestCase):
+    def test_reads_raw_timeline_range_facts_without_normalizing_them(self):
+        timeline = FakeMarkerTimeline(markers={"20": {"color": "Blue", "duration": 24}})
+        timeline.start_frame = None
+
+        self.assertIsNone(read_timeline_start_frame(timeline))
+        self.assertIs(read_timeline_markers(timeline), timeline.markers)
+
+    def test_raw_timeline_range_fact_errors_propagate_unchanged(self):
+        start_error = RuntimeError("start failed")
+        marker_error = RuntimeError("markers failed")
+        timeline = FakeMarkerTimeline()
+        timeline.GetStartFrame = lambda: (_ for _ in ()).throw(start_error)
+        timeline.GetMarkers = lambda: (_ for _ in ()).throw(marker_error)
+
+        with self.assertRaises(RuntimeError) as raised_start:
+            read_timeline_start_frame(timeline)
+        self.assertIs(raised_start.exception, start_error)
+        with self.assertRaises(RuntimeError) as raised_markers:
+            read_timeline_markers(timeline)
+        self.assertIs(raised_markers.exception, marker_error)
+
     def test_uses_an_already_importable_resolve_module(self):
         module = SimpleNamespace(scriptapp=lambda name: "resolve" if name == "Resolve" else None)
         with patch.dict(sys.modules, {"bmd": None, "DaVinciResolveScript": module}):

@@ -207,6 +207,14 @@ def current_timeline_frame(project: Any, timeline: Any) -> tuple[int, str]:
     return frame_id, str(current_timecode)
 
 
+def read_timeline_start_frame(timeline: Any) -> Any:
+    return timeline.GetStartFrame()
+
+
+def read_timeline_markers(timeline: Any) -> Any:
+    return timeline.GetMarkers()
+
+
 def add_marker() -> Dict[str, Any]:
     project, timeline = get_project_and_timeline()
     frame_id, current_timecode = current_timeline_frame(project, timeline)
