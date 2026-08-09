@@ -672,3 +672,24 @@ Connected Script Capability availability to the existing runtime provider/probe/
 ### Status
 
 [OK] **Completed**
+
+
+## Session 31: Clackly architecture convergence closure
+
+**Date**: 2026-08-09
+**Task**: Clackly architecture convergence closure
+**Branch**: `main`
+
+### Summary
+
+Completed the Phase 3 dependency, composition, runtime-readiness, Host-boundary, cache, and regression audit; documented the final architecture and four-step Python Feature path; confirmed zero production changes and archived the full four-phase architecture-convergence task.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b966396` | (see git log) |
+
+### Status
+
+[OK] **Completed**
