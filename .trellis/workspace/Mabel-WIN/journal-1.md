@@ -630,3 +630,24 @@ Captured Workflow/Electron composition evidence, Script Runtime readiness gaps, 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 29: Clackly architecture convergence Phase 1
+
+**Date**: 2026-08-09
+**Task**: Clackly architecture convergence Phase 1
+**Branch**: `main`
+
+### Summary
+
+Centralized shared application composition for both Electron hosts while preserving host lifecycle, failure semantics, marker precedence, cache paths, and startup timing.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b6c86d1` | (see git log) |
+
+### Status
+
+[OK] **Completed**
