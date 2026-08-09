@@ -1,0 +1,2 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"回归检查跨层契约、状态映射和反向依赖。"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"检查共享注册是否成为单一主要来源，并区分测试 fixture 中合理的独立构造。"}

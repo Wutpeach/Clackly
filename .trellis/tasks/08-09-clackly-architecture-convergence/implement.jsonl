@@ -1,0 +1,2 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"用于审查 Host → application → capability → provider → runtime 的跨层数据流和依赖方向。"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"用于约束 Host wiring 去重必须复用现有模块且不引入投机抽象。"}

@@ -1,0 +1,2 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"复核最终 dependency map、readiness chain 与 Host/Core 责任文档。"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复核 production duplication 已消除且测试 fixture 未被误删。"}

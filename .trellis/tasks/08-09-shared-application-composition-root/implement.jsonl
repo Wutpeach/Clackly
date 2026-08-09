@@ -1,0 +1,2 @@
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"指导共享 wiring 单一来源与最小复用，防止引入 DI/container 抽象。"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"审查 Host dependency 注入和 application service 返回契约。"}

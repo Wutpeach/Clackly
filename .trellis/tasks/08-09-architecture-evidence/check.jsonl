@@ -1,0 +1,2 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"复核 composition/readiness 图是否覆盖实际跨层数据流和状态转换。"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复核 duplication 清单是否区分共享注册、Host adapter 和测试 fixture。"}

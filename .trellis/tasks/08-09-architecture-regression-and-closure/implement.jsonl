@@ -1,0 +1,2 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"用于最终依赖方向、数据流和架构文档核对。"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"用于重复注册审计和过度抽象防护。"}

@@ -1,0 +1,2 @@
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"检查 Host-level duplication 是否真正删除且未过度抽象测试 fixture。"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"检查 Host/Core 边界、依赖方向和运行时行为兼容。"}

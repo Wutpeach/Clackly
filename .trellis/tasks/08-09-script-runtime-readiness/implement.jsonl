@@ -1,0 +1,2 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"指导 runtime probe 到 Capability/Feature status 的跨层契约和状态转换。"}
+{"file":".trellis/spec/backend/error-handling.md","reason":"实现前核对项目现有错误处理规范；若仍为空，以 Phase 0 的代码证据为准。"}

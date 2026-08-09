@@ -1,0 +1,2 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"指导两个 Host 与 readiness 链路的跨层取证，避免遗漏数据转换和边界依赖。"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"判断重复 wiring 是否是真正的共享模式，而非 Host-specific 差异。"}

@@ -1,0 +1,2 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"复核 availability 数据流、错误归一化和 native capability 回归。"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"检查 readiness 是否复用现有 runtime lookup/status/error 模型而未建立第二套 registry。"}
