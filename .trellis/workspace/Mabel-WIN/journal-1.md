@@ -735,3 +735,24 @@ Added Paste Clipboard Image through the existing Command and Capability path, sa
 ### Status
 
 [OK] **Completed**
+
+
+## Session 34: Fix Image Clipboard click execution
+
+**Date**: 2026-08-10
+**Task**: Fix Image Clipboard click execution
+**Branch**: `main`
+
+### Summary
+
+Added the missing Image Clipboard left-click binding, migrated pre-feature default binding files, updated interaction specs, passed full regression/package verification, and installed the Workflow package.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fe69a30` | (see git log) |
+
+### Status
+
+[OK] **Completed**
