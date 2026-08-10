@@ -46,9 +46,17 @@ test("binding storage initializes, normalizes, persists, and validates bindings"
     },
     "timeline.exportToAfterEffects.ctrl-shift-left-click": {
       target: "timeline.exportToAfterEffects", modifiers: ["CTRL", "SHIFT"], action: "timeline.exportVideoToAfterEffects"
+    },
+    "media.clipboard-image.import.left-click": {
+      target: "media.clipboard-image.import", modifiers: [], action: "media.clipboard-image.import"
     }
   });
-  assert.equal(Object.keys(defaultBindings).length, 4);
+  assert.equal(Object.keys(defaultBindings).length, 5);
+  assert.deepEqual(defaultBindings["media.clipboard-image.import.left-click"], {
+    target: "media.clipboard-image.import",
+    trigger: { type: "mouse", button: "left", modifiers: [] },
+    action: { command: "media.clipboard-image.import" }
+  });
   assert.deepEqual(JSON.parse(fs.readFileSync(storage.filePath, "utf8")), defaultBindings);
 
   const oldDefault = {
@@ -214,9 +222,68 @@ test("the shipped marker-plus-seven-AE default fingerprint migrates regardless o
       target: "timeline.exportToAfterEffects",
       trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT"] },
       action: { command: "timeline.exportVideoToAfterEffects" }
+    },
+    "media.clipboard-image.import.left-click": {
+      target: "media.clipboard-image.import",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "media.clipboard-image.import" }
     }
   });
   assert.equal(fs.existsSync(`${storage.filePath}.backup`), false);
+});
+
+function preImageClipboardDefaultBindings() {
+  return {
+    "timeline.addMarker.left-click": {
+      target: "timeline.addMarker",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.addMarker" }
+    },
+    "timeline.exportToAfterEffects.left-click": {
+      target: "timeline.exportToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "timeline.exportToAfterEffects" }
+    },
+    "timeline.exportToAfterEffects.ctrl-left-click": {
+      target: "timeline.exportToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: ["CTRL"] },
+      action: { command: "timeline.exportAudioToAfterEffects" }
+    },
+    "timeline.exportToAfterEffects.ctrl-shift-left-click": {
+      target: "timeline.exportToAfterEffects",
+      trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT"] },
+      action: { command: "timeline.exportVideoToAfterEffects" }
+    }
+  };
+}
+
+test("an installed pre-Image-Clipboard default migrates to the shipped default with left-click binding", (t) => {
+  const storage = createStorage(t);
+  writeBindings(storage, shuffled(preImageClipboardDefaultBindings()));
+
+  const loaded = storage.load();
+  assert.deepEqual(loaded, {
+    ...preImageClipboardDefaultBindings(),
+    "media.clipboard-image.import.left-click": {
+      target: "media.clipboard-image.import",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
+      action: { command: "media.clipboard-image.import" }
+    }
+  });
+  assert.equal(fs.existsSync(`${storage.filePath}.backup`), false);
+  assert.equal(JSON.parse(fs.readFileSync(storage.filePath, "utf8"))["media.clipboard-image.import.left-click"].target, "media.clipboard-image.import");
+});
+
+test("a customized root with the Image Clipboard card absent stays user-owned", (t) => {
+  const storage = createStorage(t);
+  const customized = preImageClipboardDefaultBindings();
+  customized["timeline.addMarker.left-click"].action.command = "custom.marker";
+  writeBindings(storage, customized);
+
+  const loaded = storage.load();
+  assert.equal(loaded["timeline.addMarker.left-click"].action.command, "custom.marker");
+  assert.equal(Object.hasOwn(loaded, "media.clipboard-image.import.left-click"), false);
+  assert.equal(Object.keys(loaded).length, 4);
 });
 
 test("a one-field customization does not take the wholesale default path", (t) => {

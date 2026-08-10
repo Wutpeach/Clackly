@@ -910,7 +910,7 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 - Stored binding: `{ target: string, trigger: { type: "mouse", button: "left" | "right", modifiers: ("CTRL" | "SHIFT" | "ALT")[] }, action: { command: string } }`
 - Renderer/IPC event: `{ target: string, type: "mouse", button: number, ctrlKey: boolean, shiftKey: boolean, altKey: boolean }`
 - Storage: `BindingStorage.fromAppData(appDataPath)`, `load()`, and `save(bindings)`.
-- Shipped binding shapes: `OLD_DEFAULT_BINDINGS` (marker only), `SHIPPED_AE_DEFAULT_BINDINGS` (marker plus the legacy four-card AE records), and `DEFAULT_BINDINGS` (marker plus three primary-target AE triggers: left -> mixed, Ctrl+left -> audio, Ctrl+Shift+left -> video).
+- Shipped binding shapes: `OLD_DEFAULT_BINDINGS` (marker only), `SHIPPED_AE_DEFAULT_BINDINGS` (marker plus the legacy four-card AE records), `PRE_IMAGE_CLIPBOARD_DEFAULT_BINDINGS` (marker plus three primary-target AE triggers: left -> mixed, Ctrl+left -> audio, Ctrl+Shift+left -> video), and `DEFAULT_BINDINGS` (the preceding shape plus unmodified left click for `media.clipboard-image.import`).
 - Manager: `new InteractionManager({ bindingStorage, executeCommand })`, `listBindings() -> Array<{ id, target, trigger, action: { command } }>`, and `handle(event) -> Promise<{ matched: false } | { matched: true, command: string, result: unknown }>`.
 - Shared trigger helpers: `normalizeTrigger(trigger)`, `normalizeMouseEventTrigger(event)`, and `triggersEqual(left, right)`.
 
@@ -922,15 +922,15 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 - `InteractionManager` accepts plain target/button/modifier facts, performs one exact match, and delegates only the matched Command ID to the injected command executor.
 - `listBindings()` returns normalized defensive records in BindingStorage order; both hosts expose the same read-only semantic IPC and no mutation IPC.
 - Command Registry remains the only Command ID -> Capability ID mapping owner. Interaction modules do not import command or capability registries.
-- Missing files receive the unmodified `timeline.addMarker` left-click compatibility binding once. An explicitly persisted empty object remains empty.
-- Exact-default migration compares canonical binding-id-sorted entries: a file equal to `OLD_DEFAULT_BINDINGS` or `SHIPPED_AE_DEFAULT_BINDINGS` is rewritten as `DEFAULT_BINDINGS`. Customized roots containing legacy AE targets are structurally retargeted to `timeline.exportToAfterEffects` with a `bindings.json.backup` written first, the original-primary binding winning each trigger collision (else the lexical-id winner), same-action losers de-duplicated silently, and one migration warning emitted through the injected `onMigrationWarning` only for different-action collisions.
+- Missing files receive the current `DEFAULT_BINDINGS` once. An explicitly persisted empty object remains empty.
+- Exact-default migration compares canonical binding-id-sorted entries: a file equal to `OLD_DEFAULT_BINDINGS`, `SHIPPED_AE_DEFAULT_BINDINGS`, or `PRE_IMAGE_CLIPBOARD_DEFAULT_BINDINGS` is rewritten as `DEFAULT_BINDINGS`. This gives existing default profiles the Image Clipboard left-click action without mutating unrelated customized roots. Customized roots containing legacy AE targets are structurally retargeted to `timeline.exportToAfterEffects` with a `bindings.json.backup` written first, the original-primary binding winning each trigger collision (else the lexical-id winner), same-action losers de-duplicated silently, and one migration warning emitted through the injected `onMigrationWarning` only for different-action collisions.
 - Unsupported mouse buttons return `{ matched: false }`; malformed events and bindings fail clearly; executor errors propagate unchanged.
 - Double-click, global shortcut, key synthesis, shortcut discovery/mutation, priorities, and wildcard modifier matching are outside this boundary.
 
 ### 4. Validation & Error Matrix
 
-- Missing bindings file -> persist and return the unmodified `timeline.addMarker` left-click compatibility binding.
-- Exact-default file -> rewrite as `DEFAULT_BINDINGS`; customized root with legacy AE targets -> backup and structural retarget; unrelated customized bindings -> preserved unchanged.
+- Missing bindings file -> persist and return the current `DEFAULT_BINDINGS`.
+- Exact-default file, including the pre-Image-Clipboard default -> rewrite as `DEFAULT_BINDINGS`; customized root with legacy AE targets -> backup and structural retarget; unrelated customized bindings -> preserved unchanged.
 - Malformed root, binding, trigger, action, or unknown/duplicate modifier -> throw `TypeError` before persistence or matching.
 - Two bindings with the same normalized target/button/modifier signature -> reject as an ambiguous duplicate.
 - Unsupported event button such as middle click -> return `{ matched: false }` and do not execute.
@@ -940,7 +940,7 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 ### 5. Good/Base/Bad Cases
 
 - Good: `CTRL+SHIFT` modifiers are normalized once and match regardless of stored input order.
-- Base: unmodified left click on target `timeline.addMarker` delegates `timeline.addMarker` to `executeCommand`.
+- Base: unmodified left click on target `timeline.addMarker` delegates `timeline.addMarker` to `executeCommand`; unmodified left click on `media.clipboard-image.import` delegates that Command exactly once.
 - Good: a modified click can execute a different Command ID that maps to the same Capability without Interaction Binding knowing that Capability ID.
 - Bad: storing `capability: "marker.add"` in a binding or importing Command/Capability Registry from `interaction/`.
 - Bad: allowing a `CTRL` binding to match a `CTRL+SHIFT` event.
@@ -948,7 +948,7 @@ if not environment.get("RESOLVE_SCRIPT_API") and standard_module_path.exists():
 ### 6. Tests Required
 
 - Assert first-run creation, persistence, modifier normalization, duplicate normalized-trigger rejection, malformed binding rejection, and defensive results.
-- Assert both shipped default shapes migrate to the three-trigger primary-target default, customized legacy targets retarget with backup/collision rules, and same-action losers never warn.
+- Assert all historical shipped default shapes migrate to the current default, including the Image Clipboard binding for the immediately preceding default; customized legacy targets retarget with backup/collision rules, and same-action losers never warn.
 - Assert exact left/right matching, individual and combined modifiers, extra-modifier non-match, unmatched behavior, one-call delegation, and unchanged executor errors.
 - Assert binding listing includes ids, preserves normalized order, and cannot mutate storage through returned nested objects.
 - Run the full Node suite and renderer build after host or IPC composition changes.

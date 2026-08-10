@@ -168,3 +168,39 @@ test("modified clicks dispatch internal compatibility alias actions without extr
     "timeline.exportCyanRangeToAfterEffects"
   ]);
 });
+
+test("unmodified left-click on the Image Clipboard card executes the command exactly once", async () => {
+  const calls = [];
+  const manager = new InteractionManager({
+    bindingStorage: {
+      load: () => ({
+        clipboard: {
+          target: "media.clipboard-image.import",
+          trigger: { type: "mouse", button: "left", modifiers: [] },
+          action: { command: "media.clipboard-image.import" }
+        }
+      })
+    },
+    executeCommand: async (command) => {
+      calls.push(command);
+      return { ok: true, diskPath: "C:/Pictures/x.png" };
+    }
+  });
+
+  assert.deepEqual(await manager.handle(mouse(0, { target: "media.clipboard-image.import" })), {
+    matched: true,
+    command: "media.clipboard-image.import",
+    result: { ok: true, diskPath: "C:/Pictures/x.png" }
+  });
+  assert.deepEqual(calls, ["media.clipboard-image.import"]);
+  // Modified clicks and other buttons do not match the plain left-click binding.
+  assert.deepEqual(
+    await manager.handle(mouse(0, { target: "media.clipboard-image.import", ctrlKey: true })),
+    { matched: false }
+  );
+  assert.deepEqual(
+    await manager.handle(mouse(2, { target: "media.clipboard-image.import" })),
+    { matched: false }
+  );
+  assert.equal(calls.length, 1);
+});

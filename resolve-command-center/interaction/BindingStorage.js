@@ -58,7 +58,7 @@ const SHIPPED_AE_DEFAULT_BINDINGS = {
   }
 };
 
-const DEFAULT_BINDINGS = {
+const PRE_IMAGE_CLIPBOARD_DEFAULT_BINDINGS = {
   ...OLD_DEFAULT_BINDINGS,
   "timeline.exportToAfterEffects.left-click": {
     target: PRIMARY_AE_TARGET,
@@ -74,6 +74,15 @@ const DEFAULT_BINDINGS = {
     target: PRIMARY_AE_TARGET,
     trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT"] },
     action: { command: "timeline.exportVideoToAfterEffects" }
+  }
+};
+
+const DEFAULT_BINDINGS = {
+  ...PRE_IMAGE_CLIPBOARD_DEFAULT_BINDINGS,
+  "media.clipboard-image.import.left-click": {
+    target: "media.clipboard-image.import",
+    trigger: { type: "mouse", button: "left", modifiers: [] },
+    action: { command: "media.clipboard-image.import" }
   }
 };
 
@@ -188,7 +197,8 @@ class BindingStorage {
     }
     const bindings = normalizeBindings(this.storage.load());
     if (sameBindings(bindings, OLD_DEFAULT_BINDINGS)
-      || sameBindings(bindings, SHIPPED_AE_DEFAULT_BINDINGS)) {
+      || sameBindings(bindings, SHIPPED_AE_DEFAULT_BINDINGS)
+      || sameBindings(bindings, PRE_IMAGE_CLIPBOARD_DEFAULT_BINDINGS)) {
       return this.save(DEFAULT_BINDINGS);
     }
     if (hasLegacyAeTargets(bindings)) {
