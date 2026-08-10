@@ -714,3 +714,24 @@ Extracted Blue duration-marker resolution into TimelineRange, migrated Export-to
 ### Status
 
 [OK] **Completed**
+
+
+## Session 33: Implement Image Clipboard import
+
+**Date**: 2026-08-10
+**Task**: Implement Image Clipboard import
+**Branch**: `main`
+
+### Summary
+
+Added Paste Clipboard Image through the existing Command and Capability path, safe PNG persistence, direct and bridge-backed Resolve Media Pool import with folder restoration, structured errors, tests, packaging verification, and reusable backend transaction guidance. Workflow package installation was attempted but blocked by the active Resolve process locking WorkflowIntegration.node.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `37b831a` | (see git log) |
+
+### Status
+
+[OK] **Completed**
