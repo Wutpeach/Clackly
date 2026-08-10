@@ -3,6 +3,7 @@ const path = require("node:path");
 const { AfterEffectsLauncher } = require("../capability/afterEffectsLaunch");
 const { createCapabilityRegistry } = require("../capability/registry");
 const { createMarkerCapability } = require("../capability/marker");
+const { createImageClipboardCapability } = require("../capability/imageClipboard");
 const { registerScriptCapabilities } = require("../capability/registerScripts");
 const { createCommandExecutor } = require("../command-engine/executor");
 const { ConfigManager } = require("../config/ConfigManager");
@@ -26,7 +27,8 @@ function createClacklyCore({
   appDataPath,
   temporaryRoot,
   hostContextProvider,
-  markerBackends
+  markerBackends,
+  imageClipboard
 } = {}) {
   if (typeof appRoot !== "string" || appRoot.trim().length === 0) {
     throw new TypeError("Clackly Core requires an application root");
@@ -43,6 +45,9 @@ function createClacklyCore({
   if (!markerBackends || typeof markerBackends !== "object" || Array.isArray(markerBackends)) {
     throw new TypeError("Clackly Core requires marker backends");
   }
+  if (!imageClipboard || typeof imageClipboard !== "object" || Array.isArray(imageClipboard)) {
+    throw new TypeError("Clackly Core requires Image Clipboard host adapters");
+  }
 
   const shortcutManager = new ShortcutManager();
   const markerCapability = createMarkerCapability({
@@ -54,6 +59,8 @@ function createClacklyCore({
   });
   const capabilityRegistry = createCapabilityRegistry();
   capabilityRegistry.register("marker.add", markerCapability);
+  const imageClipboardCapability = createImageClipboardCapability(imageClipboard);
+  capabilityRegistry.register("media.clipboard-image.import", imageClipboardCapability);
 
   const desktopLauncher = new AfterEffectsLauncher({
     hostEnvironment: process.env,

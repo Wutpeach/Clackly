@@ -17,6 +17,8 @@ from resolve.adapter import (
     read_timeline_start_frame,
     timecode_to_frames,
     get_resolve,
+    get_current_project_name,
+    import_media_to_bin,
 )
 
 
@@ -61,7 +63,87 @@ class FakeMarkerTimeline(FakeTimeline):
         return self.markers
 
 
+class FakeFolder:
+    def __init__(self, name, children=None):
+        self.name = name
+        self.children = children or []
+
+    def GetName(self):
+        return self.name
+
+    def GetSubFolderList(self):
+        return {index: child for index, child in enumerate(self.children)}
+
+
+class FakeMediaPool:
+    def __init__(self, existing=True, import_result=None):
+        self.original = FakeFolder("Original")
+        self.clipboard = FakeFolder("Clipboard")
+        self.root = FakeFolder("Root", [self.clipboard] if existing else [])
+        self.import_result = [{}] if import_result is None else import_result
+        self.calls = []
+
+    def GetRootFolder(self):
+        return self.root
+
+    def GetCurrentFolder(self):
+        return self.original
+
+    def AddSubFolder(self, parent, name):
+        self.calls.append(("AddSubFolder", parent, name))
+        return self.clipboard
+
+    def SetCurrentFolder(self, folder):
+        self.calls.append(("SetCurrentFolder", folder))
+        return True
+
+    def ImportMedia(self, paths):
+        self.calls.append(("ImportMedia", paths))
+        if isinstance(self.import_result, Exception):
+            raise self.import_result
+        return self.import_result
+
+
 class ResolveAdapterTests(unittest.TestCase):
+    def test_reads_current_project_name_with_safe_fallback(self):
+        named = SimpleNamespace(GetName=lambda: "Demo Project")
+        unnamed = SimpleNamespace(GetName=lambda: "")
+        with patch("resolve.adapter.get_current_project", return_value=named):
+            self.assertEqual(get_current_project_name(), {"projectName": "Demo Project"})
+        with patch("resolve.adapter.get_current_project", return_value=unnamed):
+            self.assertEqual(get_current_project_name(), {"projectName": "Untitled Project"})
+
+    def test_media_pool_import_reuses_bin_and_restores_original_folder(self):
+        media_pool = FakeMediaPool(existing=True)
+        project = SimpleNamespace(GetMediaPool=lambda: media_pool)
+        with patch("resolve.adapter.get_current_project", return_value=project):
+            result = import_media_to_bin("C:/Pictures/image.png", "Clipboard")
+
+        self.assertEqual(result, {"mediaPoolBin": "Clipboard"})
+        self.assertEqual(media_pool.calls, [
+            ("SetCurrentFolder", media_pool.clipboard),
+            ("ImportMedia", ["C:/Pictures/image.png"]),
+            ("SetCurrentFolder", media_pool.original),
+        ])
+
+    def test_media_pool_import_creates_missing_bin(self):
+        media_pool = FakeMediaPool(existing=False)
+        project = SimpleNamespace(GetMediaPool=lambda: media_pool)
+        with patch("resolve.adapter.get_current_project", return_value=project):
+            import_media_to_bin("C:/Pictures/image.png", "Clipboard")
+        self.assertEqual(media_pool.calls[0][0], "AddSubFolder")
+
+    def test_media_pool_import_failure_still_restores_original_folder(self):
+        media_pool = FakeMediaPool(import_result=RuntimeError("native import failure"))
+        project = SimpleNamespace(GetMediaPool=lambda: media_pool)
+        with (
+            patch("resolve.adapter.get_current_project", return_value=project),
+            self.assertRaises(ResolveAdapterError) as raised,
+        ):
+            import_media_to_bin("C:/Pictures/image.png", "Clipboard")
+        self.assertEqual(raised.exception.code, "media-pool-import-failed")
+        self.assertEqual(media_pool.calls[-1], ("SetCurrentFolder", media_pool.original))
+
     def test_reads_raw_timeline_range_facts_without_normalizing_them(self):
         timeline = FakeMarkerTimeline(markers={"20": {"color": "Blue", "duration": 24}})
         timeline.start_frame = None

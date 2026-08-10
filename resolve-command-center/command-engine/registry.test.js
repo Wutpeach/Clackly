@@ -57,6 +57,23 @@ test("timeline.addMarker preserves registry search with capability metadata", ()
   assert.equal(getCommandById("timeline.addMarker").keywords[0], "marker");
 });
 
+test("Paste Clipboard Image command registration uses the standard metadata contract", () => {
+  resetCommandCache();
+  assert.deepEqual(getCommandById("media.clipboard-image.import"), {
+    id: "media.clipboard-image.import",
+    name: "Paste Clipboard Image",
+    description: "Save the Clipboard image and import it into the Resolve Media Pool",
+    category: "Media",
+    icon: "image",
+    keywords: ["clipboard", "image", "paste", "png", "media pool"],
+    capability: "media.clipboard-image.import",
+    presentation: "visible"
+  });
+  assert.deepEqual(searchCommands("clipboard image").map(({ id }) => id), [
+    "media.clipboard-image.import"
+  ]);
+});
+
 test("only the visible After Effects export Command is searchable while internal actions stay executable", () => {
   resetCommandCache();
   const commands = searchCommands("after effects");

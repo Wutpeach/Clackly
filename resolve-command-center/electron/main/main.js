@@ -1,5 +1,5 @@
 const path = require("node:path");
-const { app, dialog, ipcMain } = require("electron");
+const { app, clipboard, dialog, ipcMain } = require("electron");
 const {
   createPaletteWindow,
   openSettingsWindow,
@@ -16,6 +16,7 @@ const { InteractionManager } = require("../../interaction/InteractionManager");
 const { createBridgeExecutionAdapter } = require("../../execution-adapter/bridge");
 const { registerFeatureUiIpc } = require("../../feature-ui/registerIpc");
 const { createClacklyCore } = require("../../app/createClacklyCore");
+const { createClipboardImageReader } = require("./clipboard");
 
 let paletteWindow = null;
 let settingsWindow = null;
@@ -32,6 +33,11 @@ const core = createClacklyCore({
   }),
   markerBackends: {
     resolveScriptApi: bridgeExecutionAdapter
+  },
+  imageClipboard: {
+    clipboard: createClipboardImageReader({ clipboard }),
+    picturesPath: app.getPath("pictures"),
+    resolveMediaPool: bridgeExecutionAdapter
   }
 });
 const interactionManager = new InteractionManager({

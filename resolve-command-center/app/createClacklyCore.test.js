@@ -24,6 +24,15 @@ function createCore(overrides = {}) {
         addMarker: async () => ({ ok: true, backend: "resolveScriptApi" })
       }
     },
+    imageClipboard: {
+      clipboard: { readPng: async () => null },
+      picturesPath: path.join(temporaryDirectory, "Pictures"),
+      resolveMediaPool: {
+        isAvailable: async () => true,
+        getCurrentProjectName: async () => "Test Project",
+        importMediaToBin: async () => ({ mediaPoolBin: "Clipboard" })
+      }
+    },
     ...overrides
   });
   return {
@@ -39,6 +48,10 @@ test("Core returns working application services with marker and script capabilit
   t.after(cleanup);
 
   assert.equal(core.capabilityRegistry.get("marker.add").metadata.id, "marker.add");
+  assert.equal(
+    core.capabilityRegistry.get("media.clipboard-image.import").metadata.id,
+    "media.clipboard-image.import"
+  );
   assert.equal(core.capabilityRegistry.get("ae.export").metadata.executor.entry, "scripts/resolve2ae_export.py");
 
   assert.deepEqual(await core.executeCommand("timeline.addMarker"), {
@@ -46,7 +59,11 @@ test("Core returns working application services with marker and script capabilit
     backend: "resolveScriptApi"
   });
 
-  assert.deepEqual(core.featureCatalog.getAllFeatures().map(({ id }) => id).sort(), ["ae.export", "marker.add"]);
+  assert.deepEqual(core.featureCatalog.getAllFeatures().map(({ id }) => id).sort(), [
+    "ae.export",
+    "marker.add",
+    "media.clipboard-image.import"
+  ]);
   assert.deepEqual(core.configManager.get("marker.add"), {});
   core.configManager.save("ae.export", { aePath: "C:\\fake\\AfterFX.exe" });
 
@@ -183,5 +200,15 @@ test("Core rejects missing dependencies", () => {
       markerBackends: null
     }),
     /marker backends/
+  );
+  assert.throws(
+    () => createClacklyCore({
+      appRoot,
+      appDataPath: "x",
+      temporaryRoot: "x",
+      hostContextProvider: async () => ({}),
+      markerBackends: {}
+    }),
+    /Image Clipboard host adapters/
   );
 });

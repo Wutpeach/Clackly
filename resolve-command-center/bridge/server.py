@@ -73,9 +73,14 @@ class CommandRequestHandler(BaseHTTPRequestHandler):
             if not isinstance(command_id, str) or not command_id:
                 raise ResolveBridgeError("Request body must include a command string")
 
-            _json_response(self, 200, execute_command(command_id))
+            _json_response(self, 200, execute_command(command_id, payload))
         except ResolveBridgeError as exc:
-            _json_response(self, 400, {"ok": False, "error": str(exc)})
+            error = {"ok": False, "error": str(exc)}
+            if getattr(exc, "code", None):
+                error["code"] = exc.code
+            if getattr(exc, "details", None):
+                error["details"] = exc.details
+            _json_response(self, 400, error)
         except json.JSONDecodeError:
             _json_response(self, 400, {"ok": False, "error": "Invalid JSON request body"})
         except Exception as exc:

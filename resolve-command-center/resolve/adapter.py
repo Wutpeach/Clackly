@@ -3,11 +3,21 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class ResolveAdapterError(RuntimeError):
     """Raised for user-facing Resolve adapter failures."""
+
+    def __init__(
+        self,
+        message: str,
+        code: str = "resolve-unavailable",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.details = details or {}
 
 
 def _add_resolve_module_paths() -> None:
@@ -28,12 +38,12 @@ def _add_resolve_module_paths() -> None:
             sys.path.insert(0, str(candidate))
 
 
-def _call_optional(target: Any, method_name: str) -> Any:
+def _call_optional(target: Any, method_name: str, *args: Any) -> Any:
     method = getattr(target, method_name, None)
     if not callable(method):
         return None
     try:
-        return method()
+        return method(*args)
     except Exception:
         return None
 
@@ -160,6 +170,177 @@ def get_project_and_timeline() -> tuple[Any, Any]:
         raise ResolveAdapterError("No current timeline")
 
     return project, timeline
+
+
+def get_current_project() -> Any:
+    resolve = get_resolve()
+    project_manager = _call_optional(resolve, "GetProjectManager")
+    if project_manager is None:
+        raise ResolveAdapterError(
+            "Resolve project manager is unavailable",
+            "resolve-project-unavailable",
+        )
+    project = _call_optional(project_manager, "GetCurrentProject")
+    if project is None:
+        raise ResolveAdapterError(
+            "No current Resolve project",
+            "resolve-project-unavailable",
+        )
+    return project
+
+
+def get_current_project_name() -> Dict[str, Any]:
+    project = get_current_project()
+    name = _call_optional(project, "GetName")
+    return {"projectName": str(name).strip() if name else "Untitled Project"}
+
+
+def _folder_values(value: Any) -> list[Any]:
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    if isinstance(value, dict):
+        return list(value.values())
+    return []
+
+
+def import_media_to_bin(disk_path: Any, bin_name: Any) -> Dict[str, Any]:
+    if not isinstance(disk_path, str) or not disk_path.strip():
+        raise ResolveAdapterError(
+            "Clipboard image import requires diskPath",
+            "media-pool-import-failed",
+        )
+    if not isinstance(bin_name, str) or not bin_name.strip():
+        raise ResolveAdapterError(
+            "Clipboard image import requires binName",
+            "media-pool-import-failed",
+            {"diskPath": disk_path},
+        )
+
+    project = get_current_project()
+    media_pool = _call_optional(project, "GetMediaPool")
+    if media_pool is None:
+        raise ResolveAdapterError(
+            "Current Resolve project has no Media Pool",
+            "resolve-media-pool-unavailable",
+            {"diskPath": disk_path},
+        )
+    root = _call_optional(media_pool, "GetRootFolder")
+    original_folder = _call_optional(media_pool, "GetCurrentFolder")
+    if root is None or original_folder is None:
+        raise ResolveAdapterError(
+            "Resolve Media Pool folders are unavailable",
+            "resolve-media-pool-unavailable",
+            {"diskPath": disk_path},
+        )
+
+    folder_list_method = getattr(root, "GetSubFolderList", None)
+    if not callable(folder_list_method):
+        raise ResolveAdapterError(
+            "Resolve Media Pool folders are unavailable",
+            "resolve-media-pool-unavailable",
+            {"diskPath": disk_path},
+        )
+    try:
+        folders = _folder_values(folder_list_method())
+    except Exception as exc:
+        raise ResolveAdapterError(
+            "Resolve Media Pool folders are unavailable",
+            "resolve-media-pool-unavailable",
+            {"diskPath": disk_path, "cause": str(exc)},
+        ) from exc
+
+    target_folder = None
+    for folder in folders:
+        get_name = getattr(folder, "GetName", None)
+        if not callable(get_name):
+            raise ResolveAdapterError(
+                "Resolve Media Pool folder name is unavailable",
+                "resolve-media-pool-unavailable",
+                {"diskPath": disk_path},
+            )
+        try:
+            folder_name = get_name()
+        except Exception as exc:
+            raise ResolveAdapterError(
+                "Resolve Media Pool folder name is unavailable",
+                "resolve-media-pool-unavailable",
+                {"diskPath": disk_path, "cause": str(exc)},
+            ) from exc
+        if folder_name == bin_name:
+            target_folder = folder
+            break
+    if target_folder is None:
+        add_subfolder = getattr(media_pool, "AddSubFolder", None)
+        try:
+            target_folder = add_subfolder(root, bin_name) if callable(add_subfolder) else None
+        except Exception as exc:
+            raise ResolveAdapterError(
+                f"Resolve could not create the {bin_name} Media Pool bin",
+                "media-pool-bin-create-failed",
+                {"diskPath": disk_path, "binName": bin_name, "cause": str(exc)},
+            ) from exc
+        if target_folder is None:
+            raise ResolveAdapterError(
+                f"Resolve could not create the {bin_name} Media Pool bin",
+                "media-pool-bin-create-failed",
+                {"diskPath": disk_path, "binName": bin_name},
+            )
+
+    primary_error: Optional[ResolveAdapterError] = None
+    restore_warning: Optional[Dict[str, str]] = None
+    switch_attempted = False
+    should_switch = original_folder is not target_folder
+    try:
+        if should_switch:
+            switch_attempted = True
+            set_current_folder = getattr(media_pool, "SetCurrentFolder", None)
+            if not callable(set_current_folder) or not set_current_folder(target_folder):
+                raise ResolveAdapterError(
+                    f"Resolve could not open the {bin_name} Media Pool bin",
+                    "media-pool-bin-open-failed",
+                    {"diskPath": disk_path, "binName": bin_name},
+                )
+        import_media = getattr(media_pool, "ImportMedia", None)
+        if not callable(import_media):
+            raise RuntimeError("Resolve Media Pool does not support ImportMedia")
+        imported_items = import_media([disk_path])
+        if not imported_items:
+            raise RuntimeError("Resolve ImportMedia returned no imported items")
+    except Exception as exc:
+        primary_error = exc if (
+            isinstance(exc, ResolveAdapterError)
+            and exc.code == "media-pool-bin-open-failed"
+        ) else ResolveAdapterError(
+                "Resolve could not import the Clipboard image",
+                "media-pool-import-failed",
+                {
+                    "diskPath": disk_path,
+                    "binName": bin_name,
+                    "cause": str(exc),
+                },
+            )
+    finally:
+        if should_switch and switch_attempted:
+            try:
+                restored = set_current_folder(original_folder)
+            except Exception:
+                restored = False
+            if not restored:
+                restore_warning = {
+                    "code": "media-pool-folder-restore-failed",
+                    "message": "Resolve could not restore the previous Media Pool folder",
+                }
+                print(f"[resolve-command-center] warning: {restore_warning['message']}")
+
+    if primary_error is not None:
+        if restore_warning is not None:
+            primary_error.details["warning"] = restore_warning
+        raise primary_error
+
+    result: Dict[str, Any] = {"mediaPoolBin": bin_name}
+    if restore_warning is not None:
+        result["warnings"] = [restore_warning]
+    return result
 
 
 def _get_setting(target: Any, name: str) -> Any:

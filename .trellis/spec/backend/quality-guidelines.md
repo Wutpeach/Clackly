@@ -1098,6 +1098,74 @@ await afterEffectsLauncher.execute(plan, { configuredExecutable: config.aePath }
 
 ---
 
+## Scenario: Host Facts to Resolve Media Pool Transaction
+
+### 1. Scope / Trigger
+
+- Trigger: a Command reads an OS/Electron fact, persists host data, and temporarily changes Resolve Media Pool state to complete an operation.
+
+### 2. Signatures
+
+- Host adapter: `readPng() -> Promise<Buffer | null>` (or an equivalent plain-facts method); application code never receives Electron `NativeImage`.
+- Resolve adapter: `getCurrentProjectName() -> Promise<string>` and `importMediaToBin({ diskPath, binName }) -> Promise<{ mediaPoolBin, warnings? }>`.
+- Success: `{ diskPath: string, mediaPoolBin: string, projectName: string, warnings?: Diagnostic[] }`.
+- Structured failure: `Error & { code: string, details: object }`; after disk persistence, `details.diskPath` is retained.
+
+### 3. Contracts
+
+- Electron Clipboard access stays in Host code and is injected through `createClacklyCore`; the Capability/Application layer consumes PNG bytes only.
+- Resolve scripting calls stay under `resolve/adapter.js` and `resolve/adapter.py`; the bridge transports validated command ids plus inert data fields, never executable code.
+- Order side effects so Clipboard/destination/disk failures occur before Resolve import. A valid disk artifact is user data and is not deleted when a later Resolve operation fails.
+- If Resolve requires `SetCurrentFolder(target)` before `ImportMedia`, remember the original folder and attempt `SetCurrentFolder(original)` in `finally`, including when target selection or import fails.
+- Restoration failure after a successful import is a warning/diagnostic, not rollback and not a failed import result. When the main operation also fails, retain the main error and attach the restoration warning.
+
+### 4. Validation & Error Matrix
+
+- Clipboard has no valid image -> business error; no directory, file, or Resolve side effect.
+- Destination is outside the configured save root -> path-safety error before file creation.
+- Exclusive file write fails -> structured disk error; zero `ImportMedia` calls.
+- Bin lookup fails -> availability error; do not infer that the bin is missing and create a duplicate.
+- Missing bin and `AddSubFolder` fails -> bin-create error; keep any already-written disk artifact.
+- `SetCurrentFolder(target)` fails -> bin-open error; attempt restoration and do not call `ImportMedia`.
+- `ImportMedia` fails or returns no items -> import error; restore the original folder and keep the disk artifact.
+- `SetCurrentFolder(original)` fails after import success -> success plus warning and logger warning.
+
+### 5. Good/Base/Bad Cases
+
+- Good: Host converts `NativeImage.toPNG()` to a Buffer and injects a reader; Capability validates/persists; Resolve adapter imports and restores.
+- Base: target bin already exists and is reused as a direct child of the Media Pool root.
+- Good: a same-millisecond filename collision is resolved with exclusive create plus a bounded suffix retry.
+- Bad: import Electron in the Composition Root/Capability, let Resolve Script read OS Clipboard, or leave the user browsing the temporary target bin.
+
+### 6. Tests Required
+
+- Assert empty Clipboard has no disk or Resolve side effects.
+- Assert unsafe project names cannot escape the save root and Windows reserved names are neutralized.
+- Assert same-timestamp writes select different paths with exclusive creation.
+- Assert existing/missing/bin-create-failure branches and zero import after disk failure.
+- Assert successful import, target-open failure, and import failure all attempt the correct folder restoration.
+- Assert restoration failure preserves success or the primary failure while adding one warning.
+- Assert direct Workflow and bridge adapters expose equivalent result/error semantics and old bridge commands remain compatible.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+const image = require("electron").clipboard.readImage();
+mediaPool.SetCurrentFolder(clipboardBin);
+mediaPool.ImportMedia([writeImage(image)]);
+```
+
+#### Correct
+
+```javascript
+const png = await hostClipboard.readPng();
+const diskPath = await persistPngExclusively(png);
+const result = await mediaPoolAdapter.importMediaToBin({ diskPath, binName: "Clipboard" });
+// importMediaToBin owns a finally block that restores its original folder.
+```
+
 ## Forbidden Patterns
 
 - Machine-specific absolute paths in startup scripts.

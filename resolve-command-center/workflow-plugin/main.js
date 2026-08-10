@@ -1,5 +1,5 @@
 const path = require("node:path");
-const { app, dialog, ipcMain } = require("electron");
+const { app, clipboard, dialog, ipcMain } = require("electron");
 const {
   createPaletteWindow,
   openSettingsWindow,
@@ -16,6 +16,7 @@ const { InteractionManager } = require("../interaction/InteractionManager");
 const { createResolveAdapter } = require("../resolve/adapter");
 const { registerFeatureUiIpc } = require("../feature-ui/registerIpc");
 const { createClacklyCore } = require("../app/createClacklyCore");
+const { createClipboardImageReader } = require("../electron/main/clipboard");
 
 const PLUGIN_ID = "com.wutpeach.clackly";
 
@@ -115,6 +116,11 @@ const core = createClacklyCore({
       },
       addMarker: resolveAdapter.addMarker
     }
+  },
+  imageClipboard: {
+    clipboard: createClipboardImageReader({ clipboard }),
+    picturesPath: app.getPath("pictures"),
+    resolveMediaPool: resolveAdapter
   }
 });
 

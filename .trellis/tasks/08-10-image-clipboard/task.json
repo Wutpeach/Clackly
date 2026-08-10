@@ -1,0 +1,28 @@
+{
+  "id": "image-clipboard",
+  "name": "image-clipboard",
+  "title": "Migrate Toolbox Image Clipboard",
+  "description": "Add Paste Clipboard Image through existing Clackly command, host, filesystem, and Resolve boundaries.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": "resolve-command-center Image Clipboard command, host adapter, filesystem persistence, Resolve Media Pool adapters, bridge, and tests",
+  "package": null,
+  "priority": "P2",
+  "creator": "Mabel-WIN",
+  "assignee": "Mabel-WIN",
+  "createdAt": "2026-08-10",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "Full automated tests, build, runtime staging, Windows package, and package inventory verification passed. Package installation was attempted but the active Resolve process locked WorkflowIntegration.node; no process was terminated.",
+  "meta": {
+    "description": "Add Paste Clipboard Image through existing Clackly command, host, filesystem, and Resolve boundaries."
+  }
+}

@@ -35,6 +35,7 @@ test("Core owns the shared application wiring without Electron or Resolve global
     /new ShortcutManager\(\)/,
     /createCapabilityRegistry\(\)/,
     /createMarkerCapability/,
+    /createImageClipboardCapability/,
     /registerScriptCapabilities/,
     /new AfterEffectsLauncher/,
     /new RuntimeManager/,
@@ -53,6 +54,7 @@ test("Core owns the shared application wiring without Electron or Resolve global
   assert.doesNotMatch(coreSource, /require\(["']electron["']\)/);
   assert.doesNotMatch(coreSource, /ipcMain|dialog|BrowserWindow|globalShortcut/);
   assert.doesNotMatch(coreSource, /WorkflowIntegration/);
+  assert.doesNotMatch(coreSource, /clipboard\.readImage|require\(["']electron["']\)/);
 });
 
 test("workflow host injects the in-process Resolve adapter; standalone injects the bridge", () => {
@@ -65,6 +67,12 @@ test("workflow host injects the in-process Resolve adapter; standalone injects t
   assert.match(standalone, /resolveScriptApi/);
   assert.match(standalone, /getResolveVersion/);
   assert.doesNotMatch(standalone, /WorkflowIntegration/);
+  assert.match(workflow, /resolveMediaPool: resolveAdapter/);
+  assert.match(standalone, /resolveMediaPool: bridgeExecutionAdapter/);
+  for (const source of [workflow, standalone]) {
+    assert.match(source, /createClipboardImageReader/);
+    assert.match(source, /app\.getPath\("pictures"\)/);
+  }
 });
 
 test("host-specific lifecycle differences remain in each Host", () => {

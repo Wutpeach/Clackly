@@ -13,6 +13,7 @@ import {
   Command as CommandIcon,
   Flag,
   Grip,
+  Image,
   LoaderCircle,
   Palette,
   Pin,
@@ -95,6 +96,7 @@ const ICONS = {
   arrow: ChevronLeft,
   loading: LoaderCircle,
   warning: TriangleAlert,
+  image: Image,
   close: X
 };
 

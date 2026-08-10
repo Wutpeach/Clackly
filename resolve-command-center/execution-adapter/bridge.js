@@ -43,7 +43,10 @@ function postJson(url, payload) {
               return;
             }
 
-            reject(new Error(parsed.error || `Bridge returned HTTP ${response.statusCode}`));
+            const error = new Error(parsed.error || `Bridge returned HTTP ${response.statusCode}`);
+            if (typeof parsed.code === "string") error.code = parsed.code;
+            if (parsed.details && typeof parsed.details === "object") error.details = parsed.details;
+            reject(error);
           } catch (error) {
             reject(new Error(`Invalid bridge response: ${error.message}`));
           }
@@ -123,6 +126,20 @@ function createBridgeExecutionAdapter({
     },
     addMarker: () => request(`${getUrl()}/command`, {
       command: "timeline.addMarker"
+    }),
+    getCurrentProjectName: async () => {
+      const response = await request(`${getUrl()}/command`, {
+        command: "media.clipboard-image.project"
+      });
+      if (typeof response.projectName !== "string") {
+        throw new Error("Bridge did not return the current Resolve project name");
+      }
+      return response.projectName;
+    },
+    importMediaToBin: ({ diskPath, binName }) => request(`${getUrl()}/command`, {
+      command: "media.clipboard-image.import",
+      diskPath,
+      binName
     })
   };
 }

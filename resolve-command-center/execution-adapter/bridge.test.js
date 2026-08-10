@@ -42,3 +42,29 @@ test("bridge execution adapter reports a dead bridge as unavailable", async () =
 
   assert.equal(await adapter.isAvailable(), false);
 });
+
+test("bridge adapter forwards Image Clipboard project and import facts", async () => {
+  const calls = [];
+  const adapter = createBridgeExecutionAdapter({
+    getUrl: () => "http://127.0.0.1:49999",
+    request: async (url, payload) => {
+      calls.push({ url, payload });
+      return payload.command === "media.clipboard-image.project"
+        ? { ok: true, projectName: "Demo Project" }
+        : { ok: true, mediaPoolBin: payload.binName };
+    }
+  });
+
+  assert.equal(await adapter.getCurrentProjectName(), "Demo Project");
+  assert.deepEqual(await adapter.importMediaToBin({
+    diskPath: "C:\\Pictures\\image.png",
+    binName: "Clipboard"
+  }), { ok: true, mediaPoolBin: "Clipboard" });
+  assert.deepEqual(calls.map(({ payload }) => payload), [{
+    command: "media.clipboard-image.project"
+  }, {
+    command: "media.clipboard-image.import",
+    diskPath: "C:\\Pictures\\image.png",
+    binName: "Clipboard"
+  }]);
+});

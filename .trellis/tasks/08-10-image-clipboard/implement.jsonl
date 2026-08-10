@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend spec index and project guideline status for application, adapter, and test changes."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"The feature crosses Electron Host, Capability service, filesystem, bridge, and Resolve boundaries."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse the existing Command, Composition Root, bridge, error, and test patterns without a parallel framework."}
+{"file":".trellis/tasks/08-10-image-clipboard/research/repository-audit.md","reason":"Repository-backed integration points and MVP decisions for implementation."}
