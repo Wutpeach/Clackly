@@ -1,0 +1,88 @@
+{
+  "scope": "Developer-only Playwright renderer evidence. Browser-process host stubs expose registered Commands, normalized interaction bindings, and semantic Interaction Panel intent.",
+  "limitations": [
+    "This proves built/packaged renderer DOM, CSS, keyboard, and pointer behavior only.",
+    "It does not prove Electron setShape/DWM composition, transparent-gap hit testing, cursor placement, native focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."
+  ],
+  "playwrightVersion": "1.62.1",
+  "browser": {
+    "channel": "explicit browser executable",
+    "version": "151.0.4129.107",
+    "headless": true
+  },
+  "renderer": "built",
+  "rendererRoot": "D:\\Clackly\\resolve-command-center\\dist\\renderer",
+  "output": "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\polish",
+  "viewports": {
+    "main": {
+      "width": 240,
+      "height": 320
+    },
+    "interaction": {
+      "width": 476,
+      "height": 320
+    },
+    "deviceScaleFactor": 1
+  },
+  "commands": [
+    {
+      "id": "timeline.exportToAfterEffects",
+      "name": "Export to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportAudioToAfterEffects",
+      "name": "Export Audio to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportVideoToAfterEffects",
+      "name": "Export Video to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportCurrentToAfterEffects",
+      "name": "Export Playhead Clip to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportBlueRangeToAfterEffects",
+      "name": "Export Blue Marker Range Video to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportCyanRangeToAfterEffects",
+      "name": "Export Blue Marker Range with Audio to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "media.clipboard-image.import",
+      "name": "Paste Clipboard Image",
+      "category": "Media",
+      "capability": "media.clipboard-image.import"
+    },
+    {
+      "id": "timeline.addMarker",
+      "name": "Add Marker",
+      "category": "Timeline",
+      "capability": "marker.add"
+    }
+  ],
+  "scenarios": [
+    "interaction-panel",
+    "interaction-lifecycle"
+  ],
+  "screenshots": [
+    "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\polish\\interaction-panel.png"
+  ],
+  "assertions": [
+    "Ctrl+K has no compatibility path; Search-input Tab stays normal; Info click toggles a #191C20, 220px, content-fit Interaction Panel with a 16px gap and mapping rows only",
+    "Tab enters/returns, Esc closes first, and selection/execute/Palette-show lifecycle leaves no stale Interaction Panel"
+  ]
+}

@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review the implementation against the shared Palette, native-shape, IPC, accessibility, and regression contracts."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit renderer-to-host data flow, duplicate authority, lifecycle restoration, and cross-host consistency."}
+{"file":".trellis/tasks/08-27-command-palette-interaction-hint/research/repository-ownership.md","reason":"Verify the diff stays within the researched ownership and removes all Actions-only presentation/orchestration without touching shared interaction capability."}

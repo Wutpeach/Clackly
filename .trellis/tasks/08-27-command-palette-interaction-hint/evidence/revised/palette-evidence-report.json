@@ -1,0 +1,97 @@
+{
+  "scope": "Developer-only Playwright renderer evidence. Browser-process host stubs expose registered Commands, normalized interaction bindings, and semantic Interaction Panel intent.",
+  "limitations": [
+    "This proves built/packaged renderer DOM, CSS, keyboard, and pointer behavior only.",
+    "It does not prove Electron setShape/DWM composition, transparent-gap hit testing, cursor placement, native focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."
+  ],
+  "playwrightVersion": "1.62.1",
+  "browser": {
+    "channel": "explicit browser executable",
+    "version": "151.0.4129.107",
+    "headless": true
+  },
+  "renderer": "built",
+  "rendererRoot": "D:\\Clackly\\resolve-command-center\\dist\\renderer",
+  "output": "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\revised",
+  "viewports": {
+    "main": {
+      "width": 240,
+      "height": 320
+    },
+    "interaction": {
+      "width": 516,
+      "height": 320
+    },
+    "deviceScaleFactor": 1
+  },
+  "commands": [
+    {
+      "id": "timeline.exportToAfterEffects",
+      "name": "Export to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportAudioToAfterEffects",
+      "name": "Export Audio to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportVideoToAfterEffects",
+      "name": "Export Video to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportCurrentToAfterEffects",
+      "name": "Export Playhead Clip to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportBlueRangeToAfterEffects",
+      "name": "Export Blue Marker Range Video to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportCyanRangeToAfterEffects",
+      "name": "Export Blue Marker Range with Audio to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "media.clipboard-image.import",
+      "name": "Paste Clipboard Image",
+      "category": "Media",
+      "capability": "media.clipboard-image.import"
+    },
+    {
+      "id": "timeline.addMarker",
+      "name": "Add Marker",
+      "category": "Timeline",
+      "capability": "marker.add"
+    }
+  ],
+  "scenarios": [
+    "default",
+    "interaction-single-description",
+    "interaction-panel",
+    "interaction-lifecycle",
+    "interaction-host-unavailable"
+  ],
+  "screenshots": [
+    "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\revised\\default.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\revised\\interaction-single-description.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\revised\\interaction-panel.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\revised\\interaction-host-unavailable.png"
+  ],
+  "assertions": [
+    "default command shell: 240×320, Settings→Pin left, universal selected-Command Info right, no legacy Ctrl/K or Actions copy, compact command rows, unified rgb(21, 22, 25) main/Footer surface with inset Search and 4.81:1 readable Footer text",
+    "hover/dwell and selection never auto-open; a single/default interaction keeps Info and opens a description-only panel",
+    "Ctrl+K has no compatibility path; Search-input Tab stays normal; Info click toggles a 260px, content-fit Interaction Panel with a 16px gap, #151619 shared surface, complete wrapped mappings, and contained vertical overflow",
+    "Tab enters/returns, Esc closes first, and selection/execute/Palette-show lifecycle leaves no stale Interaction Panel",
+    "Null and rejected Interaction Panel host intent fail closed, refocus the Palette, and show concise persistent error feedback"
+  ]
+}

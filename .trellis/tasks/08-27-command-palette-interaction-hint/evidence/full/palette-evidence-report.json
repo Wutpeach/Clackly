@@ -1,0 +1,107 @@
+{
+  "scope": "Developer-only Playwright renderer evidence. Browser-process host stubs expose registered Commands, normalized interaction bindings, and semantic Interaction Panel intent.",
+  "limitations": [
+    "This proves built/packaged renderer DOM, CSS, keyboard, and pointer behavior only.",
+    "It does not prove Electron setShape/DWM composition, transparent-gap hit testing, cursor placement, native focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."
+  ],
+  "playwrightVersion": "1.62.1",
+  "browser": {
+    "channel": "explicit browser executable",
+    "version": "151.0.4129.107",
+    "headless": true
+  },
+  "renderer": "built",
+  "rendererRoot": "D:\\Clackly\\resolve-command-center\\dist\\renderer",
+  "output": "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\full",
+  "viewports": {
+    "main": {
+      "width": 240,
+      "height": 320
+    },
+    "interaction": {
+      "width": 476,
+      "height": 320
+    },
+    "deviceScaleFactor": 1
+  },
+  "commands": [
+    {
+      "id": "timeline.exportToAfterEffects",
+      "name": "Export to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportAudioToAfterEffects",
+      "name": "Export Audio to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportVideoToAfterEffects",
+      "name": "Export Video to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportCurrentToAfterEffects",
+      "name": "Export Playhead Clip to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportBlueRangeToAfterEffects",
+      "name": "Export Blue Marker Range Video to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportCyanRangeToAfterEffects",
+      "name": "Export Blue Marker Range with Audio to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "media.clipboard-image.import",
+      "name": "Paste Clipboard Image",
+      "category": "Media",
+      "capability": "media.clipboard-image.import"
+    },
+    {
+      "id": "timeline.addMarker",
+      "name": "Add Marker",
+      "category": "Timeline",
+      "capability": "marker.add"
+    }
+  ],
+  "scenarios": [
+    "default",
+    "pinned-recent",
+    "search-results",
+    "command-baseline",
+    "interaction-single-hidden",
+    "interaction-panel",
+    "interaction-lifecycle",
+    "interaction-host-unavailable",
+    "error-feedback"
+  ],
+  "screenshots": [
+    "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\full\\default.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\full\\pinned-recent.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\full\\search-results.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\full\\interaction-panel.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\full\\interaction-host-unavailable.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\full\\error-feedback.png"
+  ],
+  "assertions": [
+    "default command shell: 240×320, Settings→Pin left, conditional Info right, no legacy Ctrl/K or Actions copy, compact command rows, unified rgb(21, 22, 25) main/Footer surface with inset Search and 4.81:1 readable Footer text",
+    "real UI Pin plus Command execution projects nonempty Pinned and Recent sections without duplicates",
+    "Search remains a separate multi-result Command DOM mode with no Launcher sections, has no footer Back control, retains its ESC hint, and Escape returns to Launcher",
+    "baseline command Arrow/Enter remains routed through the injected command API",
+    "hover/dwell and selection never auto-open; a single-interaction Command exposes neither Info nor empty panel",
+    "Info click toggles a #191C20, 220px, content-fit Interaction Panel with a 16px gap and mapping rows only",
+    "Tab enters/returns, Esc closes first, and selection/execute/Palette-show lifecycle leaves no stale Interaction Panel",
+    "Null and rejected Interaction Panel host intent fail closed, refocus the Palette, and show concise persistent error feedback",
+    "Errors remain visible, retain full aria-live text, and use a compact readable three-line maximum rather than acknowledgement auto-dismissal"
+  ]
+}
