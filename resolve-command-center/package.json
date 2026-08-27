@@ -12,6 +12,7 @@
     "runtime:stage": "powershell -ExecutionPolicy Bypass -File scripts/stage-managed-python.ps1",
     "package:win": "npm run build && electron-builder --win dir",
     "package:verify": "node scripts/verify-package.js",
+    "palette:evidence": "node scripts/palette-evidence.mjs",
     "test": "node --test app/*.test.js interaction/*.test.js config/*.test.js capability/*.test.js script-runtime/*.test.js script-runtime/providers/*.test.js feature-status/*.test.js feature-ui/*.test.js shortcut/*.test.js command-engine/*.test.js execution-adapter/*.test.js resolve/*.test.js electron/main/*.test.js electron/renderer/*.test.mjs scripts/*.test.js && python -m unittest discover -s bridge -p \"test_*.py\" && python -m unittest discover -s resolve -p \"test_*.py\" && python -m unittest discover -s script-runtime -p \"test_*.py\" && python -m unittest discover -s resolve2ae_core/tests -p \"test_*.py\" && python -m unittest discover -s scripts -p \"test_*.py\"",
     "workflow:install": "powershell -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1",
     "workflow:install:package": "powershell -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1 -Mode Copy -PackageRoot release/win-unpacked"
@@ -50,6 +51,7 @@
     "concurrently": "^9.1.0",
     "electron": "36.3.2",
     "electron-builder": "^26.15.3",
+    "playwright": "1.62.1",
     "vite": "^8.1.5",
     "wait-on": "^8.0.1"
   }

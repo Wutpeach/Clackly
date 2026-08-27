@@ -3,6 +3,7 @@ const { app, clipboard, dialog, ipcMain } = require("electron");
 const {
   createPaletteWindow,
   openSettingsWindow,
+  registerAttachedActionsIpc,
   showPaletteWindow,
   hidePaletteWindow,
   isPaletteWindowShown
@@ -107,6 +108,7 @@ function registerIpcHandlers() {
     return result;
   });
   ipcMain.on("palette:hide", hidePalette);
+  registerAttachedActionsIpc(ipcMain, () => paletteWindow);
   registerFeatureUiIpc({
     ipcMain,
     dialog,

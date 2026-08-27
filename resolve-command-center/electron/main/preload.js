@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld("resolveCommandCenter", {
   openSettings: (featureId) => ipcRenderer.send("settings:open", featureId),
   closeSettings: () => ipcRenderer.send("settings:close"),
   hidePalette: () => ipcRenderer.send("palette:hide"),
+  openAttachedActions: (metrics) => ipcRenderer.invoke("palette:attached-actions:open", metrics),
+  closeAttachedActions: () => ipcRenderer.send("palette:attached-actions:close"),
   onPaletteShown: (callback) => {
     const listener = () => callback();
     ipcRenderer.on("palette:shown", listener);

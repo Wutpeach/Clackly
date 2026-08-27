@@ -122,6 +122,30 @@ export function rankCommands(commands, query, pinnedIds = new Set(), recentIds =
     .map(({ command }) => command);
 }
 
+export function projectLauncherSections(commands, pinnedIds = new Set(), recentIds = new Set()) {
+  const sections = {
+    pinned: [],
+    recent: [],
+    commands: []
+  };
+
+  for (const command of commands) {
+    if (pinnedIds.has(command.id)) {
+      sections.pinned.push(command);
+    } else if (recentIds.has(command.id)) {
+      sections.recent.push(command);
+    } else {
+      sections.commands.push(command);
+    }
+  }
+
+  return [
+    ["pinned", "Pinned", sections.pinned],
+    ["recent", "Recent", sections.recent],
+    ["commands", "Commands", sections.commands]
+  ].filter(([, , sectionCommands]) => sectionCommands.length > 0);
+}
+
 export function getCommandGroup(command) {
   const initial = command.name.trim().charAt(0).toUpperCase();
   return /^[A-Z]$/.test(initial) ? initial : "#";

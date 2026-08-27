@@ -15,6 +15,7 @@ import {
   isCommandPresentable,
   isFeatureVisible,
   joinFeatureStatuses,
+  projectLauncherSections,
   rankCommands
 } from "./model.mjs";
 
@@ -33,6 +34,22 @@ test("ranking prioritizes exact, pinned, recent, then source order", () => {
   );
 
   assert.deepEqual(ranked.map(({ id }) => id), ["alpha", "beta", "recent"]);
+});
+
+test("launcher sections preserve ranked order while projecting pinned and recent commands once", () => {
+  const ranked = [commands[1], commands[2], commands[0]];
+  const sections = projectLauncherSections(
+    ranked,
+    new Set(["beta"]),
+    new Set(["beta", "recent"])
+  );
+
+  assert.deepEqual(sections.map(([id]) => id), ["pinned", "recent", "commands"]);
+  assert.deepEqual(
+    sections.flatMap(([, , sectionCommands]) => sectionCommands).map(({ id }) => id),
+    ["beta", "recent", "alpha"]
+  );
+  assert.deepEqual(projectLauncherSections([], new Set(["alpha"]), new Set(["recent"])), []);
 });
 
 test("search matches command metadata, not presentation-only categories", () => {

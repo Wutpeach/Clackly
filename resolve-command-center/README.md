@@ -72,7 +72,7 @@ No changes are needed to the Command Engine, either Host `main.js`, the renderer
 
 ## Command Metadata
 
-Command manifests require `id`, `name`, `description`, `category`, `icon`, `keywords`, and `capability`. The Command Registry validates and defensively projects that fixed shape through list, search, and lookup. Launcher, Search, and All Actions use those registered records directly; the browser preview intentionally returns an empty catalog and renders the normal empty state.
+Command manifests require `id`, `name`, `description`, `category`, `icon`, `keywords`, and `capability`. The Command Registry validates and defensively projects that fixed shape through list, search, and lookup. Launcher and Search use those registered records directly; the browser preview intentionally returns an empty catalog and renders the normal empty state.
 
 ## Interaction Binding
 
@@ -89,6 +89,12 @@ Interaction Binding does not implement double-clicks, wildcard modifiers, global
 ## Interaction Help
 
 `InteractionManager.listBindings()` exposes normalized defensive binding records through the same semantic preload API in both Electron hosts. One renderer projection selects bindings for the hovered/focused target Command, resolves each `action.command` against loaded Command Metadata, formats the generic trigger label (`Click`, `Shift + Right Click`, and so on), and uses the action Command description. Palette and Settings share this projection, so remapping a binding updates help without changing Command Metadata or renderer branches. Missing action metadata omits only that help row; empty bindings fall back to the target Command description.
+
+## Selected Command Actions Preview
+
+`Ctrl` + `K` opens a first-level renderer-local Actions shell for the currently selected Command. It preserves the current command mode/query/selection, owns separate action query/selection/hover state, and Enter only acknowledges that execution is not connected; it sends no command or interaction IPC. There is no production Action registry or persistence contract yet, and the shell is honestly empty outside developer/test injection. It must never derive Actions rows from Interaction Help, bindings, or Command metadata.
+
+`npm run palette:evidence` is the developer-only Playwright renderer utility. It runs headlessly by default against packaged assets and writes temporary evidence; use `node scripts/palette-evidence.mjs --renderer built --scenario actions-attached,actions-hover-selected --output <directory>` to select a built renderer, scenarios, and output. `--headed` is an explicit opt-in. The tool injects the preload-shaped host API and clearly named test-only Actions presentation rows only inside the browser process; it is not Electron native-compositor, `setShape` hit-testing, Resolve, or command-execution validation.
 
 ## Capability Routing
 
@@ -177,7 +183,7 @@ Selection scope comes from Resolve state: the lowest numeric Blue duration marke
 
 ## Feature UI Framework
 
-The Settings button opens a fixed, frameless `760x560` window with a draggable Clackly title bar and accessible custom close button, while Launcher, Search, and All Actions remain in the fixed frameless `376x468` palette. Both windows disable the Windows thick frame so Resolve does not add an active-window accent border; Settings overflow scrolls inside the fixed workspace. `feature-ui/FeatureCatalog.js` projects full defensive metadata records from the existing Capability Registry, so registering a capability automatically adds it to the category-grouped Settings sidebar.
+The Settings button opens a fixed, frameless `760x560` window with a draggable Clackly title bar and accessible custom close button. Launcher and Search remain on the fixed frameless `240x320` Palette main surface. Selected Command Actions temporarily opens as a right-attached, content-fit `176px` panel within the same `422x320` Palette BrowserWindow envelope; the shared host owns the work-area clamp and the narrow `setShape` union that leaves the `6px` gap and unused right column click-through. Both windows disable the Windows thick frame so Resolve does not add an active-window accent border; Settings overflow scrolls inside the fixed workspace. `feature-ui/FeatureCatalog.js` projects full defensive metadata records from the existing Capability Registry, so registering a capability automatically adds it to the category-grouped Settings sidebar.
 
 The unified detail panel renders feature identity and resolved schema from Capability Metadata, binding-derived interaction help for associated Commands, and all settings through the generic `SettingsRenderer`. String, number, boolean, color, path, folder, and select fields use native controls. Path/folder selection uses Electron dialogs, drafts remain local until Save, and Save/Reset cross preload IPC into `ConfigManager`; renderer code never reads config files or calls capabilities and Resolve APIs directly.
 

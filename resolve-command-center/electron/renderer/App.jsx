@@ -1,18 +1,17 @@
 /**
- * THESIS: A compact Resolve precision instrument replaces the generic search window.
- * OWN-WORLD: Near-black tonal layers, hairlines, exact orange signals, and geometric SVG marks.
- * STORY: Launch a favorite, search any action, or browse the complete catalog without leaving the edit.
- * FIRST VIEWPORT: Wordmark and controls above a centered 3x3 command matrix and one slim action bar.
- * FORM: Dense launcher, the pinned operate-mode direction; no concept seed was needed for the settled brief.
+ * THESIS: A compact Resolve command menu puts search and the current action list ahead of product chrome.
+ * OWN-WORLD: Near-black tonal layers, fine neutral hairlines, light selected anchors, and monochrome Lucide marks.
+ * STORY: Launch a favorite, search a command, or preview selected-command Actions without leaving the edit.
+ * FIRST VIEWPORT: Search leads a truthful Pinned, Recent, and Commands list; secondary actions recede into one footer.
+ * FORM: Dense Blender-style floating menu with local pointer hover and existing keyboard selection authority.
  */
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AudioWaveform,
   Bookmark,
   ChevronLeft,
   Command as CommandIcon,
   Flag,
-  Grip,
   Image,
   LoaderCircle,
   Palette,
@@ -27,17 +26,15 @@ import {
   Upload,
   X
 } from "lucide-react";
-import logoUrl from "./assets/clackly-logo.svg";
 import SettingsApp from "./SettingsApp.jsx";
 import {
   canExecuteCommand,
   createPresentationCatalog,
   getCommandHint,
-  getCommandGroup,
   getFeatureWarning,
   getInteractionHelp,
   getRecoveryAction,
-  groupCommands,
+  projectLauncherSections,
   rankCommands
 } from "./model.mjs";
 
@@ -69,14 +66,14 @@ const api = window.resolveCommandCenter || {
   openSettings: () => window.open("?view=settings", "clackly-settings"),
   closeSettings: () => window.close(),
   hidePalette: () => {},
+  openAttachedActions: async () => null,
+  closeAttachedActions: () => {},
   onPaletteShown: (callback) => {
     requestAnimationFrame(callback);
     return () => {};
   },
   onSettingsFeatureSelected: () => () => {}
 };
-
-const ALPHABET = ["#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
 
 const ICONS = {
   marker: Bookmark,
@@ -92,7 +89,6 @@ const ICONS = {
   command: CommandIcon,
   pin: Pin,
   settings: Settings,
-  grip: Grip,
   arrow: ChevronLeft,
   loading: LoaderCircle,
   warning: TriangleAlert,
@@ -107,64 +103,191 @@ function Icon({ name, size = 24 }) {
 
 function getCommandAriaLabel(command) {
   const warning = getFeatureWarning(command.featureStatus);
-  return warning ? `${command.name}, ${warning.message}` : undefined;
+  return warning ? `${command.name}, ${warning.message}` : command.name;
 }
 
-function Header({ mode, selectedCommand, pinned, onBack, onTogglePin, onSettings }) {
+function getCommandAccessibleDescription(command, commands, bindings) {
+  const interactionHelp = canExecuteCommand(command) ? getInteractionHelp(command, commands, bindings) : [];
+  const interactionText = interactionHelp.map(({ label, description }) => `${label}: ${description}`).join(". ");
+  return interactionText || getCommandHint(command) || command.description;
+}
+
+function useOverflowTooltip(labelRef) {
+  const timeoutRef = useRef(null);
+  const [placement, setPlacement] = useState(null);
+
+  const hide = () => {
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+    timeoutRef.current = null;
+    setPlacement(null);
+  };
+
+  const reveal = (immediate) => {
+    const update = () => {
+      const label = labelRef.current;
+      const shell = document.querySelector(".palette-shell");
+      if (!label || !shell || label.scrollWidth <= label.clientWidth + 1) return;
+      const labelRect = label.getBoundingClientRect();
+      const shellRect = shell.getBoundingClientRect();
+      const width = Math.min(210, Math.max(180, shellRect.width - 12));
+      const left = Math.min(Math.max(labelRect.left, shellRect.left + 6), shellRect.right - width - 6);
+      const top = Math.min(Math.max(labelRect.bottom + 5, shellRect.top + 6), shellRect.bottom - 54);
+      setPlacement({ left, top, width });
+    };
+    hide();
+    if (immediate) update();
+    else timeoutRef.current = window.setTimeout(update, 450);
+  };
+
+  useEffect(() => hide, []);
+  return { placement, reveal, hide };
+}
+
+function OverflowTooltip({ placement, text }) {
+  if (!placement) return null;
   return (
-    <header className="palette-header">
-      <div className="header-surface">
-        <div className="brand-lockup">
-          {mode !== "launcher" && (
-            <button className="icon-button back-button" type="button" onClick={onBack} aria-label="Back to launcher">
-              <Icon name="arrow" size={18} />
-            </button>
-          )}
-          <img className="clackly-logo" src={logoUrl} alt="Clackly" />
-        </div>
-        <div className="header-actions">
-          <button
-            className={pinned ? "icon-button active" : "icon-button"}
-            type="button"
-            onClick={onTogglePin}
-            aria-label={selectedCommand ? `${pinned ? "Unpin" : "Pin"} ${selectedCommand.name}` : "Pin selected command"}
-            aria-pressed={pinned}
-            disabled={!selectedCommand}
-          >
-            <Icon name="pin" size={17} />
-          </button>
-          <button className="icon-button" type="button" onClick={onSettings} aria-label="Settings">
-            <Icon name="settings" size={18} />
-          </button>
-        </div>
-      </div>
-    </header>
+    <span className="palette-tooltip" role="tooltip" style={placement}>
+      {text}
+    </span>
   );
 }
 
-function CommandMeta({ command, pinned }) {
+function CommandMeta({ command, pinned, labelRef }) {
   return (
     <>
       <span className="command-icon">
         <Icon name={command.icon} size={22} />
         {pinned && <span className="pin-indicator" aria-label="Pinned" />}
       </span>
-      <span className="command-copy">
-        <span className="command-name">{command.name}</span>
-        <span className="command-detail">
-          {command.category}
-          {!canExecuteCommand(command) && (
-            <span className="status-label">{getFeatureWarning(command.featureStatus)?.kind}</span>
-          )}
-        </span>
+      <span ref={labelRef} className="command-name" title={command.name}>{command.name}</span>
+      <span className="command-detail">
+        <span className="command-category">{command.category}</span>
+        {!canExecuteCommand(command) && (
+          <span className="status-label">{getFeatureWarning(command.featureStatus)?.kind}</span>
+        )}
       </span>
     </>
   );
 }
 
+function CommandRow({
+  command,
+  index,
+  pinned,
+  selected,
+  hovered,
+  accessibleDescription,
+  keycap,
+  onHover,
+  onLeave,
+  onFocus,
+  onBlur,
+  onClick,
+  onContextMenu
+}) {
+  const labelRef = useRef(null);
+  const { placement, reveal, hide } = useOverflowTooltip(labelRef);
+  const className = ["command-row", selected && "selected", hovered && "hovered"].filter(Boolean).join(" ");
+  const descriptionId = `command-description-${index}`;
+
+  return (
+    <button
+      data-command-index={index}
+      className={className}
+      type="button"
+      role="option"
+      aria-label={getCommandAriaLabel(command)}
+      aria-selected={selected}
+      aria-disabled={!canExecuteCommand(command)}
+      aria-describedby={accessibleDescription ? descriptionId : undefined}
+      onMouseEnter={() => {
+        onHover(command);
+        reveal(false);
+      }}
+      onMouseLeave={() => {
+        hide();
+        onLeave();
+      }}
+      onFocus={() => {
+        onFocus(command, index);
+        reveal(true);
+      }}
+      onBlur={() => {
+        hide();
+        onBlur();
+      }}
+      onClick={(event) => onClick(command, event)}
+      onContextMenu={(event) => onContextMenu(command, event)}
+    >
+      <CommandMeta command={command} pinned={pinned} labelRef={labelRef} />
+      {keycap && <kbd aria-hidden="true">{keycap}</kbd>}
+      {accessibleDescription && <span id={descriptionId} className="screen-reader-only">{accessibleDescription}</span>}
+      <OverflowTooltip placement={placement} text={command.name} />
+    </button>
+  );
+}
+
+/**
+ * Browser-process-only presentation boundary for developer/test Actions evidence.
+ * Production has no Action authority yet, so this intentionally resolves to an
+ * empty shell unless a harness injects the explicitly named developer value
+ * before the renderer loads. These display rows are neither Actions domain data
+ * nor persisted/IPC/runtime payloads.
+ */
+function getDeveloperTestActionPresentation(commandId) {
+  const source = window.__CLACKLY_DEVELOPER_TEST_ACTIONS_PRESENTATION__;
+  if (!source || source.commandId !== commandId || !Array.isArray(source.rows)) return [];
+
+  return source.rows
+    .filter((row) => row && typeof row.label === "string" && row.label.trim())
+    .map((row) => ({
+      label: row.label.trim(),
+      description: typeof row.description === "string" ? row.description.trim() : ""
+    }));
+}
+
+function ActionRow({ action, index, selected, hovered, onHover, onLeave, onFocus, onClick }) {
+  const labelRef = useRef(null);
+  const { placement, reveal, hide } = useOverflowTooltip(labelRef);
+  const className = ["action-row", selected && "selected", hovered && "hovered"].filter(Boolean).join(" ");
+
+  return (
+    <button
+      data-action-index={index}
+      className={className}
+      type="button"
+      role="option"
+      aria-selected={selected}
+      aria-label={action.description ? `${action.label}, ${action.description}` : action.label}
+      title={action.description || action.label}
+      onMouseEnter={() => {
+        onHover(index);
+        reveal(false);
+      }}
+      onMouseLeave={() => {
+        hide();
+        onLeave();
+      }}
+      onFocus={() => {
+        onFocus(index);
+        reveal(true);
+      }}
+      onBlur={hide}
+      onClick={() => onClick(action)}
+    >
+      <span ref={labelRef} className="action-label" title={action.label}>{action.label}</span>
+      {action.description && <span className="action-description">{action.description}</span>}
+      <OverflowTooltip placement={placement} text={action.label} />
+    </button>
+  );
+}
+
 function PaletteApp() {
   const shellRef = useRef(null);
+  const mainSurfaceRef = useRef(null);
   const searchRef = useRef(null);
+  const actionsSearchRef = useRef(null);
+  const actionsPanelRef = useRef(null);
   const [mode, setMode] = useState("launcher");
   const [catalog, setCatalog] = useState(() => createPresentationCatalog([]));
   const [commands, setCommands] = useState([]);
@@ -172,10 +295,17 @@ function PaletteApp() {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [status, setStatus] = useState("");
-  const [hintedCommand, setHintedCommand] = useState(null);
+  const [hoveredCommandId, setHoveredCommandId] = useState(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [pinnedIds, setPinnedIds] = useState(() => new Set());
   const [recentIds, setRecentIds] = useState(() => new Set());
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [actionsContextCommand, setActionsContextCommand] = useState(null);
+  const [actionQuery, setActionQuery] = useState("");
+  const [selectedActionIndex, setSelectedActionIndex] = useState(0);
+  const [hoveredActionIndex, setHoveredActionIndex] = useState(null);
+  const [actionAcknowledgement, setActionAcknowledgement] = useState("");
+  const [attachedPanelGeometry, setAttachedPanelGeometry] = useState(null);
 
   const launcherCommands = useMemo(
     () => rankCommands(catalog, "", pinnedIds, recentIds).slice(0, 9),
@@ -185,24 +315,37 @@ function PaletteApp() {
     () => rankCommands(catalog, query, pinnedIds, recentIds),
     [catalog, query, pinnedIds, recentIds]
   );
-  const groupedCommands = useMemo(() => groupCommands(catalog), [catalog]);
-  const allCommands = useMemo(
-    () => groupedCommands.flatMap(([, commands]) => commands),
-    [groupedCommands]
+  const launcherSections = useMemo(
+    () => projectLauncherSections(launcherCommands, pinnedIds, recentIds).map(([id, label, sectionCommands]) => ({
+      id,
+      label,
+      entries: sectionCommands.map((command) => ({
+        command,
+        index: launcherCommands.indexOf(command)
+      }))
+    })),
+    [launcherCommands, pinnedIds, recentIds]
   );
-  const activeCommands = mode === "search"
-    ? searchCommands
-    : mode === "all-actions"
-      ? allCommands
-      : launcherCommands;
+  const activeCommands = mode === "search" ? searchCommands : launcherCommands;
   const selectedCommand = activeCommands[selectedIndex] || null;
-  const currentLetter = selectedCommand ? getCommandGroup(selectedCommand) : groupedCommands[0]?.[0] || "A";
-  const interactionHelp = canExecuteCommand(hintedCommand)
-    ? getInteractionHelp(hintedCommand, commands, bindings)
-    : [];
-  const commandHint = interactionHelp.length ? "" : getCommandHint(hintedCommand);
-  const activeHintId = (interactionHelp.length || commandHint) && !status && !isExecuting ? hintedCommand.id : null;
-  const message = status || (isExecuting ? "Running command…" : commandHint);
+  const actionContext = actionsContextCommand || selectedCommand;
+  const developerTestActions = useMemo(
+    () => getDeveloperTestActionPresentation(actionContext?.id),
+    [actionContext?.id]
+  );
+  const filteredActions = useMemo(() => {
+    const normalizedQuery = actionQuery.trim().toLocaleLowerCase();
+    if (!normalizedQuery) return developerTestActions;
+    return developerTestActions.filter(({ label, description }) => (
+      `${label} ${description}`.toLocaleLowerCase().includes(normalizedQuery)
+    ));
+  }, [actionQuery, developerTestActions]);
+  const selectedAction = filteredActions[selectedActionIndex] || null;
+  const eventFeedback = status
+    ? { visible: status, accessible: status, error: true }
+    : isExecuting
+      ? { visible: "Running command…", accessible: "Running command…", error: false }
+      : actionAcknowledgement;
 
   useEffect(() => {
     let mounted = true;
@@ -231,8 +374,15 @@ function PaletteApp() {
       setQuery("");
       setSelectedIndex(0);
       setStatus("");
-      setHintedCommand(null);
+      setHoveredCommandId(null);
       setIsExecuting(false);
+      setActionsOpen(false);
+      setActionsContextCommand(null);
+      setActionQuery("");
+      setSelectedActionIndex(0);
+      setHoveredActionIndex(null);
+      setActionAcknowledgement("");
+      setAttachedPanelGeometry(null);
       refreshCatalog();
       requestAnimationFrame(() => shellRef.current?.focus());
     });
@@ -246,7 +396,7 @@ function PaletteApp() {
   useEffect(() => {
     setSelectedIndex(0);
     setStatus("");
-    setHintedCommand(null);
+    setHoveredCommandId(null);
     requestAnimationFrame(() => {
       if (mode === "search") searchRef.current?.focus();
       else shellRef.current?.focus();
@@ -255,13 +405,71 @@ function PaletteApp() {
 
   useEffect(() => {
     setSelectedIndex(0);
-    setHintedCommand(null);
+    setHoveredCommandId(null);
   }, [query]);
 
   useEffect(() => {
-    if (mode !== "all-actions") return;
-    document.querySelector(`[data-command-index="${selectedIndex}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [mode, selectedIndex]);
+    if (!actionsOpen) return;
+    setSelectedActionIndex(0);
+    setHoveredActionIndex(null);
+    setActionAcknowledgement("");
+  }, [actionQuery, actionsOpen]);
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    setSelectedActionIndex((current) => Math.min(current, Math.max(0, filteredActions.length - 1)));
+  }, [actionsOpen, filteredActions.length]);
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    requestAnimationFrame(() => actionsSearchRef.current?.focus());
+  }, [actionsOpen]);
+
+  useLayoutEffect(() => {
+    if (!actionsOpen) {
+      api.closeAttachedActions();
+      setAttachedPanelGeometry(null);
+      return undefined;
+    }
+    const panel = actionsPanelRef.current;
+    const main = mainSurfaceRef.current;
+    const selectedRow = main?.querySelector(`[data-command-index="${selectedIndex}"]`);
+    if (!panel || !main || !selectedRow) {
+      failAttachedActions();
+      return undefined;
+    }
+
+    const mainRect = main.getBoundingClientRect();
+    const selectedRect = selectedRow.getBoundingClientRect();
+    const metrics = {
+      anchorY: Math.round(selectedRect.top - mainRect.top + selectedRect.height / 2),
+      contentHeight: Math.round(panel.getBoundingClientRect().height)
+    };
+    let active = true;
+    Promise.resolve(api.openAttachedActions(metrics))
+      .then((geometry) => {
+        if (!active) return;
+        if (!geometry) {
+          failAttachedActions();
+          return;
+        }
+        setAttachedPanelGeometry(geometry);
+      })
+      .catch(() => {
+        if (active) failAttachedActions();
+      });
+    return () => {
+      active = false;
+    };
+  }, [actionsOpen, filteredActions.length, mode, selectedIndex]);
+
+  useEffect(() => {
+    if (!actionAcknowledgement || status || isExecuting) return undefined;
+    const timeout = window.setTimeout(() => {
+      setActionAcknowledgement("");
+    }, 3000);
+    return () => window.clearTimeout(timeout);
+  }, [actionAcknowledgement, status, isExecuting]);
 
   function enterSearch(text = "") {
     setQuery(text);
@@ -281,11 +489,9 @@ function PaletteApp() {
     else next.add(commandId);
     setPinnedIds(next);
 
-    if (mode !== "all-actions") {
-      const reordered = rankCommands(catalog, mode === "search" ? query : "", next, recentIds);
-      const nextIndex = reordered.findIndex((command) => command.id === commandId);
-      setSelectedIndex(mode === "launcher" && nextIndex >= 9 ? 0 : Math.max(0, nextIndex));
-    }
+    const reordered = rankCommands(catalog, mode === "search" ? query : "", next, recentIds);
+    const nextIndex = reordered.findIndex((command) => command.id === commandId);
+    setSelectedIndex(mode === "launcher" && nextIndex >= 9 ? 0 : Math.max(0, nextIndex));
   }
 
   async function executeCommand(command) {
@@ -304,6 +510,7 @@ function PaletteApp() {
     try {
       await api.executeCommand(command.id);
       setRecentIds((current) => new Set([command.id, ...current]));
+      setIsExecuting(false);
     } catch (error) {
       setStatus(error.message);
       setIsExecuting(false);
@@ -341,6 +548,7 @@ function PaletteApp() {
       });
       if (result.matched) {
         setRecentIds((current) => new Set([result.command, ...current]));
+        setIsExecuting(false);
       } else {
         setIsExecuting(false);
       }
@@ -356,10 +564,95 @@ function PaletteApp() {
     setSelectedIndex((current) => Math.max(0, Math.min(current + delta, activeCommands.length - 1)));
   }
 
+  function openActions() {
+    if (!selectedCommand) return;
+    setActionsContextCommand(selectedCommand);
+    setActionsOpen(true);
+    setActionQuery("");
+    setSelectedActionIndex(0);
+    setHoveredActionIndex(null);
+    setActionAcknowledgement("");
+    setHoveredCommandId(null);
+  }
+
+  function closeActions() {
+    api.closeAttachedActions();
+    setActionsOpen(false);
+    setActionsContextCommand(null);
+    setActionQuery("");
+    setSelectedActionIndex(0);
+    setHoveredActionIndex(null);
+    setActionAcknowledgement("");
+    setAttachedPanelGeometry(null);
+    requestAnimationFrame(() => (mode === "search" ? searchRef.current : shellRef.current)?.focus());
+  }
+
+  function failAttachedActions() {
+    setStatus("Actions panel is unavailable.");
+    closeActions();
+  }
+
+  function toggleActions() {
+    if (actionsOpen) closeActions();
+    else openActions();
+  }
+
+  function moveActionSelection(delta) {
+    if (filteredActions.length === 0) return;
+    setActionAcknowledgement("");
+    setSelectedActionIndex((current) => Math.max(0, Math.min(current + delta, filteredActions.length - 1)));
+  }
+
+  function acknowledgeAction(action) {
+    if (!action) return;
+    setActionAcknowledgement({
+      visible: `Selected ${action.label}`,
+      accessible: `Selected ${action.label} — execution is not connected in this preview.`,
+      error: false
+    });
+  }
+
   function handleKeyDown(event) {
+    if (actionsOpen) {
+      if (event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLocaleLowerCase() === "k") {
+        event.preventDefault();
+        closeActions();
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeActions();
+        return;
+      }
+      if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+        event.preventDefault();
+        moveActionSelection(1);
+        return;
+      }
+      if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        moveActionSelection(-1);
+        return;
+      }
+      if (event.key === "Enter") {
+        const actionTrigger = event.target.closest?.(".action-row");
+        if (event.target.closest?.("button") && !actionTrigger) return;
+        event.preventDefault();
+        acknowledgeAction(selectedAction);
+        return;
+      }
+      return;
+    }
+
+    if (event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLocaleLowerCase() === "k") {
+      event.preventDefault();
+      openActions();
+      return;
+    }
     if (event.key === "Escape") {
       event.preventDefault();
-      api.hidePalette();
+      if (mode === "search") goToLauncher();
+      else api.hidePalette();
       return;
     }
     if (event.key === "ArrowDown" || event.key === "ArrowRight") {
@@ -373,7 +666,7 @@ function PaletteApp() {
       return;
     }
     if (event.key === "Enter") {
-      const commandTrigger = event.target.closest?.(".command-tile, .command-row");
+      const commandTrigger = event.target.closest?.(".command-row");
       if (event.target.closest?.("button") && !commandTrigger) return;
       event.preventDefault();
       executeCommand(selectedCommand);
@@ -385,228 +678,211 @@ function PaletteApp() {
     }
   }
 
-  function selectLetter(letter) {
-    const index = allCommands.findIndex((command) => getCommandGroup(command) === letter);
-    if (index >= 0) setSelectedIndex(index);
-  }
-
   const selectedPinned = Boolean(selectedCommand && pinnedIds.has(selectedCommand.id));
+  const handleCommandHover = (command) => {
+    setHoveredCommandId(command.id);
+  };
+  const handleCommandLeave = () => {
+    setHoveredCommandId(null);
+  };
+  const handleCommandFocus = (command, index) => {
+    setSelectedIndex(index);
+  };
+  const handleActionHover = (index) => setHoveredActionIndex(index);
+  const handleActionLeave = () => setHoveredActionIndex(null);
+  const handleActionFocus = (index) => {
+    setSelectedActionIndex(index);
+    setActionAcknowledgement("");
+  };
 
   return (
     <main
       ref={shellRef}
       className={browserPreview ? "palette-shell browser-preview" : "palette-shell"}
       data-mode={mode}
+      data-actions-open={actionsOpen || undefined}
       tabIndex={-1}
       onKeyDown={handleKeyDown}
     >
-      <Header
-        mode={mode}
-        selectedCommand={selectedCommand}
-        pinned={selectedPinned}
-        onBack={goToLauncher}
-        onTogglePin={toggleSelectedPin}
-        onSettings={() => api.openSettings()}
-      />
-
-      {mode === "launcher" && (
-        <section className="launcher-view" aria-label="Launcher">
-          {launcherCommands.length > 0 ? (
-          <div className="launcher-grid" role="listbox" aria-label="Commands">
-            {launcherCommands.map((command, index) => (
-              <button
-                key={command.id}
-                className={index === selectedIndex ? "command-tile selected" : "command-tile"}
-                type="button"
-                role="option"
-                aria-label={getCommandAriaLabel(command)}
-                aria-selected={index === selectedIndex}
-                aria-disabled={!canExecuteCommand(command)}
-                aria-describedby={activeHintId === command.id ? "command-hint" : undefined}
-                onMouseEnter={() => {
-                  setSelectedIndex(index);
-                  setHintedCommand(command);
-                }}
-                onMouseLeave={() => setHintedCommand(null)}
-                onFocus={() => {
-                  setSelectedIndex(index);
-                  setHintedCommand(command);
-                }}
-                onBlur={() => setHintedCommand(null)}
-                onClick={(event) => executeInteraction(command, event)}
-                onContextMenu={(event) => executeInteraction(command, event)}
-              >
-                <span className="tile-topline">
-                  <kbd aria-hidden="true">{index + 1}</kbd>
-                  {pinnedIds.has(command.id) ? <span className="pin-indicator" aria-label="Pinned" /> : <span />}
-                </span>
-                <span className="tile-icon"><Icon name={command.icon} size={30} /></span>
-                <span className="tile-label">{command.name}</span>
-              </button>
-            ))}
-          </div>
-          ) : (
-            <div className="empty-state">
-              <strong>No actions registered</strong>
-              <span>Registered command metadata will appear here automatically.</span>
+      <div ref={mainSurfaceRef} className="palette-main" inert={actionsOpen ? "" : undefined}>
+        {mode === "launcher" && (
+          <section className="launcher-view" aria-label="Launcher">
+            <button type="button" className="launcher-search" onClick={() => enterSearch("")} aria-label="Search commands">
+              <Icon name="search" size={17} />
+              <span>Search commands…</span>
+            </button>
+            <div className="launcher-content">
+              {launcherCommands.length > 0 ? (
+                <div className="launcher-list" role="listbox" aria-label="Commands">
+                  {launcherSections.map(({ id, label, entries }) => (
+                    <section key={id} className="command-section" aria-labelledby={`launcher-${id}`}>
+                      <h2 id={`launcher-${id}`}>{label}</h2>
+                      {entries.map(({ command, index }) => (
+                        <CommandRow
+                          key={command.id}
+                          command={command}
+                          index={index}
+                          pinned={pinnedIds.has(command.id)}
+                          selected={index === selectedIndex}
+                          hovered={hoveredCommandId === command.id}
+                          accessibleDescription={getCommandAccessibleDescription(command, commands, bindings)}
+                          keycap={index + 1}
+                          onHover={handleCommandHover}
+                          onLeave={handleCommandLeave}
+                          onFocus={handleCommandFocus}
+                          onBlur={() => {}}
+                          onClick={executeInteraction}
+                          onContextMenu={executeInteraction}
+                        />
+                      ))}
+                    </section>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <strong>No commands registered</strong>
+                  <span>Registered command metadata will appear here automatically.</span>
+                </div>
+              )}
             </div>
-          )}
-        </section>
-      )}
+          </section>
+        )}
 
-      {mode === "search" && (
-        <section className="search-view" aria-label="Search commands">
-          <div className="search-control">
+        {mode === "search" && (
+          <section className="search-view" aria-label="Search commands">
+            <div className="search-control">
+              <Icon name="search" size={18} />
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search commands"
+                aria-label="Search commands"
+                spellCheck="false"
+                autoComplete="off"
+              />
+              <kbd>ESC</kbd>
+            </div>
+            <h2 className="list-heading">RESULTS</h2>
+            <div className="command-list" role="listbox" aria-label="Search results">
+              {searchCommands.map((command, index) => (
+                <CommandRow
+                  key={command.id}
+                  command={command}
+                  index={index}
+                  pinned={pinnedIds.has(command.id)}
+                  selected={index === selectedIndex}
+                  hovered={hoveredCommandId === command.id}
+                  accessibleDescription={getCommandAccessibleDescription(command, commands, bindings)}
+                  onHover={handleCommandHover}
+                  onLeave={handleCommandLeave}
+                  onFocus={handleCommandFocus}
+                  onBlur={() => {}}
+                  onClick={executeInteraction}
+                  onContextMenu={executeInteraction}
+                />
+              ))}
+              {searchCommands.length === 0 && (
+                <div className="empty-state">
+                  <strong>No matching commands</strong>
+                  <span>Try another command name or editing verb.</span>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        <div className="palette-footer-area">
+          <footer className="palette-footer">
+            <button className="footer-control footer-icon" type="button" onClick={() => api.openSettings()} aria-label="Settings" title="Settings">
+              <Icon name="settings" size={16} />
+            </button>
+            <button
+              className={selectedPinned ? "footer-control footer-icon active" : "footer-control footer-icon"}
+              type="button"
+              onClick={toggleSelectedPin}
+              aria-label={selectedCommand ? `${selectedPinned ? "Unpin" : "Pin"} ${selectedCommand.name}` : "Pin selected command"}
+              aria-pressed={selectedPinned}
+              disabled={!selectedCommand}
+              title={selectedCommand ? `${selectedPinned ? "Unpin" : "Pin"} ${selectedCommand.name}` : "Pin selected command"}
+            >
+              <Icon name="pin" size={15} />
+            </button>
+            <span className="footer-spacer" aria-hidden="true" />
+            <button
+              className={actionsOpen ? "footer-control footer-action footer-actions active" : "footer-control footer-action footer-actions"}
+              type="button"
+              onClick={toggleActions}
+              aria-label={actionsOpen ? "Close selected command actions" : "Open selected command actions"}
+              aria-keyshortcuts="Control+K"
+              aria-pressed={actionsOpen}
+              disabled={!selectedCommand}
+              title={actionsOpen ? "Close Actions (Ctrl+K)" : "Open Actions (Ctrl+K)"}
+            >
+              <span className="footer-actions-keycaps" aria-hidden="true"><kbd>Ctrl</kbd><kbd>K</kbd></span>
+              <span>Actions</span>
+            </button>
+          </footer>
+        </div>
+      </div>
+
+      {actionsOpen && (
+        <section
+          ref={actionsPanelRef}
+          className="actions-panel"
+          style={{
+            top: `${attachedPanelGeometry?.panelTop ?? 8}px`,
+            "--actions-arrow-top": `${Math.max(0, (attachedPanelGeometry?.anchorY ?? 80) - (attachedPanelGeometry?.panelTop ?? 8) - 7)}px`
+          }}
+          aria-label={`Actions for ${actionContext?.name || "selected command"}`}
+        >
+          <span className="actions-panel-arrow" aria-hidden="true" />
+          <div className="search-control actions-search-control">
             <Icon name="search" size={18} />
             <input
-              ref={searchRef}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search commands"
-              aria-label="Search commands"
+              ref={actionsSearchRef}
+              value={actionQuery}
+              onChange={(event) => setActionQuery(event.target.value)}
+              placeholder="Search actions"
+              aria-label="Search selected-command actions"
               spellCheck="false"
               autoComplete="off"
             />
-            <kbd>ESC</kbd>
           </div>
-          <div className="command-list" role="listbox" aria-label="Search results">
-            {searchCommands.map((command, index) => (
-              <button
-                key={command.id}
-                className={index === selectedIndex ? "command-row selected" : "command-row"}
-                type="button"
-                role="option"
-                aria-label={getCommandAriaLabel(command)}
-                aria-selected={index === selectedIndex}
-                aria-disabled={!canExecuteCommand(command)}
-                aria-describedby={activeHintId === command.id ? "command-hint" : undefined}
-                onMouseEnter={() => {
-                  setSelectedIndex(index);
-                  setHintedCommand(command);
-                }}
-                onMouseLeave={() => setHintedCommand(null)}
-                onFocus={() => {
-                  setSelectedIndex(index);
-                  setHintedCommand(command);
-                }}
-                onBlur={() => setHintedCommand(null)}
-                onClick={(event) => executeInteraction(command, event)}
-                onContextMenu={(event) => executeInteraction(command, event)}
-              >
-                <CommandMeta command={command} pinned={pinnedIds.has(command.id)} />
-              </button>
+          <h2 className="list-heading">ACTIONS</h2>
+          <div className="actions-list" role="listbox" aria-label={`Actions for ${actionContext?.name || "selected command"}`}>
+            {filteredActions.map((action, index) => (
+              <ActionRow
+                key={`${action.label}-${index}`}
+                action={action}
+                index={index}
+                selected={index === selectedActionIndex}
+                hovered={hoveredActionIndex === index}
+                onHover={handleActionHover}
+                onLeave={handleActionLeave}
+                onFocus={handleActionFocus}
+                onClick={acknowledgeAction}
+              />
             ))}
-            {searchCommands.length === 0 && (
+            {developerTestActions.length === 0 && (
+              <div className="empty-state">
+                <strong>No contextual actions</strong>
+                <span>Actions will appear here when a formal action contract is available.</span>
+              </div>
+            )}
+            {developerTestActions.length > 0 && filteredActions.length === 0 && (
               <div className="empty-state">
                 <strong>No matching actions</strong>
-                <span>Try another command name or editing verb.</span>
+                <span>Try another action name or description.</span>
               </div>
             )}
           </div>
         </section>
       )}
 
-      {mode === "all-actions" && (
-        <section className="all-actions-view" aria-label="All actions">
-          <div className="all-actions-body">
-            <div className="grouped-command-list" role="listbox" aria-label="All commands">
-              {groupedCommands.map(([letter, commands]) => (
-                <section key={letter} className="command-group" role="group" aria-labelledby={`group-${letter}`}>
-                  <h2 id={`group-${letter}`} className={letter === currentLetter ? "active" : ""}>{letter}</h2>
-                  {commands.map((command) => {
-                    const index = allCommands.indexOf(command);
-                    return (
-                      <button
-                        key={command.id}
-                        data-command-index={index}
-                        className={index === selectedIndex ? "command-row selected" : "command-row"}
-                        type="button"
-                        role="option"
-                        aria-label={getCommandAriaLabel(command)}
-                        aria-selected={index === selectedIndex}
-                        aria-disabled={!canExecuteCommand(command)}
-                        aria-describedby={activeHintId === command.id ? "command-hint" : undefined}
-                        onMouseEnter={() => {
-                          setSelectedIndex(index);
-                          setHintedCommand(command);
-                        }}
-                        onMouseLeave={() => setHintedCommand(null)}
-                        onFocus={() => {
-                          setSelectedIndex(index);
-                          setHintedCommand(command);
-                        }}
-                        onBlur={() => setHintedCommand(null)}
-                        onClick={(event) => executeInteraction(command, event)}
-                        onContextMenu={(event) => executeInteraction(command, event)}
-                      >
-                        <CommandMeta command={command} pinned={pinnedIds.has(command.id)} />
-                      </button>
-                    );
-                  })}
-                </section>
-              ))}
-              {groupedCommands.length === 0 && (
-                <div className="empty-state">
-                  <strong>No actions registered</strong>
-                  <span>Registered command metadata will appear here automatically.</span>
-                </div>
-              )}
-            </div>
-            <nav className="alphabet-rail" aria-label="Command groups">
-              {ALPHABET.map((letter) => {
-                const available = groupedCommands.some(([groupLetter]) => groupLetter === letter);
-                return (
-                  <button
-                    key={letter}
-                    className={letter === currentLetter ? "active" : ""}
-                    type="button"
-                    disabled={!available}
-                    aria-label={`Go to ${letter} commands`}
-                    aria-current={letter === currentLetter ? "true" : undefined}
-                    onClick={() => selectLetter(letter)}
-                  >
-                    {letter}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        </section>
-
-      )}
-
-      {mode === "launcher" && (
-        <div className="launcher-footer-area">
-          <footer className="launcher-footer">
-            <button
-              type="button"
-              className="all-actions-button"
-              aria-label="All Actions"
-              title="All Actions"
-              onClick={() => setMode("all-actions")}
-            >
-              <Icon name="grip" size={18} />
-            </button>
-            <button type="button" className="search-prompt" onClick={() => enterSearch("")}>
-              <span>Type to search…</span>
-            </button>
-          </footer>
-        </div>
-      )}
-
-      {(message || interactionHelp.length > 0) && (
-        <div
-          id={activeHintId ? "command-hint" : undefined}
-          className={`${status ? "status-message error" : "status-message"}${activeHintId && interactionHelp.length ? " interaction-help" : ""}`}
-          role={activeHintId ? "tooltip" : "status"}
-          aria-live={activeHintId ? undefined : "polite"}
-        >
-          {activeHintId && interactionHelp.length ? interactionHelp.map((entry, index) => (
-            <div className="interaction-help-row" key={`${entry.label}-${index}`}>
-              <span className="interaction-help-label">{entry.label}</span>
-              <span className="interaction-help-description">{entry.description}</span>
-            </div>
-          )) : message}
+      {eventFeedback && (
+        <div className={eventFeedback.error ? "palette-event-feedback error" : "palette-event-feedback"} role="status" aria-live="polite" aria-label={eventFeedback.accessible}>
+          {eventFeedback.visible}
         </div>
       )}
     </main>
