@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 35
+- **Total Sessions**: 36
 - **Last Active**: 2026-08-27
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~780 | Active |
+| `journal-1.md` | ~802 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 36 | 2026-08-27 | Command Palette Interaction Hint | `25d23b4`, `ad16405` | `main` |
 | 35 | 2026-08-27 | Refine Command Palette and Attached Actions | `30bb662a8e26f0d85cde16d80fc8a8de1bd35279`, `fa4cd9c4f1d2df73390b72a9e311b41600f55039` | `main` |
 | 34 | 2026-08-10 | Fix Image Clipboard click execution | `fe69a30` | `main` |
 | 33 | 2026-08-10 | Implement Image Clipboard import | `37b831a` | `main` |

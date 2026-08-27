@@ -778,3 +778,25 @@ Refined the 240x320 Command Palette, added the searchable right-attached Actions
 ### Status
 
 [OK] **Completed**
+
+
+## Session 36: Command Palette Interaction Hint
+
+**Date**: 2026-08-27
+**Task**: Command Palette Interaction Hint
+**Branch**: `main`
+
+### Summary
+
+Replaced legacy Ctrl+K Actions with universal selected-Command Interaction Info, added mapping-or-description presentation with shared #151619 surface and 260px scrollable panel, renamed native shaped-window wiring, expanded tests/evidence, packaged and installed the revised Workflow plugin.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `25d23b4` | (see git log) |
+| `ad16405` | (see git log) |
+
+### Status
+
+[OK] **Completed**
