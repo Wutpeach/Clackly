@@ -156,7 +156,11 @@ test("internal action descriptions resolve under visible targets but never creat
   }];
 
   assert.deepEqual(getInteractionHelp(target, commands, bindings), [
-    { label: "Ctrl + Click", description: "Send the current Resolve audio selection to After Effects" }
+    {
+      label: "Ctrl + Click",
+      actionName: "Export Audio to After Effects",
+      description: "Send the current Resolve audio selection to After Effects"
+    }
   ]);
   assert.deepEqual(getInteractionHelpCommands(commands, "ae.export", bindings).map(({ id }) => id), [
     "timeline.exportToAfterEffects"
@@ -225,12 +229,12 @@ test("command hints prefer descriptions and fall back to command state", () => {
   assert.equal(getCommandHint({ name: "Add Marker" }), "Add Marker");
 });
 
-test("interaction help joins normalized bindings to action command descriptions", () => {
-  const target = { id: "timeline.addMarker", description: "Add marker at current frame" };
+test("interaction help joins normalized bindings to registered action labels and descriptions", () => {
+  const target = { id: "timeline.addMarker", name: "Add Marker", description: "Add marker at current frame" };
   const commands = [
     target,
-    { id: "timeline.openOptions", description: "Open marker options" },
-    { id: "timeline.addNote", description: "Add a marker note" }
+    { id: "timeline.openOptions", name: "Open Marker Options", description: "Open marker options" },
+    { id: "timeline.addNote", name: "Add Marker Note", description: "Add a marker note" }
   ];
   const bindings = [
     {
@@ -261,9 +265,9 @@ test("interaction help joins normalized bindings to action command descriptions"
   const projected = getInteractionHelp(target, commands, bindings);
 
   assert.deepEqual(projected, [
-    { label: "Click", description: "Add marker at current frame" },
-    { label: "Shift + Right Click", description: "Open marker options" },
-    { label: "Ctrl + Shift + Alt + Click", description: "Add a marker note" }
+    { label: "Click", actionName: "Add Marker", description: "Add marker at current frame" },
+    { label: "Shift + Right Click", actionName: "Open Marker Options", description: "Open marker options" },
+    { label: "Ctrl + Shift + Alt + Click", actionName: "Add Marker Note", description: "Add a marker note" }
   ]);
   projected[0].label = "Changed";
   assert.equal(bindings[0].trigger.button, "left");

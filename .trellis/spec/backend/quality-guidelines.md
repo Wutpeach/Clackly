@@ -973,22 +973,22 @@ const result = await interactionManager.handle(event);
 ### 1. Scope / Trigger
 
 - Trigger: listing executable mouse bindings or projecting help for Command surfaces.
-- Interaction Binding remains the trigger owner; Command Metadata supplies only the action description.
+- Interaction Binding remains the trigger owner; Command Metadata supplies the action label and description.
 
 ### 2. Signatures
 
 - Binding list record: `{ id: string, target: string, trigger: CanonicalMouseTrigger, action: { command: string } }`.
 - Preload operation: `listInteractionBindings() -> Promise<BindingRecord[]>`.
-- Renderer projection: `getInteractionHelp(targetCommand, commands, bindings) -> Array<{ label: string, description: string }>`.
+- Renderer projection: `getInteractionHelp(targetCommand, commands, bindings) -> Array<{ label: string, actionName: string, description: string }>`.
 
 ### 3. Contracts
 
 - Command manifests contain no trigger/help rows. Command Registry validates required presentation strings and returns the fixed defensive Command shape.
 - `InteractionManager.listBindings()` is a read-only projection over `BindingStorage.load()` and preserves normalized storage order.
-- The renderer selects bindings by `binding.target === targetCommand.id`, resolves `binding.action.command` against loaded Command Metadata, and uses that action Command's `description`.
+- The renderer selects bindings by `binding.target === targetCommand.id`, resolves `binding.action.command` against loaded Command Metadata, and uses that action Command's `name` and `description`.
 - Trigger labels are generic: canonical modifiers render in `Ctrl`, `Shift`, `Alt` order followed by `Click` or `Right Click`.
 - Palette and Settings call the same pure projection. No layer infers a Capability ID or changes execution routing.
-- Help targets (`getInteractionHelpCommands`) contain only presentable Commands for the capability, so `presentation: "internal"` actions never become help targets; `getInteractionHelp` still resolves each binding's `action.command` against the raw loaded Command list so internal action descriptions render under visible targets.
+- Help targets (`getInteractionHelpCommands`) contain only presentable Commands for the capability, so `presentation: "internal"` actions never become help targets; `getInteractionHelp` still resolves each binding's `action.command` against the raw loaded Command list so internal action labels and descriptions render under visible targets.
 
 ### 4. Validation & Error Matrix
 
@@ -999,7 +999,7 @@ const result = await interactionManager.handle(event);
 
 ### 5. Good/Base/Bad Cases
 
-- Good: remapping a target binding to another registered Command changes the displayed description without editing renderer or target Command metadata.
+- Good: remapping a target binding to another registered Command changes the displayed action label and description without editing renderer or target Command metadata.
 - Base: the default marker binding renders `Click` plus `Add marker at current frame`.
 - Good: `SHIFT` plus right click renders `Shift + Right Click` in the same order as normalized storage.
 - Bad: copying triggers into a Command manifest or adding a Command-id-specific help table.
@@ -1008,7 +1008,7 @@ const result = await interactionManager.handle(event);
 ### 6. Tests Required
 
 - Assert left/right labels, canonical modifier order, remapped action Commands, empty bindings, unresolved action Commands, defensive listing, and unchanged Command ID -> Capability ID mapping.
-- Assert help targets exclude internal Commands while their action descriptions still resolve for visible targets.
+- Assert help targets exclude internal Commands while their action labels and descriptions still resolve for visible targets.
 - Assert standalone and Workflow Integration compose the same `interactions:list` preload/IPC operation.
 
 ### 7. Wrong vs Correct
@@ -1025,7 +1025,7 @@ const help = command.id === "timeline.addMarker"
 
 ```javascript
 const help = getInteractionHelp(command, commands, bindings);
-// Bindings own triggers; action Command Metadata owns descriptions.
+// Bindings own triggers; action Command Metadata owns action labels and descriptions.
 ```
 
 ---

@@ -82,6 +82,7 @@ export function getInteractionHelp(targetCommand, commands, bindings) {
     })[modifier] || modifier);
     return [{
       label: [...modifiers, button].join(" + "),
+      actionName: actionCommand.name,
       description: actionCommand.description
     }];
   });

@@ -6,24 +6,22 @@ const PALETTE_SIZE = Object.freeze({
   width: 240,
   height: 320
 });
-const PALETTE_ATTACHED_PANEL = Object.freeze({
-  gap: 6,
-  width: 176,
-  minHeight: 65,
-  maxHeight: 304,
-  inset: 8,
-  arrowWidth: 7,
-  arrowHeight: 14
+const PALETTE_INTERACTION_PANEL = Object.freeze({
+  gap: 16,
+  width: 260,
+  minHeight: 60,
+  maxHeight: 180,
+  inset: 8
 });
-const PALETTE_EXPANDED_SIZE = Object.freeze({
-  width: PALETTE_SIZE.width + PALETTE_ATTACHED_PANEL.gap + PALETTE_ATTACHED_PANEL.width,
+const PALETTE_INTERACTION_SIZE = Object.freeze({
+  width: PALETTE_SIZE.width + PALETTE_INTERACTION_PANEL.gap + PALETTE_INTERACTION_PANEL.width,
   height: PALETTE_SIZE.height
 });
 const SETTINGS_SIZE = Object.freeze({
   width: 760,
   height: 560
 });
-const attachedPanelState = new WeakMap();
+const interactionPanelState = new WeakMap();
 
 function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -43,47 +41,36 @@ function setPaletteShape(window, rectangles) {
   }
 }
 
-function normalizeAttachedPanelMetrics(metrics) {
+function normalizeInteractionPanelMetrics(metrics) {
   if (!metrics || typeof metrics !== "object" || Array.isArray(metrics)) return null;
   const keys = Object.keys(metrics);
   if (keys.some((key) => key !== "anchorY" && key !== "contentHeight")) return null;
   const { anchorY, contentHeight } = metrics;
   if (!Number.isInteger(anchorY) || !Number.isInteger(contentHeight)) return null;
   if (anchorY < 0 || anchorY > PALETTE_SIZE.height) return null;
-  if (contentHeight < PALETTE_ATTACHED_PANEL.minHeight || contentHeight > PALETTE_ATTACHED_PANEL.maxHeight) return null;
+  if (contentHeight < PALETTE_INTERACTION_PANEL.minHeight || contentHeight > PALETTE_INTERACTION_PANEL.maxHeight) return null;
   return { anchorY, contentHeight };
 }
 
-function getAttachedPanelGeometry(metrics) {
-  const normalized = normalizeAttachedPanelMetrics(metrics);
+function getInteractionPanelGeometry(metrics) {
+  const normalized = normalizeInteractionPanelMetrics(metrics);
   if (!normalized) return null;
 
   const panelTop = clamp(
     Math.round(normalized.anchorY - normalized.contentHeight / 2),
-    PALETTE_ATTACHED_PANEL.inset,
-    PALETTE_SIZE.height - PALETTE_ATTACHED_PANEL.inset - normalized.contentHeight
+    PALETTE_INTERACTION_PANEL.inset,
+    PALETTE_SIZE.height - PALETTE_INTERACTION_PANEL.inset - normalized.contentHeight
   );
   const panel = {
-    x: PALETTE_SIZE.width + PALETTE_ATTACHED_PANEL.gap,
+    x: PALETTE_SIZE.width + PALETTE_INTERACTION_PANEL.gap,
     y: panelTop,
-    width: PALETTE_ATTACHED_PANEL.width,
+    width: PALETTE_INTERACTION_PANEL.width,
     height: normalized.contentHeight
-  };
-  const arrow = {
-    x: PALETTE_SIZE.width - 1,
-    y: clamp(
-      Math.round(normalized.anchorY - PALETTE_ATTACHED_PANEL.arrowHeight / 2),
-      panelTop,
-      panelTop + normalized.contentHeight - PALETTE_ATTACHED_PANEL.arrowHeight
-    ),
-    width: PALETTE_ATTACHED_PANEL.arrowWidth,
-    height: PALETTE_ATTACHED_PANEL.arrowHeight
   };
   return {
     ...normalized,
     panel,
-    arrow,
-    shape: [...paletteBaseShape(), arrow, panel]
+    shape: [...paletteBaseShape(), panel]
   };
 }
 
@@ -92,18 +79,18 @@ function getWindowBounds(window) {
   return { x: 0, y: 0, width: PALETTE_SIZE.width, height: PALETTE_SIZE.height };
 }
 
-function getExpandedPaletteBounds(baseBounds, screenApi) {
+function getInteractionPaletteBounds(baseBounds, screenApi) {
   const display = screenApi?.getDisplayMatching?.(baseBounds) || screenApi?.getDisplayNearestPoint?.(baseBounds);
   const workArea = display?.workArea;
   if (!workArea) {
-    return { x: baseBounds.x, y: baseBounds.y, ...PALETTE_EXPANDED_SIZE };
+    return { x: baseBounds.x, y: baseBounds.y, ...PALETTE_INTERACTION_SIZE };
   }
-  const maximumX = Math.max(workArea.x, workArea.x + workArea.width - PALETTE_EXPANDED_SIZE.width);
-  const maximumY = Math.max(workArea.y, workArea.y + workArea.height - PALETTE_EXPANDED_SIZE.height);
+  const maximumX = Math.max(workArea.x, workArea.x + workArea.width - PALETTE_INTERACTION_SIZE.width);
+  const maximumY = Math.max(workArea.y, workArea.y + workArea.height - PALETTE_INTERACTION_SIZE.height);
   return {
     x: clamp(baseBounds.x, workArea.x, maximumX),
     y: clamp(baseBounds.y, workArea.y, maximumY),
-    ...PALETTE_EXPANDED_SIZE
+    ...PALETTE_INTERACTION_SIZE
   };
 }
 
@@ -118,15 +105,15 @@ function sameShape(left, right) {
   });
 }
 
-function openAttachedActionsPanel(window, metrics, options = {}) {
+function openInteractionPanel(window, metrics, options = {}) {
   if (!window || window.isDestroyed()) return null;
   if (typeof window.setShape !== "function") return null;
-  const geometry = getAttachedPanelGeometry(metrics);
+  const geometry = getInteractionPanelGeometry(metrics);
   if (!geometry) return null;
 
-  const previous = attachedPanelState.get(window);
+  const previous = interactionPanelState.get(window);
   const baseBounds = previous?.baseBounds || getWindowBounds(window);
-  const nextBounds = getExpandedPaletteBounds(baseBounds, options.screen || screen);
+  const nextBounds = getInteractionPaletteBounds(baseBounds, options.screen || screen);
   if (!previous || !sameBounds(previous.bounds, nextBounds)) {
     if (typeof window.setBounds === "function") window.setBounds(nextBounds);
   }
@@ -135,33 +122,33 @@ function openAttachedActionsPanel(window, metrics, options = {}) {
       const current = getWindowBounds(window);
       if (!sameBounds(current, baseBounds) && typeof window.setBounds === "function") window.setBounds(baseBounds);
       setPaletteShape(window, paletteBaseShape());
-      attachedPanelState.delete(window);
+      interactionPanelState.delete(window);
       return null;
     }
   }
-  attachedPanelState.set(window, { baseBounds, bounds: nextBounds, shape: geometry.shape });
+  interactionPanelState.set(window, { baseBounds, bounds: nextBounds, shape: geometry.shape });
   return { panelTop: geometry.panel.y, panelHeight: geometry.panel.height, anchorY: geometry.anchorY };
 }
 
-function closeAttachedActionsPanel(window) {
+function closeInteractionPanel(window) {
   if (!window || window.isDestroyed()) return false;
-  const previous = attachedPanelState.get(window);
+  const previous = interactionPanelState.get(window);
   if (!previous) return false;
 
   const current = getWindowBounds(window);
   const { baseBounds } = previous;
   if (!sameBounds(current, baseBounds) && typeof window.setBounds === "function") window.setBounds(baseBounds);
   setPaletteShape(window, paletteBaseShape());
-  attachedPanelState.delete(window);
+  interactionPanelState.delete(window);
   return true;
 }
 
-function registerAttachedActionsIpc(ipcMain, getPaletteWindow) {
-  ipcMain.handle("palette:attached-actions:open", (_event, metrics) => (
-    openAttachedActionsPanel(getPaletteWindow(), metrics)
+function registerInteractionPanelIpc(ipcMain, getPaletteWindow) {
+  ipcMain.handle("palette:interaction-panel:open", (_event, metrics) => (
+    openInteractionPanel(getPaletteWindow(), metrics)
   ));
-  ipcMain.on("palette:attached-actions:close", () => {
-    closeAttachedActionsPanel(getPaletteWindow());
+  ipcMain.on("palette:interaction-panel:close", () => {
+    closeInteractionPanel(getPaletteWindow());
   });
 }
 
@@ -315,7 +302,7 @@ function showPaletteWindow(window, options = {}) {
     return;
   }
 
-  closeAttachedActionsPanel(window);
+  closeInteractionPanel(window);
   const screenApi = options.screen || screen;
   if (screenApi) {
     positionPaletteNearCursor(window, screenApi);
@@ -337,7 +324,7 @@ function hidePaletteWindow(window) {
     return;
   }
 
-  closeAttachedActionsPanel(window);
+  closeInteractionPanel(window);
 
   if (!isPaletteWindowShown(window)) {
     return;
@@ -350,13 +337,13 @@ function hidePaletteWindow(window) {
 
 module.exports = {
   PALETTE_SIZE,
-  PALETTE_ATTACHED_PANEL,
-  PALETTE_EXPANDED_SIZE,
+  PALETTE_INTERACTION_PANEL,
+  PALETTE_INTERACTION_SIZE,
   SETTINGS_SIZE,
-  getAttachedPanelGeometry,
-  openAttachedActionsPanel,
-  closeAttachedActionsPanel,
-  registerAttachedActionsIpc,
+  getInteractionPanelGeometry,
+  openInteractionPanel,
+  closeInteractionPanel,
+  registerInteractionPanelIpc,
   createPaletteWindow,
   createSettingsWindow,
   openSettingsWindow,

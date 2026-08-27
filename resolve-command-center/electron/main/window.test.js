@@ -5,16 +5,16 @@ const test = require("node:test");
 
 const {
   PALETTE_SIZE,
-  PALETTE_ATTACHED_PANEL,
-  PALETTE_EXPANDED_SIZE,
+  PALETTE_INTERACTION_PANEL,
+  PALETTE_INTERACTION_SIZE,
   SETTINGS_SIZE,
   createPaletteWindow,
   createSettingsWindow,
   openSettingsWindow,
-  getAttachedPanelGeometry,
-  openAttachedActionsPanel,
-  closeAttachedActionsPanel,
-  registerAttachedActionsIpc,
+  getInteractionPanelGeometry,
+  openInteractionPanel,
+  closeInteractionPanel,
+  registerInteractionPanelIpc,
   showPaletteWindow,
   hidePaletteWindow,
   isPaletteWindowShown
@@ -82,78 +82,73 @@ test("palette owns one fixed footprint and settings owns separate dimensions", (
   });
 });
 
-test("attached Actions geometry accepts only bounded semantic metrics and paints the minimal rectangle union", () => {
-  assert.deepEqual(PALETTE_ATTACHED_PANEL, {
-    gap: 6,
-    width: 176,
-    minHeight: 65,
-    maxHeight: 304,
-    inset: 8,
-    arrowWidth: 7,
-    arrowHeight: 14
+test("Interaction Panel geometry accepts only bounded semantic metrics and paints two rectangles", () => {
+  assert.deepEqual(PALETTE_INTERACTION_PANEL, {
+    gap: 16,
+    width: 260,
+    minHeight: 60,
+    maxHeight: 180,
+    inset: 8
   });
-  assert.deepEqual(PALETTE_EXPANDED_SIZE, { width: 422, height: 320 });
-  assert.equal(getAttachedPanelGeometry({ anchorY: 80, contentHeight: 155 }).panel.y, 8);
-  assert.deepEqual(getAttachedPanelGeometry({ anchorY: 80, contentHeight: 155 }).shape, [
+  assert.deepEqual(PALETTE_INTERACTION_SIZE, { width: 516, height: 320 });
+  assert.equal(getInteractionPanelGeometry({ anchorY: 80, contentHeight: 155 }).panel.y, 8);
+  assert.deepEqual(getInteractionPanelGeometry({ anchorY: 80, contentHeight: 155 }).shape, [
     { x: 0, y: 0, width: 240, height: 320 },
-    { x: 239, y: 73, width: 7, height: 14 },
-    { x: 246, y: 8, width: 176, height: 155 }
+    { x: 256, y: 8, width: 260, height: 155 }
   ]);
-  assert.equal(getAttachedPanelGeometry({ anchorY: 80, contentHeight: 155, width: 422 }), null);
-  assert.equal(getAttachedPanelGeometry({ anchorY: 80, contentHeight: 305 }), null);
-  assert.equal(getAttachedPanelGeometry({ anchorY: -1, contentHeight: 155 }), null);
+  assert.equal(getInteractionPanelGeometry({ anchorY: 80, contentHeight: 155, width: 516 }), null);
+  assert.equal(getInteractionPanelGeometry({ anchorY: 80, contentHeight: 181 }), null);
+  assert.equal(getInteractionPanelGeometry({ anchorY: -1, contentHeight: 155 }), null);
 });
 
-test("attached Actions expands, clamps, and applies idempotent panel-only shape updates", () => {
+test("Interaction Panel expands, clamps, and applies idempotent panel-only shape updates", () => {
   const calls = [];
   const palette = createAttachedPaletteWindow(calls, { x: 1700, y: 100, width: 240, height: 320 });
   const screenApi = {
     getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })
   };
 
-  assert.deepEqual(openAttachedActionsPanel(palette, { anchorY: 80, contentHeight: 155 }, { screen: screenApi }), {
+  assert.deepEqual(openInteractionPanel(palette, { anchorY: 80, contentHeight: 155 }, { screen: screenApi }), {
     panelTop: 8,
     panelHeight: 155,
     anchorY: 80
   });
-  assert.deepEqual(calls[0], ["setBounds", { x: 1498, y: 100, width: 422, height: 320 }]);
+  assert.deepEqual(calls[0], ["setBounds", { x: 1404, y: 100, width: 516, height: 320 }]);
   assert.deepEqual(calls[1], ["setShape", [
     { x: 0, y: 0, width: 240, height: 320 },
-    { x: 239, y: 73, width: 7, height: 14 },
-    { x: 246, y: 8, width: 176, height: 155 }
+    { x: 256, y: 8, width: 260, height: 155 }
   ]]);
 
   calls.length = 0;
-  openAttachedActionsPanel(palette, { anchorY: 80, contentHeight: 155 }, { screen: screenApi });
+  openInteractionPanel(palette, { anchorY: 80, contentHeight: 155 }, { screen: screenApi });
   assert.deepEqual(calls, []);
 
-  openAttachedActionsPanel(palette, { anchorY: 180, contentHeight: 185 }, { screen: screenApi });
+  openInteractionPanel(palette, { anchorY: 180, contentHeight: 175 }, { screen: screenApi });
   assert.deepEqual(calls, [["setShape", [
     { x: 0, y: 0, width: 240, height: 320 },
-    { x: 239, y: 173, width: 7, height: 14 },
-    { x: 246, y: 88, width: 176, height: 185 }
+    { x: 256, y: 93, width: 260, height: 175 }
   ]]]);
 
   calls.length = 0;
-  assert.equal(closeAttachedActionsPanel(palette), true);
+  assert.equal(closeInteractionPanel(palette), true);
   assert.deepEqual(calls, [
     ["setBounds", { x: 1700, y: 100, width: 240, height: 320 }],
     ["setShape", [{ x: 0, y: 0, width: 240, height: 320 }]]
   ]);
 });
 
-test("attached Actions fails closed without setShape and never expands the native rectangle", () => {
+test("Interaction Panel fails closed without setShape and never expands the native rectangle", () => {
   const calls = [];
   const initialBounds = { x: 1700, y: 100, width: 240, height: 320 };
   const palette = createAttachedPaletteWindow(calls, initialBounds);
   delete palette.setShape;
 
-  assert.equal(openAttachedActionsPanel(palette, { anchorY: 80, contentHeight: 155 }), null);
+  assert.equal(openInteractionPanel(palette, { anchorY: 80, contentHeight: 155 }), null);
   assert.deepEqual(calls, []);
   assert.deepEqual(palette.getBounds(), initialBounds);
 });
 
-test("attached Actions restores base bounds when applying the shape union fails", () => {
+test("Interaction Panel restores base bounds when applying the shape union fails", () => {
   const calls = [];
   const initialBounds = { x: 100, y: 100, width: 240, height: 320 };
   const palette = createAttachedPaletteWindow(calls, initialBounds);
@@ -165,33 +160,32 @@ test("attached Actions restores base bounds when applying the shape union fails"
     getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })
   };
 
-  assert.equal(openAttachedActionsPanel(palette, { anchorY: 80, contentHeight: 155 }, { screen: screenApi }), null);
+  assert.equal(openInteractionPanel(palette, { anchorY: 80, contentHeight: 155 }, { screen: screenApi }), null);
   assert.deepEqual(palette.getBounds(), initialBounds);
   assert.deepEqual(calls, [
-    ["setBounds", { x: 100, y: 100, width: 422, height: 320 }],
+    ["setBounds", { x: 100, y: 100, width: 516, height: 320 }],
     ["setShape", [
       { x: 0, y: 0, width: 240, height: 320 },
-      { x: 239, y: 73, width: 7, height: 14 },
-      { x: 246, y: 8, width: 176, height: 155 }
+      { x: 256, y: 8, width: 260, height: 155 }
     ]],
     ["setBounds", initialBounds],
     ["setShape", [{ x: 0, y: 0, width: 240, height: 320 }]]
   ]);
 });
 
-test("attached Actions close and hide restore the fixed main rectangle", () => {
+test("Interaction Panel close and hide restore the fixed main rectangle", () => {
   const calls = [];
   const palette = createAttachedPaletteWindow(calls);
-  openAttachedActionsPanel(palette, { anchorY: 160, contentHeight: 155 });
+  openInteractionPanel(palette, { anchorY: 160, contentHeight: 155 });
   calls.length = 0;
 
-  assert.equal(closeAttachedActionsPanel(palette), true);
+  assert.equal(closeInteractionPanel(palette), true);
   assert.deepEqual(calls, [
     ["setBounds", { x: 100, y: 100, width: 240, height: 320 }],
     ["setShape", [{ x: 0, y: 0, width: 240, height: 320 }]]
   ]);
 
-  openAttachedActionsPanel(palette, { anchorY: 160, contentHeight: 155 });
+  openInteractionPanel(palette, { anchorY: 160, contentHeight: 155 });
   calls.length = 0;
   hidePaletteWindow(palette);
   assert.deepEqual(calls, [
@@ -203,23 +197,23 @@ test("attached Actions close and hide restore the fixed main rectangle", () => {
   ]);
 });
 
-test("attached Actions IPC exposes semantic bounded metrics rather than renderer bounds", () => {
+test("Interaction Panel IPC exposes semantic bounded metrics rather than renderer bounds", () => {
   const handlers = new Map();
   const listeners = new Map();
   const calls = [];
   const palette = createAttachedPaletteWindow(calls);
-  registerAttachedActionsIpc({
+  registerInteractionPanelIpc({
     handle: (name, handler) => handlers.set(name, handler),
     on: (name, listener) => listeners.set(name, listener)
   }, () => palette);
 
-  assert.deepEqual(handlers.get("palette:attached-actions:open")({}, { anchorY: 160, contentHeight: 155 }), {
+  assert.deepEqual(handlers.get("palette:interaction-panel:open")({}, { anchorY: 160, contentHeight: 155 }), {
     panelTop: 83,
     panelHeight: 155,
     anchorY: 160
   });
-  assert.equal(handlers.get("palette:attached-actions:open")({}, { x: 1, y: 2, width: 422, height: 320 }), null);
-  listeners.get("palette:attached-actions:close")();
+  assert.equal(handlers.get("palette:interaction-panel:open")({}, { x: 1, y: 2, width: 516, height: 320 }), null);
+  listeners.get("palette:interaction-panel:close")();
   assert.ok(calls.some(([name]) => name === "setShape"));
 });
 
@@ -587,7 +581,7 @@ test("palette blur conceals once while logically shown", () => {
   });
 });
 
-test("both hosts share the fixed palette helper and register only semantic attached Actions intent", () => {
+test("both hosts share the fixed palette helper and register only semantic Interaction Panel intent", () => {
   const hostPaths = [
     path.join(__dirname, "main.js"),
     path.join(__dirname, "../../workflow-plugin/main.js")
@@ -597,7 +591,7 @@ test("both hosts share the fixed palette helper and register only semantic attac
     assert.match(source, /showPaletteWindow/);
     assert.match(source, /hidePaletteWindow/);
     assert.match(source, /isPaletteWindowShown/);
-    assert.match(source, /registerAttachedActionsIpc/);
+    assert.match(source, /registerInteractionPanelIpc/);
     assert.doesNotMatch(source, /setPaletteWindowMode/);
     assert.doesNotMatch(source, /palette:set-mode/);
   }
@@ -614,28 +608,30 @@ test("both hosts toggle on the logical shown predicate", () => {
   }
 });
 
-test("preload exposes bounded attached Actions intent without a renderer bounds protocol", () => {
+test("preload exposes bounded Interaction Panel intent without a renderer bounds protocol", () => {
   const preload = fs.readFileSync(path.join(__dirname, "preload.js"), "utf8");
   const app = fs.readFileSync(path.join(__dirname, "../renderer/App.jsx"), "utf8");
   const styles = fs.readFileSync(path.join(__dirname, "../renderer/styles.css"), "utf8");
 
   assert.doesNotMatch(preload, /setPaletteMode/);
   assert.doesNotMatch(preload, /palette:set-mode/);
-  assert.match(preload, /openAttachedActions: \(metrics\) => ipcRenderer\.invoke\("palette:attached-actions:open", metrics\)/);
-  assert.match(preload, /closeAttachedActions: \(\) => ipcRenderer\.send\("palette:attached-actions:close"\)/);
+  assert.match(preload, /openInteractionPanel: \(metrics\) => ipcRenderer\.invoke\("palette:interaction-panel:open", metrics\)/);
+  assert.match(preload, /closeInteractionPanel: \(\) => ipcRenderer\.send\("palette:interaction-panel:close"\)/);
   assert.doesNotMatch(preload, /setBounds|setSize|palette:bounds/);
   assert.doesNotMatch(app, /setPaletteMode/);
   assert.match(styles, /\.palette-shell:focus/);
   assert.match(styles, /outline:\s*none/);
 });
 
-test("palette main and Settings keep rectangular paint while only the attached panel occupies the expanded column", () => {
+test("palette main and Settings keep rectangular paint while only the Interaction Panel occupies the expanded column", () => {
   const styles = fs.readFileSync(path.join(__dirname, "../renderer/styles.css"), "utf8");
 
   assert.match(styles, /\.settings-shell,\s*\.palette-main\s*\{[^}]*border:\s*1px solid var\(--color-border-strong\)[^}]*border-radius:\s*0[^}]*box-shadow:/s);
   assert.match(styles, /\.palette-shell\s*\{[^}]*background:\s*transparent/s);
-  assert.match(styles, /\.actions-panel\s*\{[^}]*left:\s*246px[^}]*width:\s*176px[^}]*max-height:\s*304px/s);
-  assert.doesNotMatch(styles, /\.actions-view/);
+  assert.match(styles, /\.interaction-panel\s*\{[^}]*left:\s*256px[^}]*width:\s*260px[^}]*max-height:\s*180px/s);
+  assert.match(styles, /--color-palette-surface:\s*#151619/);
+  assert.match(styles, /--color-interaction-panel:\s*var\(--color-palette-surface\)/);
+  assert.doesNotMatch(styles, /actions-panel|actions-view|panel-arrow/);
   assert.doesNotMatch(styles, /--radius-window/);
   assert.match(styles, /\.settings-titlebar\s*\{[^}]*var\(--header-surface-shadow\)/s);
   assert.match(styles, /\.settings-titlebar-brand::before\s*\{/s);

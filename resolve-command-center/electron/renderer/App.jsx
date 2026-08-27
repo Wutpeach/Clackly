@@ -1,8 +1,8 @@
 /**
- * THESIS: A compact Resolve command menu puts search and the current action list ahead of product chrome.
+ * THESIS: A compact Resolve command menu keeps search primary and reveals interaction hints only on request.
  * OWN-WORLD: Near-black tonal layers, fine neutral hairlines, light selected anchors, and monochrome Lucide marks.
- * STORY: Launch a favorite, search a command, or preview selected-command Actions without leaving the edit.
- * FIRST VIEWPORT: Search leads a truthful Pinned, Recent, and Commands list; secondary actions recede into one footer.
+ * STORY: Launch a favorite, search a command, or inspect metadata-backed interactions without leaving the edit.
+ * FIRST VIEWPORT: Search leads a truthful Pinned, Recent, and Commands list; secondary controls recede into one footer.
  * FORM: Dense Blender-style floating menu with local pointer hover and existing keyboard selection authority.
  */
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -13,6 +13,7 @@ import {
   Command as CommandIcon,
   Flag,
   Image,
+  Info,
   LoaderCircle,
   Palette,
   Pin,
@@ -66,8 +67,8 @@ const api = window.resolveCommandCenter || {
   openSettings: () => window.open("?view=settings", "clackly-settings"),
   closeSettings: () => window.close(),
   hidePalette: () => {},
-  openAttachedActions: async () => null,
-  closeAttachedActions: () => {},
+  openInteractionPanel: async () => null,
+  closeInteractionPanel: () => {},
   onPaletteShown: (callback) => {
     requestAnimationFrame(callback);
     return () => {};
@@ -88,6 +89,7 @@ const ICONS = {
   spark: Sparkles,
   command: CommandIcon,
   pin: Pin,
+  info: Info,
   settings: Settings,
   arrow: ChevronLeft,
   loading: LoaderCircle,
@@ -227,58 +229,20 @@ function CommandRow({
   );
 }
 
-/**
- * Browser-process-only presentation boundary for developer/test Actions evidence.
- * Production has no Action authority yet, so this intentionally resolves to an
- * empty shell unless a harness injects the explicitly named developer value
- * before the renderer loads. These display rows are neither Actions domain data
- * nor persisted/IPC/runtime payloads.
- */
-function getDeveloperTestActionPresentation(commandId) {
-  const source = window.__CLACKLY_DEVELOPER_TEST_ACTIONS_PRESENTATION__;
-  if (!source || source.commandId !== commandId || !Array.isArray(source.rows)) return [];
-
-  return source.rows
-    .filter((row) => row && typeof row.label === "string" && row.label.trim())
-    .map((row) => ({
-      label: row.label.trim(),
-      description: typeof row.description === "string" ? row.description.trim() : ""
-    }));
-}
-
-function ActionRow({ action, index, selected, hovered, onHover, onLeave, onFocus, onClick }) {
-  const labelRef = useRef(null);
-  const { placement, reveal, hide } = useOverflowTooltip(labelRef);
-  const className = ["action-row", selected && "selected", hovered && "hovered"].filter(Boolean).join(" ");
-
+function InteractionRow({ interaction }) {
+  const inputTokens = interaction.label.split(" + ").filter(Boolean);
   return (
-    <button
-      data-action-index={index}
-      className={className}
-      type="button"
-      role="option"
-      aria-selected={selected}
-      aria-label={action.description ? `${action.label}, ${action.description}` : action.label}
-      title={action.description || action.label}
-      onMouseEnter={() => {
-        onHover(index);
-        reveal(false);
-      }}
-      onMouseLeave={() => {
-        hide();
-        onLeave();
-      }}
-      onFocus={() => {
-        onFocus(index);
-        reveal(true);
-      }}
-      onBlur={hide}
-      onClick={() => onClick(action)}
-    >
-      <span ref={labelRef} className="action-label" title={action.label}>{action.label}</span>
-      {action.description && <span className="action-description">{action.description}</span>}
-      <OverflowTooltip placement={placement} text={action.label} />
-    </button>
+    <div className="interaction-row" role="listitem" aria-label={`${interaction.label}: ${interaction.actionName}`}>
+      <span className="interaction-input" aria-hidden="true">
+        {inputTokens.map((token, index) => (
+          <React.Fragment key={`${token}-${index}`}>
+            {index > 0 && <span className="interaction-plus">+</span>}
+            <kbd>{token}</kbd>
+          </React.Fragment>
+        ))}
+      </span>
+      <span className="interaction-action-name">{interaction.actionName}</span>
+    </div>
   );
 }
 
@@ -286,8 +250,7 @@ function PaletteApp() {
   const shellRef = useRef(null);
   const mainSurfaceRef = useRef(null);
   const searchRef = useRef(null);
-  const actionsSearchRef = useRef(null);
-  const actionsPanelRef = useRef(null);
+  const interactionPanelRef = useRef(null);
   const [mode, setMode] = useState("launcher");
   const [catalog, setCatalog] = useState(() => createPresentationCatalog([]));
   const [commands, setCommands] = useState([]);
@@ -299,13 +262,8 @@ function PaletteApp() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [pinnedIds, setPinnedIds] = useState(() => new Set());
   const [recentIds, setRecentIds] = useState(() => new Set());
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const [actionsContextCommand, setActionsContextCommand] = useState(null);
-  const [actionQuery, setActionQuery] = useState("");
-  const [selectedActionIndex, setSelectedActionIndex] = useState(0);
-  const [hoveredActionIndex, setHoveredActionIndex] = useState(null);
-  const [actionAcknowledgement, setActionAcknowledgement] = useState("");
-  const [attachedPanelGeometry, setAttachedPanelGeometry] = useState(null);
+  const [interactionPanelOpen, setInteractionPanelOpen] = useState(false);
+  const [interactionPanelGeometry, setInteractionPanelGeometry] = useState(null);
 
   const launcherCommands = useMemo(
     () => rankCommands(catalog, "", pinnedIds, recentIds).slice(0, 9),
@@ -328,24 +286,17 @@ function PaletteApp() {
   );
   const activeCommands = mode === "search" ? searchCommands : launcherCommands;
   const selectedCommand = activeCommands[selectedIndex] || null;
-  const actionContext = actionsContextCommand || selectedCommand;
-  const developerTestActions = useMemo(
-    () => getDeveloperTestActionPresentation(actionContext?.id),
-    [actionContext?.id]
+  const interactionRows = useMemo(
+    () => (selectedCommand ? getInteractionHelp(selectedCommand, commands, bindings) : []),
+    [selectedCommand, commands, bindings]
   );
-  const filteredActions = useMemo(() => {
-    const normalizedQuery = actionQuery.trim().toLocaleLowerCase();
-    if (!normalizedQuery) return developerTestActions;
-    return developerTestActions.filter(({ label, description }) => (
-      `${label} ${description}`.toLocaleLowerCase().includes(normalizedQuery)
-    ));
-  }, [actionQuery, developerTestActions]);
-  const selectedAction = filteredActions[selectedActionIndex] || null;
+  const hasSelectedCommand = Boolean(selectedCommand);
+  const interactionPanelUsesMappings = interactionRows.length > 1;
   const eventFeedback = status
     ? { visible: status, accessible: status, error: true }
     : isExecuting
       ? { visible: "Running command…", accessible: "Running command…", error: false }
-      : actionAcknowledgement;
+      : null;
 
   useEffect(() => {
     let mounted = true;
@@ -376,13 +327,9 @@ function PaletteApp() {
       setStatus("");
       setHoveredCommandId(null);
       setIsExecuting(false);
-      setActionsOpen(false);
-      setActionsContextCommand(null);
-      setActionQuery("");
-      setSelectedActionIndex(0);
-      setHoveredActionIndex(null);
-      setActionAcknowledgement("");
-      setAttachedPanelGeometry(null);
+      setInteractionPanelOpen(false);
+      setInteractionPanelGeometry(null);
+      api.closeInteractionPanel();
       refreshCatalog();
       requestAnimationFrame(() => shellRef.current?.focus());
     });
@@ -393,7 +340,8 @@ function PaletteApp() {
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    closeInteractionPanel(false);
     setSelectedIndex(0);
     setStatus("");
     setHoveredCommandId(null);
@@ -403,39 +351,38 @@ function PaletteApp() {
     });
   }, [mode]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    closeInteractionPanel(false);
     setSelectedIndex(0);
     setHoveredCommandId(null);
   }, [query]);
 
-  useEffect(() => {
-    if (!actionsOpen) return;
-    setSelectedActionIndex(0);
-    setHoveredActionIndex(null);
-    setActionAcknowledgement("");
-  }, [actionQuery, actionsOpen]);
+  useLayoutEffect(() => {
+    if (!interactionPanelOpen) return;
+    closeInteractionPanel(false);
+  }, [selectedCommand?.id]);
 
   useEffect(() => {
-    if (!actionsOpen) return;
-    setSelectedActionIndex((current) => Math.min(current, Math.max(0, filteredActions.length - 1)));
-  }, [actionsOpen, filteredActions.length]);
+    if (!interactionPanelOpen || hasSelectedCommand) return;
+    closeInteractionPanel(false);
+  }, [hasSelectedCommand, interactionPanelOpen]);
 
   useEffect(() => {
-    if (!actionsOpen) return;
-    requestAnimationFrame(() => actionsSearchRef.current?.focus());
-  }, [actionsOpen]);
+    if (!interactionPanelOpen) return;
+    requestAnimationFrame(() => interactionPanelRef.current?.focus());
+  }, [interactionPanelOpen]);
 
   useLayoutEffect(() => {
-    if (!actionsOpen) {
-      api.closeAttachedActions();
-      setAttachedPanelGeometry(null);
+    if (!interactionPanelOpen) {
+      api.closeInteractionPanel();
+      setInteractionPanelGeometry(null);
       return undefined;
     }
-    const panel = actionsPanelRef.current;
+    const panel = interactionPanelRef.current;
     const main = mainSurfaceRef.current;
     const selectedRow = main?.querySelector(`[data-command-index="${selectedIndex}"]`);
     if (!panel || !main || !selectedRow) {
-      failAttachedActions();
+      failInteractionPanel();
       return undefined;
     }
 
@@ -446,30 +393,22 @@ function PaletteApp() {
       contentHeight: Math.round(panel.getBoundingClientRect().height)
     };
     let active = true;
-    Promise.resolve(api.openAttachedActions(metrics))
+    Promise.resolve(api.openInteractionPanel(metrics))
       .then((geometry) => {
         if (!active) return;
         if (!geometry) {
-          failAttachedActions();
+          failInteractionPanel();
           return;
         }
-        setAttachedPanelGeometry(geometry);
+        setInteractionPanelGeometry(geometry);
       })
       .catch(() => {
-        if (active) failAttachedActions();
+        if (active) failInteractionPanel();
       });
     return () => {
       active = false;
     };
-  }, [actionsOpen, filteredActions.length, mode, selectedIndex]);
-
-  useEffect(() => {
-    if (!actionAcknowledgement || status || isExecuting) return undefined;
-    const timeout = window.setTimeout(() => {
-      setActionAcknowledgement("");
-    }, 3000);
-    return () => window.clearTimeout(timeout);
-  }, [actionAcknowledgement, status, isExecuting]);
+  }, [interactionPanelOpen, interactionRows.length, mode, selectedIndex]);
 
   function enterSearch(text = "") {
     setQuery(text);
@@ -505,6 +444,7 @@ function PaletteApp() {
       return;
     }
 
+    closeInteractionPanel(false);
     setIsExecuting(true);
     setStatus("");
     try {
@@ -535,6 +475,7 @@ function PaletteApp() {
       return;
     }
 
+    closeInteractionPanel(false);
     setIsExecuting(true);
     setStatus("");
     try {
@@ -564,89 +505,47 @@ function PaletteApp() {
     setSelectedIndex((current) => Math.max(0, Math.min(current + delta, activeCommands.length - 1)));
   }
 
-  function openActions() {
-    if (!selectedCommand) return;
-    setActionsContextCommand(selectedCommand);
-    setActionsOpen(true);
-    setActionQuery("");
-    setSelectedActionIndex(0);
-    setHoveredActionIndex(null);
-    setActionAcknowledgement("");
-    setHoveredCommandId(null);
-  }
-
-  function closeActions() {
-    api.closeAttachedActions();
-    setActionsOpen(false);
-    setActionsContextCommand(null);
-    setActionQuery("");
-    setSelectedActionIndex(0);
-    setHoveredActionIndex(null);
-    setActionAcknowledgement("");
-    setAttachedPanelGeometry(null);
+  function restorePaletteFocus() {
     requestAnimationFrame(() => (mode === "search" ? searchRef.current : shellRef.current)?.focus());
   }
 
-  function failAttachedActions() {
-    setStatus("Actions panel is unavailable.");
-    closeActions();
+  function openInteractionPanel() {
+    if (!hasSelectedCommand) return;
+    setInteractionPanelOpen(true);
+    setHoveredCommandId(null);
   }
 
-  function toggleActions() {
-    if (actionsOpen) closeActions();
-    else openActions();
+  function closeInteractionPanel(restoreFocus = true) {
+    api.closeInteractionPanel();
+    setInteractionPanelOpen(false);
+    setInteractionPanelGeometry(null);
+    if (restoreFocus) restorePaletteFocus();
   }
 
-  function moveActionSelection(delta) {
-    if (filteredActions.length === 0) return;
-    setActionAcknowledgement("");
-    setSelectedActionIndex((current) => Math.max(0, Math.min(current + delta, filteredActions.length - 1)));
+  function failInteractionPanel() {
+    setStatus("Interaction panel is unavailable.");
+    closeInteractionPanel();
   }
 
-  function acknowledgeAction(action) {
-    if (!action) return;
-    setActionAcknowledgement({
-      visible: `Selected ${action.label}`,
-      accessible: `Selected ${action.label} — execution is not connected in this preview.`,
-      error: false
-    });
+  function toggleInteractionPanel() {
+    if (interactionPanelOpen) closeInteractionPanel();
+    else openInteractionPanel();
   }
 
   function handleKeyDown(event) {
-    if (actionsOpen) {
-      if (event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLocaleLowerCase() === "k") {
+    if (interactionPanelOpen) {
+      if (event.key === "Tab" || event.key === "Escape") {
         event.preventDefault();
-        closeActions();
-        return;
-      }
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeActions();
-        return;
-      }
-      if (event.key === "ArrowDown" || event.key === "ArrowRight") {
-        event.preventDefault();
-        moveActionSelection(1);
-        return;
-      }
-      if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
-        event.preventDefault();
-        moveActionSelection(-1);
-        return;
-      }
-      if (event.key === "Enter") {
-        const actionTrigger = event.target.closest?.(".action-row");
-        if (event.target.closest?.("button") && !actionTrigger) return;
-        event.preventDefault();
-        acknowledgeAction(selectedAction);
+        closeInteractionPanel();
         return;
       }
       return;
     }
 
-    if (event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLocaleLowerCase() === "k") {
+    const commandSelectionHasFocus = event.target === shellRef.current || Boolean(event.target.closest?.(".command-row"));
+    if (event.key === "Tab" && hasSelectedCommand && commandSelectionHasFocus) {
       event.preventDefault();
-      openActions();
+      openInteractionPanel();
       return;
     }
     if (event.key === "Escape") {
@@ -688,23 +587,17 @@ function PaletteApp() {
   const handleCommandFocus = (command, index) => {
     setSelectedIndex(index);
   };
-  const handleActionHover = (index) => setHoveredActionIndex(index);
-  const handleActionLeave = () => setHoveredActionIndex(null);
-  const handleActionFocus = (index) => {
-    setSelectedActionIndex(index);
-    setActionAcknowledgement("");
-  };
 
   return (
     <main
       ref={shellRef}
       className={browserPreview ? "palette-shell browser-preview" : "palette-shell"}
       data-mode={mode}
-      data-actions-open={actionsOpen || undefined}
+      data-interaction-panel-open={interactionPanelOpen || undefined}
       tabIndex={-1}
       onKeyDown={handleKeyDown}
     >
-      <div ref={mainSurfaceRef} className="palette-main" inert={actionsOpen ? "" : undefined}>
+      <div ref={mainSurfaceRef} className="palette-main">
         {mode === "launcher" && (
           <section className="launcher-view" aria-label="Launcher">
             <button type="button" className="launcher-search" onClick={() => enterSearch("")} aria-label="Search commands">
@@ -809,74 +702,44 @@ function PaletteApp() {
               <Icon name="pin" size={15} />
             </button>
             <span className="footer-spacer" aria-hidden="true" />
-            <button
-              className={actionsOpen ? "footer-control footer-action footer-actions active" : "footer-control footer-action footer-actions"}
-              type="button"
-              onClick={toggleActions}
-              aria-label={actionsOpen ? "Close selected command actions" : "Open selected command actions"}
-              aria-keyshortcuts="Control+K"
-              aria-pressed={actionsOpen}
-              disabled={!selectedCommand}
-              title={actionsOpen ? "Close Actions (Ctrl+K)" : "Open Actions (Ctrl+K)"}
-            >
-              <span className="footer-actions-keycaps" aria-hidden="true"><kbd>Ctrl</kbd><kbd>K</kbd></span>
-              <span>Actions</span>
-            </button>
+            {hasSelectedCommand && (
+              <button
+                className={interactionPanelOpen ? "footer-control footer-icon footer-info active" : "footer-control footer-icon footer-info"}
+                type="button"
+                onClick={toggleInteractionPanel}
+                aria-label={interactionPanelOpen ? "Close interaction info" : "Open interaction info"}
+                aria-controls="interaction-panel"
+                aria-expanded={interactionPanelOpen}
+                aria-pressed={interactionPanelOpen}
+                title={interactionPanelOpen ? "Close command information" : "Command information"}
+              >
+                <Icon name="info" size={16} />
+              </button>
+            )}
           </footer>
         </div>
       </div>
 
-      {actionsOpen && (
+      {interactionPanelOpen && hasSelectedCommand && (
         <section
-          ref={actionsPanelRef}
-          className="actions-panel"
+          id="interaction-panel"
+          ref={interactionPanelRef}
+          className="interaction-panel"
           style={{
-            top: `${attachedPanelGeometry?.panelTop ?? 8}px`,
-            "--actions-arrow-top": `${Math.max(0, (attachedPanelGeometry?.anchorY ?? 80) - (attachedPanelGeometry?.panelTop ?? 8) - 7)}px`
+            top: `${interactionPanelGeometry?.panelTop ?? 8}px`
           }}
-          aria-label={`Actions for ${actionContext?.name || "selected command"}`}
+          aria-label="Command information"
+          tabIndex={-1}
         >
-          <span className="actions-panel-arrow" aria-hidden="true" />
-          <div className="search-control actions-search-control">
-            <Icon name="search" size={18} />
-            <input
-              ref={actionsSearchRef}
-              value={actionQuery}
-              onChange={(event) => setActionQuery(event.target.value)}
-              placeholder="Search actions"
-              aria-label="Search selected-command actions"
-              spellCheck="false"
-              autoComplete="off"
-            />
-          </div>
-          <h2 className="list-heading">ACTIONS</h2>
-          <div className="actions-list" role="listbox" aria-label={`Actions for ${actionContext?.name || "selected command"}`}>
-            {filteredActions.map((action, index) => (
-              <ActionRow
-                key={`${action.label}-${index}`}
-                action={action}
-                index={index}
-                selected={index === selectedActionIndex}
-                hovered={hoveredActionIndex === index}
-                onHover={handleActionHover}
-                onLeave={handleActionLeave}
-                onFocus={handleActionFocus}
-                onClick={acknowledgeAction}
-              />
-            ))}
-            {developerTestActions.length === 0 && (
-              <div className="empty-state">
-                <strong>No contextual actions</strong>
-                <span>Actions will appear here when a formal action contract is available.</span>
-              </div>
-            )}
-            {developerTestActions.length > 0 && filteredActions.length === 0 && (
-              <div className="empty-state">
-                <strong>No matching actions</strong>
-                <span>Try another action name or description.</span>
-              </div>
-            )}
-          </div>
+          {interactionPanelUsesMappings ? (
+            <div className="interaction-list" role="list">
+              {interactionRows.map((interaction, index) => (
+                <InteractionRow key={`${interaction.label}-${interaction.actionName}-${index}`} interaction={interaction} />
+              ))}
+            </div>
+          ) : (
+            <p className="interaction-description">{selectedCommand.description}</p>
+          )}
         </section>
       )}
 

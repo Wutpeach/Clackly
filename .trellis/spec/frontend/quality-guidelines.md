@@ -34,19 +34,19 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Renderer presentation contains registered Commands only. Browser preview returns an empty catalog, and pinned/recent state starts empty.
 - Launcher, Search, ranking, icons, accessibility names, and generic hints preserve registered Command Metadata; renderer code contains no Command-id presentation override.
 - Renderer execution sends only the selected `commandId`.
-- Per-command shortcut badges are absent until an authoritative presentation contract exists. The approved renderer-local `Ctrl`/`K` Actions toggle is a separate first-level shell, not command shortcut metadata or a host-wide hotkey.
-- Launcher and Search always occupy the fixed `240x320` Palette main rectangle. Selected Command Actions is renderer-local state, but its approved right-attached presentation may request only semantic open/close plus bounded integer `{ anchorY, contentHeight }` metrics through the shared host helper. The renderer never supplies screen coordinates, bounds, width, height, shapes, or resize policy.
+- Per-command shortcut badges are absent until an authoritative presentation contract exists. The universal selected-Command Footer Info control is derived from interaction metadata and is not command shortcut metadata or a host-wide hotkey.
+- Launcher and Search always occupy the fixed `240x320` Palette main rectangle. Interaction Panel open/closed is Palette-local presentation state, and its right-side presentation may request only semantic open/close plus bounded integer `{ anchorY, contentHeight }` metrics through the shared host helper. The renderer never supplies screen coordinates, bounds, width, height, shapes, or resize policy.
 - Palette composition is search-led, not brand-led: Launcher and Search begin with the compact search surface; the Palette itself has no wordmark, orange identity rule, or primary header toolbar. Search is a separate DOM/content mode containing only `RESULTS`, while Launcher projects only nonempty `PINNED`, `RECENT`, and fallback `COMMANDS` sections from its existing ranked source.
-- Palette rows are compact list primitives: transparent at rest, soft neutral on pointer hover, and light neutral with dark foreground for keyboard selection. Main list, Footer, and Attached Actions share the exact `#151619` Palette neutral surface; Search is the slightly inset control and the Footer may use only a faint hairline, never a separately dominant black toolbar. Command name and the `14–16px` monochrome Lucide icon take priority; category/status, true Launcher numeric keycaps, and the `27px` footer are progressively weaker but remain readable. Pin, Settings, and the separate `Ctrl`/`K` Actions toggle belong in the quiet Launcher footer; Search retains only its in-field `ESC` hint and uses it to return to Launcher, without a duplicate footer Back control. Do not synthesize per-command shortcuts or submenu behavior.
-- Selected Command Actions has no production Action authority until a formal contract is approved. It may use an explicitly named browser-process developer/test presentation source only for renderer evidence; it must not derive rows from `getInteractionHelp()`, bindings, Command metadata, or another product model. Its query/selection/hover/acknowledgement remain renderer-local, Enter only acknowledges locally, and it sends zero command or interaction IPC.
-- While Actions is open, one existing BrowserWindow may temporarily use the approved `422x320` envelope: `240px` main-left, transparent `6px` gap, and a `176px` right panel whose content height is clamped to `65–304px` and vertically anchored to the selected Command row. The host owns final work-area clamp, shape and reset behavior; it never flips the panel to the left.
-- Palette construction owns the fixed footprint, initial centering, taskbar skipping, and the stable always-on-top policy. On reveal, its top-left starts at the cursor coordinates; only work-area overflow uses the existing narrow flip/clamp path. Attached Actions continues to clamp the complete `422x320` envelope while keeping the main left and panel right. Showing performs one visibility/focus transition plus a `palette:shown` notification, and hiding conceals the transparent window in place without destroying its native surface.
+- Palette rows are compact list primitives: transparent at rest, soft neutral on pointer hover, and light neutral with dark foreground for keyboard selection. Main list, Footer, and Interaction Panel share the exact `#151619` Palette neutral surface; a subtle panel border and shadow provide separation. Search is the slightly inset control and the Footer may use only a faint hairline, never a separately dominant black toolbar. Command name and the `14–16px` monochrome Lucide icon take priority; category/status, true Launcher numeric keycaps, and the `27px` footer are progressively weaker but remain readable. Settings and the push-pin control stay on the Footer left; Info stays on the right for every selected Command. Search retains only its in-field `ESC` hint and uses it to return to Launcher, without a duplicate footer Back control. Do not synthesize per-command shortcuts or submenu behavior.
+- Interaction Panel rows come only from `getInteractionHelp(selectedCommand, commands, bindings)`, which resolves normalized bindings against registered action Commands. The Palette's existing `selectedCommand` remains the sole current-command authority. The panel owns no captured Command, interaction definitions, query, selection, hover, acknowledgement, execution route, global state, or new domain.
+- While Interaction Info is open, one existing BrowserWindow may temporarily use the approved `516x320` envelope: `240px` main-left, transparent `16px` gap, and a `260px` right panel whose content height is clamped to `60–180px` and vertically anchored to the selected Command row. Mapping labels wrap naturally, and the panel itself contains vertical overflow. The host owns final work-area clamp, shape and reset behavior; it never flips the panel to the left.
+- Palette construction owns the fixed footprint, initial centering, taskbar skipping, and the stable always-on-top policy. On reveal, its top-left starts at the cursor coordinates; only work-area overflow uses the existing narrow flip/clamp path. Interaction Info continues to clamp the complete `516x320` envelope while keeping the main left and panel right. Showing performs one visibility/focus transition plus a `palette:shown` notification, and hiding conceals the transparent window in place without destroying its native surface.
 - The programmatically focused non-interactive `.palette-shell` suppresses only its own default focus outline; interactive controls keep their `:focus-visible` indicators.
 - Electron hosts delegate command execution to the command engine, which resolves intent through an injected capability registry. External Electron registers a bridge-backed capability; Workflow Plugin registers a Resolve-backed capability. Renderer code still sends only command ids through preload IPC.
 - Functional UI icons use `lucide-react` with the shared optical size/stroke convention. Clackly logo and mark remain project-owned SVG assets rather than Lucide substitutions.
 - Clackly wordmark assets are deterministic vector geometry: use SVG paths/shapes only, never `<text>`, font-family declarations, or external font/image dependencies.
-- The outer window silhouette is rectangular: the shared `.palette-shell`/`.settings-shell` uses `border-radius: 0`, so all rounding lives inside content surfaces. The `240x320` Palette main uses compact list rows rather than launcher tiles: rows are transparent at rest, softly neutral on hover, and light neutral with dark foreground when selected. The Actions panel uses the same row hierarchy. Interaction Help remains off-layout accessible description text; status/error/local acknowledgement appears only as compact absolute feedback. Only normal acknowledgement auto-dismisses; error/status follows existing clear/recovery semantics and is visually clamped to two or three readable lines while full aria-live text remains available.
-- Both Palette and Settings BrowserWindows set `roundedCorners: false` beside the transparent compositor contract (`frame: false`, `transparent: true`, `thickFrame: false`, `backgroundColor: "#00000000"`). The qualified Windows 11 build 26200 rule remains rectangular by default. The sole approved Electron 36 `setShape(Rectangle[])` exception is open Attached Actions: union only the `240x320` main rectangle, actual content-fit right panel, and smallest `7x14px` arrow envelope. Transparent gap and unused right-column pixels must stay outside the native region. If `setShape` is unavailable or the union fails, attached open fails closed before/after restoring exact pre-open `240x320` bounds; it never leaves a 422px rectangular hit region. Close, hide, and show recovery restore that exact base bounds/shape even after a right-edge clamp translation. Any broader/rounded/decorative shape still requires a separate ADR and a permissioned native A/B.
+- The outer window silhouette is rectangular: the shared `.palette-shell`/`.settings-shell` uses `border-radius: 0`, so all rounding lives inside content surfaces. The `240x320` Palette main uses compact list rows rather than launcher tiles: rows are transparent at rest, softly neutral on hover, and light neutral with dark foreground when selected. Interaction rows are static mappings without hover or selection state. Status/error appears only as compact absolute feedback and follows existing clear/recovery semantics with full aria-live text available.
+- Both Palette and Settings BrowserWindows set `roundedCorners: false` beside the transparent compositor contract (`frame: false`, `transparent: true`, `thickFrame: false`, `backgroundColor: "#00000000"`). The qualified Windows 11 build 26200 rule remains rectangular by default. The sole approved Electron 36 `setShape(Rectangle[])` exception is open Interaction Info: union only the `240x320` main rectangle and the actual content-fit right panel at `x=256`; no arrow or connector region is permitted. Transparent gap and unused right-column pixels must stay outside the native region. If `setShape` is unavailable or the union fails, Interaction Info fails closed before/after restoring exact pre-open `240x320` bounds; it never leaves a 516px rectangular hit region. Close, hide, and show recovery restore that exact base bounds/shape even after a right-edge clamp translation. Any broader/rounded/decorative shape still requires a separate ADR and a permissioned native A/B.
 - Development renderer loading must be explicit, for example `--dev-renderer` or `RESOLVE_COMMAND_CENTER_RENDERER_URL`.
 - Default non-packaged startup should load built renderer files so Resolve-launched Electron does not depend on a Vite dev server.
 
@@ -55,7 +55,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Unknown command id -> command engine rejects with a user-facing error.
 - Missing capability handler -> command engine rejects with a user-facing error.
 - Unknown palette mode -> renderer state only; the shared window footprint never changes because modes are content-only.
-- Empty registered catalog -> Launcher and Search render truthful empty states; browser preview does not inject fixtures. Selected Command Actions is truthfully empty in production until a formal Action contract exists.
+- Empty registered catalog -> Launcher and Search render truthful empty states; browser preview does not inject fixtures. A selected Command with zero or one resolved interaction still exposes Info and presents only its registered description, never an empty state.
 - Bridge failure -> renderer keeps the palette open, shows the error, and refocuses search.
 - Successful command -> Electron hides the palette.
 - Global shortcut registration failure -> main process logs a warning.
@@ -65,7 +65,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 
 - Good: Adding command intent metadata and registering its capability in each supported host.
 - Base: `marker` query matches `timeline.addMarker` via registry search.
-- Good: Opening Selected Command Actions retains the visible `240x320` main surface and asks the shared host only for bounded anchor/content metrics; the host validates, clamps, temporarily opens the `422x320` envelope and applies the three-rectangle union, then restores the main shape/bounds on close/hide/show.
+- Good: Opening Interaction Info retains the visible `240x320` main surface and asks the shared host only for bounded anchor/content metrics; the host validates, clamps, temporarily opens the `516x320` envelope and applies the two-rectangle union, then restores the main shape/bounds on close/hide/show.
 - Good: registering a Command with declared description/category/icon makes it appear correctly without renderer edits.
 - Bad: UI code checks `if (query === "marker")` or invokes Resolve APIs directly.
 - Bad: searching category labels, adding production prototype fixtures, sending renderer-provided bounds/shape/position, using a general resize protocol, or dynamically routing whole-window mouse events.
@@ -76,12 +76,12 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Assert presentation category text alone does not match a command.
 - Assert registered Command presentation is preserved, the empty catalog stays empty, and no shortcut/prototype entries are synthesized.
 - Assert Launcher and Search exclude `presentation: "internal"` Commands while `listCommands()`/`getCommandById()` still return them, and that the shared presentability predicate has no Command-id branches.
-- Assert the palette owns the `240x320` main footprint, first show uses native `show`, repeat show reveals a concealed window without native `show`, hide conceals in place, and both hosts toggle on the logical shown predicate. Assert attached-open metric validation, rectangle union, edge clamp, idempotence, and close/hide/show restoration through the shared host helper.
+- Assert the palette owns the `240x320` main footprint, first show uses native `show`, repeat show reveals a concealed window without native `show`, hide conceals in place, and both hosts toggle on the logical shown predicate. Assert Interaction Panel metric validation, two-rectangle union, edge clamp, idempotence, and close/hide/show restoration through the shared host helper.
 - Assert the `.palette-shell` suppresses only its own focus outline while control `:focus-visible` rules remain.
 - Assert renderer uses preload APIs instead of direct Node or Resolve imports.
 - Assert `npm run build` succeeds and file-backed Electron startup has a built renderer target.
 - Assert `clackly-logo.svg` parses as XML and contains no `<text>`, font reference, or external image.
-- Visually verify Launcher/Search at `240x320` and Attached Actions at `422x320`, including compact rows, hover versus selection, overflow-only tooltip, transient feedback, and footer geometry. Use the repository `palette:evidence` developer tool headlessly by default; its browser-only evidence does not prove Electron `setShape`, native hit-testing, DWM composition, or Resolve validation.
+- Visually verify Launcher/Search at `240x320` and Interaction Info at `516x320`, including universal Info, correct push-pin, mapping-or-description content exclusivity, complete wrapped labels, vertical scroll containment, the shared `#151619` surface, `16px` gap, absence of connector/title/Command-name repetition/footer, transient feedback, and Footer geometry. Use the repository `palette:evidence` developer tool headlessly by default; its browser-only evidence does not prove Electron `setShape`, native hit-testing, DWM composition, or Resolve validation.
 
 ### 7. Wrong vs Correct
 
@@ -101,60 +101,64 @@ await window.resolveCommandCenter.executeCommand(command.id);
 
 ---
 
-## Scenario: Selected Command Actions Preview
+## Scenario: Command Interaction Hint
 
 ### 1. Scope / Trigger
 
-- Trigger: extending the Palette with a first-level context shell for the currently selected Command while no formal Action domain contract exists.
-- Applies to the renderer surface, Palette-scoped CSS, developer-only Playwright utility, and the minimum shared preload/host path for attached-panel semantic intent. It does not authorize an Action registry, persistence, Actions execution IPC, runtime/Resolve, global-hotkey changes, a second window, or arbitrary resize controls.
+- Trigger: exposing the valid interaction methods of the currently selected Command through explicit progressive disclosure.
+- Applies to the renderer projection and lifecycle, Palette-scoped CSS, developer-only Playwright utility, and the minimum shared preload/host path for Interaction Panel semantic intent. It does not authorize a new interaction domain, persistence, interaction execution UI, runtime/Resolve changes, a global hotkey, a second window, or arbitrary resize controls.
 
 ### 2. Signatures
 
-- Renderer-local state: `actionsOpen`, `actionQuery`, `selectedActionIndex`, `hoveredActionIndex`, `actionAcknowledgement`, and a captured selected Command context.
-- Optional browser-process test input only: `window.__CLACKLY_DEVELOPER_TEST_ACTIONS_PRESENTATION__ = { commandId, rows: [{ label, description? }] }`. This is a disposable renderer evidence shape, not a production Action schema or a host API.
+- Renderer projection: `getInteractionHelp(command, commands, bindings) -> Array<{ label, actionName, description }>`; unresolved action Commands are omitted.
+- Palette-local state: `interactionPanelOpen: boolean` plus returned presentation geometry. `selectedCommand` and interaction definitions are never copied into panel state.
+- Preload intent: `openInteractionPanel({ anchorY, contentHeight }) -> Promise<{ panelTop, panelHeight, anchorY } | null>` and `closeInteractionPanel() -> void`.
 - Developer command: `npm run palette:evidence`; it is headless by default. `node scripts/palette-evidence.mjs --renderer <built|packaged> --scenario <name[,name]> --output <directory>` selects evidence inputs; `--headed` is explicit opt-in.
 
 ### 3. Contracts
 
-- Production Actions presentation is empty until an approved Action contract exists. Never derive its rows from `getInteractionHelp()`, bindings, Command metadata, or another product model.
-- `Ctrl+K` toggles only while the Palette is focused and a Command is selected. It captures that Command context, focuses Actions Search, and does not mutate the underlying Command mode, query, selection, pin/recent state, or lifecycle state.
-- Actions query/Arrow selection/pointer hover are independent renderer-local state. Enter renders only a local acknowledgement and sends zero `executeCommand` / `executeInteraction` calls. Escape and Ctrl+K return to the exact underlying Command context.
-- Actions rows are one first-level attached listbox; no nested menu or A–Z browser is permitted. The main Palette remains visible at left, while the `176px` panel stays content-fit at right with only its list scrollable. Interaction Help keeps its semantic data flow off-layout; visible status/acknowledgement is transient event feedback. Overflowed labels alone may show a clamped custom tooltip after a real-overflow check.
+- Info eligibility requires only a selected Command. More than one valid resolved interaction renders mappings only; zero or one renders only the selected Command's registered description, never an empty state.
+- Info click toggles the panel. `Tab` opens it only while Command selection has focus; `Tab` while open closes it and restores Palette focus. Hover, dwell timers, pointer leave, selection, and result changes never open it.
+- `Esc` closes an open panel first. Selection id change, mode/query change, command or interaction execution, Palette show/hide, and host open failure all close it. Existing Search-to-Launcher and Launcher-to-hide `Esc` behavior remains unchanged while the panel is closed.
+- The panel consumes the current `selectedCommand` and its derived rows directly. It has no captured Command, selected interaction row, hover state, query, acknowledgement, execution semantics, or independent focus-navigation model.
+- Panel content is either static input-to-action mappings or the selected Command's registered description, never both. It has no connector, title, Command-name repetition, category, explanatory copy, footer, search, or empty state.
+- The main Palette remains visible at left. The `260px` panel shares the exact `#151619` Palette surface, uses an approximately `16px` transparent gap, compact keycaps, naturally wrapped action labels, vertical overflow containment, and a content-fit `60–180px` height.
 
 ### 4. Validation & Error Matrix
 
-- No selected Command -> Actions footer control is disabled.
-- No test input / production -> show truthful “No contextual actions”.
-- Test rows present but query has no match -> show truthful “No matching actions”.
-- Enter on an Action -> acknowledgement only; command and interaction IPC spies remain empty.
-- Escape while Actions is open -> close Actions only; main Palette does not hide.
+- No selected Command -> no Info control. Unresolved bindings or one valid interaction -> Info opens the registered Command description only.
+- Multiple valid interactions -> Info appears and rows use registered action Command names.
+- Host returns `null` or rejects -> panel fails closed, restores Palette focus, and reports the existing compact error feedback.
+- Selection changes while open -> panel closes before a new Command's mappings can remain visible.
+- Escape while Interaction Info is open -> close the panel only; main Palette does not hide.
 - Escape in Search -> return to Launcher; Escape in Launcher -> existing `hidePalette()` behavior remains unchanged.
 
 ### 5. Good/Base/Bad Cases
 
-- Good: a Playwright `addInitScript` injects clearly labelled developer/test rows before the renderer loads and the Actions view filters those rows locally.
-- Base: pressing Ctrl+K on `timeline.addMarker` opens the first-level Actions shell, Arrow Down moves only `selectedActionIndex`, and Enter acknowledges locally.
-- Bad: using `getInteractionHelp(selectedCommand, commands, bindings)` as Actions rows, calling `executeInteraction` from an Action row, or writing Action data through preload.
+- Good: a BindingStorage remap changes both Settings help and Palette mappings through the shared projection without renderer branches.
+- Base: selecting a multi-interaction Command shows Info; pressing `Tab` opens its static mappings and pressing `Tab` again returns to the Palette.
+- Bad: storing `interactionPanelCommand`, copying binding rows into component state, adding hover-open timers, or executing a mapping row as a second Command Palette.
 
 ### 6. Tests Required
 
-- Run `npm run palette:evidence` against built or packaged renderer assets; assert exact `240x320` main geometry and `422x320` Attached Actions envelope, visible/frozen main state, content-fit right panel, no All Actions/A–Z DOM, single-line Action rows, focus, filtering, independent hover/selection, zero execution/interaction IPC on Enter, Escape preservation, overflow-only tooltip, transient feedback, and console/page-error capture.
-- Run focused renderer/window tests, `npm run build`, and `npm test`. Package and verify before a packaged renderer evidence pass.
+- Run `npm run palette:evidence` against built or packaged renderer assets; assert exact `240x320` main geometry and `516x320` Interaction Info envelope, universal Info, explicit click/Tab open, Tab/Esc return, selection/execute/show close, no hover/timer open, metadata-derived mappings and description fallback, no connector/title/Command-name repetition/footer/empty state, wrapped non-ellipsized labels, contained vertical overflow, shared `#151619`, `16px` gap, and console/page-error capture.
+- Run focused renderer/window tests, `npm run build`, and `npm test`. After the outer-window change, run `npm run package:win`, `npm run package:verify`, and `npm run workflow:install:package` before packaged Resolve validation.
 
 ### 7. Wrong vs Correct
 
 #### Wrong
 
 ```javascript
-const actions = getInteractionHelp(selectedCommand, commands, bindings);
-await api.executeInteraction(actions[selectedActionIndex]);
+const [interactionPanelCommand, setInteractionPanelCommand] = useState(selectedCommand);
+const [interactionRows, setInteractionRows] = useState(copiedInteractionDefinitions);
 ```
 
 #### Correct
 
 ```javascript
-const previewRows = getDeveloperTestActionPresentation(selectedCommand.id); // empty outside test injection
-setActionAcknowledgement(`Selected ${previewRows[selectedActionIndex].label} — execution is not connected in this preview.`);
+const interactionRows = getInteractionHelp(selectedCommand, commands, bindings);
+const hasSelectedCommand = Boolean(selectedCommand);
+const interactionPanelUsesMappings = interactionRows.length > 1;
 ```
 
 ---
@@ -181,7 +185,7 @@ setActionAcknowledgement(`Selected ${previewRows[selectedActionIndex].label} —
 - Settings is one fixed frameless `760x560` window with the exact Electron 36 BrowserWindow options `show: false`, `frame: false`, `roundedCorners: false`, `transparent: true`, `thickFrame: false`, `resizable: false`, `maximizable: false`, `minimizable: false`, `fullscreenable: false`, `alwaysOnTop: false`, `autoHideMenuBar: true`, `backgroundColor: "#00000000"`, and `title: "Clackly Settings"`. Its renderer `.settings-shell` must paint the opaque `--color-window` background across the full `100vw x 100vh` viewport so the transparent compositor surface never shows through. Do not use the Electron 37+ `accentColor` API, and do not add DWM/Python/timer/native-hook workarounds for the Resolve-host opaque frameless edge — the verified fix is the transparent surface plus the opaque renderer shell (live-validated 2026-08-06).
 - The `240x320` palette keeps its own separate surface contract — `transparent: true`, `backgroundColor: "#00000000"`, `roundedCorners: false`, `skipTaskbar: true`, `alwaysOnTop: true`, and the completed conceal/reveal lifecycle. Settings must not adopt palette product behavior: it stays `alwaysOnTop: false` with normal taskbar behavior.
 - Repeated Settings opens reuse and focus the singleton; it does not hide on blur or become always-on-top. Its custom drag region and accessible close button replace native title-bar controls, and overflow scrolls inside the fixed workspace.
-- Launcher and Search remain on the frameless fixed `240x320` Palette main surface. Selected Command Actions temporarily attaches inside the same frameless `422x320` envelope under the separately documented narrow shape-union exception.
+- Launcher and Search remain on the frameless fixed `240x320` Palette main surface. Interaction Info temporarily occupies the same frameless `516x320` envelope under the separately documented two-rectangle shape-union exception.
 - The existing renderer bundle selects Settings through a main-process-owned `?view=settings` marker. Renderer code never sends dimensions.
 - Draft values remain local until Save. Save and Reset route through ConfigManager; path and folder fields route through Electron native dialogs.
 - FeatureCatalog clones schemas with resolved labels from the shared backend utility. SettingsRenderer maps only the seven validated schema types to native controls and renders `field.label` without fallback formatting.
@@ -255,7 +259,7 @@ new BrowserWindow({
 ### 1. Scope / Trigger
 
 - Trigger: Feature Settings or command surfaces need lifecycle visibility, warnings, execution gating, or recovery navigation.
-- Applies to shared Feature UI IPC/preload, Settings, Launcher, and Search. Selected Command Actions never executes and does not make lifecycle decisions.
+- Applies to shared Feature UI IPC/preload, Settings, Launcher, and Search. Interaction Info is eligible for every selected Command, while existing executability gating remains responsible only for command execution; the panel never executes a mapping or adds lifecycle decisions.
 
 ### 2. Signatures
 
@@ -329,7 +333,7 @@ if (!canExecuteCommand(command)) {
 ### 1. Scope / Trigger
 
 - Trigger: changing compact command-row mouse handlers, the preload interaction method, or Electron host interaction IPC.
-- Applies to Launcher and Search command rows in both standalone and Workflow Integration hosts. Selected Command Actions rows are renderer-local acknowledgements and never use this route.
+- Applies to Launcher and Search command rows in both standalone and Workflow Integration hosts. Interaction Panel rows are static help mappings and never use this execution route.
 
 ### 2. Signatures
 
@@ -346,7 +350,7 @@ if (!canExecuteCommand(command)) {
 - Successful matched mouse execution is hidden by the host; unmatched interactions execute nothing and leave the palette available.
 - Browser preview returns empty Commands and bindings and renders the normal empty catalog state.
 - Double-click handlers and global-shortcut behavior are outside renderer interaction binding.
-- Hover and keyboard focus use the same existing `aria-describedby` tooltip relationship in Launcher and Search. Selected Command Actions has its own listbox semantics and does not reuse Interaction Help as row data.
+- Hover and keyboard focus use the same existing `aria-describedby` tooltip relationship in Launcher and Search. Interaction Info reuses the same metadata projection as visible static mapping rows, without a second listbox selection model.
 - Status, error, and executing messages replace interaction help until cleared; Commands without target bindings retain their metadata description.
 
 ### 4. Validation & Error Matrix
@@ -399,8 +403,8 @@ onContextMenu={(event) => executeInteraction(command, event)}
 - Renderer imports from `WorkflowIntegration.node` or calls Resolve API methods.
 - Implicit dev-server loading for normal Electron startup.
 - Renderer-provided screen bounds, panel placement coordinates, whole-window dimensions, shapes, or hit-test policy.
-- A semantic mode IPC that re-applies arbitrary geometry rather than the approved bounded attached-actions open/close metrics.
-- `setShape` on Clackly BrowserWindows except the approved open Attached Actions union of main rectangle, actual panel rectangle, and minimal arrow envelope; rounded, stepped, decorative, or general shaped-window uses remain forbidden.
+- A semantic mode IPC that re-applies arbitrary geometry rather than the approved bounded Interaction Panel open/close metrics.
+- `setShape` on Clackly BrowserWindows except the approved open Interaction Info union of the main rectangle and actual panel rectangle; connector, arrow, rounded, stepped, decorative, or general shaped-window uses remain forbidden.
 - Hand-authored functional icon path libraries when the existing Lucide dependency provides the icon; brand assets are the exception.
 - Font-dependent SVG `<text>` wordmarks or external font/image references inside Clackly brand assets.
 - Selection halos, orange row fills, and card-like row borders; use the light neutral selected row with dark foreground instead.

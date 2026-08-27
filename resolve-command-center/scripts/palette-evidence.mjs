@@ -10,8 +10,8 @@
  *
  * Examples:
  *   npm run palette:evidence
- *   node scripts/palette-evidence.mjs --renderer packaged --output ..\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright
- *   node scripts/palette-evidence.mjs --renderer built --scenario actions-attached,actions-hover-selected
+ *   node scripts/palette-evidence.mjs --renderer packaged --output ..\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\playwright
+ *   node scripts/palette-evidence.mjs --renderer built --scenario interaction-panel,interaction-lifecycle
  */
 import assert from "node:assert/strict";
 import { access, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
@@ -28,23 +28,19 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(SCRIPT_DIR, "..");
 const EDGE_EXECUTABLE = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const MAIN_VIEWPORT = { width: 240, height: 320 };
-const ATTACHED_VIEWPORT = { width: 422, height: 320 };
-const ATTACHED_PANEL = { inset: 8, minHeight: 65, maxHeight: 304 };
+const INTERACTION_VIEWPORT = { width: 516, height: 320 };
+const INTERACTION_PANEL = { inset: 8, minHeight: 60, maxHeight: 180 };
 const PALETTE_SURFACE = "rgb(21, 22, 25)";
+const INTERACTION_SURFACE = PALETTE_SURFACE;
 const SCENARIOS = new Set([
   "default",
   "pinned-recent",
   "search-results",
   "command-baseline",
-  "actions-disabled",
-  "actions-empty",
-  "actions-attached",
-  "actions-host-unavailable",
-  "actions-filtered",
-  "actions-hover-selected",
-  "actions-no-results",
-  "label-tooltip",
-  "event-feedback",
+  "interaction-single-description",
+  "interaction-panel",
+  "interaction-lifecycle",
+  "interaction-host-unavailable",
   "error-feedback"
 ]);
 const MIME_TYPES = new Map([
@@ -172,32 +168,42 @@ function rendererPaths(renderer) {
   };
 }
 
-async function loadVisibleCommands(commandRoot) {
+async function loadCommands(commandRoot) {
   const files = (await readdir(commandRoot)).filter((file) => file.endsWith(".json")).sort();
   const commands = (await Promise.all(files.map(async (file) => JSON.parse(await readFile(path.join(commandRoot, file), "utf8"))))).flat();
   const visible = commands.filter((command) => command.presentation !== "internal");
   expect(visible.length >= 3, "The renderer authority must provide at least three visible registered commands.");
-  return visible;
+  return commands;
 }
 
 function createBindings(commands) {
-  return commands.map((command) => ({
+  const visible = commands.filter((command) => command.presentation !== "internal");
+  const bindings = visible.map((command) => ({
     id: `${command.id}.left-click`,
     target: command.id,
     trigger: { type: "mouse", button: "left", modifiers: [] },
     action: { command: command.id }
   }));
-}
-
-function developerTestActions(commandId) {
-  return {
-    commandId,
-    rows: [
-      { label: "Preview · Context", description: "Browser-only developer/test row for the current command context" },
-      { label: "Preview · Boundary", description: "Browser-only developer/test row; no product Action contract or execution" },
-      { label: "Preview · Truncation validation", description: "Browser-only developer/test row with long compact secondary text at 240×320" }
-    ]
-  };
+  const aeTarget = commands.find(({ id }) => id === "timeline.exportToAfterEffects");
+  const audioAction = commands.find(({ id }) => id === "timeline.exportAudioToAfterEffects");
+  const videoAction = commands.find(({ id }) => id === "timeline.exportVideoToAfterEffects");
+  if (aeTarget && audioAction && videoAction) {
+    bindings.push(
+      {
+        id: `${aeTarget.id}.ctrl-left-click`,
+        target: aeTarget.id,
+        trigger: { type: "mouse", button: "left", modifiers: ["CTRL"] },
+        action: { command: audioAction.id }
+      },
+      {
+        id: `${aeTarget.id}.ctrl-shift-left-click`,
+        target: aeTarget.id,
+        trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT"] },
+        action: { command: videoAction.id }
+      }
+    );
+  }
+  return bindings;
 }
 
 async function startStaticServer(rendererRoot) {
@@ -226,11 +232,9 @@ async function createScenario(browser, serverUrl, host) {
   const context = await browser.newContext({ viewport: MAIN_VIEWPORT, deviceScaleFactor: 1 });
   await context.addInitScript((seed) => {
     const clone = (value) => JSON.parse(JSON.stringify(value));
-    const state = { executedCommands: [], interactions: [], hideCount: 0, settingsCount: 0, attachedActionsMetrics: [], attachedActionsCloseCount: 0, onShown: null };
+    const state = { executedCommands: [], interactions: [], hideCount: 0, settingsCount: 0, interactionPanelMetrics: [], interactionPanelCloseCount: 0, onShown: null };
     const emitShown = () => requestAnimationFrame(() => state.onShown?.());
     window.__clacklyPaletteEvidence = state;
-    // Explicitly developer/test-only renderer presentation input; never host API data.
-    window.__CLACKLY_DEVELOPER_TEST_ACTIONS_PRESENTATION__ = clone(seed.actionPresentation);
     window.resolveCommandCenter = {
       listCommands: async () => clone(seed.commands),
       listInteractionBindings: async () => clone(seed.bindings),
@@ -256,17 +260,17 @@ async function createScenario(browser, serverUrl, host) {
       openSettings: () => { state.settingsCount += 1; },
       closeSettings: () => {},
       hidePalette: () => { state.hideCount += 1; },
-      openAttachedActions: async (metrics) => {
-        state.attachedActionsMetrics.push(clone(metrics));
-        if (seed.attachedPanelFailure === "reject") throw new Error("Attached Actions host unavailable");
-        if (seed.attachedPanelFailure === "null") return null;
+      openInteractionPanel: async (metrics) => {
+        state.interactionPanelMetrics.push(clone(metrics));
+        if (seed.interactionPanelFailure === "reject") throw new Error("Interaction Panel host unavailable");
+        if (seed.interactionPanelFailure === "null") return null;
         const panelTop = Math.min(
-          Math.max(Math.round(metrics.anchorY - metrics.contentHeight / 2), seed.attachedPanel.inset),
-          320 - seed.attachedPanel.inset - metrics.contentHeight
+          Math.max(Math.round(metrics.anchorY - metrics.contentHeight / 2), seed.interactionPanel.inset),
+          320 - seed.interactionPanel.inset - metrics.contentHeight
         );
         return { panelTop, panelHeight: metrics.contentHeight, anchorY: metrics.anchorY };
       },
-      closeAttachedActions: () => { state.attachedActionsCloseCount += 1; },
+      closeInteractionPanel: () => { state.interactionPanelCloseCount += 1; },
       onPaletteShown: (callback) => {
         state.onShown = callback;
         emitShown();
@@ -296,9 +300,9 @@ async function inspectLayout(page, label) {
     };
     const shell = document.querySelector(".palette-shell");
     const main = document.querySelector(".palette-main");
-    const panel = document.querySelector(".actions-panel");
+    const panel = document.querySelector(".interaction-panel");
     const footer = document.querySelector(".palette-footer");
-    const candidates = [...document.querySelectorAll(".launcher-search, .search-control, .command-row, .action-row, .actions-list, .palette-event-feedback")]
+    const candidates = [...document.querySelectorAll(".launcher-search, .search-control, .command-row, .interaction-row, .interaction-list, .palette-event-feedback")]
       .filter((element) => getComputedStyle(element).display !== "none")
       .map(rect);
     return {
@@ -327,10 +331,10 @@ async function inspectLayout(page, label) {
   assert.equal(Math.round(layout.main.height), MAIN_VIEWPORT.height, `${label}: main remains fixed at 320px`);
   assert.ok(layout.footer.top >= 0 && layout.footer.bottom <= MAIN_VIEWPORT.height, `${label}: footer remains inside the main surface`);
   if (layout.panel) {
-    assert.deepEqual(viewport, ATTACHED_VIEWPORT, `${label}: attached panel uses the 422×320 envelope`);
-    assert.equal(Math.round(layout.panel.left), 246, `${label}: panel stays right of the main surface`);
-    assert.equal(Math.round(layout.panel.width), 176, `${label}: panel keeps the content-fit width`);
-    assert.ok(layout.panel.height >= 65 && layout.panel.height <= 304, `${label}: panel height is content-fit and bounded`);
+    assert.deepEqual(viewport, INTERACTION_VIEWPORT, `${label}: Interaction Panel uses the 516×320 envelope`);
+    assert.equal(Math.round(layout.panel.left), 256, `${label}: panel keeps the 16px visual gap`);
+    assert.equal(Math.round(layout.panel.width), 260, `${label}: panel uses the reference width`);
+    assert.ok(layout.panel.height >= 60 && layout.panel.height <= 180, `${label}: panel height is content-fit and bounded`);
   }
   for (const candidate of layout.candidates) {
     assert.ok(candidate.left >= -0.5 && candidate.right <= viewport.width + 0.5, `${label}: content remains horizontally inside the viewport`);
@@ -349,11 +353,10 @@ async function inspectSurfaceHierarchy(page, label) {
       content: color(".launcher-view, .search-view"),
       footer: color(".palette-footer-area"),
       search: color(".launcher-search, .search-control"),
-      panel: color(".actions-panel"),
-      arrow: color(".actions-panel-arrow"),
+      panel: color(".interaction-panel"),
       footerText: color(".footer-control", "color"),
       sectionText: color(".command-section h2, .list-heading", "color"),
-      metadataText: color(".command-row:not(.selected) .command-detail, .action-row:not(.selected) .action-description", "color"),
+      metadataText: color(".command-row:not(.selected) .command-detail", "color"),
       commandText: getComputedStyle(document.documentElement).getPropertyValue("--color-text-secondary").trim()
     };
   });
@@ -363,8 +366,7 @@ async function inspectSurfaceHierarchy(page, label) {
   assert.equal(surfaces.main, surfaces.content, `${label}: main background continues the Palette content field`);
   assert.equal(surfaces.footer, surfaces.content, `${label}: footer remains in the Palette surface family, not a dark toolbar`);
   if (surfaces.panel) {
-    assert.equal(surfaces.panel, surfaces.content, `${label}: attached Actions uses the shared Palette surface`);
-    assert.equal(surfaces.arrow, surfaces.panel, `${label}: attached Actions arrow matches its panel surface`);
+    assert.equal(surfaces.panel, INTERACTION_SURFACE, `${label}: Interaction Panel shares the approved #151619 Palette surface`);
   }
 
   const search = composite(surfaces.search, surfaces.content);
@@ -386,7 +388,7 @@ async function inspectSurfaceHierarchy(page, label) {
 
 async function assertRowsSingleLine(page, selector, label) {
   const rows = await page.locator(selector).evaluateAll((elements) => elements.map((row) => {
-    const text = row.querySelector(".command-name, .action-label");
+    const text = row.querySelector(".command-name, .interaction-action-name");
     const rect = row.getBoundingClientRect();
     const style = getComputedStyle(text);
     return { height: rect.height, textHeight: text.getBoundingClientRect().height, scrollHeight: text.scrollHeight, whiteSpace: style.whiteSpace, textOverflow: style.textOverflow };
@@ -398,6 +400,59 @@ async function assertRowsSingleLine(page, selector, label) {
     assert.equal(row.textOverflow, "ellipsis", `${label}: primary text truncates rather than wraps`);
     assert.ok(row.scrollHeight <= Math.ceil(row.textHeight) + 1, `${label}: primary text did not gain a second line`);
   }
+}
+
+async function assertInteractionLabelsPresentFully(page, label) {
+  const labels = await page.locator(".interaction-action-name").evaluateAll((elements) => elements.map((element) => {
+    const style = getComputedStyle(element);
+    const lineHeight = Number.parseFloat(style.lineHeight);
+    return {
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      textHeight: element.getBoundingClientRect().height,
+      scrollHeight: element.scrollHeight,
+      lineHeight,
+      whiteSpace: style.whiteSpace,
+      textOverflow: style.textOverflow
+    };
+  }));
+  expect(labels.length > 0, `${label}: renders registered action labels`);
+  for (const action of labels) {
+    assert.equal(action.whiteSpace, "normal", `${label}: action labels may wrap naturally`);
+    assert.notEqual(action.textOverflow, "ellipsis", `${label}: action labels never ellipsize`);
+    assert.ok(action.scrollWidth <= action.clientWidth + 1, `${label}: action labels do not clip horizontally`);
+    assert.ok(action.scrollHeight <= Math.ceil(action.lineHeight * 2) + 1, `${label}: ordinary action labels stay within roughly two lines`);
+    assert.ok(action.scrollHeight <= Math.ceil(action.textHeight) + 1, `${label}: action labels present their complete text`);
+  }
+}
+
+async function assertInteractionScrollContainment(page, label) {
+  const containment = await page.locator(".interaction-panel").evaluate((panel) => {
+    const list = panel.querySelector(".interaction-list");
+    const sourceRow = list?.querySelector(".interaction-row");
+    if (!list || !sourceRow) return null;
+    for (let index = 0; index < 12; index += 1) {
+      const clone = sourceRow.cloneNode(true);
+      clone.setAttribute("data-evidence-clone", String(index));
+      list.append(clone);
+    }
+    const before = panel.scrollTop;
+    panel.scrollTop = panel.scrollHeight;
+    const style = getComputedStyle(panel);
+    return {
+      before,
+      after: panel.scrollTop,
+      clientHeight: panel.clientHeight,
+      scrollHeight: panel.scrollHeight,
+      height: panel.getBoundingClientRect().height,
+      overflowY: style.overflowY
+    };
+  });
+  expect(containment, `${label}: mapping panel is available for overflow containment`);
+  assert.equal(containment.overflowY, "auto", `${label}: Interaction Panel owns vertical scrolling`);
+  assert.ok(containment.height <= INTERACTION_PANEL.maxHeight, `${label}: panel itself stays within its maximum height`);
+  assert.ok(containment.scrollHeight > containment.clientHeight, `${label}: overflowing mappings stay inside the panel`);
+  assert.ok(containment.after > containment.before, `${label}: panel can scroll vertically through overflowing mappings`);
 }
 
 async function screenshot(page, output, name) {
@@ -417,13 +472,13 @@ async function focusShell(page) {
   await page.locator(".palette-shell").focus();
 }
 
-async function openActions(page) {
+async function openInteractionPanel(page, method = "tab") {
   await focusShell(page);
-  await page.setViewportSize(ATTACHED_VIEWPORT);
-  await page.keyboard.press("Control+k");
-  await page.locator(".actions-panel").waitFor();
-  await page.locator(".actions-search-control input").waitFor();
-  await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Search selected-command actions");
+  await page.setViewportSize(INTERACTION_VIEWPORT);
+  if (method === "click") await page.getByRole("button", { name: "Open interaction info" }).click();
+  else await page.keyboard.press("Tab");
+  await page.locator(".interaction-panel").waitFor();
+  await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Command information");
 }
 
 async function closeScenario(scenario, label) {
@@ -440,16 +495,23 @@ async function runScenario(name, context) {
       await inspectLayout(page, name);
       const surfaces = await inspectSurfaceHierarchy(page, name);
       await assertRowsSingleLine(page, ".command-row", name);
-      assert.equal(await page.locator(".all-actions-view, .alphabet-rail, [aria-label='All actions']").count(), 0, "Default removes the All Actions browser and A–Z rail");
+      assert.equal(await page.locator(".alphabet-rail, [aria-label*='actions' i]").count(), 0, "Default exposes no legacy Actions surface");
       const footer = await page.locator(".palette-footer").evaluate((element) => ({
-        keycaps: [...element.querySelectorAll(".footer-actions-keycaps kbd")].map((keycap) => keycap.textContent),
+        keycaps: [...element.querySelectorAll("kbd")].map((keycap) => keycap.textContent),
         buttons: [...element.querySelectorAll("button")].map((button) => button.getAttribute("aria-label"))
       }));
-      assert.deepEqual(footer.keycaps, ["Ctrl", "K"], "Footer exposes separate Ctrl and K keycaps");
+      assert.deepEqual(footer.keycaps, [], "Footer exposes no legacy Ctrl/K keycaps");
       assert.equal(footer.buttons[0], "Settings", "Settings remains the leftmost footer affordance");
       expect(footer.buttons[1].startsWith("Pin "), "Pin follows Settings in the footer");
+      assert.equal(footer.buttons[2], "Open interaction info", "Metadata-backed Info stays on the Footer right");
+      const commandRows = page.locator(".launcher-view .command-row");
+      for (let index = 0; index < await commandRows.count(); index += 1) {
+        await commandRows.nth(index).focus();
+        assert.equal(await page.getByRole("button", { name: "Open interaction info" }).count(), 1, "Every selected Command exposes Info");
+      }
+      assert.doesNotMatch(await page.locator(".palette-main").innerText(), /\bActions\b/, "Default contains no user-visible legacy Actions copy");
       evidence.push(await screenshot(page, output, "default.png"));
-      checks.push(`default command shell: 240×320, no All Actions/A–Z, Settings→Pin footer, separate Ctrl/K Actions keycaps, compact command rows, unified ${surfaces.content} main/Footer surface with inset Search and ${surfaces.mutedContrast[0].ratio.toFixed(2)}:1 readable Footer text`);
+      checks.push(`default command shell: 240×320, Settings→Pin left, universal selected-Command Info right, no legacy Ctrl/K or Actions copy, compact command rows, unified ${surfaces.content} main/Footer surface with inset Search and ${surfaces.mutedContrast[0].ratio.toFixed(2)}:1 readable Footer text`);
     } else if (name === "pinned-recent") {
       await page.getByRole("button", { name: /pin export to after effects/i }).click();
       await focusShell(page);
@@ -489,154 +551,98 @@ async function runScenario(name, context) {
       const state = await readState(page);
       assert.equal(state.executedCommands.length, 1, "Command Enter retains existing command execution routing");
       checks.push("baseline command Arrow/Enter remains routed through the injected command API");
-    } else if (name === "actions-disabled") {
-      const noCommandHost = { ...host, commands: [], bindings: [], statuses: [], actionPresentation: null };
-      await scenario.context.close();
-      const disabledScenario = await createScenario(browser, serverUrl, noCommandHost);
-      const actionsToggle = disabledScenario.page.getByRole("button", { name: "Open selected command actions" });
-      assert.equal(await actionsToggle.isDisabled(), true, "Actions footer control is disabled without a selected command");
-      await closeScenario(disabledScenario, name);
-      checks.push("Actions footer is disabled when the renderer has no valid selected Command");
-      return;
-    } else if (name === "actions-empty") {
-      const emptyHost = { ...host, actionPresentation: null };
-      await scenario.context.close();
-      const emptyScenario = await createScenario(browser, serverUrl, emptyHost);
-      await openActions(emptyScenario.page);
-      await emptyScenario.page.getByText("No contextual actions").waitFor();
-      assert.equal(await emptyScenario.page.locator(".action-row").count(), 0, "Production-shaped empty Actions shell has no injected rows");
-      await closeScenario(emptyScenario, name);
-      checks.push("empty Actions shell stays truthful without developer/test presentation data");
-      return;
-    } else if (name === "actions-attached") {
-      const preservedName = await page.locator(".launcher-view .command-row.selected .command-name").textContent();
-      await openActions(page);
-      assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "Search selected-command actions", "Actions search receives focus immediately");
-      assert.equal(await page.locator(".action-row").count(), host.actionPresentation.rows.length, "Developer/test presentation rows are the sole populated Actions input");
+    } else if (name === "interaction-single-description") {
+      await page.locator(".launcher-view .command-row").first().hover();
+      await page.waitForTimeout(850);
+      assert.equal(await page.locator(".interaction-panel").count(), 0, "Hover and dwell never auto-open Interaction Panel");
+      await focusShell(page);
       await page.keyboard.press("ArrowDown");
-      assert.equal(await page.locator(".palette-main .command-row.selected .command-name").textContent(), preservedName, "Main keyboard selection remains visibly frozen under Actions");
-      assert.equal(await page.locator(".actions-panel .action-row.selected .action-label").textContent(), host.actionPresentation.rows[1].label, "Actions keeps an independent selected row");
-      assert.equal(await page.locator(".palette-main").isVisible(), true, "Main Palette remains visible beside attached Actions");
+      assert.equal(await page.getByRole("button", { name: "Open interaction info" }).count(), 1, "Single-interaction Command keeps the universal Info entry");
+      assert.equal(await page.locator(".interaction-panel").count(), 0, "Selection change does not auto-open Interaction Panel");
+      await openInteractionPanel(page, "click");
+      const panel = page.locator(".interaction-panel");
+      assert.equal(await panel.locator(".interaction-row").count(), 0, "Single/default interaction does not render mappings");
+      assert.equal(await panel.locator(".interaction-description").innerText(), "Save the Clipboard image and import it into the Resolve Media Pool", "Single/default interaction renders only the registered Command description");
+      assert.equal(await panel.locator("h1, h2, input, footer, .empty-state, [class*='arrow']").count(), 0, "Description panel has no title, search, footer, empty state, or triangle");
       await inspectLayout(page, name);
       await inspectSurfaceHierarchy(page, name);
-      await assertRowsSingleLine(page, ".action-row", name);
-      evidence.push(await screenshot(page, output, "actions-attached.png"));
+      evidence.push(await screenshot(page, output, "interaction-single-description.png"));
+      checks.push("hover/dwell and selection never auto-open; a single/default interaction keeps Info and opens a description-only panel");
+    } else if (name === "interaction-panel") {
+      await focusShell(page);
       await page.keyboard.press("Control+k");
-      await page.locator(".actions-panel").waitFor({ state: "detached" });
-      assert.equal(await page.locator(".launcher-view .command-row.selected .command-name").textContent(), preservedName, "Ctrl+K close preserves command selection");
-      await openActions(page);
+      assert.equal(await page.locator(".interaction-panel").count(), 0, "Ctrl+K has no hidden compatibility path");
+      await page.locator(".launcher-search").click();
+      await page.locator(".search-control input").fill("export");
+      await page.keyboard.press("Tab");
+      assert.equal(await page.locator(".interaction-panel").count(), 0, "Tab from Search input does not impersonate Command selection focus");
       await page.keyboard.press("Escape");
-      await page.locator(".actions-panel").waitFor({ state: "detached" });
-      assert.equal(await page.locator(".launcher-view .command-row.selected .command-name").textContent(), preservedName, "Escape return preserves command selection");
+      await page.locator(".launcher-view").waitFor();
+      await openInteractionPanel(page, "click");
+      const panel = page.locator(".interaction-panel");
+      const rows = panel.locator(".interaction-row");
+      assert.equal(await rows.count(), 3, "Interaction Panel renders domain-derived mappings only");
+      assert.equal(await page.getByRole("button", { name: "Close interaction info" }).getAttribute("aria-pressed"), "true", "Footer Info exposes its subdued active state");
+      assert.equal(await panel.locator("h1, h2, input, footer, .empty-state, [class*='arrow']").count(), 0, "Panel has no title, search, footer, empty state, or triangle");
+      assert.equal(await panel.locator(".interaction-description").count(), 0, "Multi-interaction panel never combines mappings with a description");
+      assert.doesNotMatch(await panel.innerText(), /Automatically send the current Resolve selection/, "Panel omits Command descriptions");
+      const interactionInputs = await rows.locator(".interaction-input").evaluateAll((elements) => (
+        elements.map((element) => element.textContent.replace(/\s+/g, ""))
+      ));
+      assert.deepEqual(interactionInputs, ["Click", "Ctrl+Click", "Ctrl+Shift+Click"], "Panel preserves compact canonical input mappings");
+      assert.deepEqual(await rows.locator(".interaction-action-name").allInnerTexts(), ["Export to After Effects", "Export Audio to After Effects", "Export Video to After Effects"], "Panel uses registered action Command labels");
+      await page.mouse.move(248, 319);
+      await inspectLayout(page, name);
+      await inspectSurfaceHierarchy(page, name);
+      await assertInteractionLabelsPresentFully(page, name);
+      evidence.push(await screenshot(page, output, "interaction-panel.png"));
+      await assertInteractionScrollContainment(page, name);
+      await page.getByRole("button", { name: "Close interaction info" }).click();
+      await panel.waitFor({ state: "detached" });
+      checks.push("Ctrl+K has no compatibility path; Search-input Tab stays normal; Info click toggles a 260px, content-fit Interaction Panel with a 16px gap, #151619 shared surface, complete wrapped mappings, and contained vertical overflow");
+    } else if (name === "interaction-lifecycle") {
+      await openInteractionPanel(page);
+      await page.keyboard.press("Tab");
+      await page.locator(".interaction-panel").waitFor({ state: "detached" });
+      await page.waitForFunction(() => document.activeElement?.classList.contains("palette-shell"));
+      await openInteractionPanel(page);
+      await page.keyboard.press("Escape");
+      await page.locator(".interaction-panel").waitFor({ state: "detached" });
+      await openInteractionPanel(page);
+      await page.locator(".launcher-view .command-row").nth(1).focus();
+      await page.locator(".interaction-panel").waitFor({ state: "detached" });
+      assert.equal(await page.getByRole("button", { name: "Open interaction info" }).count(), 1, "Selection change closes the old panel while preserving universal Info");
+      await page.locator(".launcher-view .command-row").first().focus();
+      await openInteractionPanel(page);
+      await page.locator(".launcher-view .command-row").first().click();
+      await page.locator(".interaction-panel").waitFor({ state: "detached" });
+      await openInteractionPanel(page);
+      await page.evaluate(() => window.__clacklyPaletteEvidence.onShown?.());
+      await page.locator(".interaction-panel").waitFor({ state: "detached" });
       const state = await readState(page);
-      assert.ok(state.attachedActionsMetrics.every(({ anchorY, contentHeight }) => Number.isInteger(anchorY) && Number.isInteger(contentHeight)), "Renderer sends only bounded semantic attached-panel measurements");
-      checks.push("Ctrl+K attaches a first-level panel with the same neutral Palette surface as the visible main/Footer, keeps main selection visible, and Ctrl+K/Escape restore the preserved Command context");
-    } else if (name === "actions-host-unavailable") {
+      assert.equal(state.interactions.length, 1, "Command-row interaction execution retains the existing IPC path");
+      assert.ok(state.interactionPanelMetrics.every(({ anchorY, contentHeight }) => Number.isInteger(anchorY) && Number.isInteger(contentHeight)), "Renderer sends only bounded semantic panel measurements");
+      assert.ok(state.interactionPanelCloseCount > 0, "Tab, Esc, selection, execute, and Palette reset close host presentation");
+      checks.push("Tab enters/returns, Esc closes first, and selection/execute/Palette-show lifecycle leaves no stale Interaction Panel");
+    } else if (name === "interaction-host-unavailable") {
       await scenario.context.close();
-      for (const attachedPanelFailure of ["null", "reject"]) {
-        const unavailableScenario = await createScenario(browser, serverUrl, { ...host, attachedPanelFailure });
+      for (const interactionPanelFailure of ["null", "reject"]) {
+        const unavailableScenario = await createScenario(browser, serverUrl, { ...host, interactionPanelFailure });
         const unavailablePage = unavailableScenario.page;
         await focusShell(unavailablePage);
-        await unavailablePage.keyboard.press("Control+k");
-        await unavailablePage.getByText("Actions panel is unavailable.").waitFor();
-        await unavailablePage.locator(".actions-panel").waitFor({ state: "detached" });
+        await unavailablePage.setViewportSize(INTERACTION_VIEWPORT);
+        await unavailablePage.keyboard.press("Tab");
+        await unavailablePage.getByText("Interaction panel is unavailable.").waitFor();
+        await unavailablePage.locator(".interaction-panel").waitFor({ state: "detached" });
         await unavailablePage.waitForFunction(() => document.activeElement?.classList.contains("palette-shell"));
-        assert.equal(await unavailablePage.locator(".palette-main").isVisible(), true, `Attached Actions ${attachedPanelFailure} keeps the main Palette visible`);
-        await inspectLayout(unavailablePage, `actions-host-unavailable-${attachedPanelFailure}`);
         const state = await readState(unavailablePage);
-        assert.ok(state.attachedActionsMetrics.length > 0, `Attached Actions ${attachedPanelFailure} attempted only semantic host metrics`);
-        assert.ok(state.attachedActionsCloseCount > 0, `Attached Actions ${attachedPanelFailure} closes the host presentation safely`);
-        if (attachedPanelFailure === "null") {
-          evidence.push(await screenshot(unavailablePage, output, "actions-host-unavailable.png"));
-        }
-        await closeScenario(unavailableScenario, `actions-host-unavailable-${attachedPanelFailure}`);
+        assert.ok(state.interactionPanelMetrics.length > 0, `Interaction Panel ${interactionPanelFailure} attempted semantic host metrics`);
+        assert.ok(state.interactionPanelCloseCount > 0, `Interaction Panel ${interactionPanelFailure} fails closed safely`);
+        if (interactionPanelFailure === "null") evidence.push(await screenshot(unavailablePage, output, "interaction-host-unavailable.png"));
+        await closeScenario(unavailableScenario, `interaction-host-unavailable-${interactionPanelFailure}`);
       }
-      checks.push("Null and rejected Attached Actions host intent close the panel, preserve/focus the main Palette, show concise persistent error feedback, and produce no console/page error");
+      checks.push("Null and rejected Interaction Panel host intent fail closed, refocus the Palette, and show concise persistent error feedback");
       return;
-    } else if (name === "actions-filtered") {
-      await openActions(page);
-      await page.locator(".actions-search-control input").fill("boundary");
-      assert.equal(await page.locator(".action-row").count(), 1, "Action query filters isolated developer/test rows case-insensitively");
-      assert.match(await page.locator(".action-row").first().innerText(), /preview · boundary/i, "Filtered Actions row is truthful test-only presentation content");
-      await inspectLayout(page, name);
-      await inspectSurfaceHierarchy(page, name);
-      evidence.push(await screenshot(page, output, "actions-filtered.png"));
-      checks.push("Actions query filters only injected developer/test presentation rows");
-    } else if (name === "actions-hover-selected") {
-      await openActions(page);
-      await page.keyboard.press("ArrowDown");
-      const rows = page.locator(".action-row");
-      await rows.nth(0).hover();
-      await page.waitForTimeout(140);
-      const rowState = await rows.evaluateAll((elements) => elements.map((row) => ({
-        label: row.querySelector(".action-label").textContent,
-        selected: row.classList.contains("selected"),
-        hovered: row.classList.contains("hovered"),
-        background: getComputedStyle(row).backgroundColor
-      })));
-      const selected = rowState.find((row) => row.selected);
-      const hovered = rowState.find((row) => row.hovered);
-      const defaultRow = rowState.find((row) => !row.selected && !row.hovered);
-      assert.notEqual(selected.label, hovered.label, "Keyboard selection remains independent from pointer hover");
-      const surface = await page.locator(".actions-panel").evaluate((element) => getComputedStyle(element).backgroundColor);
-      const tones = {
-        default: luminance(composite(defaultRow.background, surface)),
-        hover: luminance(composite(hovered.background, surface)),
-        selected: luminance(composite(selected.background, surface))
-      };
-      assert.ok(tones.selected > tones.hover && tones.hover > tones.default, `Actions selected > hover > default hierarchy: ${JSON.stringify(tones)}`);
-      await page.keyboard.press("Enter");
-      await page.locator(".palette-event-feedback").waitFor();
-      const state = await readState(page);
-      assert.deepEqual(state.executedCommands, [], "Actions Enter sends zero command IPC calls");
-      assert.deepEqual(state.interactions, [], "Actions Enter sends zero interaction IPC calls");
-      await inspectLayout(page, name);
-      await inspectSurfaceHierarchy(page, name);
-      await assertRowsSingleLine(page, ".action-row", name);
-      evidence.push(await screenshot(page, output, "actions-hover-selected.png"));
-      checks.push(`Actions Arrow selection, separate pointer hover, local Enter acknowledgement, and zero execution/interaction IPC; tones ${JSON.stringify(tones)}`);
-    } else if (name === "actions-no-results") {
-      await openActions(page);
-      await page.locator(".actions-search-control input").fill("does-not-exist");
-      await page.getByText("No matching actions").waitFor();
-      assert.equal(await page.locator(".action-row").count(), 0, "No-result action query renders no rows");
-      await inspectLayout(page, name);
-      await inspectSurfaceHierarchy(page, name);
-      evidence.push(await screenshot(page, output, "actions-no-results.png"));
-      checks.push("Actions no-result state is truthful and remains inside the fixed viewport");
-    } else if (name === "label-tooltip") {
-      await openActions(page);
-      const rows = page.locator(".action-row");
-      assert.equal(await page.locator(".palette-tooltip").count(), 0, "No custom tooltip is persistent before real overflow interaction");
-      const longLabel = rows.nth(2).locator(".action-label");
-      assert.equal(await longLabel.evaluate((element) => element.scrollWidth > element.clientWidth), true, "Long Action label genuinely overflows");
-      await rows.nth(2).hover();
-      await page.waitForTimeout(500);
-      const tooltip = page.locator(".palette-tooltip");
-      await tooltip.waitFor();
-      const tooltipRect = await tooltip.evaluate((element) => {
-        const rect = element.getBoundingClientRect();
-        return { width: rect.width, height: rect.height, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
-      });
-      assert.ok(tooltipRect.width >= 180 && tooltipRect.width <= 210, "Overflow tooltip keeps a bounded readable width");
-      assert.ok(tooltipRect.height <= 54 && tooltipRect.left >= 0 && tooltipRect.right <= ATTACHED_VIEWPORT.width && tooltipRect.top >= 0 && tooltipRect.bottom <= ATTACHED_VIEWPORT.height, "Overflow tooltip remains clamped inside the current BrowserWindow");
-      await inspectSurfaceHierarchy(page, name);
-      evidence.push(await screenshot(page, output, "label-tooltip.png"));
-      checks.push("Custom tooltip appears only after 450ms real label overflow, stays clamped, and native title remains fallback only");
-    } else if (name === "event-feedback") {
-      await openActions(page);
-      await page.keyboard.press("ArrowDown");
-      await page.keyboard.press("Enter");
-      const feedback = page.locator(".palette-event-feedback");
-      await feedback.waitFor();
-      assert.match(await feedback.textContent(), /^Selected Preview · Boundary$/, "Action acknowledgement uses concise visible copy");
-      assert.match(await feedback.getAttribute("aria-label"), /execution is not connected in this preview/i, "Action acknowledgement preserves full aria-live detail");
-      await inspectLayout(page, name);
-      await inspectSurfaceHierarchy(page, name);
-      evidence.push(await screenshot(page, output, "event-feedback.png"));
-      await page.waitForTimeout(3100);
-      assert.equal(await feedback.count(), 0, "Transient acknowledgement auto-dismisses without a persistent help bar");
-      checks.push("Status/acknowledgement is a compact transient event feedback surface with concise visible and full accessible text");
     } else if (name === "error-feedback") {
       const commandFailure = "Command bridge is unavailable. Open Settings to recover, then retry.";
       await scenario.context.close();
@@ -680,14 +686,13 @@ async function run() {
   if (!options) return;
 
   const { rendererRoot, commandRoot } = rendererPaths(options.renderer);
-  const commands = await loadVisibleCommands(commandRoot);
+  const commands = await loadCommands(commandRoot);
   const capabilities = [...new Set(commands.map((command) => command.capability))];
   const host = {
     commands,
     bindings: createBindings(commands),
     statuses: capabilities.map(readyStatus),
-    actionPresentation: developerTestActions(commands[0].id),
-    attachedPanel: ATTACHED_PANEL
+    interactionPanel: INTERACTION_PANEL
   };
   await mkdir(options.output, { recursive: true });
   const { server, url } = await startStaticServer(rendererRoot);
@@ -700,7 +705,7 @@ async function run() {
       if (options.scenarios.has(scenario)) await runScenario(scenario, { browser, serverUrl: url, host, output: options.output, evidence, checks });
     }
     const report = {
-      scope: "Developer-only Playwright renderer evidence. Host stubs and developer/test Actions presentation data exist only in the browser process.",
+      scope: "Developer-only Playwright renderer evidence. Browser-process host stubs expose registered Commands, normalized interaction bindings, and semantic Interaction Panel intent.",
       limitations: [
         "This proves built/packaged renderer DOM, CSS, keyboard, and pointer behavior only.",
         "It does not prove Electron setShape/DWM composition, transparent-gap hit testing, cursor placement, native focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."
@@ -710,7 +715,7 @@ async function run() {
       renderer: options.renderer,
       rendererRoot,
       output: options.output,
-      viewports: { main: MAIN_VIEWPORT, attached: ATTACHED_VIEWPORT, deviceScaleFactor: 1 },
+      viewports: { main: MAIN_VIEWPORT, interaction: INTERACTION_VIEWPORT, deviceScaleFactor: 1 },
       commands: commands.map(({ id, name, category, capability }) => ({ id, name, category, capability })),
       scenarios: [...options.scenarios],
       screenshots: evidence,
