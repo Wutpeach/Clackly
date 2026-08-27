@@ -1,0 +1,69 @@
+{
+  "scope": "Developer-only Playwright renderer evidence. Host stubs and developer/test Actions presentation data exist only in the browser process.",
+  "limitations": [
+    "This proves built/packaged renderer DOM, CSS, keyboard, and pointer behavior only.",
+    "It does not prove Electron transparent-window/DWM composition, cursor placement, native focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."
+  ],
+  "playwrightVersion": "1.62.1",
+  "browser": {
+    "channel": "explicit browser executable",
+    "version": "151.0.4129.107",
+    "headless": true
+  },
+  "renderer": "built",
+  "rendererRoot": "D:\\Clackly\\resolve-command-center\\dist\\renderer",
+  "output": "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright-built",
+  "viewport": {
+    "width": 240,
+    "height": 320,
+    "deviceScaleFactor": 1
+  },
+  "commands": [
+    {
+      "id": "timeline.exportToAfterEffects",
+      "name": "Export to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "media.clipboard-image.import",
+      "name": "Paste Clipboard Image",
+      "category": "Media",
+      "capability": "media.clipboard-image.import"
+    },
+    {
+      "id": "timeline.addMarker",
+      "name": "Add Marker",
+      "category": "Timeline",
+      "capability": "marker.add"
+    }
+  ],
+  "scenarios": [
+    "default",
+    "command-baseline",
+    "actions-empty",
+    "actions-initial",
+    "actions-filtered",
+    "actions-hover-selected",
+    "actions-no-results",
+    "hint-footer"
+  ],
+  "screenshots": [
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright-built\\default.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright-built\\actions-initial.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright-built\\actions-filtered.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright-built\\actions-hover-selected.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright-built\\actions-no-results.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright-built\\hint-footer.png"
+  ],
+  "assertions": [
+    "default command shell: 240×320, no All Actions/A–Z, Settings→Pin footer, separate Ctrl/K Actions keycaps, compact command rows",
+    "baseline command Arrow/Enter remains routed through the injected command API",
+    "empty Actions shell stays truthful without developer/test presentation data",
+    "Ctrl+K opens/closes first-level Actions, focuses its search, and Ctrl+K/Escape return to preserved command mode/query/selection",
+    "Actions query filters only injected developer/test presentation rows",
+    "Actions Arrow selection, separate pointer hover, local Enter acknowledgement, and zero execution/interaction IPC; tones {\"default\":0.016556230539684635,\"hover\":0.02699396356951084,\"selected\":0.8064266282543238}",
+    "Actions no-result state is truthful and remains inside the fixed viewport",
+    "interaction-help/status remains semantic but renders as a low-profile one-line truncated hint above the quiet footer"
+  ]
+}

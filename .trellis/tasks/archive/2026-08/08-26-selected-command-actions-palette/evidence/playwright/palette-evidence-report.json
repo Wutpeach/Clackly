@@ -1,0 +1,92 @@
+{
+  "scope": "Developer-only Playwright renderer evidence. Host stubs and developer/test Actions presentation data exist only in the browser process.",
+  "limitations": [
+    "This proves built/packaged renderer DOM, CSS, keyboard, and pointer behavior only.",
+    "It does not prove Electron setShape/DWM composition, transparent-gap hit testing, cursor placement, native focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."
+  ],
+  "playwrightVersion": "1.62.1",
+  "browser": {
+    "channel": "explicit browser executable",
+    "version": "151.0.4129.107",
+    "headless": true
+  },
+  "renderer": "packaged",
+  "rendererRoot": "D:\\Clackly\\resolve-command-center\\release\\win-unpacked\\resources\\app\\dist\\renderer",
+  "output": "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright",
+  "viewports": {
+    "main": {
+      "width": 240,
+      "height": 320
+    },
+    "attached": {
+      "width": 422,
+      "height": 320
+    },
+    "deviceScaleFactor": 1
+  },
+  "commands": [
+    {
+      "id": "timeline.exportToAfterEffects",
+      "name": "Export to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "media.clipboard-image.import",
+      "name": "Paste Clipboard Image",
+      "category": "Media",
+      "capability": "media.clipboard-image.import"
+    },
+    {
+      "id": "timeline.addMarker",
+      "name": "Add Marker",
+      "category": "Timeline",
+      "capability": "marker.add"
+    }
+  ],
+  "scenarios": [
+    "default",
+    "pinned-recent",
+    "search-results",
+    "command-baseline",
+    "actions-disabled",
+    "actions-empty",
+    "actions-attached",
+    "actions-host-unavailable",
+    "actions-filtered",
+    "actions-hover-selected",
+    "actions-no-results",
+    "label-tooltip",
+    "event-feedback",
+    "error-feedback"
+  ],
+  "screenshots": [
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright\\default.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright\\pinned-recent.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright\\search-results.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright\\actions-attached.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright\\actions-host-unavailable.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright\\actions-filtered.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright\\actions-hover-selected.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright\\actions-no-results.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright\\label-tooltip.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright\\event-feedback.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright\\error-feedback.png"
+  ],
+  "assertions": [
+    "default command shell: 240×320, no All Actions/A–Z, Settings→Pin footer, separate Ctrl/K Actions keycaps, compact command rows, unified rgb(21, 22, 25) main/Footer surface with inset Search and 4.81:1 readable Footer text",
+    "real UI Pin plus Command execution projects nonempty Pinned and Recent sections without duplicates",
+    "Search remains a separate multi-result Command DOM mode with no Launcher sections, has no footer Back control, retains its ESC hint, and Escape returns to Launcher",
+    "baseline command Arrow/Enter remains routed through the injected command API",
+    "Actions footer is disabled when the renderer has no valid selected Command",
+    "empty Actions shell stays truthful without developer/test presentation data",
+    "Ctrl+K attaches a first-level panel with the same neutral Palette surface as the visible main/Footer, keeps main selection visible, and Ctrl+K/Escape restore the preserved Command context",
+    "Null and rejected Attached Actions host intent close the panel, preserve/focus the main Palette, show concise persistent error feedback, and produce no console/page error",
+    "Actions query filters only injected developer/test presentation rows",
+    "Actions Arrow selection, separate pointer hover, local Enter acknowledgement, and zero execution/interaction IPC; tones {\"default\":0.008034353726058405,\"hover\":0.015730026873019408,\"selected\":0.8064266282543238}",
+    "Actions no-result state is truthful and remains inside the fixed viewport",
+    "Custom tooltip appears only after 450ms real label overflow, stays clamped, and native title remains fallback only",
+    "Status/acknowledgement is a compact transient event feedback surface with concise visible and full accessible text",
+    "Errors remain visible, retain full aria-live text, and use a compact readable three-line maximum rather than acknowledgement auto-dismissal"
+  ]
+}

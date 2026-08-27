@@ -1,0 +1,81 @@
+{
+  "timestamp": "2026-08-26T21:24:35.8677277+08:00",
+  "processId": 13960,
+  "environment": {
+    "foregroundCompetingWindow": "Cindy",
+    "foregroundCompetingProcessId": 25456,
+    "screenCaptureAuthority": "Windows desktop composition",
+    "interpretation": "Geometry and native region shape were measured from the packaged Clackly HWND. WindowFromPoint and desktop capture were not acceptance-authoritative because Cindy remained above Clackly as a competing topmost window; forcing a z-order change triggered the existing blur-hide lifecycle."
+  },
+  "normal": {
+    "x": 882,
+    "y": 404,
+    "width": 240,
+    "height": 320
+  },
+  "open": {
+    "bounds": {
+      "x": 882,
+      "y": 404,
+      "width": 422,
+      "height": 320
+    },
+    "regionKind": 3,
+    "arrow": {
+      "first": 75,
+      "last": 88
+    },
+    "panel": {
+      "first": 21,
+      "last": 143
+    },
+    "pids": {
+      "own": 13960,
+      "main": 25456,
+      "arrow": 25456,
+      "gap": 25456,
+      "panel": 25456,
+      "unused": 25456
+    }
+  },
+  "close": {
+    "x": 882,
+    "y": 404,
+    "width": 240,
+    "height": 320
+  },
+  "edge": {
+    "normal": {
+      "x": 2305,
+      "y": 572,
+      "width": 240,
+      "height": 320
+    },
+    "open": {
+      "x": 2138,
+      "y": 572,
+      "width": 422,
+      "height": 320
+    },
+    "close": {
+      "x": 2305,
+      "y": 572,
+      "width": 240,
+      "height": 320
+    }
+  },
+  "result": {
+    "normalSize": true,
+    "openSize": true,
+    "closeExact": true,
+    "mainHit": null,
+    "arrowHit": null,
+    "panelHit": null,
+    "gapPass": null,
+    "unusedPass": null,
+    "edgeInside": true,
+    "edgeCloseExact": true,
+    "nativeGeometryVerdict": "pass",
+    "nativeDwmAndHitTestVerdict": "inconclusive"
+  }
+}

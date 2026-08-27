@@ -1,0 +1,62 @@
+{
+  "scope": "Developer-only Playwright renderer evidence. Host stubs and developer/test Actions presentation data exist only in the browser process.",
+  "limitations": [
+    "This proves built/packaged renderer DOM, CSS, keyboard, and pointer behavior only.",
+    "It does not prove Electron setShape/DWM composition, transparent-gap hit testing, cursor placement, native focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."
+  ],
+  "playwrightVersion": "1.62.1",
+  "browser": {
+    "channel": "explicit browser executable",
+    "version": "151.0.4129.107",
+    "headless": true
+  },
+  "renderer": "built",
+  "rendererRoot": "D:\\Clackly\\resolve-command-center\\dist\\renderer",
+  "output": "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright-hardening-smoke",
+  "viewports": {
+    "main": {
+      "width": 240,
+      "height": 320
+    },
+    "attached": {
+      "width": 422,
+      "height": 320
+    },
+    "deviceScaleFactor": 1
+  },
+  "commands": [
+    {
+      "id": "timeline.exportToAfterEffects",
+      "name": "Export to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "media.clipboard-image.import",
+      "name": "Paste Clipboard Image",
+      "category": "Media",
+      "capability": "media.clipboard-image.import"
+    },
+    {
+      "id": "timeline.addMarker",
+      "name": "Add Marker",
+      "category": "Timeline",
+      "capability": "marker.add"
+    }
+  ],
+  "scenarios": [
+    "actions-host-unavailable",
+    "error-feedback",
+    "event-feedback"
+  ],
+  "screenshots": [
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright-hardening-smoke\\actions-host-unavailable.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright-hardening-smoke\\event-feedback.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-selected-command-actions-palette\\evidence\\playwright-hardening-smoke\\error-feedback.png"
+  ],
+  "assertions": [
+    "Null and rejected Attached Actions host intent close the panel, preserve/focus the main Palette, show concise persistent error feedback, and produce no console/page error",
+    "Status/acknowledgement is a compact transient event feedback surface with concise visible and full accessible text",
+    "Errors remain visible, retain full aria-live text, and use a compact readable three-line maximum rather than acknowledgement auto-dismissal"
+  ]
+}
