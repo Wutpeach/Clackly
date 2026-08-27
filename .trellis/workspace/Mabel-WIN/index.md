@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 34
-- **Last Active**: 2026-08-10
+- **Total Sessions**: 35
+- **Last Active**: 2026-08-27
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~758 | Active |
+| `journal-1.md` | ~780 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 35 | 2026-08-27 | Refine Command Palette and Attached Actions | `30bb662a8e26f0d85cde16d80fc8a8de1bd35279`, `fa4cd9c4f1d2df73390b72a9e311b41600f55039` | `main` |
 | 34 | 2026-08-10 | Fix Image Clipboard click execution | `fe69a30` | `main` |
 | 33 | 2026-08-10 | Implement Image Clipboard import | `37b831a` | `main` |
 | 32 | 2026-08-09 | Seal TimelineRange architecture | `9d0a4048a099c1e82bc00f423d4508c40ba7037b` | `main` |

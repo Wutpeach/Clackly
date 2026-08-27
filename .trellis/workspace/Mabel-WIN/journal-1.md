@@ -756,3 +756,25 @@ Added the missing Image Clipboard left-click binding, migrated pre-feature defau
 ### Status
 
 [OK] **Completed**
+
+
+## Session 35: Refine Command Palette and Attached Actions
+
+**Date**: 2026-08-27
+**Task**: Refine Command Palette and Attached Actions
+**Branch**: `main`
+
+### Summary
+
+Refined the 240x320 Command Palette, added the searchable right-attached Actions panel, aligned cursor-origin/Search behavior, corrected the Palette surface to #151619, added persistent headless evidence, packaged and installed the final Workflow.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `30bb662a8e26f0d85cde16d80fc8a8de1bd35279` | (see git log) |
+| `fa4cd9c4f1d2df73390b72a9e311b41600f55039` | (see git log) |
+
+### Status
+
+[OK] **Completed**
