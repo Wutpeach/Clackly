@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Binding renderer, metadata, shortcut, fixed-window, accessibility and host contracts for palette implementation."}
+{"file":"DESIGN.md","reason":"Current Clackly visual tokens, rectangular shell rules, Lucide conventions and professional-tool design principles."}
+{"file":".trellis/tasks/08-26-command-palette-visual-density/research/current-state.md","reason":"Repository-grounded current components, visual gaps, minimal file scope, platform constraints and verification limits."}
+{"file":"resolve-command-center/electron/renderer/App.jsx","reason":"Presentation repair replaces the legacy branded header with a search-led compact command-menu composition while preserving the existing local mode, selection, command, pin, and footer control behavior."}
+{"file":"resolve-command-center/electron/renderer/styles.css","reason":"Presentation repair establishes the Blender-style list rhythm: no Palette header, neutral 34px search surface, 30px transparent/hover/selected rows, weak 27px footer, and a narrow low-priority A–Z rail without changing host geometry."}

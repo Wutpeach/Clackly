@@ -1,0 +1,57 @@
+{
+  "scope": "Packaged renderer assets served to headless Microsoft Edge through a temporary Playwright harness.",
+  "limitations": [
+    "This proves renderer DOM/CSS/keyboard/mouse presentation only.",
+    "It does not prove Electron transparent-window/DWM composition, cursor placement, native focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."
+  ],
+  "playwrightVersion": "1.62.1",
+  "browser": {
+    "channel": "Microsoft Edge executable",
+    "version": "151.0.4129.107",
+    "headless": true
+  },
+  "viewport": {
+    "width": 240,
+    "height": 320,
+    "deviceScaleFactor": 1
+  },
+  "rendererRoot": "D:\\Clackly\\resolve-command-center\\release\\win-unpacked\\resources\\app\\dist\\renderer",
+  "commands": [
+    {
+      "id": "timeline.exportToAfterEffects",
+      "name": "Export to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "media.clipboard-image.import",
+      "name": "Paste Clipboard Image",
+      "category": "Media",
+      "capability": "media.clipboard-image.import"
+    },
+    {
+      "id": "timeline.addMarker",
+      "name": "Add Marker",
+      "category": "Timeline",
+      "capability": "marker.add"
+    }
+  ],
+  "screenshots": [
+    "D:\\Clackly\\.trellis\\tasks\\08-26-command-palette-visual-density\\evidence\\playwright\\default-commands.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-command-palette-visual-density\\evidence\\playwright\\default-pinned-recent.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-command-palette-visual-density\\evidence\\playwright\\search-results.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-command-palette-visual-density\\evidence\\playwright\\search-no-results.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-command-palette-visual-density\\evidence\\playwright\\all-actions.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-command-palette-visual-density\\evidence\\playwright\\hover-vs-selected.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-26-command-palette-visual-density\\evidence\\playwright\\long-status-help.png"
+  ],
+  "assertions": [
+    "default fallback Commands projection, Settings→Pin footer order, 240×320 geometry, no overflow, and compact single-line rows",
+    "Pin and keyboard execution create nonempty Pinned/Recent sections through existing UI state with no duplicates",
+    "keyboard entry into separate RESULTS-only Search mode with multiple real catalog results",
+    "truthful Search no-result state and existing Escape hide semantics",
+    "All Actions grouping and reachable low-priority 14px A–Z rail",
+    "Arrow-selected versus pointer-hovered distinct rows; luminance {\"default\":0.016556230539684635,\"hover\":0.02699396356951084,\"selected\":0.8064266282543238}",
+    "longest real command (Export to After Effects) with structurally generated unavailable lifecycle status and bounded status panel"
+  ]
+}

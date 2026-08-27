@@ -1,0 +1,28 @@
+{
+  "id": "command-palette-visual-density",
+  "name": "command-palette-visual-density",
+  "title": "Refine Command Palette visual density",
+  "description": "Refine Clackly Launcher, Search, All Actions, footer and secondary surfaces into a dense list palette at one fixed 240x320 footprint while preserving command, IPC and window lifecycle behavior.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "Mabel-WIN",
+  "assignee": "Mabel-WIN",
+  "createdAt": "2026-08-26",
+  "completedAt": "2026-08-27",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-26-selected-command-actions-palette"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
