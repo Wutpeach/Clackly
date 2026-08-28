@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Owns the Electron renderer/preload/host, Command metadata, browser-preview, Settings, Interaction Panel, and validation contracts this localization boundary must preserve."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Locale preference and localized metadata cross persistence, main IPC, preload, renderer presentation, and Command registry boundaries and require one validated contract owner."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"The implementation must centralize locale constants, metadata projection, fallback, and event handling instead of duplicating them across three renderers and two hosts."}
+{"file":".trellis/tasks/08-28-localization-foundation/research/repository-localization-audit.md","reason":"Repository-grounded map of current string sources, ownership boundaries, impacted files, test seams, and working-tree overlap."}

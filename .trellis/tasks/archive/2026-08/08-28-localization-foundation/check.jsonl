@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check that localization keeps existing Electron, D6/D7, browser-preview, Command presentation, accessibility, and test contracts intact."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Check that application preference persistence and structured errors remain outside Resolve/runtime execution and preserve stable ID boundaries."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify the complete preference-to-effective-locale-to-renderer event flow and no second authority or unvalidated payload readers."}
+{"file":".trellis/tasks/08-28-localization-foundation/research/repository-localization-audit.md","reason":"Use the initial audit as the baseline for final hard-coded-string and impacted-surface coverage review."}

@@ -1,0 +1,104 @@
+{
+  "scope": "Developer-only Playwright renderer evidence. Browser-process host stubs expose registered Commands, normalized interaction bindings, and semantic Interaction Panel intent; root browser preview intentionally omits that host API and uses only its isolated renderer-local presentation adapter plus local Agentation toolbar.",
+  "limitations": [
+    "This proves built/packaged renderer DOM, CSS, keyboard, and pointer behavior only.",
+    "It does not prove Electron setShape/DWM composition, transparent-gap hit testing, cursor placement, native focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."
+  ],
+  "playwrightVersion": "1.62.1",
+  "browser": {
+    "channel": "explicit browser executable",
+    "version": "151.0.4129.107",
+    "headless": true
+  },
+  "renderer": "built",
+  "rendererRoot": "D:\\Clackly\\resolve-command-center\\dist\\renderer",
+  "output": "D:\\Clackly\\.trellis\\tasks\\08-28-localization-foundation\\evidence\\palette-en-final",
+  "viewports": {
+    "visibleMain": {
+      "width": 240,
+      "height": 320
+    },
+    "visibleInteraction": {
+      "width": 516,
+      "height": 320
+    },
+    "nativeMain": {
+      "width": 256,
+      "height": 336
+    },
+    "nativeInteraction": {
+      "width": 532,
+      "height": 336
+    },
+    "browserPreview": {
+      "width": 800,
+      "height": 600
+    },
+    "browserPreviewSmall": {
+      "width": 220,
+      "height": 280
+    },
+    "shadowPadding": 8,
+    "deviceScaleFactor": 1
+  },
+  "commands": [
+    {
+      "id": "timeline.exportToAfterEffects",
+      "name": "Export to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportAudioToAfterEffects",
+      "name": "Export Audio to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportVideoToAfterEffects",
+      "name": "Export Video to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportCurrentToAfterEffects",
+      "name": "Export Playhead Clip to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportBlueRangeToAfterEffects",
+      "name": "Export Blue Marker Range Video to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportCyanRangeToAfterEffects",
+      "name": "Export Blue Marker Range with Audio to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "media.clipboard-image.import",
+      "name": "Paste Clipboard Image",
+      "category": "Media",
+      "capability": "media.clipboard-image.import"
+    },
+    {
+      "id": "timeline.addMarker",
+      "name": "Add Marker",
+      "category": "Timeline",
+      "capability": "marker.add"
+    }
+  ],
+  "scenarios": [
+    "browser-preview"
+  ],
+  "screenshots": [
+    "D:\\Clackly\\.trellis\\tasks\\08-28-localization-foundation\\evidence\\palette-en-final\\browser-preview-open.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-28-localization-foundation\\evidence\\palette-en-final\\browser-preview-small-open.png"
+  ],
+  "assertions": [
+    "Root browser preview has no injected Electron host: isolated renderer-local data drives the real Palette and Interaction Panel; Agentation's fixed local toolbar stays above the preview without a host or external route; Info, Tab, Escape, and command activation retain the panel lifecycle, while activation remains quiet and carries its preview-only note inside the panel; the visible 240×320/516×320 compositions center inside shared 256×336/532×336 shadow envelopes, whose alpha fades before the shell edge and scroll to safe edges when small"
+  ]
+}

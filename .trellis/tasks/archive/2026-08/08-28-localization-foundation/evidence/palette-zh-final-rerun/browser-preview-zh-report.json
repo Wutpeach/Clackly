@@ -1,0 +1,8 @@
+{
+  "effectiveLocale": "zh-CN",
+  "commandName": "预览调色",
+  "launcherSearch": "搜索命令…",
+  "searchPlaceholder": "搜索命令",
+  "interactionAriaLabel": "命令信息",
+  "interactionText": "单击\n预览调色\nCtrl\n+\n单击\n检查预览详情\nShift\n+\n右键单击\n调整预览设置\n\n仅预览 — 命令会在 Electron 中运行。"
+}
