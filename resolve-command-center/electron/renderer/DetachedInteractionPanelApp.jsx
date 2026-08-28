@@ -11,8 +11,12 @@ export default function DetachedInteractionPanelApp() {
     return panelApi.onPresentation(setPresentation);
   }, []);
 
+  useEffect(() => {
+    if (presentation?.effectiveLocale) document.documentElement.lang = presentation.effectiveLocale;
+  }, [presentation?.effectiveLocale]);
+
   return (
-    <main className="detached-interaction-panel" style={getPaletteVisualStyle(0)} aria-label="Command information">
+    <main className="detached-interaction-panel" style={getPaletteVisualStyle(0)} aria-label={presentation?.ariaLabel}>
       <InteractionPanelContent presentation={presentation} />
     </main>
   );

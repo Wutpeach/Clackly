@@ -1,5 +1,5 @@
 const path = require("node:path");
-const { app, clipboard, dialog, ipcMain } = require("electron");
+const { app, BrowserWindow, clipboard, dialog, ipcMain } = require("electron");
 const {
   createPaletteWindow,
   createDetachedInteractionPanelWindow,
@@ -26,6 +26,9 @@ const { InteractionManager } = require("../../interaction/InteractionManager");
 const { createBridgeExecutionAdapter } = require("../../execution-adapter/bridge");
 const { registerFeatureUiIpc } = require("../../feature-ui/registerIpc");
 const { createClacklyCore } = require("../../app/createClacklyCore");
+const { getElectronSystemLanguages } = require("../../localization/LocalizationService");
+const { registerLocalizationIpc } = require("../../localization/registerIpc");
+const { translate } = require("../../localization/resources");
 const { createClipboardImageReader } = require("./clipboard");
 
 let paletteWindow = null;
@@ -52,6 +55,7 @@ const core = createClacklyCore({
   appRoot,
   appDataPath: app.getPath("appData"),
   temporaryRoot: app.getPath("temp"),
+  systemLanguagesProvider: () => getElectronSystemLanguages(app),
   hostContextProvider: async () => ({
     application: "davinci-resolve",
     version: await bridgeExecutionAdapter.getResolveVersion()
@@ -108,7 +112,9 @@ function hidePalette() {
 
 function openSettings(featureId) {
   const previousWindow = settingsWindow;
-  settingsWindow = openSettingsWindow(settingsWindow, featureId);
+  settingsWindow = openSettingsWindow(settingsWindow, featureId, {
+    title: translate(core.localizationService.getSnapshot().effectiveLocale, "settings.title")
+  });
   if (settingsWindow !== previousWindow) {
     const openedWindow = settingsWindow;
     openedWindow.once("closed", () => {
@@ -146,6 +152,13 @@ function registerIpcHandlers() {
     return result;
   });
   ipcMain.on("palette:hide", hidePalette);
+  registerLocalizationIpc({
+    ipcMain,
+    localizationService: core.localizationService,
+    getWindows: () => BrowserWindow.getAllWindows().filter((window) => (
+      window !== nativeDualWindowHost?.getInteractionPanelWindow()
+    ))
+  });
   registerInteractionPanelIpc(ipcMain, () => paletteWindow, nativeDualWindowHost
     ? {
       open: (request) => nativeDualWindowHost.openInteractionPanel(request),
@@ -176,7 +189,11 @@ if (!hasSingleInstanceLock) {
       createPaletteWindow: createStandalonePaletteWindow,
       registerIpcHandlers,
       registerPaletteHotkey: () => registerPaletteHotkey(togglePalette),
-      reportInitializationError: (error) => dialog.showErrorBox("Clackly", error.message)
+      reportInitializationError: (error) => {
+        console.error(error);
+        const locale = core.localizationService.getSnapshot().effectiveLocale;
+        dialog.showErrorBox(translate(locale, "app.title"), translate(locale, "error.generic"));
+      }
     }).paletteWindow;
 
     app.on("activate", () => {

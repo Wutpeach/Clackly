@@ -8,6 +8,8 @@ const { registerScriptCapabilities } = require("../capability/registerScripts");
 const { createCommandExecutor } = require("../command-engine/executor");
 const { ConfigManager } = require("../config/ConfigManager");
 const { ConfigStorage } = require("../config/ConfigStorage");
+const { Preferences } = require("../preferences/Preferences");
+const { LocalizationService } = require("../localization/LocalizationService");
 const { FeatureCatalog } = require("../feature-ui/FeatureCatalog");
 const { FeatureStateStorage } = require("../feature-status/FeatureStateStorage");
 const { FeatureStatusManager } = require("../feature-status/FeatureStatusManager");
@@ -27,6 +29,7 @@ function createClacklyCore({
   appDataPath,
   temporaryRoot,
   hostContextProvider,
+  systemLanguagesProvider = () => [],
   markerBackends,
   imageClipboard
 } = {}) {
@@ -41,6 +44,9 @@ function createClacklyCore({
   }
   if (typeof hostContextProvider !== "function") {
     throw new TypeError("Clackly Core requires a host context provider");
+  }
+  if (typeof systemLanguagesProvider !== "function") {
+    throw new TypeError("Clackly Core requires a system languages provider");
   }
   if (!markerBackends || typeof markerBackends !== "object" || Array.isArray(markerBackends)) {
     throw new TypeError("Clackly Core requires marker backends");
@@ -86,6 +92,10 @@ function createClacklyCore({
     capabilityRegistry,
     storage: ConfigStorage.fromAppData(appDataPath)
   });
+  // Preferences deliberately own a separate full-replacement document. ConfigManager
+  // remains the only capability-domain authority for config.json.
+  const preferences = new Preferences({ appDataPath });
+  const localizationService = new LocalizationService({ preferences, systemLanguagesProvider });
   const featureStatusManager = new FeatureStatusManager({
     capabilityRegistry,
     configManager,
@@ -100,6 +110,8 @@ function createClacklyCore({
   return {
     capabilityRegistry,
     configManager,
+    preferences,
+    localizationService,
     featureStatusManager,
     featureCatalog,
     executeCommand,

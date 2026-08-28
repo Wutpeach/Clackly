@@ -37,7 +37,7 @@ test("timeline.addMarker preserves registry search with capability metadata", ()
   resetCommandCache();
 
   const command = getCommandById("timeline.addMarker");
-  assert.deepEqual(command, {
+  assert.deepEqual({ ...command, localizations: undefined }, {
     id: "timeline.addMarker",
     name: "Add Marker",
     description: "Add marker at current frame",
@@ -45,7 +45,8 @@ test("timeline.addMarker preserves registry search with capability metadata", ()
     icon: "marker",
     keywords: ["marker", "mark", "timeline", "red"],
     capability: "marker.add",
-    presentation: "visible"
+    presentation: "visible",
+    localizations: undefined
   });
   assert.deepEqual(searchCommands("marker").map(({ id }) => id), ["timeline.addMarker"]);
   assert.deepEqual(searchCommands("current frame"), []);
@@ -59,7 +60,7 @@ test("timeline.addMarker preserves registry search with capability metadata", ()
 
 test("Paste Clipboard Image command registration uses the standard metadata contract", () => {
   resetCommandCache();
-  assert.deepEqual(getCommandById("media.clipboard-image.import"), {
+  assert.deepEqual({ ...getCommandById("media.clipboard-image.import"), localizations: undefined }, {
     id: "media.clipboard-image.import",
     name: "Paste Clipboard Image",
     description: "Save the Clipboard image and import it into the Resolve Media Pool",
@@ -67,7 +68,8 @@ test("Paste Clipboard Image command registration uses the standard metadata cont
     icon: "image",
     keywords: ["clipboard", "image", "paste", "png", "media pool"],
     capability: "media.clipboard-image.import",
-    presentation: "visible"
+    presentation: "visible",
+    localizations: undefined
   });
   assert.deepEqual(searchCommands("clipboard image").map(({ id }) => id), [
     "media.clipboard-image.import"
@@ -149,4 +151,31 @@ test("command registry requires presentation metadata and drops unsupported fiel
   const [command] = loadFixture(t, fixture({ interactionHelp: "removed", executor: "resolve" }));
   assert.equal(Object.hasOwn(command, "interactionHelp"), false);
   assert.equal(Object.hasOwn(command, "executor"), false);
+});
+
+test("Command localization overlays validate, clone defensively, and keep English-only packages compatible", (t) => {
+  const [englishOnly] = loadFixture(t, fixture({ id: "vendor.english-only" }));
+  assert.equal(Object.hasOwn(englishOnly, "localizations"), false);
+
+  const [localized] = loadFixture(t, fixture({
+    id: "vendor.localized",
+    localizations: {
+      "zh-CN": { name: "中文命令", keywords: ["中文"] }
+    }
+  }));
+  localized.localizations["zh-CN"].keywords.push("changed");
+  const [fresh] = loadFixture(t, fixture({
+    id: "vendor.localized",
+    localizations: { "zh-CN": { name: "中文命令", keywords: ["中文"] } }
+  }));
+  assert.deepEqual(fresh.localizations["zh-CN"].keywords, ["中文"]);
+
+  assert.throws(
+    () => loadFixture(t, fixture({ localizations: { "zh-CN": { name: "" } } })),
+    /invalid name/
+  );
+  assert.throws(
+    () => loadFixture(t, fixture({ localizations: { "zh-CN": { keywords: [""] } } })),
+    /invalid keywords/
+  );
 });

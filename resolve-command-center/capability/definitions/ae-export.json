@@ -7,6 +7,13 @@
   "version": "1.0.0",
   "type": "command",
   "providers": ["script"],
+  "localizations": {
+    "zh-CN": {
+      "name": "导出到 After Effects",
+      "description": "将 Resolve 时间线片段发送到 After Effects",
+      "category": "导出"
+    }
+  },
   "executor": {
     "type": "script",
     "runtime": "python",
@@ -16,11 +23,13 @@
     "aePath": {
       "type": "path",
       "label": "After Effects Path",
-      "required": true
+      "required": true,
+      "localizations": { "zh-CN": { "label": "After Effects 路径" } }
     },
     "prefix": {
       "type": "string",
-      "label": "Composition Prefix"
+      "label": "Composition Prefix",
+      "localizations": { "zh-CN": { "label": "合成前缀" } }
     }
   }
 }

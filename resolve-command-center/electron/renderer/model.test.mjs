@@ -187,6 +187,7 @@ test("feature lifecycle projection drives visibility, execution, warning, and re
   };
   const disabled = { ...ready, enabled: false };
   const loading = { ...ready, status: "loading", message: "Checking feature availability…" };
+  const unavailable = { ...ready, status: "unavailable", message: "No marker provider is available." };
 
   assert.equal(isFeatureVisible(ready), true);
   assert.equal(isFeatureVisible({ ...ready, installed: false }), false);
@@ -196,7 +197,7 @@ test("feature lifecycle projection drives visibility, execution, warning, and re
   assert.equal(canExecuteFeature(loading), false);
   assert.deepEqual(getFeatureWarning(missing), {
     kind: "missing-config",
-    message: "Missing Resolve Path"
+    message: "Needs setup"
   });
   assert.deepEqual(getFeatureWarning(disabled), {
     kind: "disabled",
@@ -206,6 +207,10 @@ test("feature lifecycle projection drives visibility, execution, warning, and re
     kind: "loading",
     message: "Checking feature availability…"
   });
+  assert.deepEqual(getFeatureWarning(unavailable), {
+    kind: "unavailable",
+    message: "Feature is unavailable."
+  });
   assert.equal(getRecoveryAction(missing), "open-settings");
   assert.equal(getRecoveryAction(ready), null);
 
@@ -214,7 +219,7 @@ test("feature lifecycle projection drives visibility, execution, warning, and re
   ], [missing]);
   assert.equal(command.featureStatus, missing);
   assert.equal(canExecuteCommand(command), false);
-  assert.equal(getCommandHint(command), "Missing Resolve Path");
+  assert.equal(getCommandHint(command), "Needs setup");
   assert.deepEqual(joinFeatureStatuses([{ id: "marker.add" }], [ready])[0].featureStatus, ready);
 
   const withoutStatus = createPresentationCatalog([

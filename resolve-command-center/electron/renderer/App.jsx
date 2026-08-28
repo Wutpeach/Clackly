@@ -32,7 +32,9 @@ import DetachedInteractionPanelApp from "./DetachedInteractionPanelApp.jsx";
 import InteractionPanelContent from "./InteractionPanelContent.jsx";
 import paletteGeometry from "../shared/palette-geometry.json";
 import { getPaletteVisualStyle } from "./paletteVisualStyle.mjs";
-import { createBrowserPreviewApi } from "./browserPreview.mjs";
+import { api } from "./api.mjs";
+import { useLocalization } from "./LocalizationContext.jsx";
+import { localizeCommands, presentError } from "../../localization/presentation.mjs";
 import { createInteractionPanelPresentation } from "./interactionPanelPresentation.mjs";
 import { getPaletteShadowPadding, usesDetachedNativePanel } from "./paletteDiagnostic.mjs";
 import {
@@ -59,7 +61,6 @@ const detachedNativeInteractionPanel = usesDetachedNativePanel({
   search: window.location.search
 });
 const paletteVisualStyle = getPaletteVisualStyle(paletteShadowPadding);
-const api = window.resolveCommandCenter || createBrowserPreviewApi();
 
 const ICONS = {
   marker: Bookmark,
@@ -88,15 +89,15 @@ function Icon({ name, size = 24 }) {
   return <LucideIcon size={size} strokeWidth={1.9} absoluteStrokeWidth aria-hidden="true" focusable="false" />;
 }
 
-function getCommandAriaLabel(command) {
-  const warning = getFeatureWarning(command.featureStatus);
+function getCommandAriaLabel(command, t) {
+  const warning = getFeatureWarning(command.featureStatus, t);
   return warning ? `${command.name}, ${warning.message}` : command.name;
 }
 
-function getCommandAccessibleDescription(command, commands, bindings) {
-  const interactionHelp = canExecuteCommand(command) ? getInteractionHelp(command, commands, bindings) : [];
+function getCommandAccessibleDescription(command, commands, bindings, t) {
+  const interactionHelp = canExecuteCommand(command) ? getInteractionHelp(command, commands, bindings, t) : [];
   const interactionText = interactionHelp.map(({ label, description }) => `${label}: ${description}`).join(". ");
-  return interactionText || getCommandHint(command) || command.description;
+  return interactionText || getCommandHint(command, t) || command.description;
 }
 
 function useOverflowTooltip(labelRef) {
@@ -139,18 +140,18 @@ function OverflowTooltip({ placement, text }) {
   );
 }
 
-function CommandMeta({ command, pinned, labelRef }) {
+function CommandMeta({ command, pinned, labelRef, t }) {
   return (
     <>
       <span className="command-icon">
         <Icon name={command.icon} size={22} />
-        {pinned && <span className="pin-indicator" aria-label="Pinned" />}
+        {pinned && <span className="pin-indicator" aria-label={t("palette.pinnedStatus")} />}
       </span>
       <span ref={labelRef} className="command-name" title={command.name}>{command.name}</span>
       <span className="command-detail">
         <span className="command-category">{command.category}</span>
         {!canExecuteCommand(command) && (
-          <span className="status-label">{getFeatureWarning(command.featureStatus)?.kind}</span>
+          <span className="status-label">{t(`status.label.${getFeatureWarning(command.featureStatus, t)?.kind}`)}</span>
         )}
       </span>
     </>
@@ -170,7 +171,8 @@ function CommandRow({
   onFocus,
   onBlur,
   onClick,
-  onContextMenu
+  onContextMenu,
+  t
 }) {
   const labelRef = useRef(null);
   const { placement, reveal, hide } = useOverflowTooltip(labelRef);
@@ -183,7 +185,7 @@ function CommandRow({
       className={className}
       type="button"
       role="option"
-      aria-label={getCommandAriaLabel(command)}
+      aria-label={getCommandAriaLabel(command, t)}
       aria-selected={selected}
       aria-disabled={!canExecuteCommand(command)}
       aria-describedby={accessibleDescription ? descriptionId : undefined}
@@ -206,7 +208,7 @@ function CommandRow({
       onClick={(event) => onClick(command, event)}
       onContextMenu={(event) => onContextMenu(command, event)}
     >
-      <CommandMeta command={command} pinned={pinned} labelRef={labelRef} />
+      <CommandMeta command={command} pinned={pinned} labelRef={labelRef} t={t} />
       {keycap && <kbd aria-hidden="true">{keycap}</kbd>}
       {accessibleDescription && <span id={descriptionId} className="screen-reader-only">{accessibleDescription}</span>}
       <OverflowTooltip placement={placement} text={command.name} />
@@ -215,13 +217,14 @@ function CommandRow({
 }
 
 function PaletteApp() {
+  const { effectiveLocale, t } = useLocalization();
   const shellRef = useRef(null);
   const mainSurfaceRef = useRef(null);
   const searchRef = useRef(null);
   const interactionPanelRef = useRef(null);
   const [mode, setMode] = useState("launcher");
-  const [catalog, setCatalog] = useState(() => createPresentationCatalog([]));
   const [commands, setCommands] = useState([]);
+  const [featureStatuses, setFeatureStatuses] = useState([]);
   const [bindings, setBindings] = useState([]);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -232,6 +235,11 @@ function PaletteApp() {
   const [recentIds, setRecentIds] = useState(() => new Set());
   const [interactionPanelOpen, setInteractionPanelOpen] = useState(false);
   const [interactionPanelGeometry, setInteractionPanelGeometry] = useState(null);
+  const localizedCommands = useMemo(() => localizeCommands(commands, effectiveLocale), [commands, effectiveLocale]);
+  const catalog = useMemo(
+    () => createPresentationCatalog(localizedCommands, featureStatuses),
+    [localizedCommands, featureStatuses]
+  );
 
   const launcherCommands = useMemo(
     () => rankCommands(catalog, "", pinnedIds, recentIds).slice(0, 9),
@@ -242,7 +250,7 @@ function PaletteApp() {
     [catalog, query, pinnedIds, recentIds]
   );
   const launcherSections = useMemo(
-    () => projectLauncherSections(launcherCommands, pinnedIds, recentIds).map(([id, label, sectionCommands]) => ({
+    () => projectLauncherSections(launcherCommands, pinnedIds, recentIds, t).map(([id, label, sectionCommands]) => ({
       id,
       label,
       entries: sectionCommands.map((command) => ({
@@ -250,23 +258,23 @@ function PaletteApp() {
         index: launcherCommands.indexOf(command)
       }))
     })),
-    [launcherCommands, pinnedIds, recentIds]
+    [launcherCommands, pinnedIds, recentIds, t]
   );
   const activeCommands = mode === "search" ? searchCommands : launcherCommands;
   const selectedCommand = activeCommands[selectedIndex] || null;
   const interactionRows = useMemo(
-    () => (selectedCommand ? getInteractionHelp(selectedCommand, commands, bindings) : []),
-    [selectedCommand, commands, bindings]
+    () => (selectedCommand ? getInteractionHelp(selectedCommand, localizedCommands, bindings, t) : []),
+    [selectedCommand, localizedCommands, bindings, t]
   );
   const hasSelectedCommand = Boolean(selectedCommand);
   const interactionPresentation = useMemo(
-    () => createInteractionPanelPresentation(selectedCommand, interactionRows),
-    [selectedCommand, interactionRows]
+    () => createInteractionPanelPresentation(selectedCommand, interactionRows, effectiveLocale, t),
+    [selectedCommand, interactionRows, effectiveLocale, t]
   );
   const eventFeedback = status
     ? { visible: status, accessible: status, error: true }
     : isExecuting
-      ? { visible: "Running command…", accessible: "Running command…", error: false }
+      ? { visible: t("palette.running"), accessible: t("palette.running"), error: false }
       : null;
 
   useEffect(() => {
@@ -281,12 +289,12 @@ function PaletteApp() {
         if (mounted) {
           setCommands(nextCommands);
           setBindings(nextBindings);
-          setCatalog(createPresentationCatalog(nextCommands, cachedStatuses));
+          setFeatureStatuses(cachedStatuses);
         }
         const featureStatuses = await api.refreshFeatureStatuses();
-        if (mounted) setCatalog(createPresentationCatalog(nextCommands, featureStatuses));
+        if (mounted) setFeatureStatuses(featureStatuses);
       } catch (error) {
-        if (mounted) setStatus(error.message);
+        if (mounted) setStatus(presentError(error, t));
       }
     };
     refreshCatalog();
@@ -415,7 +423,7 @@ function PaletteApp() {
     }
     if (!command.available) return;
     if (!canExecuteCommand(command)) {
-      setStatus(getFeatureWarning(command.featureStatus)?.message || "Feature is unavailable.");
+      setStatus(getFeatureWarning(command.featureStatus, t)?.message || t("status.warning.unavailable"));
       if (getRecoveryAction(command.featureStatus) === "open-settings") {
         api.openSettings(command.capability);
       }
@@ -430,7 +438,7 @@ function PaletteApp() {
       setRecentIds((current) => new Set([command.id, ...current]));
       setIsExecuting(false);
     } catch (error) {
-      setStatus(error.message);
+      setStatus(presentError(error, t));
       setIsExecuting(false);
       requestAnimationFrame(() => (mode === "search" ? searchRef.current : shellRef.current)?.focus());
     }
@@ -450,7 +458,7 @@ function PaletteApp() {
       return;
     }
     if (!canExecuteCommand(command)) {
-      setStatus(getFeatureWarning(command.featureStatus)?.message || "Feature is unavailable.");
+      setStatus(getFeatureWarning(command.featureStatus, t)?.message || t("status.warning.unavailable"));
       if (getRecoveryAction(command.featureStatus) === "open-settings") {
         api.openSettings(command.capability);
       }
@@ -476,7 +484,7 @@ function PaletteApp() {
         setIsExecuting(false);
       }
     } catch (error) {
-      setStatus(error.message);
+      setStatus(presentError(error, t));
       setIsExecuting(false);
       requestAnimationFrame(() => (mode === "search" ? searchRef.current : shellRef.current)?.focus());
     }
@@ -505,7 +513,7 @@ function PaletteApp() {
   }
 
   function failInteractionPanel() {
-    setStatus("Interaction panel is unavailable.");
+    setStatus(t("palette.panelUnavailable"));
     closeInteractionPanel();
   }
 
@@ -582,14 +590,14 @@ function PaletteApp() {
     >
       <div ref={mainSurfaceRef} className="palette-main">
         {mode === "launcher" && (
-          <section className="launcher-view" aria-label="Launcher">
-            <button type="button" className="launcher-search" onClick={() => enterSearch("")} aria-label="Search commands">
+          <section className="launcher-view" aria-label={t("palette.launcher")}>
+            <button type="button" className="launcher-search" onClick={() => enterSearch("")} aria-label={t("palette.search")}>
               <Icon name="search" size={17} />
-              <span>Search commands…</span>
+              <span>{t("palette.searchPlaceholderLauncher")}</span>
             </button>
             <div className="launcher-content">
               {launcherCommands.length > 0 ? (
-                <div className="launcher-list" role="listbox" aria-label="Commands">
+                <div className="launcher-list" role="listbox" aria-label={t("palette.commands")}>
                   {launcherSections.map(({ id, label, entries }) => (
                     <section key={id} className="command-section" aria-labelledby={`launcher-${id}`}>
                       <h2 id={`launcher-${id}`}>{label}</h2>
@@ -601,7 +609,7 @@ function PaletteApp() {
                           pinned={pinnedIds.has(command.id)}
                           selected={index === selectedIndex}
                           hovered={hoveredCommandId === command.id}
-                          accessibleDescription={getCommandAccessibleDescription(command, commands, bindings)}
+                          accessibleDescription={getCommandAccessibleDescription(command, localizedCommands, bindings, t)}
                           keycap={index + 1}
                           onHover={handleCommandHover}
                           onLeave={handleCommandLeave}
@@ -609,6 +617,7 @@ function PaletteApp() {
                           onBlur={() => {}}
                           onClick={executeInteraction}
                           onContextMenu={executeInteraction}
+                          t={t}
                         />
                       ))}
                     </section>
@@ -616,8 +625,8 @@ function PaletteApp() {
                 </div>
               ) : (
                 <div className="empty-state">
-                  <strong>No commands registered</strong>
-                  <span>Registered command metadata will appear here automatically.</span>
+                  <strong>{t("palette.noCommands")}</strong>
+                  <span>{t("palette.noCommands.detail")}</span>
                 </div>
               )}
             </div>
@@ -625,22 +634,22 @@ function PaletteApp() {
         )}
 
         {mode === "search" && (
-          <section className="search-view" aria-label="Search commands">
+          <section className="search-view" aria-label={t("palette.search")}>
             <div className="search-control">
               <Icon name="search" size={18} />
               <input
                 ref={searchRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search commands"
-                aria-label="Search commands"
+                placeholder={t("palette.searchPlaceholder")}
+                aria-label={t("palette.search")}
                 spellCheck="false"
                 autoComplete="off"
               />
               <kbd>ESC</kbd>
             </div>
-            <h2 className="list-heading">RESULTS</h2>
-            <div className="command-list" role="listbox" aria-label="Search results">
+            <h2 className="list-heading">{t("palette.results")}</h2>
+            <div className="command-list" role="listbox" aria-label={t("palette.results")}>
               {searchCommands.map((command, index) => (
                 <CommandRow
                   key={command.id}
@@ -649,19 +658,20 @@ function PaletteApp() {
                   pinned={pinnedIds.has(command.id)}
                   selected={index === selectedIndex}
                   hovered={hoveredCommandId === command.id}
-                  accessibleDescription={getCommandAccessibleDescription(command, commands, bindings)}
+                  accessibleDescription={getCommandAccessibleDescription(command, localizedCommands, bindings, t)}
                   onHover={handleCommandHover}
                   onLeave={handleCommandLeave}
                   onFocus={handleCommandFocus}
                   onBlur={() => {}}
                   onClick={executeInteraction}
                   onContextMenu={executeInteraction}
+                  t={t}
                 />
               ))}
               {searchCommands.length === 0 && (
                 <div className="empty-state">
-                  <strong>No matching commands</strong>
-                  <span>Try another command name or editing verb.</span>
+                  <strong>{t("palette.noResults")}</strong>
+                  <span>{t("palette.noResults.detail")}</span>
                 </div>
               )}
             </div>
@@ -670,17 +680,17 @@ function PaletteApp() {
 
         <div className="palette-footer-area">
           <footer className="palette-footer">
-            <button className="footer-control footer-icon" type="button" onClick={() => api.openSettings()} aria-label="Settings" title="Settings">
+            <button className="footer-control footer-icon" type="button" onClick={() => api.openSettings()} aria-label={t("palette.settings")} title={t("palette.settings")}>
               <Icon name="settings" size={16} />
             </button>
             <button
               className={selectedPinned ? "footer-control footer-icon active" : "footer-control footer-icon"}
               type="button"
               onClick={toggleSelectedPin}
-              aria-label={selectedCommand ? `${selectedPinned ? "Unpin" : "Pin"} ${selectedCommand.name}` : "Pin selected command"}
+              aria-label={selectedCommand ? t(selectedPinned ? "palette.unpin" : "palette.pin", { name: selectedCommand.name }) : t("palette.pinSelected")}
               aria-pressed={selectedPinned}
               disabled={!selectedCommand}
-              title={selectedCommand ? `${selectedPinned ? "Unpin" : "Pin"} ${selectedCommand.name}` : "Pin selected command"}
+              title={selectedCommand ? t(selectedPinned ? "palette.unpin" : "palette.pin", { name: selectedCommand.name }) : t("palette.pinSelected")}
             >
               <Icon name="pin" size={15} />
             </button>
@@ -690,11 +700,11 @@ function PaletteApp() {
                 className={interactionPanelOpen ? "footer-control footer-icon footer-info active" : "footer-control footer-icon footer-info"}
                 type="button"
                 onClick={toggleInteractionPanel}
-                aria-label={interactionPanelOpen ? "Close interaction info" : "Open interaction info"}
+                aria-label={interactionPanelOpen ? t("palette.closeInfo") : t("palette.openInfo")}
                 aria-controls="interaction-panel"
                 aria-expanded={interactionPanelOpen}
                 aria-pressed={interactionPanelOpen}
-                title={interactionPanelOpen ? "Close command information" : "Command information"}
+                title={interactionPanelOpen ? t("palette.closeInfo") : t("palette.commandInfo")}
               >
                 <Icon name="info" size={16} />
               </button>
@@ -711,10 +721,10 @@ function PaletteApp() {
           style={{
             "--interaction-panel-top": `${interactionPanelGeometry?.panelTop ?? 8}px`
           }}
-          aria-label="Command information"
+          aria-label={t("interaction.ariaLabel")}
           tabIndex={-1}
         >
-          <InteractionPanelContent presentation={interactionPresentation} previewNote={browserPreview} />
+          <InteractionPanelContent presentation={interactionPresentation} previewNote={browserPreview ? t("interaction.preview") : null} />
         </section>
       )}
 

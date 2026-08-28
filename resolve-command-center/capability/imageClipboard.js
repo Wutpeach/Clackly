@@ -202,6 +202,13 @@ function createImageClipboardCapability({
       version: "1.0.0",
       type: "command",
       providers: ["electron-host", "resolve-api"],
+      localizations: {
+        "zh-CN": {
+          name: "粘贴剪贴板图像",
+          description: "保存剪贴板图像并导入 Resolve",
+          category: "媒体"
+        }
+      },
       configSchema: {}
     },
     execute,

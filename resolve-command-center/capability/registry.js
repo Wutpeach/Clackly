@@ -65,6 +65,8 @@ function createCapabilityRegistry() {
       }
     }
 
+    validateMetadataLocalizations(metadata);
+
     schemaValidator.validateSchema(metadata.configSchema);
 
     if (metadata.id !== capabilityId) {
@@ -97,6 +99,48 @@ function createCapabilityRegistry() {
   }
 
   return { register, get, getMetadata, getAllCapabilities };
+}
+
+function validateMetadataLocalizations(metadata) {
+  if (metadata.localizations !== undefined) {
+    if (!isPlainObject(metadata.localizations)) {
+      throw new TypeError("Capability metadata localizations must be an object");
+    }
+    for (const [locale, overlay] of Object.entries(metadata.localizations)) {
+      if (!locale.trim() || !isPlainObject(overlay)) {
+        throw new TypeError("Capability metadata localization must be an object");
+      }
+      for (const field of ["name", "description", "category"]) {
+        if (overlay[field] !== undefined && (typeof overlay[field] !== "string" || !overlay[field].trim())) {
+          throw new TypeError(`Capability metadata localization ${locale} has an invalid ${field}`);
+        }
+      }
+    }
+  }
+  for (const [key, field] of Object.entries(metadata.configSchema || {})) {
+    if (!isPlainObject(field)) continue;
+    if (field.optionLabels !== undefined && !isNonEmptyStringMap(field.optionLabels)) {
+      throw new TypeError(`Config schema field ${key} optionLabels must be an object of non-empty strings`);
+    }
+    if (field.localizations === undefined) continue;
+    if (!isPlainObject(field.localizations)) {
+      throw new TypeError(`Config schema field ${key} localizations must be an object`);
+    }
+    for (const [locale, overlay] of Object.entries(field.localizations)) {
+      if (!locale.trim() || !isPlainObject(overlay)
+        || (overlay.label !== undefined && (typeof overlay.label !== "string" || !overlay.label.trim()))
+        || (overlay.optionLabels !== undefined && !isNonEmptyStringMap(overlay.optionLabels))) {
+      throw new TypeError(`Config schema field ${key} localization ${locale} is invalid`);
+      }
+    }
+  }
+}
+
+function isNonEmptyStringMap(value) {
+  return isPlainObject(value) && Object.entries(value).every(([key, label]) => (
+    typeof key === "string" && key.trim().length > 0
+    && typeof label === "string" && label.trim().length > 0
+  ));
 }
 
 module.exports = { createCapabilityRegistry };

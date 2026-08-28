@@ -6,7 +6,8 @@
     "category": "Export",
     "icon": "send",
     "keywords": ["after effects", "ae", "export", "timeline"],
-    "capability": "ae.export"
+    "capability": "ae.export",
+    "localizations": { "zh-CN": { "name": "导出到 After Effects", "description": "将当前 Resolve 选择自动发送到 After Effects", "category": "导出", "keywords": ["导出", "After Effects", "AE", "时间线"] } }
   },
   {
     "id": "timeline.exportAudioToAfterEffects",
@@ -16,7 +17,8 @@
     "icon": "send",
     "keywords": ["after effects", "ae", "export", "audio"],
     "capability": "ae.export",
-    "presentation": "internal"
+    "presentation": "internal",
+    "localizations": { "zh-CN": { "name": "导出音频到 After Effects", "description": "将当前 Resolve 音频选择发送到 After Effects", "category": "导出", "keywords": ["导出", "音频", "After Effects", "AE"] } }
   },
   {
     "id": "timeline.exportVideoToAfterEffects",
@@ -26,7 +28,8 @@
     "icon": "send",
     "keywords": ["after effects", "ae", "export", "video"],
     "capability": "ae.export",
-    "presentation": "internal"
+    "presentation": "internal",
+    "localizations": { "zh-CN": { "name": "导出视频到 After Effects", "description": "将当前 Resolve 视频选择发送到 After Effects", "category": "导出", "keywords": ["导出", "视频", "After Effects", "AE"] } }
   },
   {
     "id": "timeline.exportCurrentToAfterEffects",
@@ -36,7 +39,8 @@
     "icon": "send",
     "keywords": ["after effects", "ae", "export", "playhead", "clip"],
     "capability": "ae.export",
-    "presentation": "internal"
+    "presentation": "internal",
+    "localizations": { "zh-CN": { "name": "导出播放头片段到 After Effects", "description": "将播放头下方最上层片段及其音频发送到 After Effects", "category": "导出", "keywords": ["导出", "播放头", "片段", "After Effects", "AE"] } }
   },
   {
     "id": "timeline.exportBlueRangeToAfterEffects",
@@ -46,7 +50,8 @@
     "icon": "send",
     "keywords": ["after effects", "ae", "export", "blue", "marker", "range", "video"],
     "capability": "ae.export",
-    "presentation": "internal"
+    "presentation": "internal",
+    "localizations": { "zh-CN": { "name": "导出蓝色标记范围视频到 After Effects", "description": "将蓝色标记范围内的视频发送到 After Effects", "category": "导出", "keywords": ["导出", "蓝色", "标记", "范围", "视频", "After Effects", "AE"] } }
   },
   {
     "id": "timeline.exportCyanRangeToAfterEffects",
@@ -56,6 +61,7 @@
     "icon": "send",
     "keywords": ["after effects", "ae", "export", "blue", "marker", "range", "audio"],
     "capability": "ae.export",
-    "presentation": "internal"
+    "presentation": "internal",
+    "localizations": { "zh-CN": { "name": "导出蓝色标记范围音视频到 After Effects", "description": "将蓝色标记范围内的视频和音频发送到 After Effects", "category": "导出", "keywords": ["导出", "蓝色", "标记", "范围", "音频", "After Effects", "AE"] } }
   }
 ]

@@ -1,5 +1,5 @@
 const path = require("node:path");
-const { app, clipboard, dialog, ipcMain } = require("electron");
+const { app, BrowserWindow, clipboard, dialog, ipcMain } = require("electron");
 const {
   createPaletteWindow,
   createDetachedInteractionPanelWindow,
@@ -26,6 +26,9 @@ const { InteractionManager } = require("../interaction/InteractionManager");
 const { createResolveAdapter } = require("../resolve/adapter");
 const { registerFeatureUiIpc } = require("../feature-ui/registerIpc");
 const { createClacklyCore } = require("../app/createClacklyCore");
+const { getElectronSystemLanguages } = require("../localization/LocalizationService");
+const { registerLocalizationIpc } = require("../localization/registerIpc");
+const { translate } = require("../localization/resources");
 const { createClipboardImageReader } = require("../electron/main/clipboard");
 
 const PLUGIN_ID = "com.wutpeach.clackly";
@@ -123,6 +126,7 @@ const core = createClacklyCore({
   appRoot,
   appDataPath: app.getPath("appData"),
   temporaryRoot: app.getPath("temp"),
+  systemLanguagesProvider: () => getElectronSystemLanguages(app),
   hostContextProvider: async () => {
     const resolve = await getResolve();
     const version = typeof resolve.GetVersionString === "function"
@@ -192,7 +196,9 @@ function createWorkflowPaletteWindow() {
 
 function openSettings(featureId) {
   const previousWindow = settingsWindow;
-  settingsWindow = openSettingsWindow(settingsWindow, featureId);
+  settingsWindow = openSettingsWindow(settingsWindow, featureId, {
+    title: translate(core.localizationService.getSnapshot().effectiveLocale, "settings.title")
+  });
   if (settingsWindow !== previousWindow) {
     const openedWindow = settingsWindow;
     openedWindow.once("closed", () => {
@@ -230,6 +236,13 @@ function registerIpcHandlers() {
     return result;
   });
   ipcMain.on("palette:hide", hidePalette);
+  registerLocalizationIpc({
+    ipcMain,
+    localizationService: core.localizationService,
+    getWindows: () => BrowserWindow.getAllWindows().filter((window) => (
+      window !== nativeDualWindowHost?.getInteractionPanelWindow()
+    ))
+  });
   registerInteractionPanelIpc(ipcMain, () => paletteWindow, nativeDualWindowHost
     ? {
       open: (request) => nativeDualWindowHost.openInteractionPanel(request),
@@ -250,16 +263,13 @@ function registerIpcHandlers() {
 
 function handleHotkeyRegistrationFailure() {
   const accelerator = getPaletteAccelerator();
+  const t = (key, params) => translate(core.localizationService.getSnapshot().effectiveLocale, key, params);
   showPalette();
   dialog.showMessageBox({
     type: "warning",
-    title: "Clackly",
-    message: `Clackly could not register ${accelerator}.`,
-    detail: [
-      "Another process is already using the global shortcut.",
-      "Close any old Clackly npm start, Utility script, or Electron dev process, then reload Clackly from Resolve.",
-      "You can also set RESOLVE_COMMAND_CENTER_HOTKEY before launching Resolve to test another shortcut."
-    ].join(" ")
+    title: t("native.hotkey.title"),
+    message: t("native.hotkey.message", { accelerator }),
+    detail: t("native.hotkey.detail")
   }).finally(() => {
     showPalette();
   });
@@ -296,7 +306,9 @@ if (!hasSingleInstanceLock) {
     try {
       await initializeWorkflowIntegration();
     } catch (error) {
-      dialog.showErrorBox("Clackly", error.message);
+      console.error(error);
+      const locale = core.localizationService.getSnapshot().effectiveLocale;
+      dialog.showErrorBox(translate(locale, "app.title"), translate(locale, "error.generic"));
     }
 
     paletteWindow = composeStartup({
@@ -304,7 +316,11 @@ if (!hasSingleInstanceLock) {
       createPaletteWindow: createWorkflowPaletteWindow,
       registerIpcHandlers,
       registerPaletteHotkey: () => registerPaletteHotkey(togglePalette),
-      reportInitializationError: (error) => dialog.showErrorBox("Clackly", error.message),
+      reportInitializationError: (error) => {
+        console.error(error);
+        const locale = core.localizationService.getSnapshot().effectiveLocale;
+        dialog.showErrorBox(translate(locale, "app.title"), translate(locale, "error.generic"));
+      },
       handleHotkeyRegistrationFailure
     }).paletteWindow;
   });

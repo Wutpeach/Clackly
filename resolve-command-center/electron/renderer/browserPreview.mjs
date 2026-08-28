@@ -9,7 +9,8 @@ const BROWSER_PREVIEW_COMMANDS = [
     icon: "palette",
     keywords: ["preview", "color", "grade"],
     capability: "preview.palette",
-    presentation: "visible"
+    presentation: "visible",
+    localizations: { "zh-CN": { name: "预览调色", description: "仅在浏览器预览中显示的示例命令。", category: "预览", keywords: ["预览", "调色"] } }
   },
   {
     id: "preview.secondary",
@@ -19,7 +20,8 @@ const BROWSER_PREVIEW_COMMANDS = [
     icon: "search",
     keywords: ["preview", "timeline"],
     capability: "preview.palette",
-    presentation: "visible"
+    presentation: "visible",
+    localizations: { "zh-CN": { name: "预览时间线", description: "浏览器预览中的第二个示例命令。", category: "预览", keywords: ["预览", "时间线"] } }
   },
   {
     id: "preview.inspect",
@@ -29,7 +31,8 @@ const BROWSER_PREVIEW_COMMANDS = [
     icon: "info",
     keywords: ["preview", "inspect"],
     capability: "preview.palette",
-    presentation: "internal"
+    presentation: "internal",
+    localizations: { "zh-CN": { name: "检查预览详情", description: "显示示例检查详情。", category: "预览", keywords: ["预览", "检查"] } }
   },
   {
     id: "preview.adjust",
@@ -39,7 +42,8 @@ const BROWSER_PREVIEW_COMMANDS = [
     icon: "settings",
     keywords: ["preview", "adjust"],
     capability: "preview.palette",
-    presentation: "internal"
+    presentation: "internal",
+    localizations: { "zh-CN": { name: "调整预览设置", description: "打开示例预览调整。", category: "预览", keywords: ["预览", "调整"] } }
   }
 ];
 
@@ -103,7 +107,26 @@ function getPreviewPanelGeometry({ anchorY, contentHeight }) {
  * not imported by command registry, preload, IPC, or Resolve capability code.
  */
 export function createBrowserPreviewApi() {
+  const requestedLocale = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("locale");
+  let preference = ["system", "en", "zh-CN"].includes(requestedLocale) ? requestedLocale : "en";
+  const listeners = new Set();
+  const resolveEffectiveLocale = () => {
+    const languages = typeof navigator === "undefined"
+      ? []
+      : (Array.isArray(navigator.languages) ? navigator.languages : [navigator.language]);
+    if (preference === "en" || preference === "zh-CN") return preference;
+    return languages.some((language) => /^(zh-cn|zh-sg)|(?:^|-)hans(?:-|$)/i.test(language || "")) ? "zh-CN" : "en";
+  };
+  const getSnapshot = () => ({ preference, effectiveLocale: resolveEffectiveLocale() });
   return {
+    getLocalizationSnapshot: async () => getSnapshot(),
+    setLocalePreference: async (locale) => {
+      if (!["system", "en", "zh-CN"].includes(locale)) throw new TypeError("Invalid locale preference");
+      preference = locale;
+      const snapshot = getSnapshot();
+      listeners.forEach((listener) => listener(snapshot));
+      return snapshot;
+    },
     listCommands: async () => clone(BROWSER_PREVIEW_COMMANDS),
     listInteractionBindings: async () => clone(BROWSER_PREVIEW_BINDINGS),
     executeCommand: async () => { throw new Error(PREVIEW_EXECUTION_ERROR); },
@@ -124,6 +147,10 @@ export function createBrowserPreviewApi() {
     onPaletteShown: (callback) => {
       const frame = requestAnimationFrame(callback);
       return () => cancelAnimationFrame(frame);
+    },
+    onLocalizationChanged: (callback) => {
+      listeners.add(callback);
+      return () => listeners.delete(callback);
     },
     onSettingsFeatureSelected: () => () => {}
   };

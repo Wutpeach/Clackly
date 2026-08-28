@@ -14,6 +14,10 @@ function createNativeDualWindowHost({
     return paletteWindow;
   }
 
+  function getInteractionPanelWindow() {
+    return detachedInteractionPanelWindow;
+  }
+
   function ensureDetachedInteractionPanelWindow() {
     if (!detachedInteractionPanelWindow || detachedInteractionPanelWindow.isDestroyed()) {
       detachedInteractionPanelWindow = createDetachedInteractionPanelWindow();
@@ -61,6 +65,7 @@ function createNativeDualWindowHost({
 
   return {
     getPaletteWindow,
+    getInteractionPanelWindow,
     createWindow,
     showPalette,
     hidePalette,

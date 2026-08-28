@@ -20,6 +20,8 @@ if (isDetachedInteractionPanel) {
 } else {
   contextBridge.exposeInMainWorld("resolveCommandCenter", {
   listCommands: () => ipcRenderer.invoke("commands:list"),
+  getLocalizationSnapshot: () => ipcRenderer.invoke("localization:get-snapshot"),
+  setLocalePreference: (locale) => ipcRenderer.invoke("preferences:set-locale", locale),
   searchCommands: (query) => ipcRenderer.invoke("commands:search", query),
   executeCommand: (commandId) => ipcRenderer.invoke("commands:execute", commandId),
   executeInteraction: (event) => ipcRenderer.invoke("interactions:execute", event),
@@ -43,6 +45,11 @@ if (isDetachedInteractionPanel) {
     const listener = () => callback();
     ipcRenderer.on("palette:shown", listener);
     return () => ipcRenderer.removeListener("palette:shown", listener);
+  },
+  onLocalizationChanged: (callback) => {
+    const listener = (_event, snapshot) => callback(snapshot);
+    ipcRenderer.on("localization:changed", listener);
+    return () => ipcRenderer.removeListener("localization:changed", listener);
   },
   onSettingsFeatureSelected: (callback) => {
     const listener = (_event, featureId) => callback(featureId);

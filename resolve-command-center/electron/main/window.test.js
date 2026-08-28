@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const { translate } = require("../../localization/resources");
 
 const {
   PALETTE_SHADOW_PADDING,
@@ -286,7 +287,7 @@ test("D7 Interaction Panel IPC delegates only its bounded request to the detache
   const received = [];
   const request = {
     metrics: { anchorY: 160, contentHeight: 100 },
-    presentation: { kind: "description", description: "Inspect the selected Command." }
+    presentation: { kind: "description", effectiveLocale: "en", ariaLabel: "Command information", description: "Inspect the selected Command." }
   };
   registerInteractionPanelIpc({
     handle: (name, handler) => handlers.set(name, handler),
@@ -632,7 +633,7 @@ test("D7 Info requested before detached renderer readiness fails closed without 
 
   assert.equal(openDetachedInteractionPanel(main, panel, {
     metrics: { anchorY: 160, contentHeight: 100 },
-    presentation: { kind: "description", description: "Inspect the selected Command." }
+    presentation: { kind: "description", effectiveLocale: "en", ariaLabel: "Command information", description: "Inspect the selected Command." }
   }), null);
   assert.deepEqual(main.getBounds(), originalMainBounds);
   assert.deepEqual(mainCalls, []);
@@ -643,25 +644,32 @@ test("D7 Info requested before detached renderer readiness fails closed without 
 test("D7 accepts only a bounded read-only presentation snapshot and clamps its two-window composition", () => {
   const mappings = {
     kind: "mappings",
+    effectiveLocale: "en",
+    ariaLabel: "Command information",
     rows: [
-      { label: "Ctrl + Left Click", actionName: "Add Marker" },
-      { label: "Right Click", actionName: "Edit Marker" }
+      { label: "Ctrl + Left Click", actionName: "Add Marker", ariaLabel: "Ctrl + Left Click: Add Marker" },
+      { label: "Right Click", actionName: "Edit Marker", ariaLabel: "Right Click: Edit Marker" }
     ]
   };
   assert.deepEqual(normalizeDetachedInteractionPanelPresentation(mappings), mappings);
   assert.deepEqual(normalizeDetachedInteractionPanelPresentation({
     kind: "description",
+    effectiveLocale: "en",
+    ariaLabel: "Command information",
     description: "Open the selected Command's details."
   }), {
     kind: "description",
+    effectiveLocale: "en",
+    ariaLabel: "Command information",
     description: "Open the selected Command's details."
   });
   assert.equal(normalizeDetachedInteractionPanelPresentation({ ...mappings, commandId: "timeline.addMarker" }), null);
   assert.equal(normalizeDetachedInteractionPanelPresentation({
     kind: "mappings",
-    rows: [{ label: "<button>", actionName: "Run" }, { label: "Ctrl", actionName: "Run again" }]
+    effectiveLocale: "en", ariaLabel: "Command information",
+    rows: [{ label: "<button>", actionName: "Run", ariaLabel: "bad" }, { label: "Ctrl", actionName: "Run again", ariaLabel: "bad" }]
   }), null);
-  assert.equal(normalizeDetachedInteractionPanelPresentation({ kind: "description", description: "<img src=x>" }), null);
+  assert.equal(normalizeDetachedInteractionPanelPresentation({ kind: "description", effectiveLocale: "en", ariaLabel: "Command information", description: "<img src=x>" }), null);
   assert.equal(normalizeDetachedInteractionPanelRequest({
     metrics: { anchorY: 160, contentHeight: 90 },
     presentation: mappings,
@@ -698,13 +706,16 @@ test("D7 readiness has no native visibility transition, then opens, updates, and
   const originalMainBounds = { x: 1700, y: 100, width: 240, height: 320 };
   const main = createAttachedPaletteWindow(mainCalls, originalMainBounds);
   const panel = createDetachedPanelWindow(panelCalls);
+  const originalPanel = panel;
   const request = {
     metrics: { anchorY: 80, contentHeight: 155 },
     presentation: {
       kind: "mappings",
+      effectiveLocale: "en",
+      ariaLabel: "Command information",
       rows: [
-        { label: "Ctrl + Click", actionName: "Add Marker" },
-        { label: "Right Click", actionName: "Edit Marker" }
+        { label: "Ctrl + Click", actionName: "Add Marker", ariaLabel: "Ctrl + Click: Add Marker" },
+        { label: "Right Click", actionName: "Edit Marker", ariaLabel: "Right Click: Edit Marker" }
       ]
     }
   };
@@ -745,6 +756,54 @@ test("D7 readiness has no native visibility transition, then opens, updates, and
 
   mainCalls.length = 0;
   panelCalls.length = 0;
+  const chineseRevision = {
+    ...request,
+    presentation: {
+      kind: "mappings",
+      effectiveLocale: "zh-CN",
+      ariaLabel: "命令信息",
+      rows: [
+        { label: "Ctrl + 单击", actionName: "添加标记", ariaLabel: "Ctrl + 单击：添加标记" },
+        { label: "右键单击", actionName: "编辑标记", ariaLabel: "右键单击：编辑标记" }
+      ]
+    }
+  };
+  assert.ok(openDetachedInteractionPanel(main, panel, chineseRevision, { screen: screenApi }));
+  assert.equal(mainCalls.some(([name]) => name === "setBounds"), false, "locale revision keeps the same D6 bounds");
+  assert.equal(panelCalls.some(([name, value]) => name === "setOpacity" && value === 0), false, "locale revision never closes D7");
+  assert.deepEqual(panelCalls.filter(([name]) => name === "send"), [["send", "interaction-panel:presentation", chineseRevision.presentation]]);
+  assert.equal(panelCalls.some(([name]) => name === "setFocusable"), false, "D7 remains a read-only nonfocusable sink");
+  assert.equal(panel, originalPanel, "locale revision reuses the already-created D7 Panel object");
+  assert.equal(panelCalls.some(([name, value]) => (
+    ["close", "destroy", "show", "hide", "recreate"].includes(name)
+    || (name === "setOpacity" && value === 0)
+  )), false, "locale revision has no close/reopen/recreate/show/hide/opacity-zero transition");
+
+  mainCalls.length = 0;
+  panelCalls.length = 0;
+  const englishReturnRevision = {
+    ...request,
+    presentation: {
+      kind: "mappings",
+      effectiveLocale: "en",
+      ariaLabel: "Command information",
+      rows: [
+        { label: "Ctrl + Click", actionName: "Add Marker", ariaLabel: "Ctrl + Click: Add Marker" },
+        { label: "Right Click", actionName: "Edit Marker", ariaLabel: "Right Click: Edit Marker" }
+      ]
+    }
+  };
+  assert.ok(openDetachedInteractionPanel(main, panel, englishReturnRevision, { screen: screenApi }));
+  assert.equal(panel, originalPanel, "zh-CN -> en reuses the same D7 Panel object");
+  assert.equal(mainCalls.some(([name]) => name === "setBounds"), false, "return locale revision keeps D6 bounds");
+  assert.deepEqual(panelCalls.filter(([name]) => name === "send"), [["send", "interaction-panel:presentation", englishReturnRevision.presentation]]);
+  assert.equal(panelCalls.some(([name, value]) => (
+    ["close", "destroy", "show", "hide", "recreate"].includes(name)
+    || (name === "setOpacity" && value === 0)
+  )), false, "en -> zh-CN -> en has no D7 lifecycle transition");
+
+  mainCalls.length = 0;
+  panelCalls.length = 0;
   assert.equal(closeDetachedInteractionPanel(main, panel), true);
   assert.deepEqual(mainCalls, [
     ["setBounds", originalMainBounds]
@@ -781,7 +840,7 @@ test("D7 restores main focus only for an active Panel close that explicitly need
   const panel = createDetachedPanelWindow(panelCalls);
   const request = {
     metrics: { anchorY: 160, contentHeight: 100 },
-    presentation: { kind: "description", description: "Inspect the selected Command." }
+    presentation: { kind: "description", effectiveLocale: "en", ariaLabel: "Command information", description: "Inspect the selected Command." }
   };
   const options = {
     screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) }
@@ -868,7 +927,7 @@ test("D7 fails closed when detached presentation delivery fails and restores the
 
   assert.equal(openDetachedInteractionPanel(main, panel, {
     metrics: { anchorY: 80, contentHeight: 155 },
-    presentation: { kind: "description", description: "Inspect the current Command." }
+    presentation: { kind: "description", effectiveLocale: "en", ariaLabel: "Command information", description: "Inspect the current Command." }
   }, {
     screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) }
   }), null);
@@ -1321,6 +1380,10 @@ test("preload exposes bounded Interaction Panel intent without a renderer bounds
   assert.match(preload, /resolveCommandCenterPanel/);
   assert.match(preload, /onPresentation: \(callback\)/);
   assert.match(preload, /interaction-panel:presentation/);
+  assert.match(palettePreload, /getLocalizationSnapshot/);
+  assert.match(palettePreload, /setLocalePreference/);
+  assert.match(palettePreload, /onLocalizationChanged/);
+  assert.doesNotMatch(detachedPreload, /getLocalizationSnapshot|setLocalePreference|onLocalizationChanged/);
   assert.doesNotMatch(detachedPreload, /executeCommand|executeInteraction|listCommands|openSettings/);
   assert.match(palettePreload, /executeCommand/);
   assert.doesNotMatch(app, /setPaletteMode/);
@@ -1415,7 +1478,7 @@ test("settings window uses the complete Electron 36 fixed frameless contract", (
       alwaysOnTop: false,
       autoHideMenuBar: true,
       backgroundColor: "#00000000",
-      title: "Clackly Settings",
+      title: translate("en", "settings.title"),
       webPreferences: {
         preload: path.join(__dirname, "preload.js"),
         contextIsolation: true,

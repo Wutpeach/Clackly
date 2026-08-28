@@ -1,6 +1,7 @@
 const path = require("node:path");
 const { BrowserWindow, screen } = require("electron");
 const paletteGeometry = require("../shared/palette-geometry.json");
+const { translate } = require("../../localization/resources");
 const {
   PALETTE_SURFACE,
   PALETTE_INTERACTION_MODE
@@ -353,20 +354,21 @@ function isBoundedPresentationText(value, maximumLength) {
 function normalizeDetachedInteractionPanelPresentation(presentation) {
   if (!presentation || typeof presentation !== "object" || Array.isArray(presentation)) return null;
   if (presentation.kind === "mappings") {
-    if (!hasExactKeys(presentation, ["kind", "rows"]) || !Array.isArray(presentation.rows)) return null;
+    if (!hasExactKeys(presentation, ["kind", "effectiveLocale", "ariaLabel", "rows"]) || !Array.isArray(presentation.rows)
+      || !["en", "zh-CN"].includes(presentation.effectiveLocale) || !isBoundedPresentationText(presentation.ariaLabel, 240)) return null;
     if (presentation.rows.length < 2 || presentation.rows.length > 16) return null;
     const rows = [];
     for (const row of presentation.rows) {
-      if (!row || typeof row !== "object" || Array.isArray(row) || !hasExactKeys(row, ["label", "actionName"])) return null;
-      if (!isBoundedPresentationText(row.label, 80) || !isBoundedPresentationText(row.actionName, 240)) return null;
-      rows.push({ label: row.label, actionName: row.actionName });
+      if (!row || typeof row !== "object" || Array.isArray(row) || !hasExactKeys(row, ["label", "actionName", "ariaLabel"])) return null;
+      if (!isBoundedPresentationText(row.label, 80) || !isBoundedPresentationText(row.actionName, 240) || !isBoundedPresentationText(row.ariaLabel, 320)) return null;
+      rows.push({ label: row.label, actionName: row.actionName, ariaLabel: row.ariaLabel });
     }
-    return { kind: "mappings", rows };
+    return { kind: "mappings", effectiveLocale: presentation.effectiveLocale, ariaLabel: presentation.ariaLabel, rows };
   }
   if (presentation.kind === "description") {
-    if (!hasExactKeys(presentation, ["kind", "description"])) return null;
-    if (!isBoundedPresentationText(presentation.description, 640)) return null;
-    return { kind: "description", description: presentation.description };
+    if (!hasExactKeys(presentation, ["kind", "effectiveLocale", "ariaLabel", "description"])) return null;
+    if (!["en", "zh-CN"].includes(presentation.effectiveLocale) || !isBoundedPresentationText(presentation.ariaLabel, 240) || !isBoundedPresentationText(presentation.description, 640)) return null;
+    return { kind: "description", effectiveLocale: presentation.effectiveLocale, ariaLabel: presentation.ariaLabel, description: presentation.description };
   }
   return null;
 }
@@ -528,7 +530,10 @@ function openDetachedInteractionPanel(mainWindow, panelWindow, request, options 
   }
 }
 
-function createSettingsWindow(BrowserWindowType = BrowserWindow) {
+function createSettingsWindow(
+  BrowserWindowType = BrowserWindow,
+  { title = translate("en", "settings.title") } = {}
+) {
   const window = new BrowserWindowType({
     width: SETTINGS_SIZE.width,
     height: SETTINGS_SIZE.height,
@@ -544,7 +549,7 @@ function createSettingsWindow(BrowserWindowType = BrowserWindow) {
     alwaysOnTop: false,
     autoHideMenuBar: true,
     backgroundColor: "#00000000",
-    title: "Clackly Settings",
+    title,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -558,9 +563,9 @@ function createSettingsWindow(BrowserWindowType = BrowserWindow) {
   return window;
 }
 
-function openSettingsWindow(window, featureId) {
+function openSettingsWindow(window, featureId, options) {
   const created = !window || window.isDestroyed();
-  const settingsWindow = created ? createSettingsWindow() : window;
+  const settingsWindow = created ? createSettingsWindow(BrowserWindow, options) : window;
   if (typeof featureId === "string" && featureId.trim()) {
     const selectFeature = () => settingsWindow.webContents.send("settings:select-feature", featureId);
     if (created) settingsWindow.once("ready-to-show", selectFeature);

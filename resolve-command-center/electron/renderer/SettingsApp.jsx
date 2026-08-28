@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import logoUrl from "./assets/clackly-logo.svg";
 import SettingsRenderer from "./SettingsRenderer.jsx";
+import { useLocalization } from "./LocalizationContext.jsx";
+import { localizeCommands, localizeFeatureMetadata, presentError } from "../../localization/presentation.mjs";
 import {
   getFeatureWarning,
   getInteractionHelpCommands,
@@ -16,17 +18,17 @@ function mergeStatuses(current, next) {
   return [...byId.values()];
 }
 
-function SettingsTitlebar({ api, Icon }) {
+function SettingsTitlebar({ api, Icon, t }) {
   return (
     <header className="settings-titlebar">
       <div className="settings-titlebar-drag">
         <span className="settings-titlebar-brand"><img src={logoUrl} alt="Clackly" /></span>
-        <span className="settings-titlebar-label">Settings</span>
+        <span className="settings-titlebar-label">{t("settings.label")}</span>
       </div>
       <button
         className="settings-titlebar-close"
         type="button"
-        aria-label="Close Settings"
+        aria-label={t("settings.close")}
         onClick={api.closeSettings}
       >
         <Icon name="close" size={18} />
@@ -36,6 +38,7 @@ function SettingsTitlebar({ api, Icon }) {
 }
 
 function SettingsApp({ api, Icon }) {
+  const { effectiveLocale, preference, setLocalePreference, t } = useLocalization();
   const [features, setFeatures] = useState([]);
   const [featureStatuses, setFeatureStatuses] = useState([]);
   const [commands, setCommands] = useState([]);
@@ -47,22 +50,27 @@ function SettingsApp({ api, Icon }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null);
 
-  const visibleFeatures = useMemo(() => joinFeatureStatuses(features, featureStatuses)
-    .filter(({ featureStatus }) => isFeatureVisible(featureStatus)), [features, featureStatuses]);
+  const localizedFeatures = useMemo(
+    () => features.map((feature) => localizeFeatureMetadata(feature, effectiveLocale)),
+    [features, effectiveLocale]
+  );
+  const localizedCommands = useMemo(() => localizeCommands(commands, effectiveLocale), [commands, effectiveLocale]);
+  const visibleFeatures = useMemo(() => joinFeatureStatuses(localizedFeatures, featureStatuses)
+    .filter(({ featureStatus }) => isFeatureVisible(featureStatus)), [localizedFeatures, featureStatuses]);
   const selectedFeature = visibleFeatures.find(({ id }) => id === selectedId) || null;
   const selectedFeatureStatus = selectedFeature?.featureStatus || null;
-  const selectedWarning = getFeatureWarning(selectedFeatureStatus);
+  const selectedWarning = getFeatureWarning(selectedFeatureStatus, t);
   const groupedFeatures = useMemo(() => groupFeaturesByCategory(visibleFeatures), [visibleFeatures]);
-  const helpCommands = useMemo(() => getInteractionHelpCommands(commands, selectedId, bindings), [
+  const helpCommands = useMemo(() => getInteractionHelpCommands(localizedCommands, selectedId, bindings, t), [
     bindings,
-    commands,
-    selectedId
+    localizedCommands,
+    selectedId,
+    t
   ]);
   const hasSchema = Boolean(selectedFeature && Object.keys(selectedFeature.configSchema).length);
   const hasSavedValues = Object.keys(savedValues).length > 0;
 
   useEffect(() => {
-    document.title = "Clackly Settings";
     let active = true;
     Promise.all([
       api.listFeatures(),
@@ -76,35 +84,42 @@ function SettingsApp({ api, Icon }) {
         setCommands(nextCommands);
         setBindings(nextBindings);
         setFeatureStatuses(nextStatuses);
-        setSelectedId((current) => nextFeatures.some(({ id }) => id === current)
+        setSelectedId((current) => current === "general" || nextFeatures.some(({ id }) => id === current)
           ? current
-          : nextFeatures[0]?.id || "");
+          : "general");
         return api.refreshFeatureStatuses();
       })
       .then((nextStatuses) => {
         if (active && nextStatuses) setFeatureStatuses(nextStatuses);
       })
       .catch((error) => {
-        if (active) setStatus({ kind: "error", message: error.message });
+        if (active) setStatus({ kind: "error", message: presentError(error, t) });
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setSelectedId((current) => current || "general");
+          setLoading(false);
+        }
       });
     return () => { active = false; };
   }, [api]);
+
+  useEffect(() => {
+    document.title = t("settings.title");
+  }, [t]);
 
   useEffect(() => api.onSettingsFeatureSelected((featureId) => {
     if (typeof featureId === "string") setSelectedId(featureId);
   }), [api]);
 
   useEffect(() => {
-    if (visibleFeatures.length > 0 && !visibleFeatures.some(({ id }) => id === selectedId)) {
-      setSelectedId(visibleFeatures[0].id);
+    if (selectedId !== "general" && visibleFeatures.length > 0 && !visibleFeatures.some(({ id }) => id === selectedId)) {
+      setSelectedId("general");
     }
   }, [selectedId, visibleFeatures]);
 
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId || selectedId === "general") return;
     let active = true;
     setBusy(true);
     setStatus(null);
@@ -117,7 +132,7 @@ function SettingsApp({ api, Icon }) {
         setDraftValues(values);
       })
       .catch((error) => {
-        if (active) setStatus({ kind: "error", message: error.message });
+        if (active) setStatus({ kind: "error", message: presentError(error, t) });
       })
       .finally(() => {
         if (active) setBusy(false);
@@ -138,10 +153,10 @@ function SettingsApp({ api, Icon }) {
   async function pickPath(type) {
     try {
       const picked = await api.pickPath(type);
-      if (picked === null) setStatus({ kind: "neutral", message: "Selection cancelled." });
+      if (picked === null) setStatus({ kind: "neutral", message: t("settings.selectionCancelled") });
       return picked;
     } catch (error) {
-      setStatus({ kind: "error", message: error.message });
+      setStatus({ kind: "error", message: presentError(error, t) });
       return null;
     }
   }
@@ -156,9 +171,9 @@ function SettingsApp({ api, Icon }) {
       setDraftValues(values);
       const nextStatus = await api.refreshFeatureStatuses(selectedFeature.id);
       setFeatureStatuses((current) => mergeStatuses(current, nextStatus));
-      setStatus({ kind: "success", message: "Settings saved." });
+      setStatus({ kind: "success", message: t("settings.saved") });
     } catch (error) {
-      setStatus({ kind: "error", message: error.message });
+      setStatus({ kind: "error", message: presentError(error, t) });
     } finally {
       setBusy(false);
     }
@@ -174,9 +189,9 @@ function SettingsApp({ api, Icon }) {
       setDraftValues(values);
       const nextStatus = await api.refreshFeatureStatuses(selectedFeature.id);
       setFeatureStatuses((current) => mergeStatuses(current, nextStatus));
-      setStatus({ kind: "success", message: "Settings reset." });
+      setStatus({ kind: "success", message: t("settings.reset") });
     } catch (error) {
-      setStatus({ kind: "error", message: error.message });
+      setStatus({ kind: "error", message: presentError(error, t) });
     } finally {
       setBusy(false);
     }
@@ -189,9 +204,9 @@ function SettingsApp({ api, Icon }) {
     try {
       const next = await api.setFeatureEnabled(selectedFeature.id, enabled);
       setFeatureStatuses((current) => mergeStatuses(current, next));
-      setStatus({ kind: "success", message: enabled ? "Feature enabled." : "Feature disabled." });
+      setStatus({ kind: "success", message: t(enabled ? "settings.enabled" : "settings.disabled") });
     } catch (error) {
-      setStatus({ kind: "error", message: error.message });
+      setStatus({ kind: "error", message: presentError(error, t) });
     } finally {
       setBusy(false);
     }
@@ -204,9 +219,22 @@ function SettingsApp({ api, Icon }) {
     try {
       const next = await api.refreshFeatureStatuses(selectedFeature.id);
       setFeatureStatuses((current) => mergeStatuses(current, next));
-      setStatus({ kind: "success", message: "Feature status refreshed." });
+      setStatus({ kind: "success", message: t("settings.refreshed") });
     } catch (error) {
-      setStatus({ kind: "error", message: error.message });
+      setStatus({ kind: "error", message: presentError(error, t) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function changeLocale(event) {
+    if (busy) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      await setLocalePreference(event.target.value);
+    } catch (error) {
+      setStatus({ kind: "error", message: presentError(error, t) });
     } finally {
       setBusy(false);
     }
@@ -215,36 +243,40 @@ function SettingsApp({ api, Icon }) {
   if (loading) {
     return (
       <main className="settings-shell">
-        <SettingsTitlebar api={api} Icon={Icon} />
-        <div className="settings-state" role="status">Loading features…</div>
+        <SettingsTitlebar api={api} Icon={Icon} t={t} />
+        <div className="settings-state" role="status">{t("settings.loading")}</div>
       </main>
     );
   }
 
-  if (visibleFeatures.length === 0) {
-    const loadError = status?.kind === "error" ? status.message : null;
-    return (
-      <main className="settings-shell">
-        <SettingsTitlebar api={api} Icon={Icon} />
-        <div className="settings-state" role={loadError ? "alert" : undefined}>
-          <strong>{loadError ? "Unable to load features" : "No features registered"}</strong>
-          <span>{loadError || "Registered capability metadata will appear here automatically."}</span>
-        </div>
-      </main>
-    );
-  }
+  const noVisibleFeaturesMessage = visibleFeatures.length === 0
+    ? (status?.kind === "error" ? status.message : t("settings.none.detail"))
+    : null;
 
   return (
     <main className="settings-shell">
-      <SettingsTitlebar api={api} Icon={Icon} />
+      <SettingsTitlebar api={api} Icon={Icon} t={t} />
       <div className="settings-workspace">
-        <aside className="feature-sidebar" aria-label="Features">
+        <aside className="feature-sidebar" aria-label={t("settings.features")}>
           <nav className="feature-navigation">
+          <section className="feature-category" aria-labelledby="general-category">
+            <h2 id="general-category">{t("settings.general")}</h2>
+            <button
+              type="button"
+              className={selectedId === "general" ? "feature-button selected" : "feature-button"}
+              aria-current={selectedId === "general" ? "page" : undefined}
+              disabled={busy}
+              onClick={() => setSelectedId("general")}
+            >
+              <Icon name="settings" size={17} />
+              <span>{t("settings.general")}</span>
+            </button>
+          </section>
           {groupedFeatures.map(([category, categoryFeatures], categoryIndex) => (
             <section className="feature-category" key={category} aria-labelledby={`feature-category-${categoryIndex}`}>
               <h2 id={`feature-category-${categoryIndex}`}>{category}</h2>
               {categoryFeatures.map((feature) => {
-                const warning = getFeatureWarning(feature.featureStatus);
+                const warning = getFeatureWarning(feature.featureStatus, t);
                 const descriptionId = `feature-status-${feature.id.replace(/[^a-z0-9_-]/gi, "-")}`;
                 return (
                 <button
@@ -278,6 +310,42 @@ function SettingsApp({ api, Icon }) {
           </nav>
         </aside>
 
+        {selectedId === "general" && (
+          <section className="feature-detail" aria-labelledby="general-title">
+            <div className="feature-detail-scroll">
+              <header className="feature-detail-header">
+                <span className="feature-detail-icon"><Icon name="settings" size={26} /></span>
+                <div><h1 id="general-title">{t("settings.general")}</h1></div>
+              </header>
+              <section className="settings-section general-settings" aria-labelledby="language-heading">
+                <h2 id="language-heading">{t("settings.language")}</h2>
+                <div className="settings-fields">
+                  <div className="settings-field">
+                    <label htmlFor="locale-preference">{t("settings.language")}</label>
+                    <select id="locale-preference" value={preference} disabled={busy} onChange={changeLocale}>
+                      <option value="system">{t("settings.language.system")}</option>
+                      <option value="en">{t("settings.language.en")}</option>
+                      <option value="zh-CN">{t("settings.language.zh-CN")}</option>
+                    </select>
+                    <p className="settings-empty-copy">{t("settings.language.help")}</p>
+                  </div>
+                </div>
+              </section>
+              {noVisibleFeaturesMessage && (
+                <div className="settings-state" role={status?.kind === "error" ? "alert" : undefined}>
+                  <strong>{status?.kind === "error" ? t("settings.unavailable") : t("settings.none")}</strong>
+                  <span>{noVisibleFeaturesMessage}</span>
+                </div>
+              )}
+            </div>
+            <footer className="settings-actions">
+              <div className={status?.kind === "error" ? "settings-feedback error" : "settings-feedback"} role={status?.kind === "error" ? "alert" : "status"} aria-live="polite">
+                {status?.message}
+              </div>
+            </footer>
+          </section>
+        )}
+
         {selectedFeature && (
           <section className="feature-detail" aria-labelledby="feature-title">
           <div className="feature-detail-scroll">
@@ -294,12 +362,12 @@ function SettingsApp({ api, Icon }) {
             <section className="settings-section feature-lifecycle" aria-labelledby="lifecycle-heading">
               <div className="feature-lifecycle-heading">
                 <div>
-                  <h2 id="lifecycle-heading">Feature Status</h2>
-                  <p>{selectedWarning?.message || "Ready to use."}</p>
+                  <h2 id="lifecycle-heading">{t("settings.featureStatus")}</h2>
+                  <p>{selectedWarning?.message || t("settings.ready")}</p>
                 </div>
                 <div className="feature-lifecycle-actions">
                   <button type="button" className="secondary-button" disabled={busy} onClick={refreshStatus}>
-                    Refresh
+                    {t("settings.refresh")}
                   </button>
                   <button
                     type="button"
@@ -307,35 +375,36 @@ function SettingsApp({ api, Icon }) {
                     disabled={busy}
                     onClick={() => setEnabled(!selectedFeatureStatus.enabled)}
                   >
-                    {selectedFeatureStatus.enabled ? "Disable" : "Enable"}
+                    {selectedFeatureStatus.enabled ? t("settings.disable") : t("settings.enable")}
                   </button>
                 </div>
               </div>
               <dl className="feature-lifecycle-details">
-                <div><dt>Installed</dt><dd>{selectedFeatureStatus.installed ? "Yes" : "No"}</dd></div>
-                <div><dt>Enabled</dt><dd>{selectedFeatureStatus.enabled ? "Yes" : "No"}</dd></div>
-                <div><dt>Readiness</dt><dd>{selectedFeatureStatus.status.replaceAll("-", " ")}</dd></div>
+                <div><dt>{t("settings.installed")}</dt><dd>{selectedFeatureStatus.installed ? t("settings.yes") : t("settings.no")}</dd></div>
+                <div><dt>{t("settings.enabledLabel")}</dt><dd>{selectedFeatureStatus.enabled ? t("settings.yes") : t("settings.no")}</dd></div>
+                <div><dt>{t("settings.readiness")}</dt><dd>{t(`status.label.${selectedFeatureStatus.status}`)}</dd></div>
                 {selectedFeatureStatus.details.missing.length > 0 && (
-                  <div><dt>Missing</dt><dd>{selectedFeatureStatus.details.missing.join(", ")}</dd></div>
+                  <div><dt>{t("settings.missing")}</dt><dd>{selectedFeatureStatus.details.missing.join(", ")}</dd></div>
                 )}
               </dl>
             </section>
 
             <section className="settings-section" aria-labelledby="settings-heading">
-              <h2 id="settings-heading">Settings</h2>
+              <h2 id="settings-heading">{t("settings.configuration")}</h2>
               <SettingsRenderer
                 schema={selectedFeature.configSchema}
                 values={draftValues}
                 onChange={updateDraft}
                 onPick={pickPath}
+                t={t}
                 disabled={busy}
               />
             </section>
 
             <section className="settings-section" aria-labelledby="help-heading">
-              <h2 id="help-heading">Interaction Help</h2>
+              <h2 id="help-heading">{t("settings.interactionHelp")}</h2>
               {helpCommands.length === 0 ? (
-                <p className="settings-empty-copy">No interaction help available.</p>
+                <p className="settings-empty-copy">{t("settings.noInteractionHelp")}</p>
               ) : helpCommands.map((command) => (
                 <div className="feature-help-command" key={command.id}>
                   <h3>{command.name}</h3>
@@ -359,10 +428,10 @@ function SettingsApp({ api, Icon }) {
               {status?.message}
             </div>
             <button type="button" className="secondary-button" disabled={busy || !hasSavedValues} onClick={reset}>
-              Reset
+              {t("settings.resetButton")}
             </button>
             <button type="button" className="primary-button" disabled={busy || !hasSchema} onClick={save}>
-              {busy ? "Working…" : "Save"}
+              {busy ? t("settings.working") : t("settings.save")}
             </button>
           </footer>
           </section>

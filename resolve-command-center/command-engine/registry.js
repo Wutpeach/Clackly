@@ -39,7 +39,8 @@ function normalizeCommand(command, filePath) {
     icon,
     keywords = [],
     capability,
-    presentation = "visible"
+    presentation = "visible",
+    localizations
   } = command;
   if (typeof id !== "string" || id.trim().length === 0) {
     throw new Error(`Command in ${filePath} is missing a non-empty string id`);
@@ -58,6 +59,8 @@ function normalizeCommand(command, filePath) {
     throw new Error(`Command ${id} in ${filePath} must define a visible or internal presentation`);
   }
 
+  const normalizedLocalizations = normalizeCommandLocalizations(localizations, id, filePath);
+
   return {
     id,
     name,
@@ -66,8 +69,38 @@ function normalizeCommand(command, filePath) {
     icon,
     keywords: [...keywords],
     capability,
-    presentation
+    presentation,
+    ...(normalizedLocalizations ? { localizations: normalizedLocalizations } : {})
   };
+}
+
+function normalizeCommandLocalizations(localizations, id, filePath) {
+  if (localizations === undefined) return null;
+  if (!localizations || typeof localizations !== "object" || Array.isArray(localizations)) {
+    throw new Error(`Command ${id} in ${filePath} localizations must be an object`);
+  }
+  const normalized = {};
+  for (const [locale, overlay] of Object.entries(localizations)) {
+    if (typeof locale !== "string" || locale.trim().length === 0 || !overlay || typeof overlay !== "object" || Array.isArray(overlay)) {
+      throw new Error(`Command ${id} in ${filePath} has an invalid localization`);
+    }
+    const next = {};
+    for (const field of ["name", "description", "category"]) {
+      if (overlay[field] === undefined) continue;
+      if (typeof overlay[field] !== "string" || overlay[field].trim().length === 0) {
+        throw new Error(`Command ${id} in ${filePath} localization ${locale} has an invalid ${field}`);
+      }
+      next[field] = overlay[field];
+    }
+    if (overlay.keywords !== undefined) {
+      if (!Array.isArray(overlay.keywords) || overlay.keywords.some((keyword) => typeof keyword !== "string" || keyword.trim().length === 0)) {
+        throw new Error(`Command ${id} in ${filePath} localization ${locale} has invalid keywords`);
+      }
+      next.keywords = [...overlay.keywords];
+    }
+    normalized[locale] = next;
+  }
+  return normalized;
 }
 
 function cloneCommand(command) {
@@ -79,7 +112,8 @@ function cloneCommand(command) {
     icon: command.icon,
     keywords: [...command.keywords],
     capability: command.capability,
-    presentation: command.presentation
+    presentation: command.presentation,
+    ...(command.localizations ? { localizations: structuredClone(command.localizations) } : {})
   };
 }
 

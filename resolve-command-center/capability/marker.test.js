@@ -16,6 +16,13 @@ test("marker capability exposes descriptive metadata", () => {
     version: "1.0.0",
     type: "command",
     providers: ["resolve-api", "shortcut"],
+    localizations: {
+      "zh-CN": {
+        name: "添加标记",
+        description: "在当前时间线位置添加标记",
+        category: "时间线"
+      }
+    },
     configSchema: {}
   });
 });

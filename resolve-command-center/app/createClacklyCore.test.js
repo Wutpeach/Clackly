@@ -10,9 +10,10 @@ const appRoot = path.resolve(__dirname, "..");
 
 function createCore(overrides = {}) {
   const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "clackly-core-"));
+  const appDataPath = path.join(temporaryDirectory, "appdata");
   const core = createClacklyCore({
     appRoot,
-    appDataPath: path.join(temporaryDirectory, "appdata"),
+    appDataPath,
     temporaryRoot: temporaryDirectory,
     hostContextProvider: async () => ({
       application: "davinci-resolve",
@@ -37,6 +38,7 @@ function createCore(overrides = {}) {
   });
   return {
     core,
+    appDataPath,
     cleanup() {
       fs.rmSync(temporaryDirectory, { recursive: true, force: true });
     }
@@ -44,7 +46,7 @@ function createCore(overrides = {}) {
 }
 
 test("Core returns working application services with marker and script capabilities", async (t) => {
-  const { core, cleanup } = createCore();
+  const { core, appDataPath, cleanup } = createCore();
   t.after(cleanup);
 
   assert.equal(core.capabilityRegistry.get("marker.add").metadata.id, "marker.add");
@@ -66,6 +68,14 @@ test("Core returns working application services with marker and script capabilit
   ]);
   assert.deepEqual(core.configManager.get("marker.add"), {});
   core.configManager.save("ae.export", { aePath: "C:\\fake\\AfterFX.exe" });
+  assert.deepEqual(core.localizationService.getSnapshot(), { preference: "system", effectiveLocale: "en" });
+  assert.equal(core.preferences.getLocale(), "system");
+  assert.deepEqual(core.localizationService.setLocalePreference("zh-CN"), { preference: "zh-CN", effectiveLocale: "zh-CN" });
+  assert.equal(core.preferences.getLocale(), "zh-CN");
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(path.join(appDataPath, "Clackly", "preferences.json"), "utf8")),
+    { locale: "zh-CN" }
+  );
 
   // The bundled runtime manifest declares a managed python, but the executable is
   // never shipped in the repository, so availability resolves to a stable

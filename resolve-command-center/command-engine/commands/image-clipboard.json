@@ -6,6 +6,14 @@
     "category": "Media",
     "icon": "image",
     "keywords": ["clipboard", "image", "paste", "png", "media pool"],
-    "capability": "media.clipboard-image.import"
+    "capability": "media.clipboard-image.import",
+    "localizations": {
+      "zh-CN": {
+        "name": "粘贴剪贴板图像",
+        "description": "保存剪贴板图像并导入 Resolve 媒体池",
+        "category": "媒体",
+        "keywords": ["剪贴板", "图像", "粘贴", "导入", "媒体池"]
+      }
+    }
   }
 ]

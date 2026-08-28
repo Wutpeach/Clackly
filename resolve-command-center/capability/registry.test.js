@@ -107,4 +107,29 @@ test("capability registry validates registration and preserves execution objects
     /id must match/
   );
   assert.throws(() => registry.register("marker.add", capability), /already registered/);
+
+  for (const optionLabels of [{ "": "Fast" }, { fast: "" }, { fast: 1 }]) {
+    assert.throws(() => registry.register("invalid", {
+      metadata: {
+        ...metadata,
+        id: "invalid",
+        configSchema: { mode: { type: "select", options: ["fast"], optionLabels } }
+      },
+      execute() {}
+    }), /optionLabels must be an object of non-empty strings/);
+  }
+  assert.throws(() => registry.register("invalid", {
+    metadata: {
+      ...metadata,
+      id: "invalid",
+      configSchema: {
+        mode: {
+          type: "select",
+          options: ["fast"],
+          localizations: { "zh-CN": { optionLabels: { fast: "" } } }
+        }
+      }
+    },
+    execute() {}
+  }), /localization zh-CN is invalid/);
 });

@@ -3,7 +3,7 @@ import React from "react";
 function InteractionRow({ interaction }) {
   const inputTokens = interaction.label.split(" + ").filter(Boolean);
   return (
-    <div className="interaction-row" role="listitem" aria-label={`${interaction.label}: ${interaction.actionName}`}>
+    <div className="interaction-row" role="listitem" aria-label={interaction.ariaLabel}>
       <span className="interaction-input" aria-hidden="true">
         {inputTokens.map((token, index) => (
           <React.Fragment key={`${token}-${index}`}>
@@ -17,7 +17,7 @@ function InteractionRow({ interaction }) {
   );
 }
 
-export default function InteractionPanelContent({ presentation, previewNote = false }) {
+export default function InteractionPanelContent({ presentation, previewNote = null }) {
   if (!presentation) return null;
   return (
     <>
@@ -31,7 +31,7 @@ export default function InteractionPanelContent({ presentation, previewNote = fa
         <p className="interaction-description">{presentation.description}</p>
       )}
       {previewNote && (
-        <p className="interaction-preview-note">Preview only — commands run in Electron.</p>
+        <p className="interaction-preview-note">{previewNote}</p>
       )}
     </>
   );

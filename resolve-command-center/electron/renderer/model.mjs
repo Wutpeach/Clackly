@@ -14,15 +14,13 @@ export function canExecuteFeature(status) {
   return Boolean(status?.installed && status.enabled && status.status === "ready");
 }
 
-export function getFeatureWarning(status) {
-  if (!status) return { kind: "loading", message: "Checking feature availability…" };
-  if (!status.enabled) return { kind: "disabled", message: "Feature is disabled." };
+export function getFeatureWarning(status, t = defaultT) {
+  if (!status) return { kind: "loading", message: t("status.warning.loading") };
+  if (!status.enabled) return { kind: "disabled", message: t("status.warning.disabled") };
   if (status.status === "ready") return null;
   return {
     kind: status.status,
-    message: status.message || (status.status === "loading"
-      ? "Checking feature availability…"
-      : "Feature is unavailable.")
+    message: t(`status.warning.${status.status}`)
   };
 }
 
@@ -49,23 +47,23 @@ export function createPresentationCatalog(realCommands, statuses = []) {
   }));
 }
 
-export function getInteractionHelpCommands(commands, capabilityId, bindings) {
+export function getInteractionHelpCommands(commands, capabilityId, bindings, t) {
   return commands
     .filter((command) => (
       command.capability === capabilityId && isCommandPresentable(command)
     ))
-    .map((command) => ({ ...command, help: getInteractionHelp(command, commands, bindings) }))
+    .map((command) => ({ ...command, help: getInteractionHelp(command, commands, bindings, t) }))
     .filter((command) => command.help.length > 0);
 }
 
-export function getCommandHint(command) {
+export function getCommandHint(command, t) {
   if (!command) return "";
-  const lifecycleWarning = command.featureStatus && getFeatureWarning(command.featureStatus);
+  const lifecycleWarning = command.featureStatus && getFeatureWarning(command.featureStatus, t);
   if (lifecycleWarning) return lifecycleWarning.message;
   return command.description || command.name || "";
 }
 
-export function getInteractionHelp(targetCommand, commands, bindings) {
+export function getInteractionHelp(targetCommand, commands, bindings, t = defaultT) {
   if (!targetCommand || !Array.isArray(commands) || !Array.isArray(bindings)) return [];
   const commandsById = new Map(commands.map((command) => [command.id, command]));
 
@@ -74,11 +72,11 @@ export function getInteractionHelp(targetCommand, commands, bindings) {
     const actionCommand = commandsById.get(binding.action?.command);
     if (!actionCommand) return [];
 
-    const button = binding.trigger?.button === "right" ? "Right Click" : "Click";
+    const button = binding.trigger?.button === "right" ? t("interaction.rightClick") : t("interaction.click");
     const modifiers = (binding.trigger?.modifiers || []).map((modifier) => ({
-      CTRL: "Ctrl",
-      SHIFT: "Shift",
-      ALT: "Alt"
+      CTRL: t("interaction.ctrl"),
+      SHIFT: t("interaction.shift"),
+      ALT: t("interaction.alt")
     })[modifier] || modifier);
     return [{
       label: [...modifiers, button].join(" + "),
@@ -94,7 +92,7 @@ function matches(command, query) {
     return true;
   }
 
-  const haystack = [command.id, command.name, ...(command.keywords || [])]
+  const haystack = [command.id, command.name, ...(command.keywords || []), command.englishName, ...(command.englishKeywords || [])]
     .join(" ")
     .toLowerCase();
   return tokens.every((token) => haystack.includes(token));
@@ -123,7 +121,7 @@ export function rankCommands(commands, query, pinnedIds = new Set(), recentIds =
     .map(({ command }) => command);
 }
 
-export function projectLauncherSections(commands, pinnedIds = new Set(), recentIds = new Set()) {
+export function projectLauncherSections(commands, pinnedIds = new Set(), recentIds = new Set(), t = defaultT) {
   const sections = {
     pinned: [],
     recent: [],
@@ -141,9 +139,9 @@ export function projectLauncherSections(commands, pinnedIds = new Set(), recentI
   }
 
   return [
-    ["pinned", "Pinned", sections.pinned],
-    ["recent", "Recent", sections.recent],
-    ["commands", "Commands", sections.commands]
+    ["pinned", t("palette.pinned"), sections.pinned],
+    ["recent", t("palette.recent"), sections.recent],
+    ["commands", t("palette.commands"), sections.commands]
   ].filter(([, , sectionCommands]) => sectionCommands.length > 0);
 }
 
@@ -199,3 +197,5 @@ export function groupFeaturesByCategory(features) {
   }
   return [...groups.entries()];
 }
+import { translate } from "../../localization/resources.mjs";
+const defaultT = (key, params) => translate("en", key, params);

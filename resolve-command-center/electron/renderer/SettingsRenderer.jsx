@@ -1,10 +1,10 @@
 import React from "react";
 import { getSettingsControl } from "./model.mjs";
 
-function SettingsRenderer({ schema, values, onChange, onPick, disabled = false }) {
+function SettingsRenderer({ schema, values, onChange, onPick, t, disabled = false }) {
   const fields = Object.entries(schema);
   if (fields.length === 0) {
-    return <p className="settings-empty-copy">No settings required.</p>;
+    return <p className="settings-empty-copy">{t("settings.noSettings")}</p>;
   }
 
   async function pickValue(key, type) {
@@ -30,7 +30,7 @@ function SettingsRenderer({ schema, values, onChange, onPick, disabled = false }
                 disabled={disabled}
                 onChange={(event) => onChange(key, event.target.checked)}
               />
-              <label htmlFor={inputId}>{field.label}{field.required ? " *" : ""}</label>
+                  <label htmlFor={inputId}>{field.label}{field.required ? " *" : ""}</label>
             </div>
           );
         }
@@ -46,9 +46,9 @@ function SettingsRenderer({ schema, values, onChange, onPick, disabled = false }
                 disabled={disabled}
                 onChange={(event) => onChange(key, event.target.value || undefined)}
               >
-                <option value="" disabled={Boolean(field.required)}>Select an option</option>
+                <option value="" disabled={Boolean(field.required)}>{t("settings.selectOption")}</option>
                 {control.options.map((option, index) => (
-                  <option key={`${option}-${index}`} value={option}>{option}</option>
+                  <option key={`${option}-${index}`} value={option}>{field.optionLabels?.[option] || option}</option>
                 ))}
               </select>
             ) : control.kind === "picker" ? (
@@ -66,7 +66,7 @@ function SettingsRenderer({ schema, values, onChange, onPick, disabled = false }
                   disabled={disabled}
                   onClick={() => pickValue(key, control.pickerType)}
                 >
-                  Browse
+                  {t("settings.browse")}
                 </button>
               </div>
             ) : (
