@@ -1,13 +1,15 @@
-export const D6_OPAQUE_FULL_BLEED_MARKER = "d6-opaque-full-bleed";
-export const D7_TWO_WINDOW_MARKER = "d7-two-window";
+import paletteGeometry from "../shared/palette-geometry.json" with { type: "json" };
+
+export const OPAQUE_FULL_BLEED_SURFACE = paletteGeometry.modes.opaqueFullBleed;
+export const DETACHED_NATIVE_PANEL_MODE = paletteGeometry.modes.detachedNativePanel;
 
 export function getPaletteShadowPadding({ hasElectronHost, search, shadowPadding }) {
-  const paletteDiagnostic = new URLSearchParams(search).get("palette-diagnostic");
-  return hasElectronHost && paletteDiagnostic === D6_OPAQUE_FULL_BLEED_MARKER
+  const paletteSurface = new URLSearchParams(search).get("palette-surface");
+  return hasElectronHost && paletteSurface === OPAQUE_FULL_BLEED_SURFACE
     ? 0
     : shadowPadding;
 }
 
-export function usesD7DetachedInteractionPanel({ hasElectronHost, search }) {
-  return hasElectronHost && new URLSearchParams(search).get("interaction-panel-diagnostic") === D7_TWO_WINDOW_MARKER;
+export function usesDetachedNativePanel({ hasElectronHost, search }) {
+  return hasElectronHost && new URLSearchParams(search).get("interaction-panel-mode") === DETACHED_NATIVE_PANEL_MODE;
 }

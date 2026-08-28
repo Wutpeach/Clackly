@@ -6,14 +6,17 @@ const {
   closeDetachedInteractionPanel,
   openDetachedInteractionPanel,
   openSettingsWindow,
-  PALETTE_INTERACTION_MODE,
-  PALETTE_SURFACE,
   registerInteractionPanelIpc,
-  shouldLoadDevRenderer,
   showPaletteWindow,
   hidePaletteWindow,
   isPaletteWindowShown
 } = require("./window");
+const {
+  PALETTE_HOST,
+  selectPaletteHostPolicy,
+  usesWindowsNativeDualWindow
+} = require("./paletteHostPolicy");
+const { createNativeDualWindowHost } = require("./nativeDualWindowHost");
 const { registerPaletteHotkey } = require("./hotkey");
 const { composeStartup } = require("./composeStartup");
 const { getCommands, searchCommands } = require("../../command-engine/registry");
@@ -27,16 +30,21 @@ const { createClipboardImageReader } = require("./clipboard");
 
 let paletteWindow = null;
 let settingsWindow = null;
-let detachedInteractionPanelWindow = null;
-const useStandaloneDevRendererD6 = process.platform === "win32" && !app.isPackaged && shouldLoadDevRenderer();
-const useStandaloneDevRendererD7 = useStandaloneDevRendererD6;
-const standaloneDevRendererPaletteOptions = useStandaloneDevRendererD7
-  ? Object.freeze({
-    surface: PALETTE_SURFACE.D6_OPAQUE_FULL_BLEED,
-    interactionPanel: PALETTE_INTERACTION_MODE.D7_TWO_WINDOW,
-    ignoreFocusedBlur: true
+const paletteHostPolicy = selectPaletteHostPolicy({
+  host: PALETTE_HOST.STANDALONE,
+  platform: process.platform
+});
+const nativeDualWindowHost = usesWindowsNativeDualWindow(paletteHostPolicy)
+  ? createNativeDualWindowHost({
+    palettePolicy: paletteHostPolicy,
+    createPaletteWindow,
+    createDetachedInteractionPanelWindow,
+    closeDetachedInteractionPanel,
+    openDetachedInteractionPanel,
+    showPaletteWindow,
+    hidePaletteWindow
   })
-  : undefined;
+  : null;
 
 const bridgeExecutionAdapter = createBridgeExecutionAdapter();
 const appRoot = path.resolve(__dirname, "../..");
@@ -77,54 +85,24 @@ async function executeStandaloneCommand(commandId) {
 }
 
 function createStandalonePaletteWindow() {
-  const window = standaloneDevRendererPaletteOptions
-    ? createPaletteWindow(standaloneDevRendererPaletteOptions)
+  return nativeDualWindowHost
+    ? nativeDualWindowHost.createWindow()
     : createPaletteWindow();
-  if (useStandaloneDevRendererD7) {
-    ensureDetachedInteractionPanelWindow();
-    window.on("blur", () => {
-      closeDetachedInteractionPanel(window, detachedInteractionPanelWindow);
-    });
-  }
-  return window;
-}
-
-function ensureDetachedInteractionPanelWindow() {
-  if (!useStandaloneDevRendererD7) return null;
-  if (!detachedInteractionPanelWindow || detachedInteractionPanelWindow.isDestroyed()) {
-    detachedInteractionPanelWindow = createDetachedInteractionPanelWindow();
-    const openedWindow = detachedInteractionPanelWindow;
-    openedWindow.once("closed", () => {
-      if (detachedInteractionPanelWindow === openedWindow) {
-        detachedInteractionPanelWindow = null;
-        closeDetachedInteractionPanel(paletteWindow, null);
-      }
-    });
-  }
-  return detachedInteractionPanelWindow;
-}
-
-function closeStandaloneDetachedInteractionPanel({ restoreFocus = false } = {}) {
-  if (!useStandaloneDevRendererD7) return;
-  closeDetachedInteractionPanel(paletteWindow, detachedInteractionPanelWindow, { restoreFocus });
-}
-
-function openStandaloneDetachedInteractionPanel(request) {
-  const panelWindow = ensureDetachedInteractionPanelWindow();
-  return openDetachedInteractionPanel(paletteWindow, panelWindow, request);
 }
 
 function showPalette() {
-  if (useStandaloneDevRendererD7) closeStandaloneDetachedInteractionPanel();
-  if (standaloneDevRendererPaletteOptions) {
-    showPaletteWindow(paletteWindow, standaloneDevRendererPaletteOptions);
+  if (nativeDualWindowHost) {
+    nativeDualWindowHost.showPalette();
     return;
   }
   showPaletteWindow(paletteWindow);
 }
 
 function hidePalette() {
-  if (useStandaloneDevRendererD7) closeStandaloneDetachedInteractionPanel();
+  if (nativeDualWindowHost) {
+    nativeDualWindowHost.hidePalette();
+    return;
+  }
   hidePaletteWindow(paletteWindow);
 }
 
@@ -168,10 +146,10 @@ function registerIpcHandlers() {
     return result;
   });
   ipcMain.on("palette:hide", hidePalette);
-  registerInteractionPanelIpc(ipcMain, () => paletteWindow, useStandaloneDevRendererD7
+  registerInteractionPanelIpc(ipcMain, () => paletteWindow, nativeDualWindowHost
     ? {
-      open: openStandaloneDetachedInteractionPanel,
-      close: () => closeStandaloneDetachedInteractionPanel({ restoreFocus: true })
+      open: (request) => nativeDualWindowHost.openInteractionPanel(request),
+      close: () => nativeDualWindowHost.closeInteractionPanel({ restoreFocus: true })
     }
     : undefined);
   registerFeatureUiIpc({

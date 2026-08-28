@@ -24,6 +24,8 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
   - `window.resolveCommandCenter.listInteractionBindings() -> Promise<BindingRecord[]>`
   - `window.resolveCommandCenter.hidePalette() -> void`
   - `window.resolveCommandCenter.onPaletteShown(callback: () -> void) -> () -> void`
+- `selectPaletteHostPolicy({ host: "standalone" | "workflow", platform }) -> WindowsNativeDualWindowPolicy | TransparentAttachedPolicy`.
+- Windows detached Panel request: `openInteractionPanel({ metrics: { anchorY, contentHeight }, presentation }) -> Promise<{ panelTop, panelHeight, anchorY } | null>`, where `presentation` is either `{ kind: "mappings", rows: [{ label, actionName }] }` or `{ kind: "description", description }`.
 - Command shape:
   - `{ id: string, name: string, description: string, category: string, icon: string, keywords: string[], capability: string, presentation?: "visible" | "internal" }`
 
@@ -31,22 +33,30 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 
 - Renderer search uses command metadata only: `id`, `name`, and `keywords`.
 - `presentation` defaults to `visible`; internal Commands stay executable and resolvable for interaction descriptions but never appear in Launcher, Search, or Settings help targets. One shared `isCommandPresentable()` predicate owns that filter in both the command registry and the renderer presentation model; no renderer branch names a Command id or capability.
-- Renderer presentation contains registered Commands only. Browser preview returns an empty catalog, and pinned/recent state starts empty.
+- Production renderer presentation contains registered Commands only, and pinned/recent state starts empty. Only the root browser preview path without `window.resolveCommandCenter` may use an isolated renderer-local presentation adapter with representative Commands, lifecycle status, and normalized bindings; it is never registry, preload, IPC, or Resolve authority and never executes a real command.
 - Launcher, Search, ranking, icons, accessibility names, and generic hints preserve registered Command Metadata; renderer code contains no Command-id presentation override.
 - Renderer execution sends only the selected `commandId`.
 - Per-command shortcut badges are absent until an authoritative presentation contract exists. The universal selected-Command Footer Info control is derived from interaction metadata and is not command shortcut metadata or a host-wide hotkey.
-- Launcher and Search always occupy the fixed `240x320` Palette main rectangle. Interaction Panel open/closed is Palette-local presentation state, and its right-side presentation may request only semantic open/close plus bounded integer `{ anchorY, contentHeight }` metrics through the shared host helper. The renderer never supplies screen coordinates, bounds, width, height, shapes, or resize policy.
+- Launcher and Search always occupy the fixed visible `240x320` Palette main rectangle. Interaction Panel open/closed remains Palette-local presentation state. The renderer sends only bounded integer `{ anchorY, contentHeight }` metrics plus a validated read-only presentation snapshot; it never supplies screen coordinates, bounds, width, height, shapes, padding, resize policy, commands, query, selection, or arbitrary HTML.
+- `electron/shared/palette-geometry.json` is the single cross-layer authority for the main `240x320`, `#151619` surface, `8px` main radius, Panel `260px` width, `16px` gap, `60–180px` height, `8px` inset, `4px` Panel radius, and visual elevation. Native helpers, browser-preview metrics, JSX style projection, and CSS must consume it rather than copy geometry.
+- `selectPaletteHostPolicy()` is the only Windows native-surface selector. It maps both `standalone` and `workflow` on `win32` to D6/D7 independent of renderer URL, `--dev-renderer`, or `app.isPackaged`; non-Windows maps to the compatible transparent attached fallback. Settings is outside this policy.
+- Windows D6 main construction is `240x320`, `frame:false`, `transparent:false`, `backgroundColor:"#151619"`, `roundedCorners:true`, `thickFrame:true`, `minimizable:false`, `skipTaskbar:true`, and `alwaysOnTop:true`, with no Mica and no base `setShape`. The renderer receives the neutral opaque full-bleed surface marker and paints at `0,0`; DWM owns the outer corners/shadow. First reveal may call `show()` only because the persistent window starts hidden. Repeated conceal/reveal uses immediate `setOpacity(0/1)`, mouse/focus gating, cursor-origin placement, and focus—never minimize, restore, hide/show, timer, or authored motion.
+- Windows D7 constructs one persistent detached opaque `260x60` Panel window with `show:true`, `opacity:0`, `frame:false`, `transparent:false`, `backgroundColor:"#151619"`, `roundedCorners:true`, `thickFrame:true`, `minimizable:false`, `skipTaskbar:true`, `alwaysOnTop:true`, and `focusable:false`. It ignores mouse immediately and remains constructor-only nonfocusable: readiness, open, update, and close never call `setFocusable`, `show`, `hide`, `minimize`, or `restore`. The host positions it at main right plus a real screen-space `16px` gap and bounds height to `60–180px`.
+- The D7 controller owns Panel creation/recreation, readiness, combined work-area clamp, main-bounds restoration, and lifecycle. A no-state close is a true native no-op. Open/update validate the bounded snapshot, retain the main as focus/selection authority, enable Panel mouse input, send presentation, and set opacity `1`. Actual close sets opacity `0`, ignores mouse, clears presentation, restores the main bounds, deletes state, and restores main focus only when explicitly requested and absent. Unready, destroyed, invalid, or failed delivery paths fail closed without hiding or unfocusing the usable main.
+- Windows native blur ignores only a queued event for which `mainWindow.isFocused()` is already true; a real unfocused blur still follows the logical-shown conceal path. This narrow guard prevents Electron focus feedback from a redundant detached operation and is not a debounce or general blur exemption.
+- The single Vite root browser preview is a hostless DOM simulation. It uses the canonical `240x320` main, `#151619` surface, `8px`/`4px` painted radii, visual shadow approximation, `16px` physical-looking gap, `260px` Panel, and the same bounded content/anchor rules; its transparent DOM staging and safe-edge scrolling are presentation-only. It cannot claim or emulate DWM, HWND separation, focus, hit testing, z-order, or Resolve acceptance.
+- Browser-preview Command activation is deliberately quiet: it opens or retains Interaction Info without invoking its local non-executable API or showing event-error feedback. Only that hostless panel includes the exact subdued note `Preview only — commands run in Electron.`; injected Electron/Resolve panels contain no preview note and retain their normal execution and error paths.
 - Palette composition is search-led, not brand-led: Launcher and Search begin with the compact search surface; the Palette itself has no wordmark, orange identity rule, or primary header toolbar. Search is a separate DOM/content mode containing only `RESULTS`, while Launcher projects only nonempty `PINNED`, `RECENT`, and fallback `COMMANDS` sections from its existing ranked source.
 - Palette rows are compact list primitives: transparent at rest, soft neutral on pointer hover, and light neutral with dark foreground for keyboard selection. Main list, Footer, and Interaction Panel share the exact `#151619` Palette neutral surface; a subtle panel border and shadow provide separation. Search is the slightly inset control and the Footer may use only a faint hairline, never a separately dominant black toolbar. Command name and the `14–16px` monochrome Lucide icon take priority; category/status, true Launcher numeric keycaps, and the `27px` footer are progressively weaker but remain readable. Settings and the push-pin control stay on the Footer left; Info stays on the right for every selected Command. Search retains only its in-field `ESC` hint and uses it to return to Launcher, without a duplicate footer Back control. Do not synthesize per-command shortcuts or submenu behavior.
 - Interaction Panel rows come only from `getInteractionHelp(selectedCommand, commands, bindings)`, which resolves normalized bindings against registered action Commands. The Palette's existing `selectedCommand` remains the sole current-command authority. The panel owns no captured Command, interaction definitions, query, selection, hover, acknowledgement, execution route, global state, or new domain.
-- While Interaction Info is open, one existing BrowserWindow may temporarily use the approved `516x320` envelope: `240px` main-left, transparent `16px` gap, and a `260px` right panel whose content height is clamped to `60–180px` and vertically anchored to the selected Command row. Mapping labels wrap naturally, and the panel itself contains vertical overflow. The host owns final work-area clamp, shape and reset behavior; it never flips the panel to the left.
-- Palette construction owns the fixed footprint, initial centering, taskbar skipping, and the stable always-on-top policy. On reveal, its top-left starts at the cursor coordinates; only work-area overflow uses the existing narrow flip/clamp path. Interaction Info continues to clamp the complete `516x320` envelope while keeping the main left and panel right. Showing performs one visibility/focus transition plus a `palette:shown` notification, and hiding conceals the transparent window in place without destroying its native surface.
+- On Windows D7, Interaction Info is two native windows: a `240x320` main left and a detached `260px` Panel right with no native window in the real `16px` gap. Panel content wraps naturally and owns vertical overflow. Combined clamp moves both together when needed and exact pre-Panel main bounds return on close/hide/failure. The host never flips the Panel left.
+- On Windows D6, native top-left directly anchors at the cursor and work-area flip/clamp uses the `240x320` footprint. The persistent Palette emits `palette:shown` after reveal and conceals in place without destruction. The compatible non-Windows attached fallback retains the padded transparent `256x336` closed / `532x336` bounded open shape contract.
 - The programmatically focused non-interactive `.palette-shell` suppresses only its own default focus outline; interactive controls keep their `:focus-visible` indicators.
 - Electron hosts delegate command execution to the command engine, which resolves intent through an injected capability registry. External Electron registers a bridge-backed capability; Workflow Plugin registers a Resolve-backed capability. Renderer code still sends only command ids through preload IPC.
 - Functional UI icons use `lucide-react` with the shared optical size/stroke convention. Clackly logo and mark remain project-owned SVG assets rather than Lucide substitutions.
 - Clackly wordmark assets are deterministic vector geometry: use SVG paths/shapes only, never `<text>`, font-family declarations, or external font/image dependencies.
-- The outer window silhouette is rectangular: the shared `.palette-shell`/`.settings-shell` uses `border-radius: 0`, so all rounding lives inside content surfaces. The `240x320` Palette main uses compact list rows rather than launcher tiles: rows are transparent at rest, softly neutral on hover, and light neutral with dark foreground when selected. Interaction rows are static mappings without hover or selection state. Status/error appears only as compact absolute feedback and follows existing clear/recovery semantics with full aria-live text available.
-- Both Palette and Settings BrowserWindows set `roundedCorners: false` beside the transparent compositor contract (`frame: false`, `transparent: true`, `thickFrame: false`, `backgroundColor: "#00000000"`). The qualified Windows 11 build 26200 rule remains rectangular by default. The sole approved Electron 36 `setShape(Rectangle[])` exception is open Interaction Info: union only the `240x320` main rectangle and the actual content-fit right panel at `x=256`; no arrow or connector region is permitted. Transparent gap and unused right-column pixels must stay outside the native region. If `setShape` is unavailable or the union fails, Interaction Info fails closed before/after restoring exact pre-open `240x320` bounds; it never leaves a 516px rectangular hit region. Close, hide, and show recovery restore that exact base bounds/shape even after a right-edge clamp translation. Any broader/rounded/decorative shape still requires a separate ADR and a permissioned native A/B.
+- Settings remains separate: square painted `0px`, `760x560`, `frame:false`, `transparent:true`, `backgroundColor:"#00000000"`, `roundedCorners:false`, `thickFrame:false`, `alwaysOnTop:false`, normal taskbar behavior, and its existing singleton show/focus lifecycle. It never adopts D6/D7 policy. The Palette main paints at `8px` and Panel at `4px`; on Windows native hosts those content radii sit inside DWM-owned outer corners/shadow, while the non-Windows fallback retains its padded renderer shadow.
+- `setShape(Rectangle[])` is forbidden for Windows D6/D7 Palette and detached Panel windows. It remains available only to the compatible non-Windows attached fallback as the exact closed padded main rectangle and bounded open main-plus-Panel union; no connector, arrow, staircase, rounded/per-pixel region, or full-width hit region is allowed. No Mica, DWM Cloak, PowerShell/native helper, native add-on, subprocess, timer, minimize/restore, repeated hide/show, or authored scale/fade/visual-blur/translation/taskbar motion is an approved substitute.
 - Development renderer loading must be explicit, for example `--dev-renderer` or `RESOLVE_COMMAND_CENTER_RENDERER_URL`.
 - Default non-packaged startup should load built renderer files so Resolve-launched Electron does not depend on a Vite dev server.
 
@@ -55,17 +65,21 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Unknown command id -> command engine rejects with a user-facing error.
 - Missing capability handler -> command engine rejects with a user-facing error.
 - Unknown palette mode -> renderer state only; the shared window footprint never changes because modes are content-only.
-- Empty registered catalog -> Launcher and Search render truthful empty states; browser preview does not inject fixtures. A selected Command with zero or one resolved interaction still exposes Info and presents only its registered description, never an empty state.
+- Empty registered catalog -> Launcher and Search render truthful empty states. The root browser preview instead intentionally presents its isolated, renderer-local representative data so the real main Palette and Interaction Panel can be inspected without Electron; this exception does not alter empty registered catalogs or production presentation authority. A selected Command with zero or one resolved interaction still exposes Info and presents only its registered description, never an empty state.
 - Bridge failure -> renderer keeps the palette open, shows the error, and refocuses search.
 - Successful command -> Electron hides the palette.
 - Global shortcut registration failure -> main process logs a warning.
 - Workflow Plugin global shortcut registration failure -> plugin shows its own palette and warns that another process owns the shortcut, because otherwise an old Utility/dev Electron process can keep routing commands to the Python bridge.
+- Windows D7 Panel unready, destroyed, invalid, or failed delivery -> keep it opacity `0` and mouse-ignored, clear stale presentation, restore any translated main bounds, and leave the main usable/focused.
+- Windows D7 close with no open state -> return without a native Panel/main mutation, presentation clear, bounds restore, or focus call.
+- Windows D7 blur delivered while `mainWindow.isFocused()` is true -> record/ignore the stale blur; an unfocused blur still takes the existing logical-shown conceal path.
 
 ### 5. Good/Base/Bad Cases
 
 - Good: Adding command intent metadata and registering its capability in each supported host.
 - Base: `marker` query matches `timeline.addMarker` via registry search.
-- Good: Opening Interaction Info retains the visible `240x320` main surface and asks the shared host only for bounded anchor/content metrics; the host validates, clamps, temporarily opens the `516x320` envelope and applies the two-rectangle union, then restores the main shape/bounds on close/hide/show.
+- Good: Opening Interaction Info on Windows D7 keeps the opaque `240x320` main at left, opens the separately native `260px` Panel at its clamped anchor with no HWND in the real `16px` gap, and restores exact original main bounds on close/hide/failure.
+- Base: Windows standalone dev, built, packaged, and Workflow select identical D6/D7 construction and opacity/mouse lifecycle; non-Windows selects the attached transparent compatibility fallback.
 - Good: registering a Command with declared description/category/icon makes it appear correctly without renderer edits.
 - Bad: UI code checks `if (query === "marker")` or invokes Resolve APIs directly.
 - Bad: searching category labels, adding production prototype fixtures, sending renderer-provided bounds/shape/position, using a general resize protocol, or dynamically routing whole-window mouse events.
@@ -74,14 +88,18 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 
 - Assert query matching returns expected command ids for names and keywords.
 - Assert presentation category text alone does not match a command.
-- Assert registered Command presentation is preserved, the empty catalog stays empty, and no shortcut/prototype entries are synthesized.
+- Assert registered Command presentation is preserved, an empty registered catalog stays empty, and no shortcut/prototype entries are synthesized in production presentation.
 - Assert Launcher and Search exclude `presentation: "internal"` Commands while `listCommands()`/`getCommandById()` still return them, and that the shared presentability predicate has no Command-id branches.
-- Assert the palette owns the `240x320` main footprint, first show uses native `show`, repeat show reveals a concealed window without native `show`, hide conceals in place, and both hosts toggle on the logical shown predicate. Assert Interaction Panel metric validation, two-rectangle union, edge clamp, idempotence, and close/hide/show restoration through the shared host helper.
+- Assert the pure policy matrix maps Windows standalone dev/built/packaged and Workflow to D6/D7 independently of URL/`app.isPackaged`, with non-Windows attached fallback and Settings outside the selector.
+- Assert Windows D6 exact `240x320` opaque options, no base shape, cursor/work-area placement, first native show only, and repeat immediate opacity `0/1` conceal/reveal; assert the fallback retains its documented transparent padded shape contract.
+- Assert Windows D7 exact persistent opaque constructor, real `16px` screen-space gap, `60–180px` height clamp, prewarm `show:true`/opacity `0`, constructor-only `focusable:false`, mouse gating, no post-construction show/hide/minimize/restore/focusability calls, no-state close no-op, idempotent update, original-main restoration, fail-closed recreation/delivery, and stale-versus-real blur handling.
 - Assert the `.palette-shell` suppresses only its own focus outline while control `:focus-visible` rules remain.
+- Assert Settings remains its painted square (`0px`) transparent contract; Windows D6/D7 owns native corners/shadow while renderer main/Panel paint the shared `8px`/`4px` content radii, and the fallback retains its padded renderer-shadow contract.
 - Assert renderer uses preload APIs instead of direct Node or Resolve imports.
+- Assert the root browser preview has no injected Electron host, uses only the isolated renderer-local adapter plus canonical geometry/visual tokens and shared Panel content projection, and renders a centered visual `240x320` main plus `260px` Panel with `16px` gap and `60–180px` clamp. It preserves Info/Tab/Escape lifecycle, opens Information quietly on Command activation with no event-error feedback, places the exact preview-only note inside the panel only, and reaches the full open composition through safe-edge scrolling on a small viewport without claiming native authority.
 - Assert `npm run build` succeeds and file-backed Electron startup has a built renderer target.
 - Assert `clackly-logo.svg` parses as XML and contains no `<text>`, font reference, or external image.
-- Visually verify Launcher/Search at `240x320` and Interaction Info at `516x320`, including universal Info, correct push-pin, mapping-or-description content exclusivity, complete wrapped labels, vertical scroll containment, the shared `#151619` surface, `16px` gap, absence of connector/title/Command-name repetition/footer, transient feedback, and Footer geometry. Use the repository `palette:evidence` developer tool headlessly by default; its browser-only evidence does not prove Electron `setShape`, native hit-testing, DWM composition, or Resolve validation.
+- Visually verify the shared `240x320` main and visually detached `260px` Panel with the `16px` gap, universal Info, correct push-pin, mapping-or-description content exclusivity, complete wrapped labels, vertical scroll containment, shared `#151619` surface, `8px`/`4px` painted radii, shadow stage, absence of connector/title/Command-name repetition/footer, transient feedback, and Footer geometry. Use the repository `palette:evidence` developer tool headlessly by default; browser evidence proves visual-token parity only, not DWM composition, HWND separation, native hit testing, focus, z-order, packaged runtime, or Resolve validation. For source Workflow host acceptance, complete the automated gate, `npm run build`, and `npm run workflow:install`, then restart Resolve and manually test the installed source; packaged-distribution installation/acceptance requires separate evidence.
 
 ### 7. Wrong vs Correct
 
@@ -99,6 +117,21 @@ if (query === "marker") {
 await window.resolveCommandCenter.executeCommand(command.id);
 ```
 
+#### Wrong
+
+```javascript
+const nativePolicy = !app.isPackaged && shouldLoadDevRenderer()
+  ? nativeDualWindow
+  : transparentAttached;
+```
+
+#### Correct
+
+```javascript
+const policy = selectPaletteHostPolicy({ host, platform: process.platform });
+// Renderer URL and packaged state select loading/distribution, never Windows surface policy.
+```
+
 ---
 
 ## Scenario: Command Interaction Hint
@@ -106,13 +139,13 @@ await window.resolveCommandCenter.executeCommand(command.id);
 ### 1. Scope / Trigger
 
 - Trigger: exposing the valid interaction methods of the currently selected Command through explicit progressive disclosure.
-- Applies to the renderer projection and lifecycle, Palette-scoped CSS, developer-only Playwright utility, and the minimum shared preload/host path for Interaction Panel semantic intent. It does not authorize a new interaction domain, persistence, interaction execution UI, runtime/Resolve changes, a global hotkey, a second window, or arbitrary resize controls.
+- Applies to the renderer projection and lifecycle, Palette-scoped CSS, developer-only Playwright utility, and the minimum shared preload/host path for Interaction Panel semantic intent. It does not authorize a new interaction domain, persistence, interaction execution UI, runtime/Resolve changes, a global hotkey, or arbitrary resize controls. The accepted Windows D7 policy is the narrow exception: it owns one persistent detached read-only presentation window, not a second interaction domain.
 
 ### 2. Signatures
 
 - Renderer projection: `getInteractionHelp(command, commands, bindings) -> Array<{ label, actionName, description }>`; unresolved action Commands are omitted.
 - Palette-local state: `interactionPanelOpen: boolean` plus returned presentation geometry. `selectedCommand` and interaction definitions are never copied into panel state.
-- Preload intent: `openInteractionPanel({ anchorY, contentHeight }) -> Promise<{ panelTop, panelHeight, anchorY } | null>` and `closeInteractionPanel() -> void`.
+- Preload intent: the non-Windows attached fallback accepts `openInteractionPanel({ anchorY, contentHeight })`; Windows D7 accepts `openInteractionPanel({ metrics: { anchorY, contentHeight }, presentation })`, validates that bounded read-only snapshot, and returns `Promise<{ panelTop, panelHeight, anchorY } | null>`. Both expose `closeInteractionPanel() -> void`.
 - Developer command: `npm run palette:evidence`; it is headless by default. `node scripts/palette-evidence.mjs --renderer <built|packaged> --scenario <name[,name]> --output <directory>` selects evidence inputs; `--headed` is explicit opt-in.
 
 ### 3. Contracts
@@ -121,8 +154,8 @@ await window.resolveCommandCenter.executeCommand(command.id);
 - Info click toggles the panel. `Tab` opens it only while Command selection has focus; `Tab` while open closes it and restores Palette focus. Hover, dwell timers, pointer leave, selection, and result changes never open it.
 - `Esc` closes an open panel first. Selection id change, mode/query change, command or interaction execution, Palette show/hide, and host open failure all close it. Existing Search-to-Launcher and Launcher-to-hide `Esc` behavior remains unchanged while the panel is closed.
 - The panel consumes the current `selectedCommand` and its derived rows directly. It has no captured Command, selected interaction row, hover state, query, acknowledgement, execution semantics, or independent focus-navigation model.
-- Panel content is either static input-to-action mappings or the selected Command's registered description, never both. It has no connector, title, Command-name repetition, category, explanatory copy, footer, search, or empty state.
-- The main Palette remains visible at left. The `260px` panel shares the exact `#151619` Palette surface, uses an approximately `16px` transparent gap, compact keycaps, naturally wrapped action labels, vertical overflow containment, and a content-fit `60–180px` height.
+- Host panel content is either static input-to-action mappings or the selected Command's registered description, never both. It has no connector, title, Command-name repetition, category, explanatory copy, footer, search, or empty state. The hostless browser preview may append only its exact `Preview only — commands run in Electron.` execution note inside that same panel.
+- The main Palette remains visible at left. On Windows D7, the `260px` Panel is a separate opaque native window with a real `16px` gap; the browser preview simulates that same composition in DOM and the non-Windows fallback remains attached. All share the exact `#151619` surface, `4px` painted Panel radius, compact keycaps, naturally wrapped action labels, vertical overflow containment, and a content-fit `60–180px` height.
 
 ### 4. Validation & Error Matrix
 
@@ -132,6 +165,8 @@ await window.resolveCommandCenter.executeCommand(command.id);
 - Selection changes while open -> panel closes before a new Command's mappings can remain visible.
 - Escape while Interaction Info is open -> close the panel only; main Palette does not hide.
 - Escape in Search -> return to Launcher; Escape in Launcher -> existing `hidePalette()` behavior remains unchanged.
+- Windows D7 invalid/unready/destroyed/delivery failure -> detached Panel remains opacity `0`/mouse-ignored, stale content is cleared, temporary main movement is restored, and the focused main stays usable.
+- Windows D7 close without open state -> true native no-op; an actual close restores bounds and clears opacity/mouse/presentation exactly once without changing Panel focusability.
 
 ### 5. Good/Base/Bad Cases
 
@@ -141,8 +176,8 @@ await window.resolveCommandCenter.executeCommand(command.id);
 
 ### 6. Tests Required
 
-- Run `npm run palette:evidence` against built or packaged renderer assets; assert exact `240x320` main geometry and `516x320` Interaction Info envelope, universal Info, explicit click/Tab open, Tab/Esc return, selection/execute/show close, no hover/timer open, metadata-derived mappings and description fallback, no connector/title/Command-name repetition/footer/empty state, wrapped non-ellipsized labels, contained vertical overflow, shared `#151619`, `16px` gap, and console/page-error capture.
-- Run focused renderer/window tests, `npm run build`, and `npm test`. After the outer-window change, run `npm run package:win`, `npm run package:verify`, and `npm run workflow:install:package` before packaged Resolve validation.
+- Run `npm run palette:evidence` against built or packaged renderer assets; assert shared visual `240x320` main / `260px` Panel / `16px` gap / `60–180px` height, `8px`/`4px` radii, shadow stage, universal Info, explicit click/Tab open, Tab/Esc return, selection/execute/show close, no hover/timer open, metadata-derived mappings and description fallback, no connector/title/Command-name repetition/footer/empty state in host panels, wrapped labels, contained overflow, `#151619`, console/page-error capture, quiet root-preview activation, and its panel-only note. Browser evidence is DOM-only.
+- Run focused policy/window/Workflow/renderer tests, `npm run build`, `npm test`, `npm run package:win`, and `npm run package:verify`. For source Workflow acceptance, then run `npm run workflow:install` and manually test after a full Resolve restart. Do not claim packaged distribution installation or Resolve acceptance without separate proof.
 
 ### 7. Wrong vs Correct
 
@@ -183,9 +218,9 @@ const interactionPanelUsesMappings = interactionRows.length > 1;
 - Standalone Electron and Workflow Integration register the same feature/config/picker channels through the shared IPC helper.
 - Resolve 20.3.2.9 with bundled Electron 36.3.2 is the qualified desktop host; local Electron must remain exactly pinned to that API baseline.
 - Settings is one fixed frameless `760x560` window with the exact Electron 36 BrowserWindow options `show: false`, `frame: false`, `roundedCorners: false`, `transparent: true`, `thickFrame: false`, `resizable: false`, `maximizable: false`, `minimizable: false`, `fullscreenable: false`, `alwaysOnTop: false`, `autoHideMenuBar: true`, `backgroundColor: "#00000000"`, and `title: "Clackly Settings"`. Its renderer `.settings-shell` must paint the opaque `--color-window` background across the full `100vw x 100vh` viewport so the transparent compositor surface never shows through. Do not use the Electron 37+ `accentColor` API, and do not add DWM/Python/timer/native-hook workarounds for the Resolve-host opaque frameless edge — the verified fix is the transparent surface plus the opaque renderer shell (live-validated 2026-08-06).
-- The `240x320` palette keeps its own separate surface contract — `transparent: true`, `backgroundColor: "#00000000"`, `roundedCorners: false`, `skipTaskbar: true`, `alwaysOnTop: true`, and the completed conceal/reveal lifecycle. Settings must not adopt palette product behavior: it stays `alwaysOnTop: false` with normal taskbar behavior.
+- On Windows, Palette uses the unified D6/D7 policy: the opaque `#151619` full-bleed `240x320` D6 main has native corners/shadow and persistent opacity lifecycle, while D7 supplies the detached `260px` Panel with real `16px` gap and bounded snapshot presentation. Non-Windows keeps the transparent attached compatibility fallback. Settings must not adopt Palette product behavior: it remains `760x560`, painted square, `alwaysOnTop: false`, and uses normal taskbar behavior.
 - Repeated Settings opens reuse and focus the singleton; it does not hide on blur or become always-on-top. Its custom drag region and accessible close button replace native title-bar controls, and overflow scrolls inside the fixed workspace.
-- Launcher and Search remain on the frameless fixed `240x320` Palette main surface. Interaction Info temporarily occupies the same frameless `516x320` envelope under the separately documented two-rectangle shape-union exception.
+- Launcher and Search remain on the fixed visible `240x320` Palette main surface. On Windows, Interaction Info is D7's detached `260px` native Panel; on non-Windows it remains the documented attached fallback. Renderer code never supplies window dimensions or native placement.
 - The existing renderer bundle selects Settings through a main-process-owned `?view=settings` marker. Renderer code never sends dimensions.
 - Draft values remain local until Save. Save and Reset route through ConfigManager; path and folder fields route through Electron native dialogs.
 - FeatureCatalog clones schemas with resolved labels from the shared backend utility. SettingsRenderer maps only the seven validated schema types to native controls and renders `field.label` without fallback formatting.
@@ -348,7 +383,7 @@ if (!canExecuteCommand(command)) {
 - Left click and suppressed context-menu events share the same interaction route. Rows contain no Command-selection table or Capability ID mapping.
 - Keyboard Enter and keyboard-generated button activation keep the direct `executeCommand(command.id)` route.
 - Successful matched mouse execution is hidden by the host; unmatched interactions execute nothing and leave the palette available.
-- Browser preview returns empty Commands and bindings and renders the normal empty catalog state.
+- The root browser preview deliberately omits Electron host injection and uses only the isolated renderer-local adapter/data. It may render representative bindings through the existing `getInteractionHelp()` projection so developers can inspect the real Interaction Panel; activation opens Information quietly instead of invoking its non-executable adapter, and it never imports registry/preload/IPC/Resolve authority or executes a real command.
 - Double-click handlers and global-shortcut behavior are outside renderer interaction binding.
 - Hover and keyboard focus use the same existing `aria-describedby` tooltip relationship in Launcher and Search. Interaction Info reuses the same metadata projection as visible static mapping rows, without a second listbox selection model.
 - Status, error, and executing messages replace interaction help until cleared; Commands without target bindings retain their metadata description.
@@ -404,7 +439,7 @@ onContextMenu={(event) => executeInteraction(command, event)}
 - Implicit dev-server loading for normal Electron startup.
 - Renderer-provided screen bounds, panel placement coordinates, whole-window dimensions, shapes, or hit-test policy.
 - A semantic mode IPC that re-applies arbitrary geometry rather than the approved bounded Interaction Panel open/close metrics.
-- `setShape` on Clackly BrowserWindows except the approved open Interaction Info union of the main rectangle and actual panel rectangle; connector, arrow, rounded, stepped, decorative, or general shaped-window uses remain forbidden.
+- `setShape` on Windows D6/D7 Palette or detached Panel windows; DWM owns their outer silhouette. The non-Windows fallback alone may use the documented attached closed padded main and bounded open main-plus-Panel union. Connector, arrow, rounded, stepped, decorative, per-pixel, full-column, or general shaped-window uses remain forbidden everywhere.
 - Hand-authored functional icon path libraries when the existing Lucide dependency provides the icon; brand assets are the exception.
 - Font-dependent SVG `<text>` wordmarks or external font/image references inside Clackly brand assets.
 - Selection halos, orange row fills, and card-like row borders; use the light neutral selected row with dark foreground instead.
@@ -415,9 +450,9 @@ onContextMenu={(event) => executeInteraction(command, event)}
 
 - Keep renderer access behind `preload.js` with `contextIsolation: true`.
 - Route command execution through command capability metadata and a host-injected capability registry.
-- Keep Command presentation Registry-only; do not add prototype catalogs, browser fixtures, or Command-id overrides.
-- Keep palette sizing, centering, taskbar, and topmost policy in the shared Electron window helper; renderer mode changes are content-only and cross no sizing IPC.
-- Set `roundedCorners: false` on both Palette and Settings BrowserWindows and keep the shared outer renderer shell at `border-radius: 0`; express all rounding inside content controls.
+- Keep production Command presentation Registry-only; do not add production prototype catalogs, fixtures, or Command-id overrides. The sole exception is the root browser preview's isolated renderer-local adapter, gated on missing `window.resolveCommandCenter`, with no imports from registry/preload/IPC/Resolve code and no executable route.
+- Keep palette sizing, cursor/work-area placement, taskbar, and topmost policy in shared host helpers; renderer mode changes are content-only and never supply native sizing/placement IPC.
+- Select native surface only through the pure `selectPaletteHostPolicy({ host, platform })`: Windows D6/D7 is opaque `roundedCorners:true`/`thickFrame:true` with native DWM outer corners/shadow; the non-Windows transparent attached fallback retains `roundedCorners:false`/`thickFrame:false` and its documented shape. Settings is always separate and painted square.
 - Use Lucide for functional controls/command icons and project SVGs for the Clackly identity.
 - Draw the CLACKLY wordmark with project-owned SVG paths/shapes and keep its accessible name on the consuming `<img>`.
 - Keep command names and metadata single-line, with a shared `14–16px` Lucide icon slot and stable truncation.
@@ -428,9 +463,10 @@ onContextMenu={(event) => executeInteraction(command, event)}
 ## Testing Requirements
 
 - Run the package build after frontend changes: `npm run build`.
-- After any outer-window surface change, run `npm run package:win`, `npm run package:verify`, and `npm run workflow:install:package`, then require packaged Resolve manual validation of first open, repeated Palette reveals, and Settings open — unit tests cannot observe DWM composition.
+- After a Windows native Palette surface/lifecycle change, run `npm run package:win` and `npm run package:verify` for static package coverage. For source Workflow host validation, then run `npm run build` and `npm run workflow:install` before a full Resolve restart/manual check of first open, 10–20 repeated Palette reveals, Info/Tab/Escape, focus, real gap, corners, and shadow. Packaged-distribution installation and Resolve acceptance require separate explicit evidence; unit/browser tests cannot observe DWM composition.
 - For command search changes, run a Node-level registry assertion for the changed query and command id.
 - For renderer catalog/ranking changes, run the renderer model tests covering search boundaries, grouping, ordering, and unavailable fixtures.
+- For root browser-preview changes, run `palette:evidence` against the built renderer and prove the closed/open composition, Info/Tab/Escape lifecycle, quiet command activation plus panel-only preview note, host absence, and small-viewport reachability.
 
 ## Scenario: Codex Impeccable Stop Hook
 
@@ -489,7 +525,7 @@ return { exitCode: 0, stdout: JSON.stringify({ continue: true }) };
 - No Resolve scripting API names appear under Electron UI/main files except Workflow Integration lifecycle calls or documentation strings.
 - Command ids live in command manifests or bridge handler tables, not renderer conditionals.
 - Command manifests describe `capability`, not a Resolve or keyboard execution backend.
-- All palette modes remain `240x320`; both Electron hosts share the fixed window helper with no renderer mode-resize IPC.
-- Browser preview and empty registries render the normal empty catalog state without fixtures.
+- All Electron Palette modes keep the visible `240x320` main surface. Windows standalone dev/built/packaged and Workflow share the D6/D7 host policy: opaque native D6 plus detached D7 without a native gap occupant; non-Windows retains the compatible attached fallback. No renderer mode supplies native resize IPC.
+- Empty registered catalogs render the normal empty catalog state. The single root browser preview is the narrow exception: it uses isolated renderer-local representative data to show the interactive Palette and Panel without an Electron host; no query-only preview entry or production fixture is allowed.
 - Functional icons come from Lucide while `clackly-logo.svg` and `clackly-mark.svg` remain custom assets.
 - `npm run dev` and built `npm start` behavior remain distinct.

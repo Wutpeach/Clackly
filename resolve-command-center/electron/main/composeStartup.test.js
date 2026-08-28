@@ -117,26 +117,28 @@ test("composition creates the Palette through its no-argument transparent defaul
   assert.deepEqual(receivedArguments, [[]]);
 });
 
-test("D6 is limited to standalone Windows dev while Workflow retains the shared transparent opacity Palette contract", () => {
+test("both Windows hosts select the shared native dual-window policy while fallback construction stays transparent", () => {
   const paletteSource = fs.readFileSync(path.join(__dirname, "window.js"), "utf8");
   const standaloneSource = fs.readFileSync(path.join(__dirname, "main.js"), "utf8");
   const workflowSource = fs.readFileSync(path.join(__dirname, "../../workflow-plugin/main.js"), "utf8");
 
-  assert.match(standaloneSource, /process\.platform === "win32" && !app\.isPackaged && shouldLoadDevRenderer\(\)/);
-  assert.match(standaloneSource, /surface:\s*PALETTE_SURFACE\.D6_OPAQUE_FULL_BLEED/);
-  assert.match(standaloneSource, /ignoreFocusedBlur:\s*true/);
+  for (const [source, host] of [[standaloneSource, "STANDALONE"], [workflowSource, "WORKFLOW"]]) {
+    assert.match(source, new RegExp(`host:\\s*PALETTE_HOST\\.${host}`));
+    assert.match(source, /platform:\s*process\.platform/);
+    assert.match(source, /selectPaletteHostPolicy\(/);
+    assert.match(source, /usesWindowsNativeDualWindow\(paletteHostPolicy\)/);
+    assert.match(source, /createNativeDualWindowHost\(/);
+    assert.match(source, /createDetachedInteractionPanelWindow/);
+  }
   assert.match(standaloneSource, /createPaletteWindow:\s*createStandalonePaletteWindow/);
-  assert.match(standaloneSource, /showPaletteWindow\(paletteWindow, standaloneDevRendererPaletteOptions\)/);
-  assert.match(standaloneSource, /hidePaletteWindow\(paletteWindow\)/);
-  assert.match(workflowSource, /showPaletteWindow\(paletteWindow\)/);
-  assert.match(workflowSource, /hidePaletteWindow\(paletteWindow\)/);
-  assert.doesNotMatch(workflowSource, /PALETTE_SURFACE|D6_OPAQUE_FULL_BLEED|backgroundMaterial|paletteDiagnostic|shouldLoadDevRenderer/);
-  assert.doesNotMatch(workflowSource, /ignoreFocusedBlur|stale-ignored/);
+  assert.match(workflowSource, /createPaletteWindow:\s*createWorkflowPaletteWindow/);
+  assert.doesNotMatch(standaloneSource, /app\.isPackaged|shouldLoadDevRenderer/);
+  assert.doesNotMatch(workflowSource, /app\.isPackaged|shouldLoadDevRenderer/);
   assert.doesNotMatch(paletteSource, /backgroundMaterial|mica|NATIVE_MICA_HIDE_SHOW|usesNativeMicaHideShow|nativeHiddenPaletteWindows/);
-  assert.match(paletteSource, /transparent:\s*true/);
-  assert.match(paletteSource, /backgroundColor:\s*"#00000000"/);
-  assert.match(paletteSource, /roundedCorners:\s*false/);
-  assert.match(paletteSource, /thickFrame:\s*false/);
+  assert.match(paletteSource, /transparent:\s*!opaqueFullBleed/);
+  assert.match(paletteSource, /backgroundColor:\s*opaqueFullBleed \? paletteGeometry\.main\.surface : "#00000000"/);
+  assert.match(paletteSource, /roundedCorners:\s*opaqueFullBleed/);
+  assert.match(paletteSource, /thickFrame:\s*opaqueFullBleed/);
   assert.match(paletteSource, /window\.setOpacity\(1\)/);
   assert.match(paletteSource, /window\.setOpacity\(0\)/);
 });

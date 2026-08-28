@@ -1,22 +1,28 @@
 const path = require("node:path");
 const { BrowserWindow, screen } = require("electron");
-const { shadowPadding: PALETTE_SHADOW_PADDING } = require("../shared/palette-geometry.json");
+const paletteGeometry = require("../shared/palette-geometry.json");
+const {
+  PALETTE_SURFACE,
+  PALETTE_INTERACTION_MODE
+} = require("./paletteHostPolicy");
+
+const { shadowPadding: PALETTE_SHADOW_PADDING } = paletteGeometry;
 
 const DEFAULT_DEV_SERVER_PORT = "5173";
 const PALETTE_SIZE = Object.freeze({
-  width: 240,
-  height: 320
+  width: paletteGeometry.main.width,
+  height: paletteGeometry.main.height
 });
 const PALETTE_WINDOW_SIZE = Object.freeze({
   width: PALETTE_SIZE.width + PALETTE_SHADOW_PADDING * 2,
   height: PALETTE_SIZE.height + PALETTE_SHADOW_PADDING * 2
 });
 const PALETTE_INTERACTION_PANEL = Object.freeze({
-  gap: 16,
-  width: 260,
-  minHeight: 60,
-  maxHeight: 180,
-  inset: 8
+  gap: paletteGeometry.interactionPanel.gap,
+  width: paletteGeometry.interactionPanel.width,
+  minHeight: paletteGeometry.interactionPanel.minHeight,
+  maxHeight: paletteGeometry.interactionPanel.maxHeight,
+  inset: paletteGeometry.interactionPanel.inset
 });
 const PALETTE_INTERACTION_SIZE = Object.freeze({
   width: PALETTE_SIZE.width + PALETTE_INTERACTION_PANEL.gap + PALETTE_INTERACTION_PANEL.width,
@@ -25,12 +31,6 @@ const PALETTE_INTERACTION_SIZE = Object.freeze({
 const PALETTE_INTERACTION_WINDOW_SIZE = Object.freeze({
   width: PALETTE_INTERACTION_SIZE.width + PALETTE_SHADOW_PADDING * 2,
   height: PALETTE_INTERACTION_SIZE.height + PALETTE_SHADOW_PADDING * 2
-});
-const PALETTE_SURFACE = Object.freeze({
-  D6_OPAQUE_FULL_BLEED: "d6-opaque-full-bleed"
-});
-const PALETTE_INTERACTION_MODE = Object.freeze({
-  D7_TWO_WINDOW: "d7-two-window"
 });
 const SETTINGS_SIZE = Object.freeze({
   width: 760,
@@ -231,15 +231,15 @@ function loadRenderer(window, view, options = {}) {
   if (rendererUrl) {
     const url = new URL(rendererUrl);
     if (view) url.searchParams.set("view", view);
-    if (options.paletteDiagnostic) url.searchParams.set("palette-diagnostic", options.paletteDiagnostic);
-    if (options.interactionPanelDiagnostic) url.searchParams.set("interaction-panel-diagnostic", options.interactionPanelDiagnostic);
+    if (options.paletteSurface) url.searchParams.set("palette-surface", options.paletteSurface);
+    if (options.interactionPanelMode) url.searchParams.set("interaction-panel-mode", options.interactionPanelMode);
     return window.loadURL(url.toString());
   }
 
   const query = {
     ...(view ? { view } : {}),
-    ...(options.paletteDiagnostic ? { "palette-diagnostic": options.paletteDiagnostic } : {}),
-    ...(options.interactionPanelDiagnostic ? { "interaction-panel-diagnostic": options.interactionPanelDiagnostic } : {})
+    ...(options.paletteSurface ? { "palette-surface": options.paletteSurface } : {}),
+    ...(options.interactionPanelMode ? { "interaction-panel-mode": options.interactionPanelMode } : {})
   };
   return window.loadFile(
     path.join(__dirname, "../../dist/renderer/index.html"),
@@ -255,11 +255,11 @@ function isPaletteWindowShown(window) {
 }
 
 function usesD6OpaqueFullBleed(options) {
-  return options?.surface === PALETTE_SURFACE.D6_OPAQUE_FULL_BLEED;
+  return options?.surface === PALETTE_SURFACE.OPAQUE_FULL_BLEED;
 }
 
-function usesD7DetachedInteractionPanel(options) {
-  return options?.interactionPanel === PALETTE_INTERACTION_MODE.D7_TWO_WINDOW;
+function usesDetachedNativePanel(options) {
+  return options?.interactionPanel === PALETTE_INTERACTION_MODE.DETACHED_NATIVE;
 }
 
 function getPaletteWindowSize(options) {
@@ -296,23 +296,23 @@ function positionPaletteNearCursor(window, screenApi, options = {}) {
 }
 
 function createPaletteWindow(options = {}, BrowserWindowType = BrowserWindow) {
-  const d6OpaqueFullBleed = usesD6OpaqueFullBleed(options);
+  const opaqueFullBleed = usesD6OpaqueFullBleed(options);
   const paletteWindowSize = getPaletteWindowSize(options);
   const window = new BrowserWindowType({
     width: paletteWindowSize.width,
     height: paletteWindowSize.height,
     show: false,
     frame: false,
-    roundedCorners: d6OpaqueFullBleed,
-    transparent: !d6OpaqueFullBleed,
-    thickFrame: d6OpaqueFullBleed,
+    roundedCorners: opaqueFullBleed,
+    transparent: !opaqueFullBleed,
+    thickFrame: opaqueFullBleed,
     resizable: false,
     maximizable: false,
     minimizable: false,
     fullscreenable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
-    backgroundColor: d6OpaqueFullBleed ? "#151619" : "#00000000",
+    backgroundColor: opaqueFullBleed ? paletteGeometry.main.surface : "#00000000",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -321,16 +321,16 @@ function createPaletteWindow(options = {}, BrowserWindowType = BrowserWindow) {
     }
   });
 
-  loadRenderer(window, undefined, d6OpaqueFullBleed
+  loadRenderer(window, undefined, opaqueFullBleed
     ? {
-      paletteDiagnostic: PALETTE_SURFACE.D6_OPAQUE_FULL_BLEED,
-      ...(usesD7DetachedInteractionPanel(options)
-        ? { interactionPanelDiagnostic: PALETTE_INTERACTION_MODE.D7_TWO_WINDOW }
+      paletteSurface: PALETTE_SURFACE.OPAQUE_FULL_BLEED,
+      ...(usesDetachedNativePanel(options)
+        ? { interactionPanelMode: PALETTE_INTERACTION_MODE.DETACHED_NATIVE }
         : {})
     }
     : undefined);
   window.center();
-  if (!d6OpaqueFullBleed) setPaletteShape(window, paletteBaseShape());
+  if (!opaqueFullBleed) setPaletteShape(window, paletteBaseShape());
 
   window.on("blur", () => {
     if (options.ignoreFocusedBlur && isWindowFocused(window)) {
@@ -433,7 +433,7 @@ function createDetachedInteractionPanelWindow(BrowserWindowType = BrowserWindow)
     skipTaskbar: true,
     alwaysOnTop: true,
     focusable: false,
-    backgroundColor: "#151619",
+    backgroundColor: paletteGeometry.main.surface,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

@@ -17,7 +17,7 @@ function InteractionRow({ interaction }) {
   );
 }
 
-export default function InteractionPanelContent({ presentation }) {
+export default function InteractionPanelContent({ presentation, previewNote = false }) {
   if (!presentation) return null;
   return (
     <>
@@ -29,6 +29,9 @@ export default function InteractionPanelContent({ presentation }) {
         </div>
       ) : (
         <p className="interaction-description">{presentation.description}</p>
+      )}
+      {previewNote && (
+        <p className="interaction-preview-note">Preview only — commands run in Electron.</p>
       )}
     </>
   );

@@ -2,12 +2,21 @@ const path = require("node:path");
 const { app, clipboard, dialog, ipcMain } = require("electron");
 const {
   createPaletteWindow,
+  createDetachedInteractionPanelWindow,
+  closeDetachedInteractionPanel,
+  openDetachedInteractionPanel,
   openSettingsWindow,
   registerInteractionPanelIpc,
   hidePaletteWindow,
   showPaletteWindow,
   isPaletteWindowShown
 } = require("../electron/main/window");
+const {
+  PALETTE_HOST,
+  selectPaletteHostPolicy,
+  usesWindowsNativeDualWindow
+} = require("../electron/main/paletteHostPolicy");
+const { createNativeDualWindowHost } = require("../electron/main/nativeDualWindowHost");
 const { getPaletteAccelerator, registerPaletteHotkey } = require("../electron/main/hotkey");
 const { composeStartup } = require("../electron/main/composeStartup");
 const { getCommandById, getCommands, searchCommands } = require("../command-engine/registry");
@@ -27,6 +36,21 @@ let settingsWindow = null;
 let initPromise = null;
 let resolvePromise = null;
 let cleanupDone = false;
+const paletteHostPolicy = selectPaletteHostPolicy({
+  host: PALETTE_HOST.WORKFLOW,
+  platform: process.platform
+});
+const nativeDualWindowHost = usesWindowsNativeDualWindow(paletteHostPolicy)
+  ? createNativeDualWindowHost({
+    palettePolicy: paletteHostPolicy,
+    createPaletteWindow,
+    createDetachedInteractionPanelWindow,
+    closeDetachedInteractionPanel,
+    openDetachedInteractionPanel,
+    showPaletteWindow,
+    hidePaletteWindow
+  })
+  : null;
 
 app.setPath("userData", path.join(app.getPath("appData"), "Clackly Workflow Plugin"));
 
@@ -145,11 +169,25 @@ const interactionManager = new InteractionManager({
 });
 
 function showPalette() {
+  if (nativeDualWindowHost) {
+    nativeDualWindowHost.showPalette();
+    return;
+  }
   showPaletteWindow(paletteWindow);
 }
 
 function hidePalette() {
+  if (nativeDualWindowHost) {
+    nativeDualWindowHost.hidePalette();
+    return;
+  }
   hidePaletteWindow(paletteWindow);
+}
+
+function createWorkflowPaletteWindow() {
+  return nativeDualWindowHost
+    ? nativeDualWindowHost.createWindow()
+    : createPaletteWindow();
 }
 
 function openSettings(featureId) {
@@ -192,7 +230,12 @@ function registerIpcHandlers() {
     return result;
   });
   ipcMain.on("palette:hide", hidePalette);
-  registerInteractionPanelIpc(ipcMain, () => paletteWindow);
+  registerInteractionPanelIpc(ipcMain, () => paletteWindow, nativeDualWindowHost
+    ? {
+      open: (request) => nativeDualWindowHost.openInteractionPanel(request),
+      close: () => nativeDualWindowHost.closeInteractionPanel({ restoreFocus: true })
+    }
+    : undefined);
   registerFeatureUiIpc({
     ipcMain,
     dialog,
@@ -258,7 +301,7 @@ if (!hasSingleInstanceLock) {
 
     paletteWindow = composeStartup({
       initializeAfterEffectsPath: () => initializeAfterEffectsPath(core.configManager),
-      createPaletteWindow,
+      createPaletteWindow: createWorkflowPaletteWindow,
       registerIpcHandlers,
       registerPaletteHotkey: () => registerPaletteHotkey(togglePalette),
       reportInitializationError: (error) => dialog.showErrorBox("Clackly", error.message),

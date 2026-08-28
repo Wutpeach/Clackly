@@ -69,6 +69,18 @@ body,
   height: 100%;
 }
 
+/*
+ * Windows uses native DWM shadow outside each opaque window. The hostless
+ * preview reserves a transparent DOM stage so the shared CSS approximation can
+ * remain visible without pretending that this is native window geometry.
+ */
+#root:has(> .palette-shell.browser-preview) {
+  display: grid;
+  place-items: safe center;
+  padding: 16px;
+  overflow: auto;
+}
+
 body {
   display: grid;
   place-items: center;
@@ -115,6 +127,9 @@ select:focus-visible {
 
 .palette-shell {
   position: relative;
+  --color-palette-surface: var(--palette-surface);
+  --color-interaction-panel: var(--palette-surface);
+  --palette-elevation: var(--palette-external-shadow);
   width: 100vw;
   height: 100vh;
   overflow: hidden;
@@ -126,16 +141,20 @@ select:focus-visible {
   top: var(--palette-shadow-padding);
   left: var(--palette-shadow-padding);
   grid-template-rows: minmax(0, 1fr) var(--palette-footer-height);
-  width: 240px;
-  height: 320px;
-  border-radius: 8px;
+  width: var(--palette-main-width);
+  height: var(--palette-main-height);
+  border-radius: var(--palette-main-radius);
   background: var(--color-palette-surface);
   box-shadow: var(--palette-elevation), inset 0 1px rgba(255, 255, 255, 0.045);
 }
 
 .palette-shell.browser-preview {
-  width: 240px;
-  height: 320px;
+  width: calc(var(--palette-main-width) + var(--palette-shadow-padding) + var(--palette-shadow-padding));
+  height: calc(var(--palette-main-height) + var(--palette-shadow-padding) + var(--palette-shadow-padding));
+}
+
+.palette-shell.browser-preview[data-interaction-panel-open] {
+  width: calc(var(--palette-main-width) + var(--interaction-panel-gap) + var(--interaction-panel-width) + var(--palette-shadow-padding) + var(--palette-shadow-padding));
 }
 
 .settings-titlebar {
@@ -339,17 +358,17 @@ kbd {
 .interaction-panel {
   position: absolute;
   top: calc(var(--palette-shadow-padding) + var(--interaction-panel-top));
-  left: calc(256px + var(--palette-shadow-padding));
+  left: calc(var(--palette-main-width) + var(--interaction-panel-gap) + var(--palette-shadow-padding));
   z-index: 2;
-  width: 260px;
-  min-height: 60px;
-  max-height: 180px;
+  width: var(--interaction-panel-width);
+  min-height: var(--interaction-panel-min-height);
+  max-height: var(--interaction-panel-max-height);
   padding: 12px;
   overflow-y: auto;
   scrollbar-color: var(--color-text-muted) transparent;
   scrollbar-width: thin;
   border: 1px solid var(--color-interaction-panel-border);
-  border-radius: 4px;
+  border-radius: var(--interaction-panel-radius);
   outline: none;
   color: var(--color-text-primary);
   background: var(--color-interaction-panel);
@@ -358,15 +377,21 @@ kbd {
 
 .interaction-panel-measure,
 .detached-interaction-panel {
-  width: 260px;
-  min-height: 60px;
-  max-height: 180px;
+  width: var(--interaction-panel-width);
+  min-height: var(--interaction-panel-min-height);
+  max-height: var(--interaction-panel-max-height);
   padding: 12px;
   overflow-y: auto;
   scrollbar-color: var(--color-text-muted) transparent;
   scrollbar-width: thin;
   color: var(--color-text-primary);
   background: var(--color-interaction-panel);
+}
+
+.detached-interaction-panel {
+  --color-palette-surface: var(--palette-surface);
+  --color-interaction-panel: var(--palette-surface);
+  --palette-elevation: var(--palette-external-shadow);
 }
 
 .interaction-panel-measure {
@@ -439,6 +464,15 @@ kbd {
   font-size: 11px;
   line-height: 1.4;
   overflow-wrap: anywhere;
+}
+
+.interaction-preview-note {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-palette-separator);
+  color: var(--color-palette-muted);
+  font-size: 10px;
+  line-height: 1.35;
 }
 
 .search-control {

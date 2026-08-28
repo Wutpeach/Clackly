@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines Electron/renderer authority, native Palette geometry, Interaction Panel, browser-preview, Settings, and host-boundary contracts."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Applies to the Workflow main, shared native helper, preload IPC, and renderer policy/data-flow change."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Applies to extracting the one shared Palette geometry/visual contract from duplicated native, preview, JSX, and CSS constants."}
+{"file":".trellis/tasks/08-28-workflow-native-dual-window/research/workflow-native-dual-window.md","reason":"Records the accepted D6/D7 evidence, current Workflow ownership, install path, policy matrix, and deferred Resolve-host risks."}
+{"file":".trellis/tasks/08-28-workflow-native-dual-window/design.md","reason":"Defines the pure host policy, shared native controller, canonical visual contract, lifecycle/focus safeguards, and host boundaries implemented here."}
+{"file":".trellis/tasks/08-28-workflow-native-dual-window/evidence.md","reason":"Records completed automated/package/browser/source-install evidence and the accepted source Workflow Resolve result while preserving the packaged-distribution boundary."}

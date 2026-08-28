@@ -31,8 +31,10 @@ import SettingsApp from "./SettingsApp.jsx";
 import DetachedInteractionPanelApp from "./DetachedInteractionPanelApp.jsx";
 import InteractionPanelContent from "./InteractionPanelContent.jsx";
 import paletteGeometry from "../shared/palette-geometry.json";
+import { getPaletteVisualStyle } from "./paletteVisualStyle.mjs";
+import { createBrowserPreviewApi } from "./browserPreview.mjs";
 import { createInteractionPanelPresentation } from "./interactionPanelPresentation.mjs";
-import { getPaletteShadowPadding, usesD7DetachedInteractionPanel } from "./paletteDiagnostic.mjs";
+import { getPaletteShadowPadding, usesDetachedNativePanel } from "./paletteDiagnostic.mjs";
 import {
   canExecuteCommand,
   createPresentationCatalog,
@@ -52,45 +54,12 @@ const paletteShadowPadding = getPaletteShadowPadding({
   search: window.location.search,
   shadowPadding: PALETTE_SHADOW_PADDING
 });
-const d7DetachedInteractionPanel = usesD7DetachedInteractionPanel({
+const detachedNativeInteractionPanel = usesDetachedNativePanel({
   hasElectronHost,
   search: window.location.search
 });
-const api = window.resolveCommandCenter || {
-  listCommands: async () => [],
-  listInteractionBindings: async () => [],
-  executeCommand: async () => {
-    throw new Error("Live preview only — open Clackly in Electron to execute commands.");
-  },
-  executeInteraction: async () => {
-    throw new Error("Live preview only — open Clackly in Electron to execute commands.");
-  },
-  listFeatures: async () => [],
-  listFeatureStatuses: async () => [],
-  refreshFeatureStatuses: async () => [],
-  setFeatureEnabled: async (featureId, enabled) => ({
-    id: featureId,
-    installed: true,
-    enabled,
-    status: "ready",
-    message: null,
-    details: { missing: [], action: null }
-  }),
-  getConfig: async () => ({}),
-  saveConfig: async (_capabilityId, values) => values,
-  resetConfig: async () => ({}),
-  pickPath: async () => null,
-  openSettings: () => window.open("?view=settings", "clackly-settings"),
-  closeSettings: () => window.close(),
-  hidePalette: () => {},
-  openInteractionPanel: async () => null,
-  closeInteractionPanel: () => {},
-  onPaletteShown: (callback) => {
-    requestAnimationFrame(callback);
-    return () => {};
-  },
-  onSettingsFeatureSelected: () => () => {}
-};
+const paletteVisualStyle = getPaletteVisualStyle(paletteShadowPadding);
+const api = window.resolveCommandCenter || createBrowserPreviewApi();
 
 const ICONS = {
   marker: Bookmark,
@@ -370,7 +339,7 @@ function PaletteApp() {
   }, [hasSelectedCommand, interactionPanelOpen]);
 
   useEffect(() => {
-    if (!interactionPanelOpen || d7DetachedInteractionPanel) return;
+    if (!interactionPanelOpen || detachedNativeInteractionPanel) return;
     requestAnimationFrame(() => interactionPanelRef.current?.focus());
   }, [interactionPanelOpen]);
 
@@ -395,7 +364,7 @@ function PaletteApp() {
       contentHeight: Math.round(panel.getBoundingClientRect().height)
     };
     let active = true;
-    const request = d7DetachedInteractionPanel
+    const request = detachedNativeInteractionPanel
       ? { metrics, presentation: interactionPresentation }
       : metrics;
     Promise.resolve(api.openInteractionPanel(request))
@@ -440,6 +409,10 @@ function PaletteApp() {
 
   async function executeCommand(command) {
     if (!command || isExecuting) return;
+    if (browserPreview) {
+      openInteractionPanel();
+      return;
+    }
     if (!command.available) return;
     if (!canExecuteCommand(command)) {
       setStatus(getFeatureWarning(command.featureStatus)?.message || "Feature is unavailable.");
@@ -472,6 +445,10 @@ function PaletteApp() {
       return;
     }
     if (!command || isExecuting || !command.available) return;
+    if (browserPreview) {
+      openInteractionPanel();
+      return;
+    }
     if (!canExecuteCommand(command)) {
       setStatus(getFeatureWarning(command.featureStatus)?.message || "Feature is unavailable.");
       if (getRecoveryAction(command.featureStatus) === "open-settings") {
@@ -599,7 +576,7 @@ function PaletteApp() {
       className={browserPreview ? "palette-shell browser-preview" : "palette-shell"}
       data-mode={mode}
       data-interaction-panel-open={interactionPanelOpen || undefined}
-      style={{ "--palette-shadow-padding": `${paletteShadowPadding}px` }}
+      style={paletteVisualStyle}
       tabIndex={-1}
       onKeyDown={handleKeyDown}
     >
@@ -726,7 +703,7 @@ function PaletteApp() {
         </div>
       </div>
 
-      {interactionPanelOpen && hasSelectedCommand && !d7DetachedInteractionPanel && (
+      {interactionPanelOpen && hasSelectedCommand && !detachedNativeInteractionPanel && (
         <section
           id="interaction-panel"
           ref={interactionPanelRef}
@@ -737,11 +714,11 @@ function PaletteApp() {
           aria-label="Command information"
           tabIndex={-1}
         >
-          <InteractionPanelContent presentation={interactionPresentation} />
+          <InteractionPanelContent presentation={interactionPresentation} previewNote={browserPreview} />
         </section>
       )}
 
-      {interactionPanelOpen && hasSelectedCommand && d7DetachedInteractionPanel && (
+      {interactionPanelOpen && hasSelectedCommand && detachedNativeInteractionPanel && (
         <div ref={interactionPanelRef} className="interaction-panel-measure" aria-hidden="true">
           <InteractionPanelContent presentation={interactionPresentation} />
         </div>

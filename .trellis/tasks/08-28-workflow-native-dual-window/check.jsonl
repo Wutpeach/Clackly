@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Provides the cross-host native-window, renderer authority, browser-preview, Settings, lifecycle, and validation contracts to review."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Requires verification of policy and bounded IPC data across Workflow, main, preload, and renderer layers."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Requires review that native and preview geometry/tokens have one authority rather than divergent copies."}
+{"file":".trellis/tasks/08-28-workflow-native-dual-window/research/workflow-native-dual-window.md","reason":"Supplies the concrete source anchors, rejected experiments, and manual Resolve validation limits for the review."}
+{"file":".trellis/tasks/08-28-workflow-native-dual-window/evidence.md","reason":"Records automated, package, headless-preview, authorized source-install verification, and the accepted source Workflow Resolve result while excluding packaged-distribution acceptance."}

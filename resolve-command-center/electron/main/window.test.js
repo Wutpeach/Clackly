@@ -31,6 +31,7 @@ const {
   hidePaletteWindow,
   isPaletteWindowShown
 } = require("./window");
+const { WINDOWS_NATIVE_DUAL_WINDOW_POLICY } = require("./paletteHostPolicy");
 
 function withoutDevRenderer(callback) {
   const names = [
@@ -368,7 +369,7 @@ test("palette window uses the complete Electron 36 fixed frameless contract", ()
   });
 });
 
-test("D6 standalone diagnostic uses an opaque full-bleed native Palette without a shape or Mica", () => {
+test("the Windows native policy uses an opaque full-bleed Palette without a shape or Mica", () => {
   withDevRenderer(() => {
     class FakeBrowserWindow {
       constructor(options) {
@@ -394,7 +395,7 @@ test("D6 standalone diagnostic uses an opaque full-bleed native Palette without 
       }
     }
 
-    const palette = createPaletteWindow({ surface: PALETTE_SURFACE.D6_OPAQUE_FULL_BLEED }, FakeBrowserWindow);
+    const palette = createPaletteWindow({ surface: PALETTE_SURFACE.OPAQUE_FULL_BLEED }, FakeBrowserWindow);
     assert.deepEqual(palette.options, {
       width: 240,
       height: 320,
@@ -417,7 +418,7 @@ test("D6 standalone diagnostic uses an opaque full-bleed native Palette without 
         sandbox: false
       }
     });
-    assert.equal(palette.loadedUrl, "http://127.0.0.1:5173/?palette-diagnostic=d6-opaque-full-bleed");
+    assert.equal(palette.loadedUrl, "http://127.0.0.1:5173/?palette-surface=opaque-full-bleed");
     assert.deepEqual(palette.shapeCalls, []);
     assert.equal(palette.centered, true);
     assert.equal(typeof palette.listeners.get("blur"), "function");
@@ -425,7 +426,58 @@ test("D6 standalone diagnostic uses an opaque full-bleed native Palette without 
   });
 });
 
-test("D7 keeps the D6 main window and creates an opaque detached Panel with no native gap occupant", () => {
+test("the Windows native policy keeps its exact full-bleed contract for the built or packaged renderer", () => {
+  withoutDevRenderer(() => {
+    class FakeBrowserWindow {
+      constructor(options) {
+        this.options = options;
+        this.listeners = new Map();
+        this.shapeCalls = [];
+      }
+
+      loadFile(filePath, options) { this.loaded = { filePath, options }; }
+      center() {}
+      setShape(shape) { this.shapeCalls.push(shape); }
+      on(event, listener) { this.listeners.set(event, listener); }
+    }
+
+    const palette = createPaletteWindow(WINDOWS_NATIVE_DUAL_WINDOW_POLICY, FakeBrowserWindow);
+    assert.deepEqual(palette.options, {
+      width: 240,
+      height: 320,
+      show: false,
+      frame: false,
+      roundedCorners: true,
+      transparent: false,
+      thickFrame: true,
+      resizable: false,
+      maximizable: false,
+      minimizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      backgroundColor: "#151619",
+      webPreferences: {
+        preload: path.join(__dirname, "preload.js"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false
+      }
+    });
+    assert.deepEqual(palette.loaded, {
+      filePath: path.join(__dirname, "../../dist/renderer/index.html"),
+      options: {
+        query: {
+          "palette-surface": "opaque-full-bleed",
+          "interaction-panel-mode": "detached-native-panel"
+        }
+      }
+    });
+    assert.deepEqual(palette.shapeCalls, []);
+  });
+});
+
+test("the Windows native policy creates an opaque detached Panel with no native gap occupant", () => {
   withDevRenderer(() => {
     class FakeBrowserWindow {
       constructor(options) {
@@ -486,8 +538,8 @@ test("D7 keeps the D6 main window and creates an opaque detached Panel with no n
     }
 
     const main = createPaletteWindow({
-      surface: PALETTE_SURFACE.D6_OPAQUE_FULL_BLEED,
-      interactionPanel: PALETTE_INTERACTION_MODE.D7_TWO_WINDOW
+      surface: PALETTE_SURFACE.OPAQUE_FULL_BLEED,
+      interactionPanel: PALETTE_INTERACTION_MODE.DETACHED_NATIVE
     }, FakeBrowserWindow);
     const panel = createDetachedInteractionPanelWindow(FakeBrowserWindow);
 
@@ -497,8 +549,8 @@ test("D7 keeps the D6 main window and creates an opaque detached Panel with no n
     assert.equal(main.options.backgroundColor, "#151619");
     assert.equal(main.options.roundedCorners, true);
     assert.equal(main.options.thickFrame, true);
-    assert.match(main.loadedUrl, /palette-diagnostic=d6-opaque-full-bleed/);
-    assert.match(main.loadedUrl, /interaction-panel-diagnostic=d7-two-window/);
+    assert.match(main.loadedUrl, /palette-surface=opaque-full-bleed/);
+    assert.match(main.loadedUrl, /interaction-panel-mode=detached-native-panel/);
 
     assert.deepEqual(panel.options, {
       width: 260,
@@ -770,7 +822,7 @@ test("D7 ignores only a stale focused blur and preserves the ordinary blur-to-hi
   }
 
   const d7 = createPaletteWindow({
-    surface: PALETTE_SURFACE.D6_OPAQUE_FULL_BLEED,
+    surface: PALETTE_SURFACE.OPAQUE_FULL_BLEED,
     ignoreFocusedBlur: true
   }, FakeBrowserWindow);
   d7.calls = [];
@@ -906,7 +958,7 @@ test("D6 anchors its full-bleed native Palette at the cursor and keeps opacity c
     webContents: { send: () => {} }
   };
   const options = {
-    surface: PALETTE_SURFACE.D6_OPAQUE_FULL_BLEED,
+    surface: PALETTE_SURFACE.OPAQUE_FULL_BLEED,
     screen: {
       getCursorScreenPoint: () => ({ x: 100, y: 100 }),
       getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })
@@ -949,7 +1001,7 @@ test("D6 uses the 240×320 native footprint for work-area flipping", () => {
   const calls = [];
   const window = createShowPaletteWindow(calls);
   showPaletteWindow(window, {
-    surface: PALETTE_SURFACE.D6_OPAQUE_FULL_BLEED,
+    surface: PALETTE_SURFACE.OPAQUE_FULL_BLEED,
     screen: {
       getCursorScreenPoint: () => ({ x: 1800, y: 900 }),
       getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })
@@ -1226,17 +1278,21 @@ test("both hosts share the fixed palette helper and register only semantic Inter
   }
 });
 
-test("D7 is isolated to the standalone Windows dev-renderer composition root", () => {
+test("both Windows composition roots use the shared native detached Panel controller", () => {
   const standalone = fs.readFileSync(path.join(__dirname, "main.js"), "utf8");
   const workflow = fs.readFileSync(path.join(__dirname, "../../workflow-plugin/main.js"), "utf8");
 
-  assert.match(standalone, /process\.platform === "win32" && !app\.isPackaged && shouldLoadDevRenderer\(\)/);
-  assert.match(standalone, /interactionPanel: PALETTE_INTERACTION_MODE\.D7_TWO_WINDOW/);
-  assert.match(standalone, /createDetachedInteractionPanelWindow/);
-  assert.match(standalone, /function createStandalonePaletteWindow\(\) \{[\s\S]*ensureDetachedInteractionPanelWindow\(\);[\s\S]*return window;/);
-  assert.match(standalone, /closeDetachedInteractionPanel\(window, detachedInteractionPanelWindow\);/);
-  assert.match(standalone, /closeDetachedInteractionPanel\(paletteWindow, null\);/);
-  assert.doesNotMatch(workflow, /D7_TWO_WINDOW|DetachedInteractionPanel|interaction-panel-diagnostic/);
+  for (const [source, host] of [[standalone, "STANDALONE"], [workflow, "WORKFLOW"]]) {
+    assert.match(source, new RegExp(`host:\\s*PALETTE_HOST\\.${host}`));
+    assert.match(source, /selectPaletteHostPolicy\(/);
+    assert.match(source, /usesWindowsNativeDualWindow\(paletteHostPolicy\)/);
+    assert.match(source, /createNativeDualWindowHost\(/);
+    assert.match(source, /createDetachedInteractionPanelWindow/);
+    assert.match(source, /openDetachedInteractionPanel/);
+    assert.match(source, /closeDetachedInteractionPanel/);
+    assert.match(source, /close:\s*\(\)\s*=> nativeDualWindowHost\.closeInteractionPanel\(\{ restoreFocus: true \}\)/);
+    assert.doesNotMatch(source, /app\.isPackaged|shouldLoadDevRenderer|backgroundMaterial|mica/);
+  }
 });
 
 test("both hosts toggle on the logical shown predicate", () => {
@@ -1268,9 +1324,9 @@ test("preload exposes bounded Interaction Panel intent without a renderer bounds
   assert.doesNotMatch(detachedPreload, /executeCommand|executeInteraction|listCommands|openSettings/);
   assert.match(palettePreload, /executeCommand/);
   assert.doesNotMatch(app, /setPaletteMode/);
-  assert.match(app, /d7DetachedInteractionPanel/);
+  assert.match(app, /usesDetachedNativePanel/);
   assert.match(app, /interaction-panel-measure/);
-  assert.match(app, /!d7DetachedInteractionPanel/);
+  assert.match(app, /!detachedNativeInteractionPanel/);
   assert.match(styles, /\.palette-shell:focus/);
   assert.match(styles, /outline:\s*none/);
 });
@@ -1282,16 +1338,15 @@ test("Palette and Settings retain their qualified painted radii while native win
 
   assert.equal(sharedGeometry.shadowPadding, PALETTE_SHADOW_PADDING, "native helper reads the shared shadow-padding authority");
   assert.match(app, /import paletteGeometry from "\.\.\/shared\/palette-geometry\.json"/);
-  assert.match(app, /import \{ getPaletteShadowPadding, usesD7DetachedInteractionPanel \} from "\.\/paletteDiagnostic\.mjs"/);
-  assert.match(app, /shadowPadding:\s*PALETTE_SHADOW_PADDING/);
-  assert.match(app, /"--palette-shadow-padding": `\$\{paletteShadowPadding\}px`/);
-  assert.match(styles, /--palette-elevation:\s*0 2px 6px rgba\(0, 0, 0, 0\.45\)/);
+  assert.match(app, /import \{ getPaletteShadowPadding, usesDetachedNativePanel \} from "\.\/paletteDiagnostic\.mjs"/);
+  assert.match(app, /getPaletteVisualStyle\(paletteShadowPadding\)/);
+  assert.match(styles, /--palette-elevation:\s*var\(--palette-external-shadow\)/);
   assert.match(styles, /\.settings-shell,\s*\.palette-main\s*\{[^}]*border:\s*1px solid var\(--color-border-strong\)/s);
   assert.match(styles, /\.settings-shell\s*\{[^}]*border-radius:\s*0[^}]*box-shadow:\s*0 18px 44px/s);
-  assert.match(styles, /\.palette-main\s*\{[^}]*top:\s*var\(--palette-shadow-padding\)[^}]*left:\s*var\(--palette-shadow-padding\)[^}]*border-radius:\s*8px[^}]*box-shadow:\s*var\(--palette-elevation\)/s);
+  assert.match(styles, /\.palette-main\s*\{[^}]*top:\s*var\(--palette-shadow-padding\)[^}]*left:\s*var\(--palette-shadow-padding\)[^}]*width:\s*var\(--palette-main-width\)[^}]*height:\s*var\(--palette-main-height\)[^}]*border-radius:\s*var\(--palette-main-radius\)[^}]*box-shadow:\s*var\(--palette-elevation\)/s);
   assert.match(styles, /\.palette-shell\s*\{[^}]*background:\s*transparent/s);
-  assert.match(styles, /\.interaction-panel\s*\{[^}]*top:\s*calc\(var\(--palette-shadow-padding\) \+ var\(--interaction-panel-top\)\)[^}]*left:\s*calc\(256px \+ var\(--palette-shadow-padding\)\)[^}]*width:\s*260px[^}]*max-height:\s*180px[^}]*border-radius:\s*4px[^}]*box-shadow:\s*var\(--palette-elevation\)/s);
-  assert.match(styles, /--color-palette-surface:\s*#151619/);
+  assert.match(styles, /\.interaction-panel\s*\{[^}]*top:\s*calc\(var\(--palette-shadow-padding\) \+ var\(--interaction-panel-top\)\)[^}]*left:\s*calc\(var\(--palette-main-width\) \+ var\(--interaction-panel-gap\) \+ var\(--palette-shadow-padding\)\)[^}]*width:\s*var\(--interaction-panel-width\)[^}]*max-height:\s*var\(--interaction-panel-max-height\)[^}]*border-radius:\s*var\(--interaction-panel-radius\)[^}]*box-shadow:\s*var\(--palette-elevation\)/s);
+  assert.match(styles, /--color-palette-surface:\s*var\(--palette-surface\)/);
   assert.match(styles, /--color-interaction-panel:\s*var\(--color-palette-surface\)/);
   assert.doesNotMatch(styles, /actions-panel|actions-view|panel-arrow/);
   assert.doesNotMatch(styles, /--radius-window/);

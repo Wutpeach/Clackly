@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import InteractionPanelContent from "./InteractionPanelContent.jsx";
+import { getPaletteVisualStyle } from "./paletteVisualStyle.mjs";
 
 export default function DetachedInteractionPanelApp() {
   const [presentation, setPresentation] = useState(null);
@@ -11,7 +12,7 @@ export default function DetachedInteractionPanelApp() {
   }, []);
 
   return (
-    <main className="detached-interaction-panel" aria-label="Command information">
+    <main className="detached-interaction-panel" style={getPaletteVisualStyle(0)} aria-label="Command information">
       <InteractionPanelContent presentation={presentation} />
     </main>
   );

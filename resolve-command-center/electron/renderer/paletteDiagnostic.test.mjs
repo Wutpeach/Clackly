@@ -1,21 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  D6_OPAQUE_FULL_BLEED_MARKER,
-  D7_TWO_WINDOW_MARKER,
+  DETACHED_NATIVE_PANEL_MODE,
+  OPAQUE_FULL_BLEED_SURFACE,
   getPaletteShadowPadding,
-  usesD7DetachedInteractionPanel
+  usesDetachedNativePanel
 } from "./paletteDiagnostic.mjs";
 
-test("D6 full-bleed inset is accepted only by an injected Electron Palette host", () => {
+test("the opaque full-bleed surface is accepted only by an injected Electron Palette host", () => {
   assert.equal(getPaletteShadowPadding({
     hasElectronHost: true,
-    search: `?palette-diagnostic=${D6_OPAQUE_FULL_BLEED_MARKER}`,
+    search: `?palette-surface=${OPAQUE_FULL_BLEED_SURFACE}`,
     shadowPadding: 8
   }), 0);
   assert.equal(getPaletteShadowPadding({
     hasElectronHost: false,
-    search: `?palette-diagnostic=${D6_OPAQUE_FULL_BLEED_MARKER}`,
+    search: `?palette-surface=${OPAQUE_FULL_BLEED_SURFACE}`,
     shadowPadding: 8
   }), 8, "the root browser preview retains its shared padded composition");
   assert.equal(getPaletteShadowPadding({
@@ -25,16 +25,16 @@ test("D6 full-bleed inset is accepted only by an injected Electron Palette host"
   }), 8, "Settings has no Palette diagnostic marker");
 });
 
-test("D7 detached Panel marker is accepted only by an injected Electron Palette host", () => {
-  assert.equal(usesD7DetachedInteractionPanel({
+test("the detached native Panel mode is accepted only by an injected Electron Palette host", () => {
+  assert.equal(usesDetachedNativePanel({
     hasElectronHost: true,
-    search: `?palette-diagnostic=${D6_OPAQUE_FULL_BLEED_MARKER}&interaction-panel-diagnostic=${D7_TWO_WINDOW_MARKER}`
+    search: `?palette-surface=${OPAQUE_FULL_BLEED_SURFACE}&interaction-panel-mode=${DETACHED_NATIVE_PANEL_MODE}`
   }), true);
-  assert.equal(usesD7DetachedInteractionPanel({
+  assert.equal(usesDetachedNativePanel({
     hasElectronHost: false,
-    search: `?interaction-panel-diagnostic=${D7_TWO_WINDOW_MARKER}`
+    search: `?interaction-panel-mode=${DETACHED_NATIVE_PANEL_MODE}`
   }), false, "browser preview remains on its attached-panel contract");
-  assert.equal(usesD7DetachedInteractionPanel({
+  assert.equal(usesDetachedNativePanel({
     hasElectronHost: true,
     search: "?view=settings"
   }), false, "Settings never opts into the detached Panel");
