@@ -800,3 +800,24 @@ Replaced legacy Ctrl+K Actions with universal selected-Command Interaction Info,
 ### Status
 
 [OK] **Completed**
+
+
+## Session 37: Stabilize native D6 D7 Palette windows
+
+**Date**: 2026-08-28
+**Task**: Stabilize native D6 D7 Palette windows
+**Branch**: `main`
+
+### Summary
+
+Committed the accepted standalone D6 opaque native Palette and D7 detached Interaction Panel. Retired the temporary tracer, preserved the focus-loss regression guard, verified focused/full/staged-index tests and build, and archived the task.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f59566a` | (see git log) |
+
+### Status
+
+[OK] **Completed**
