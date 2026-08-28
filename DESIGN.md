@@ -1,6 +1,6 @@
 ---
 name: Clackly
-description: A compact keyboard-first precision command instrument for DaVinci Resolve.
+description: A compact, keyboard-first command instrument for DaVinci Resolve.
 colors:
   accent: "#F36A2D"
   accent-hover: "#FF7A3D"
@@ -14,7 +14,7 @@ colors:
   palette-separator: "rgba(255,255,255,0.055)"
   panel-bg: "#15181E"
   header-bottom: "#1C1F23"
-  row-hover: "rgba(255,255,255,0.065)"
+  row-hover: "rgba(255,255,255,0.052)"
   row-selected: "#E7E8EA"
   row-selected-foreground: "#17191D"
   toolbar-bg: "rgba(24,26,30,0.72)"
@@ -62,38 +62,61 @@ typography:
     fontWeight: 600
     lineHeight: 1
 rounded:
-  window: "0px"
+  settings-shell: "0px"
+  palette-main: "8px"
+  interaction-panel: "4px"
+  search: "4px"
   control: "6px"
-  row: "2px"
+  row: "3px"
   rail: "3px"
   toolbar: "4px"
-  icon: "6px"
   keycap: "4px"
 spacing:
   xs: "4px"
   sm: "8px"
+  panel-gap: "16px"
   row: "30px"
-  md: "16px"
+  section: "21px"
+  footer: "27px"
 components:
   command-row:
     backgroundColor: "transparent"
     textColor: "{colors.text-secondary}"
     rounded: "{rounded.row}"
     padding: "0 7px"
-    height: "30px"
+    height: "{spacing.row}"
   command-row-selected:
     backgroundColor: "{colors.row-selected}"
     textColor: "{colors.row-selected-foreground}"
-    rounded: "{rounded.control}"
+    rounded: "{rounded.row}"
+    height: "{spacing.row}"
+  launcher-search:
+    backgroundColor: "{colors.palette-control-fill}"
+    textColor: "{colors.text-secondary}"
+    rounded: "{rounded.search}"
+    padding: "0 9px"
+    height: "34px"
   search-input:
-    backgroundColor: "{colors.panel-bg}"
+    backgroundColor: "{colors.palette-control-fill}"
     textColor: "{colors.text-primary}"
-    rounded: "{rounded.control}"
+    rounded: "{rounded.search}"
+    padding: "0 9px"
     height: "34px"
   palette-footer:
     backgroundColor: "{colors.palette-surface}"
     textColor: "{colors.palette-muted}"
-    height: "27px"
+    height: "{spacing.footer}"
+  interaction-panel:
+    backgroundColor: "{colors.interaction-panel}"
+    textColor: "{colors.text-primary}"
+    rounded: "{rounded.interaction-panel}"
+    padding: "12px"
+    width: "260px"
+  settings-shell:
+    backgroundColor: "{colors.window-bg}"
+    rounded: "{rounded.settings-shell}"
+    width: "760px"
+    height: "560px"
 ---
 
 # Design System: Clackly
@@ -102,89 +125,101 @@ components:
 
 **Creative North Star: "The Resolve Precision Instrument"**
 
-Clackly is a compact professional control surface that appears inside the editor's existing Resolve workflow, performs one focused job, and gets out of the way. Its visual language combines Resolve-grade dark tonal layering with the immediacy of Spotlight and FX Console, while rejecting the oversized cards, generous empty space and playful softness of consumer launchers.
+Clackly is a compact professional control surface that appears inside the editor's Resolve workflow, performs one focused job, and returns attention to the timeline. Its visual language combines Resolve-grade dark tonal restraint with the immediacy of Spotlight and FX Console. It rejects oversized cards, generous empty space, and playful consumer-launcher softness.
+
+On Windows, that instrument is a stable native two-window composition: a fixed main Palette and an independent information Panel. The host owns native window behavior; the renderer owns only Palette content and the bounded information presentation. The browser page is a visual DOM simulation of the same shared contract, never evidence of native behavior.
 
 **Key Characteristics:**
 
-- Dense, keyboard-first and operational.
-- Dark neutral layers separated by tone and hairline borders.
-- Orange used sparingly for active state, focus and identity.
+- Dense, keyboard-first, and operational.
+- Dark neutral surfaces separated by tone, hairlines, and restrained depth.
+- Orange used sparingly for identity, focus, pinning, and essential state.
 - Small controlled radii and a consistent `lucide-react` line-icon vocabulary.
-- Fast motion that confirms state without becoming decoration.
+- Windows native Palette visibility changes immediately and without authored entry or exit motion.
 
 ## Colors
 
-The system uses restrained near-black layers and one precise orange signal. The Palette main field, Footer, and Interaction Panel share the exact `#151619` neutral instrument field; the Footer is separated only by a faint hairline, and the panel only by a subtle border and shadow. Search is the inset control within the main field. Settings titlebar tones remain independent. Backgrounds establish hierarchy through small tonal steps; orange never becomes a large fill.
+The Palette main field, Footer, and information Panel use one shared neutral surface token. Search and keycaps inset slightly into that field; subtle borders and white-on-black tonal contrast create separation without a second dark toolbar. Settings retains its independent titlebar treatment and base window tone.
 
-**The Orange Signal Rule.** Use the accent only for Settings/brand identity, focus indication, pinned indicators, and essential state. Palette selection is always a light neutral anchor with dark foreground; orange never becomes a Palette row fill.
+**The Orange Signal Rule.** Use the accent only for Settings or brand identity, focus indication, pinned indicators, and essential state. Palette selection is always a light neutral anchor with dark foreground; orange never becomes a Palette row fill.
 
 ## Typography
 
 **Display Font:** HarmonyOS Sans with Segoe UI and system sans-serif fallback
-**Body Font:** HarmonyOS Sans with system sans-serif fallback
+**Body Font:** HarmonyOS Sans with Segoe UI and system sans-serif fallback
 
-Typography is compact and utilitarian. Labels prioritize fast scanning; the wordmark earns distinction through geometric construction and increased tracking rather than a decorative display face.
+Typography is compact and utilitarian. Command names lead the scan path; categories, lifecycle status, keycaps, and Footer controls remain weaker. The wordmark earns distinction through geometric SVG construction and tracking rather than a decorative display face.
 
-**The Single-Line Command Rule.** Command names and supporting metadata stay on one line and truncate before row height changes.
+**The Single-Line Command Rule.** Command names and supporting metadata stay on one line and truncate before row height changes. Interaction action labels wrap naturally inside their own Panel because complete action names outrank horizontal compression there.
 
 ## Layout
 
-The Palette main surface is a fixed `240×320px` floating instrument, not a responsive page. Launcher and Search always occupy that left rectangle. On normal reveal its top-left anchors at the cursor; only a work-area overflow uses the existing flip/clamp rule. When Interaction Info is explicitly open, one existing BrowserWindow temporarily expands to a `516×320px` envelope: the main remains at `x=0`, a transparent `16px` gap follows, and a `260px` content-fit Interaction Panel sits to its right. The panel is clamped to `60–180px` high and scrolls its own vertical overflow; mapping labels wrap naturally instead of ellipsizing. The main keeps its `34px` search surface, `30px` rows, `21px` section labels, and quiet `27px` footer.
+The Windows D6 main Palette is a fixed, opaque `240×320px` native surface. Its visible top-left starts at the cursor, with the existing work-area flip and clamp protecting screen edges. Launcher and Search always occupy this rectangle; D6 remains full bleed from the renderer origin and has no transparent padding around its native footprint.
 
-**The Workspace Preservation Rule.** Every layout must occupy only the space required for the current task and must not turn into a full application window.
+Windows D7 is a separate, opaque native information Panel to the right of D6. It is `260px` wide, its measured content height is bounded to `60–180px`, and it is vertically positioned from the selected row within the shared inset rule. A real `16px` desktop gap separates the two windows. When the combined composition needs clamping, both native windows move together; closing D7 restores D6's exact pre-Panel bounds. D7 never flips to the left.
+
+The root browser preview renders one DOM composition from the shared geometry and visual tokens. Its transparent staging exists solely to show the CSS shadow approximation and the visibly empty gap; it does not create physical native separation or validate input, focus, z-order, DWM, HWNDs, or Resolve. Non-Windows keeps the transparent attached presentation as a compatibility fallback, not as a second visual direction.
+
+**The Workspace Preservation Rule.** Every layout occupies only the space required for the current command task and never turns into a full application window.
 
 ## Elevation & Depth
 
-Depth comes from the rectangular near-black main surface, the matching Interaction Panel, faint inner highlights, restrained borders, and a soft panel shadow. Command rows stay transparent at rest and take only a low-contrast neutral hover fill. Keyboard selection is the strongest state: a light neutral row with dark foreground across primary and secondary text. Interaction mappings remain read-only and introduce no second selection state. Status and errors appear only as compact event feedback, never as a persistent help bar.
+On Windows, DWM owns the external corners and shadow of each opaque native window. The main and Panel do not use a rendered halo, connector, or shadow-bearing bridge to impersonate that system treatment. The shared external-shadow token lets the browser preview approximate the visual depth only; it is not native geometry.
+
+Inside the surfaces, depth stays quiet: a faint inner highlight, subtle borders, and small tonal shifts distinguish controls. Command rows are transparent at rest and gain only a low-contrast neutral hover. Keyboard selection is the strongest in-Palette state: a light neutral row with dark foreground. Status and errors are compact event feedback, never a persistent help bar.
+
+**The Native Depth Rule.** Treat immediate opacity `0/1` as a stable visibility state, not an animation. Do not add scale, fade, blur, translation, taskbar animation, or timing choreography to Palette reveal or concealment.
 
 ## Shapes
 
-The outer main silhouette is a precise rectangle (`border-radius: 0`), because rounded transparent window surfaces are not paint-safe under the qualified Windows 11 build 26200 host compositor. The approved Interaction Panel exception uses Electron 36 `setShape(Rectangle[])` only while open: the native region is exactly the union of the `240×320` main rectangle and the actual content-fit panel rectangle at `x=256`. There is no connector or arrow region. The transparent gap and unused right-column pixels remain outside the native region and must pass through to Resolve. If `setShape` is unavailable or applying the union fails, the host fails closed and never leaves a `516×320` rectangular native window. On close, hide, and show recovery, it restores the exact pre-open main bounds and shape, including a right-edge clamp translation. The Interaction Panel may use an internal `8px` radius; the outer main and command rows remain precise list surfaces. Interface icons come from `lucide-react`, use a fixed `1.9px` absolute stroke width at a `14–16px` slot, and remain monochrome; the Clackly logo and mark remain custom SVG assets.
+Windows D6 is frameless, opaque, and full bleed, with native DWM corners and shadow. The Palette renderer preserves the small main-radius contract inside that native treatment. Windows D7 follows the same native outer-window policy; browser and compatibility representations preserve the smaller Panel-radius contract. The `16px` gap is empty desktop space, not part of either window.
+
+Settings is deliberately separate: its native window may use transparency, but its visible `760×560px` shell is fully painted, square, and `0px` radius. It retains the ordinary Settings lifecycle and non-Palette titlebar treatment, and does not inherit D6/D7 corners, shadow, focus, taskbar, or layout rules. Interface icons remain monochrome `lucide-react` symbols with a fixed optical stroke; the Clackly logo and mark remain project-owned path SVGs with no `<text>` or font dependency.
 
 ## Components
 
-### Palette Composition
+### Palette Main
 
-The Palette has no wordmark, colored identity line, or primary toolbar. Launcher and Search start with the search surface; Search is a separate DOM/content mode that renders only `RESULTS`, never Launcher sections. Its in-field `ESC` hint returns to Launcher, so Search has no duplicate footer Back affordance. Settings and Pin live at the left of the quiet Footer. A subdued Info control appears at the right for every selected Command. Clicking Info or pressing `Tab` while Command selection has focus explicitly opens the Interaction Panel; selection and hover never open it. The CLACKLY wordmark remains a project-owned path SVG with no `<text>` or font dependency where product identity is needed outside this Palette composition.
+The Windows main Palette is the selection and keyboard authority. It stays at the fixed D6 size, preserves focus across information open and close, and has no wordmark, orange identity rule, or primary toolbar. It is constructed hidden and persistent; first reveal may show it, while subsequent reveal and conceal use the immediate opacity lifecycle with input and focus gating.
+
+### Launcher and Search
+
+Launcher begins with the compact search surface and projects only nonempty `PINNED`, `RECENT`, and fallback `COMMANDS` sections from the existing ranked source. Search is a separate content mode containing only `RESULTS`. Its in-field `ESC` hint returns to Launcher, so Search has no duplicate Footer Back affordance. The main keeps its compact search field, row rhythm, section labels, and quiet Footer.
 
 ### Command Rows
 
-Launcher projects its existing ranked top-nine commands into truthful `PINNED`, `RECENT`, and fallback `COMMANDS` sections without duplication or a second source of truth; empty sections are absent. Search presents only `RESULTS`. All Command rows use the same `30px` rhythm: command name first with a monochrome `16px` Lucide slot where needed, then weaker single-line metadata. Default rows suppress redundant category metadata, have no card border or gradient, and retain only real Launcher position keycaps `1–9`; Search retains `ESC`. Hover is a soft neutral fill while keyboard selection is the strongest light-neutral anchor. Empty catalogs and searches use honest empty states.
+Rows are compact list primitives: transparent at rest, soft neutral on hover, and light neutral with dark foreground for keyboard selection. The command name and monochrome icon lead; category/status and true Launcher numeric keycaps are progressively weaker. There are no invented per-command shortcuts, submenu behavior, card borders, or gradients. Empty catalogs and searches use truthful empty states.
 
 ### Palette Footer
 
-The `27px` footer is a weak separator within the continuous Palette surface rather than a floating card or dark toolbar. Settings and the push-pin control stay on the left. The Info icon stays on the right for every selected Command with normal, hover, and subdued active states; it uses no saturated accent. Search leaves the in-field `ESC` hint as its only Launcher-return affordance. There are no per-command shortcut badges, Favorites, History controls, or hidden compatibility triggers.
+The Footer is a weak hairline within the same continuous Palette surface. Settings and the push-pin control stay on the left; the universal Info control stays on the right for every selected Command. Info is subdued in every state. Search uses only its in-field `ESC` return; the Footer never adds a Back control, Favorites, or History control.
 
-### Search
+### Interaction Information
 
-The search field is `34px` high with a neutral focus border. Result rows remain `30px` high with one-line registered name, category, lifecycle status, and pinned state; long metadata truncates instead of enlarging the list.
+Info click or `Tab` opens information for the selected Command; `Tab` or `Escape` closes it while preserving Palette keyboard behavior. On Windows, the main renderer measures bounded content but the actual information surface is D7: a persistent, independent native window constructed with `focusable:false`. It never steals focus or changes focusability after construction. The host gates its mouse hit target only with the visible read-only information surface; D7 never becomes a focusable, executable, or settings/control panel. Open/update sends only validated mappings-or-description presentation data; close clears it, disables panel mouse input, restores D6 bounds, and leaves no stale content.
 
-### Interaction Panel
+The content is shared across the native detached renderer, compatibility fallback, and browser preview. It shows either valid input-to-action mappings or the selected Command description, never both. It has no title, Command-name repetition, category, explanatory Footer, search, row selection, hover model, acknowledgement, or empty state. The browser preview alone adds its subdued preview-only note and never executes commands.
 
-The Interaction Panel answers either which valid input-to-action mappings exist for the currently selected Command or what that Command does. It derives rows from normalized bindings plus registered action Command labels and consumes the Palette's existing `selectedCommand`; it owns only local open/closed presentation state. More than one resolved interaction renders only the mapping rows; zero or one renders only the selected Command's registered description. It has no title, Command-name repetition, category, explanatory footer, search, row selection, hover model, acknowledgement, or empty state. The renderer sends only semantic open/close intent plus bounded integer `anchorY` and `contentHeight` measurements through the shared host helper; the host alone validates them, owns bounds/work-area clamping, and applies/restores the two-rectangle shape union. `Tab`, `Esc`, selection change, execution, and Palette close end the lifecycle before stale content can remain.
+### Settings
 
-### Overflow and Event Feedback
-
-Command labels remain single-line ellipses, while Interaction Panel action labels wrap naturally and present fully in roughly two lines. A custom tooltip is eligible for Command labels only after actual overflow detection: pointer hover waits about `450ms`, keyboard focus may reveal it immediately, and the readable `180–210px`, two-to-three-line surface is clamped inside the current BrowserWindow; native `title` remains a fallback. Status and failure feedback is an absolute compact toast with concise visible copy and full aria-live detail; error/status follows its existing clear or recovery path and may use up to three readable lines.
-
-### Motion
-
-Mode entry lasts about `120ms`; row hover/selection feedback lasts `80–120ms`. Reduced-motion environments remove motion while preserving immediate state changes.
+Settings remains a separate native window with a fully painted square visible shell and its existing singleton show/focus lifecycle. Its titlebar, feature controls, and normal taskbar behavior are intentionally independent from the compact Palette and must not absorb D6/D7 styling or behavior.
 
 ## Do's and Don'ts
 
 ### Do:
 
 - **Do** preserve complete keyboard operation and visible focus/selection.
-- **Do** use CSS variables for every confirmed color and reusable measurement.
+- **Do** consume the shared Palette geometry and visual tokens for native hosts and browser simulation.
+- **Do** keep the Windows main and information Panel as independent opaque native windows with a genuinely empty gap.
 - **Do** preserve the path-only custom SVG wordmark and mark, and use `lucide-react` SVG components for interface icons.
-- **Do** keep names single-line, selection obvious, and metadata progressively weaker.
 - **Do** render only registered Command metadata and use the truthful empty state when none is available.
+- **Do** keep Settings on its existing separate square-window contract.
 
 ### Don't:
 
-- **Don't** use large glow, full-orange rows, gradient text or decorative glass effects.
-- **Don't** use SVG `<text>` or font-dependent rendering for the CLACKLY wordmark.
-- **Don't** use radii above `16px`, oversized whitespace or card-heavy consumer layouts.
+- **Don't** add a rendered bridge, connector, or occupied hit area between the Windows native windows.
+- **Don't** add authored Palette reveal or conceal motion, or treat opacity state changes as animation.
+- **Don't** represent browser-preview output as proof of DWM, HWND separation, focus, hit testing, z-order, or Resolve acceptance.
+- **Don't** use large glow, full-orange rows, gradient text, decorative glass effects, oversized whitespace, or card-heavy consumer layouts.
 - **Don't** let UI code know how Resolve actions are implemented.
-- **Don't** add a dedicated History control; history influences ranking instead.
+- **Don't** make Settings adopt the Palette's native D6/D7 treatment.
