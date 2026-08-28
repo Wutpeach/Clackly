@@ -34,6 +34,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Renderer search uses command metadata only: `id`, `name`, and `keywords`.
 - `presentation` defaults to `visible`; internal Commands stay executable and resolvable for interaction descriptions but never appear in Launcher, Search, or Settings help targets. One shared `isCommandPresentable()` predicate owns that filter in both the command registry and the renderer presentation model; no renderer branch names a Command id or capability.
 - Production renderer presentation contains registered Commands only, and pinned/recent state starts empty. Only the root browser preview path without `window.resolveCommandCenter` may use an isolated renderer-local presentation adapter with representative Commands, lifecycle status, and normalized bindings; it is never registry, preload, IPC, or Resolve authority and never executes a real command.
+- `agentation@3.0.2` (PolyForm-Shield-1.0.0) is a development-only browser feedback tool. Lazy-load and mount its official `<Agentation />` only on that same hostless root Palette preview gate; do not render it in Electron dev/packaged renderers, Resolve, or Settings. It remains local annotation/structured-copy UI only: no registry/IPC/Resolve access, callbacks, endpoint, webhook, or automatic external submission.
 - Launcher, Search, ranking, icons, accessibility names, and generic hints preserve registered Command Metadata; renderer code contains no Command-id presentation override.
 - Renderer execution sends only the selected `commandId`.
 - Per-command shortcut badges are absent until an authoritative presentation contract exists. The universal selected-Command Footer Info control is derived from interaction metadata and is not command shortcut metadata or a host-wide hotkey.
@@ -97,6 +98,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Assert Settings remains its painted square (`0px`) transparent contract; Windows D6/D7 owns native corners/shadow while renderer main/Panel paint the shared `8px`/`4px` content radii, and the fallback retains its padded renderer-shadow contract.
 - Assert renderer uses preload APIs instead of direct Node or Resolve imports.
 - Assert the root browser preview has no injected Electron host, uses only the isolated renderer-local adapter plus canonical geometry/visual tokens and shared Panel content projection, and renders a centered visual `240x320` main plus `260px` Panel with `16px` gap and `60–180px` clamp. It preserves Info/Tab/Escape lifecycle, opens Information quietly on Command activation with no event-error feedback, places the exact preview-only note inside the panel only, and reaches the full open composition through safe-edge scrolling on a small viewport without claiming native authority.
+- Assert Agentation's browser-preview gate accepts only hostless `/` Palette preview and rejects host-injected Electron plus `?view=settings`; browser evidence must find its toolbar beside the open Interaction Panel and must find no toolbar in the injected-host scenario.
 - Assert `npm run build` succeeds and file-backed Electron startup has a built renderer target.
 - Assert `clackly-logo.svg` parses as XML and contains no `<text>`, font reference, or external image.
 - Visually verify the shared `240x320` main and visually detached `260px` Panel with the `16px` gap, universal Info, correct push-pin, mapping-or-description content exclusivity, complete wrapped labels, vertical scroll containment, shared `#151619` surface, `8px`/`4px` painted radii, shadow stage, absence of connector/title/Command-name repetition/footer, transient feedback, and Footer geometry. Use the repository `palette:evidence` developer tool headlessly by default; browser evidence proves visual-token parity only, not DWM composition, HWND separation, native hit testing, focus, z-order, packaged runtime, or Resolve validation. For source Workflow host acceptance, complete the automated gate, `npm run build`, and `npm run workflow:install`, then restart Resolve and manually test the installed source; packaged-distribution installation/acceptance requires separate evidence.
@@ -363,6 +365,97 @@ if (!canExecuteCommand(command)) {
 }
 ```
 
+## Scenario: Application Localization Boundary
+
+### 1. Scope / Trigger
+
+- Trigger: adding or changing user-visible copy, locale preference behavior, localized Command/Capability metadata, localization IPC, or Interaction Panel presentation.
+- Applies to `preferences/`, `localization/`, both Electron hosts, preload APIs, Palette, Settings, and attached/detached Interaction Panel renderers.
+
+### 2. Signatures
+
+- `Preferences.getLocale() -> "system" | "en" | "zh-CN"`.
+- `Preferences.setLocale(locale) -> locale`; invalid values throw before persistence or notification.
+- `LocalizationService.getSnapshot() -> { preference, effectiveLocale: "en" | "zh-CN" }`.
+- Main preload: `getLocalizationSnapshot()`, `setLocalePreference(locale)`, and `onLocalizationChanged(callback) -> unsubscribe`.
+- Optional package-owned metadata: `localizations[locale] = { name?, description?, category?, keywords? }`; config fields may use `{ label?, optionLabels? }`.
+- Detached presentation revision is exactly one of:
+  - `{ kind: "description", effectiveLocale, ariaLabel, description }`
+  - `{ kind: "mappings", effectiveLocale, ariaLabel, rows: [{ label, actionName, ariaLabel }] }`
+
+### 3. Contracts
+
+- `Preferences` is the only mutable locale-preference authority and writes `%APPDATA%/Clackly/preferences.json`. `ConfigManager` remains the only capability-domain writer of `%APPDATA%/Clackly/config.json`; atomic whole-file replacement is not merge or serialized-mutation safety, so these authorities must not share one document.
+- The localization service resolves `system` from Electron system languages. English is the effective and per-key fallback; unsupported and Traditional Chinese system tags resolve to English.
+- Locale snapshots are read-only presentation state. Stable Command/Capability/feature/binding/error IDs and execution IPC never carry display locale.
+- Core UI copy comes from bundled resources. Package metadata keeps required English base fields and may add partial locale overlays; each missing field or option label falls back independently to its English/base value.
+- Locale persistence completes before `localization:changed` is broadcast. A failed write leaves renderers on the previous authoritative snapshot.
+- The detached D7 Panel has no locale getter, setter, subscription, raw Command catalog, or projection logic. The Palette owner computes `stable/raw interaction data + effectiveLocale -> complete presentation revision` and sends each revision to the existing Panel window.
+- A locale change while D7 is open updates that same window through `interaction-panel:presentation`; it must not close, hide, recreate, refocus, change opacity to zero, or independently combine old localized content with a new locale snapshot.
+
+### 4. Validation & Error Matrix
+
+- Missing/invalid persisted preference -> `system`; invalid requested preference -> reject without saving or broadcasting.
+- `system` + `en-*` -> `en`; `zh-CN`, `zh-SG`, or `zh-Hans*` -> `zh-CN`; unsupported/`zh-Hant*` -> `en`.
+- Missing localized resource key -> English resource; missing in English too -> safe English fallback, never the key.
+- Missing metadata locale/field/option label -> required English/base metadata value.
+- Malformed metadata overlay or option-label map -> reject at registry boundary.
+- Known structured error code -> localized presentation; unknown/unstructured error -> localized generic failure while diagnostic details remain internal.
+- Destroyed renderer during broadcast -> ignore that send failure; other open owner renderers still receive the snapshot.
+- Invalid, incomplete, oversized, or markup-bearing detached presentation -> reject and fail closed.
+
+### 5. Good/Base/Bad Cases
+
+- Good: Settings saves `zh-CN`, every open owner renderer receives one authoritative snapshot, Palette re-projects Commands, and the already-open D7 receives one complete Chinese revision.
+- Base: an English-only third-party Command remains valid and usable in both locales through field-level English fallback.
+- Good: Preferences and Capability config writes overlap in time but survive because they have distinct file authorities.
+- Bad: adding locale under a Capability config root, writing `config.json` from Preferences, or persisting locale in a component/window.
+- Bad: sending a new locale snapshot to D7 while retaining an already-localized presentation payload there.
+- Bad: rendering resource keys, raw runtime `error.message`, or new hard-coded user-facing JSX strings.
+
+### 6. Tests Required
+
+- Unit-test locale resolution, invalid preference handling, resource fallback, interpolation, and no-key exposure.
+- Persist locale and Capability config in both write orders and with overlapping service lifetimes; assert both `preferences.json` and `config.json` retain their values.
+- Test IPC get/set, broadcast only after successful persistence, unsubscribe behavior, and absence of localization APIs from the detached preload.
+- Test English-only, partial localized, malformed, cloned, and searchable Command metadata; test partial config `optionLabels` fallback.
+- With one D7 object already open, assert `en -> zh-CN -> en` changes description/mapping/action/ARIA presentation and performs no close/reopen/recreate/show/hide/opacity-zero transition.
+- Run `npm test`, `npm run build`, bilingual headless browser evidence, and the repository literal audit. Install the Workflow package before requesting Resolve-host manual acceptance.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+// Two independent full-document writers can lose sibling-root changes.
+const document = configStorage.load();
+document.preferences = { locale };
+configStorage.save(document);
+```
+
+#### Correct
+
+```javascript
+preferences.setLocale(locale);       // preferences.json authority
+configManager.save(capabilityId, v); // config.json authority
+```
+
+#### Wrong
+
+```javascript
+// D7 now owns two independently changing presentation inputs.
+panel.setState({ localizedPayload, effectiveLocale: nextLocale });
+```
+
+#### Correct
+
+```javascript
+const revision = projectInteraction(rawCommands, bindings, effectiveLocale);
+panel.webContents.send("interaction-panel:presentation", revision);
+```
+
+---
+
 ## Scenario: Command Row Mouse Interaction
 
 ### 1. Scope / Trigger
@@ -467,6 +560,7 @@ onContextMenu={(event) => executeInteraction(command, event)}
 - For command search changes, run a Node-level registry assertion for the changed query and command id.
 - For renderer catalog/ranking changes, run the renderer model tests covering search boundaries, grouping, ordering, and unavailable fixtures.
 - For root browser-preview changes, run `palette:evidence` against the built renderer and prove the closed/open composition, Info/Tab/Escape lifecycle, quiet command activation plus panel-only preview note, host absence, and small-viewport reachability.
+- For the development-only Agentation integration, prove the toolbar is fixed above root browser-preview content without changing Palette geometry, while Electron-host evidence remains toolbar-free.
 
 ## Scenario: Codex Impeccable Stop Hook
 
@@ -527,5 +621,6 @@ return { exitCode: 0, stdout: JSON.stringify({ continue: true }) };
 - Command manifests describe `capability`, not a Resolve or keyboard execution backend.
 - All Electron Palette modes keep the visible `240x320` main surface. Windows standalone dev/built/packaged and Workflow share the D6/D7 host policy: opaque native D6 plus detached D7 without a native gap occupant; non-Windows retains the compatible attached fallback. No renderer mode supplies native resize IPC.
 - Empty registered catalogs render the normal empty catalog state. The single root browser preview is the narrow exception: it uses isolated renderer-local representative data to show the interactive Palette and Panel without an Electron host; no query-only preview entry or production fixture is allowed.
+- Agentation is a lazily loaded devDependency in the same hostless-root browser-preview exception only; it keeps its local click/annotation/copy behavior and has no external-send configuration or production host mount.
 - Functional icons come from Lucide while `clackly-logo.svg` and `clackly-mark.svg` remain custom assets.
 - `npm run dev` and built `npm start` behavior remain distinct.
