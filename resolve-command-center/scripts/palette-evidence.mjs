@@ -313,6 +313,7 @@ async function createBrowserPreviewScenario(browser, serverUrl) {
   page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
   await page.goto(serverUrl, { waitUntil: "networkidle" });
   await page.locator(".launcher-view .command-row").first().waitFor();
+  await page.locator(".clackly-browser-preview-agentation").waitFor();
   await page.waitForTimeout(80);
   return { context, page, problems };
 }
@@ -719,6 +720,15 @@ async function runScenario(name, context) {
     if (name === "browser-preview") {
       await inspectBrowserPreviewLayout(page, name);
       await assertShadowFitsPaddedShell(page, name);
+      const agentation = page.locator(".clackly-browser-preview-agentation");
+      assert.equal(await agentation.count(), 1, "Root browser preview mounts one local Agentation toolbar");
+      const agentationStyle = await agentation.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { position: style.position, zIndex: Number(style.zIndex), pointerEvents: style.pointerEvents };
+      });
+      assert.equal(agentationStyle.position, "fixed", "Agentation stays available while the preview root scrolls");
+      assert.ok(agentationStyle.zIndex >= 100000, "Agentation toolbar stays above the browser preview surface");
+      assert.equal(agentationStyle.pointerEvents, "none", "Only Agentation's own controls capture preview input");
       assert.equal(await page.locator(".interaction-panel").count(), 0, "Browser preview starts with Interaction Panel closed");
       await openBrowserPreviewInteractionPanel(page, "click");
       const panel = page.locator(".interaction-panel");
@@ -733,6 +743,7 @@ async function runScenario(name, context) {
       await assertShadowFitsPaddedShell(page, `${name}-open`);
       await inspectSurfaceHierarchy(page, `${name}-open`);
       await assertInteractionLabelsPresentFully(page, `${name}-open`);
+      assert.equal(await agentation.count(), 1, "Agentation remains available beside an open Interaction Panel");
       evidence.push(await screenshot(page, output, "browser-preview-open.png"));
       await page.keyboard.press("Tab");
       await panel.waitFor({ state: "detached" });
@@ -752,10 +763,11 @@ async function runScenario(name, context) {
       await openBrowserPreviewInteractionPanel(page, "click");
       await inspectBrowserPreviewLayout(page, `${name}-small-open`, { compact: true });
       evidence.push(await screenshot(page, output, "browser-preview-small-open.png"));
-      checks.push("Root browser preview has no injected Electron host: isolated renderer-local data drives the real Palette and Interaction Panel; Info, Tab, Escape, and command activation retain the panel lifecycle, while activation remains quiet and carries its preview-only note inside the panel; the visible 240×320/516×320 compositions center inside shared 256×336/532×336 shadow envelopes, whose alpha fades before the shell edge and scroll to safe edges when small");
+      checks.push("Root browser preview has no injected Electron host: isolated renderer-local data drives the real Palette and Interaction Panel; Agentation's fixed local toolbar stays above the preview without a host or external route; Info, Tab, Escape, and command activation retain the panel lifecycle, while activation remains quiet and carries its preview-only note inside the panel; the visible 240×320/516×320 compositions center inside shared 256×336/532×336 shadow envelopes, whose alpha fades before the shell edge and scroll to safe edges when small");
     } else if (name === "default") {
       await inspectLayout(page, name);
       await assertShadowFitsPaddedShell(page, name);
+      assert.equal(await page.locator(".clackly-browser-preview-agentation, [data-feedback-toolbar]").count(), 0, "Host-injected Electron renderer never mounts Agentation");
       assert.equal(await page.locator(".interaction-preview-note").count(), 0, "Host-injected Palette has no browser-preview execution note");
       const surfaces = await inspectSurfaceHierarchy(page, name);
       await assertRowsSingleLine(page, ".command-row", name);
@@ -973,7 +985,7 @@ async function run() {
       if (options.scenarios.has(scenario)) await runScenario(scenario, { browser, serverUrl: url, host, output: options.output, evidence, checks });
     }
     const report = {
-      scope: "Developer-only Playwright renderer evidence. Browser-process host stubs expose registered Commands, normalized interaction bindings, and semantic Interaction Panel intent; root browser preview intentionally omits that host API and uses only its isolated renderer-local presentation adapter.",
+      scope: "Developer-only Playwright renderer evidence. Browser-process host stubs expose registered Commands, normalized interaction bindings, and semantic Interaction Panel intent; root browser preview intentionally omits that host API and uses only its isolated renderer-local presentation adapter plus local Agentation toolbar.",
       limitations: [
         "This proves built/packaged renderer DOM, CSS, keyboard, and pointer behavior only.",
         "It does not prove Electron setShape/DWM composition, transparent-gap hit testing, cursor placement, native focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."

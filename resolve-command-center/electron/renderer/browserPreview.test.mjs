@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createBrowserPreviewApi } from "./browserPreview.mjs";
+import { createBrowserPreviewApi, shouldRenderBrowserPreviewAgentation } from "./browserPreview.mjs";
 import { getInteractionHelp } from "./model.mjs";
 
 test("browser preview keeps representative presentation data isolated and non-executable", async () => {
@@ -49,16 +49,6 @@ test("browser preview calculates only local bounded panel presentation geometry"
   });
 });
 
-test("browser preview keeps its locale preference adapter isolated and broadcasts snapshots", async () => {
-  const api = createBrowserPreviewApi();
-  const changes = [];
-  const unsubscribe = api.onLocalizationChanged((snapshot) => changes.push(snapshot));
-  assert.equal((await api.getLocalizationSnapshot()).preference, "en");
-  assert.deepEqual(await api.setLocalePreference("zh-CN"), { preference: "zh-CN", effectiveLocale: "zh-CN" });
-  assert.deepEqual(changes, [{ preference: "zh-CN", effectiveLocale: "zh-CN" }]);
-  unsubscribe();
-});
-
 test("browser preview reads the canonical visual contract while remaining a hostless DOM composition", () => {
   const previewSource = fs.readFileSync(new URL("./browserPreview.mjs", import.meta.url), "utf8");
   const appSource = fs.readFileSync(new URL("./App.jsx", import.meta.url), "utf8");
@@ -84,4 +74,42 @@ test("browser preview reads the canonical visual contract while remaining a host
   assert.match(styles, /\.palette-shell\.browser-preview\[data-interaction-panel-open\]\s*\{[^}]*var\(--interaction-panel-gap\)[^}]*var\(--interaction-panel-width\)/s);
   assert.match(styles, /#root:has\(> \.palette-shell\.browser-preview\)/);
   assert.doesNotMatch(previewSource, /BrowserWindow|ipcRenderer|resolveCommandCenterPanel|palette-surface/);
+});
+
+test("Agentation mounts only on the hostless root Palette preview", () => {
+  assert.equal(shouldRenderBrowserPreviewAgentation({
+    hasElectronHost: false,
+    pathname: "/",
+    search: ""
+  }), true);
+  assert.equal(shouldRenderBrowserPreviewAgentation({
+    hasElectronHost: true,
+    pathname: "/",
+    search: ""
+  }), false, "Electron dev and packaged renderers keep Agentation out");
+  assert.equal(shouldRenderBrowserPreviewAgentation({
+    hasElectronHost: false,
+    pathname: "/",
+    search: "?view=settings"
+  }), false, "Settings does not mount the preview tool");
+  assert.equal(shouldRenderBrowserPreviewAgentation({
+    hasElectronHost: false,
+    pathname: "/",
+    search: "?preview=agentation"
+  }), false, "Agentation has no query-only preview entry");
+  assert.equal(shouldRenderBrowserPreviewAgentation({
+    hasElectronHost: false,
+    pathname: "/renderer/index.html",
+    search: ""
+  }), false, "Only the normal Vite root URL mounts the preview tool");
+});
+
+test("browser preview keeps its locale preference adapter isolated and broadcasts snapshots", async () => {
+  const api = createBrowserPreviewApi();
+  const changes = [];
+  const unsubscribe = api.onLocalizationChanged((snapshot) => changes.push(snapshot));
+  assert.equal((await api.getLocalizationSnapshot()).preference, "en");
+  assert.deepEqual(await api.setLocalePreference("zh-CN"), { preference: "zh-CN", effectiveLocale: "zh-CN" });
+  assert.deepEqual(changes, [{ preference: "zh-CN", effectiveLocale: "zh-CN" }]);
+  unsubscribe();
 });

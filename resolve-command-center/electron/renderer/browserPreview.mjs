@@ -83,6 +83,9 @@ const PREVIEW_EXECUTION_ERROR = "Browser preview commands cannot execute outside
 const { inset: PANEL_INSET, minHeight: PANEL_MIN_HEIGHT, maxHeight: PANEL_MAX_HEIGHT } = paletteGeometry.interactionPanel;
 const PALETTE_HEIGHT = paletteGeometry.main.height;
 
+export function shouldRenderBrowserPreviewAgentation({ hasElectronHost, pathname, search }) {
+  return !hasElectronHost && pathname === "/" && search === "";
+}
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));

@@ -5,7 +5,7 @@
  * FIRST VIEWPORT: Search leads a truthful Pinned, Recent, and Commands list; secondary controls recede into one footer.
  * FORM: Dense Blender-style floating menu with local pointer hover and existing keyboard selection authority.
  */
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AudioWaveform,
   Bookmark,
@@ -32,6 +32,7 @@ import DetachedInteractionPanelApp from "./DetachedInteractionPanelApp.jsx";
 import InteractionPanelContent from "./InteractionPanelContent.jsx";
 import paletteGeometry from "../shared/palette-geometry.json";
 import { getPaletteVisualStyle } from "./paletteVisualStyle.mjs";
+import { shouldRenderBrowserPreviewAgentation } from "./browserPreview.mjs";
 import { api } from "./api.mjs";
 import { useLocalization } from "./LocalizationContext.jsx";
 import { localizeCommands, presentError } from "../../localization/presentation.mjs";
@@ -61,6 +62,12 @@ const detachedNativeInteractionPanel = usesDetachedNativePanel({
   search: window.location.search
 });
 const paletteVisualStyle = getPaletteVisualStyle(paletteShadowPadding);
+const showBrowserPreviewAgentation = shouldRenderBrowserPreviewAgentation({
+  hasElectronHost,
+  pathname: window.location.pathname,
+  search: window.location.search
+});
+const BrowserPreviewAgentation = lazy(() => import("./BrowserPreviewAgentation.jsx"));
 
 const ICONS = {
   marker: Bookmark,
@@ -748,9 +755,20 @@ function App() {
   if (view === "interaction-panel") {
     return <DetachedInteractionPanelApp />;
   }
-  return view === "settings"
-    ? <SettingsApp api={api} Icon={Icon} />
-    : <PaletteApp />;
+  if (view === "settings") {
+    return <SettingsApp api={api} Icon={Icon} />;
+  }
+
+  return (
+    <>
+      <PaletteApp />
+      {showBrowserPreviewAgentation && (
+        <Suspense fallback={null}>
+          <BrowserPreviewAgentation />
+        </Suspense>
+      )}
+    </>
+  );
 }
 
 export default App;
