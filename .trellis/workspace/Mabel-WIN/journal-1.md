@@ -821,3 +821,33 @@ Committed the accepted standalone D6 opaque native Palette and D7 detached Inter
 ### Status
 
 [OK] **Completed**
+
+
+## Session 38: Unify Windows native dual-window Palette
+
+**Date**: 2026-08-28
+**Task**: Unify Windows native dual-window Palette
+**Branch**: `main`
+
+### Summary
+
+Unified D6/D7 across Windows hosts, recorded accepted source Workflow Resolve validation, and synchronized the executable contract.
+
+### Main Changes
+
+- Unified Windows D6/D7 host policy and detached Panel lifecycle across Workflow and standalone hosts.
+- Recorded source Workflow Resolve acceptance; packaged-distribution acceptance remains untested.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `80844f6ba2181382d060901d501f6a700742e48c` | (see git log) |
+
+### Testing
+
+- [OK] Focused/staged snapshot suites, npm test, and renderer builds passed.
+
+### Status
+
+[OK] **Completed**
