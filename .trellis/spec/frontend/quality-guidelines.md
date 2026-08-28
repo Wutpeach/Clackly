@@ -8,6 +8,12 @@
 
 Frontend code includes Electron main-process code, Workflow Integration Plugin main-process code, preload APIs, and renderer UI. The frontend layer owns desktop behavior and user interaction only; integration actions must cross a narrow IPC/API boundary instead of importing backend or Resolve-specific APIs into renderer code.
 
+### Palette Architecture Authority
+
+- This spec records the accepted D6/D7 contract implemented by `electron/main/paletteHostPolicy.js`, the shared native window helpers, and both Windows host entry points. Windows native behavior is never inferred from a renderer URL, browser screenshot, or preview query.
+- `electron/shared/palette-geometry.json` is the cross-layer authority for shared Palette dimensions and visual tokens. The hostless root browser preview consumes that contract as an isolated, non-executable DOM simulation; it does not define or validate DWM, HWND, focus, hit testing, z-order, packaged-runtime, or Resolve behavior.
+- The transparent attached `setShape` model is a non-Windows compatibility fallback only. It is not the Windows D6/D7 architecture and must not be described as the production Windows window model.
+
 ## Scenario: Electron Command Palette Boundary
 
 ### 1. Scope / Trigger

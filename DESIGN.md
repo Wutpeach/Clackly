@@ -129,6 +129,8 @@ Clackly is a compact professional control surface that appears inside the editor
 
 On Windows, that instrument is a stable native two-window composition: a fixed main Palette and an independent information Panel. The host owns native window behavior; the renderer owns only Palette content and the bounded information presentation. The browser page is a visual DOM simulation of the same shared contract, never evidence of native behavior.
 
+**Architecture authority.** The approved D6/D7 contract as encoded by the native host policy and window helpers defines Windows behavior. `electron/shared/palette-geometry.json` owns the shared dimensions and visual tokens consumed by native helpers and renderers. The hostless root browser preview consumes those sources through an isolated, non-executable presentation adapter; it neither defines the production contract nor validates native behavior.
+
 **Key Characteristics:**
 
 - Dense, keyboard-first, and operational.
@@ -212,7 +214,7 @@ Settings remains a separate native window with a fully painted square visible sh
 - **Do** consume the shared Palette geometry and visual tokens for native hosts and browser simulation.
 - **Do** keep the Windows main and information Panel as independent opaque native windows with a genuinely empty gap.
 - **Do** preserve the path-only custom SVG wordmark and mark, and use `lucide-react` SVG components for interface icons.
-- **Do** render only registered Command metadata and use the truthful empty state when none is available.
+- **Do** keep production Command presentation Registry-only and use the truthful empty state when no registered Commands exist; only the hostless root browser preview may use isolated representative presentation data.
 - **Do** keep Settings on its existing separate square-window contract.
 
 ### Don't:

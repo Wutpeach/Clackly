@@ -6,7 +6,7 @@
 
 ## Overview
 
-This directory contains guidelines for frontend development. Fill in each file with your project's specific conventions.
+This directory contains the project's frontend implementation contracts. For Palette architecture, [Quality Guidelines](./quality-guidelines.md) is the active Trellis source of truth for the accepted Windows D6/D7 host policy, the non-Windows attached compatibility fallback, and the browser-preview authority boundary.
 
 ---
 
@@ -18,7 +18,7 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [Component Guidelines](./component-guidelines.md) | Component patterns, props, composition | To fill |
 | [Hook Guidelines](./hook-guidelines.md) | Custom hooks, data fetching patterns | To fill |
 | [State Management](./state-management.md) | Local state, global state, server state | To fill |
-| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
+| [Quality Guidelines](./quality-guidelines.md) | Active Electron, Palette, and browser-preview architecture contracts | Active |
 | [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
 
 ---
