@@ -851,3 +851,26 @@ Unified D6/D7 across Windows hosts, recorded accepted source Workflow Resolve va
 ### Status
 
 [OK] **Completed**
+
+
+## Session 39: Clackly Localization Foundation
+
+**Date**: 2026-08-28
+**Task**: Clackly Localization Foundation
+**Branch**: `main`
+
+### Summary
+
+Implemented English/Simplified Chinese localization, isolated Preferences persistence, live multi-window updates, package-owned metadata overlays, and Vite dev compatibility.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1b4f147` | (see git log) |
+| `3ba0455` | (see git log) |
+| `84d8c20` | (see git log) |
+
+### Status
+
+[OK] **Completed**
