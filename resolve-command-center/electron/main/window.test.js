@@ -4,9 +4,14 @@ const path = require("node:path");
 const test = require("node:test");
 
 const {
+  PALETTE_SHADOW_PADDING,
   PALETTE_SIZE,
+  PALETTE_WINDOW_SIZE,
   PALETTE_INTERACTION_PANEL,
   PALETTE_INTERACTION_SIZE,
+  PALETTE_INTERACTION_WINDOW_SIZE,
+  PALETTE_INTERACTION_MODE,
+  PALETTE_SURFACE,
   SETTINGS_SIZE,
   createPaletteWindow,
   createSettingsWindow,
@@ -15,6 +20,13 @@ const {
   openInteractionPanel,
   closeInteractionPanel,
   registerInteractionPanelIpc,
+  normalizeDetachedInteractionPanelPresentation,
+  normalizeDetachedInteractionPanelRequest,
+  getDetachedInteractionPanelGeometry,
+  createDetachedInteractionPanelWindow,
+  markDetachedInteractionPanelReady,
+  openDetachedInteractionPanel,
+  closeDetachedInteractionPanel,
   showPaletteWindow,
   hidePaletteWindow,
   isPaletteWindowShown
@@ -38,6 +50,17 @@ function withoutDevRenderer(callback) {
   }
 }
 
+function withDevRenderer(callback) {
+  const previous = process.env.RESOLVE_COMMAND_CENTER_RENDERER_URL;
+  process.env.RESOLVE_COMMAND_CENTER_RENDERER_URL = "http://127.0.0.1:5173";
+  try {
+    callback();
+  } finally {
+    if (previous === undefined) delete process.env.RESOLVE_COMMAND_CENTER_RENDERER_URL;
+    else process.env.RESOLVE_COMMAND_CENTER_RENDERER_URL = previous;
+  }
+}
+
 function createShowPaletteWindow(calls) {
   return {
     isDestroyed: () => false,
@@ -53,7 +76,7 @@ function createShowPaletteWindow(calls) {
   };
 }
 
-function createAttachedPaletteWindow(calls, initialBounds = { x: 100, y: 100, width: 240, height: 320 }) {
+function createAttachedPaletteWindow(calls, initialBounds = { x: 100, y: 100, ...PALETTE_WINDOW_SIZE }) {
   let bounds = { ...initialBounds };
   return {
     isDestroyed: () => false,
@@ -67,15 +90,39 @@ function createAttachedPaletteWindow(calls, initialBounds = { x: 100, y: 100, wi
     getOpacity: () => 1,
     setOpacity: (value) => calls.push(["setOpacity", value]),
     setIgnoreMouseEvents: (value) => calls.push(["setIgnoreMouseEvents", value]),
-    setFocusable: (value) => calls.push(["setFocusable", value])
+    setFocusable: (value) => calls.push(["setFocusable", value]),
+    focus: () => calls.push(["focus"])
+  };
+}
+
+function createDetachedPanelWindow(calls, initialBounds = { x: 0, y: 0, width: 260, height: 60 }) {
+  let bounds = { ...initialBounds };
+  return {
+    isDestroyed: () => false,
+    getBounds: () => ({ ...bounds }),
+    setBounds: (nextBounds) => {
+      bounds = { ...nextBounds };
+      calls.push(["setBounds", nextBounds]);
+    },
+    setOpacity: (value) => calls.push(["setOpacity", value]),
+    setIgnoreMouseEvents: (value) => calls.push(["setIgnoreMouseEvents", value]),
+    setFocusable: (value) => calls.push(["setFocusable", value]),
+    showInactive: () => calls.push("showInactive"),
+    show: () => calls.push("show"),
+    hide: () => calls.push("hide"),
+    minimize: () => calls.push("minimize"),
+    restore: () => calls.push("restore"),
+    webContents: { send: (...args) => calls.push(["send", ...args]) }
   };
 }
 
 test("palette owns one fixed footprint and settings owns separate dimensions", () => {
+  assert.equal(PALETTE_SHADOW_PADDING, 8);
   assert.deepEqual(PALETTE_SIZE, {
     width: 240,
     height: 320
   });
+  assert.deepEqual(PALETTE_WINDOW_SIZE, { width: 256, height: 336 });
   assert.deepEqual(SETTINGS_SIZE, {
     width: 760,
     height: 560
@@ -91,19 +138,34 @@ test("Interaction Panel geometry accepts only bounded semantic metrics and paint
     inset: 8
   });
   assert.deepEqual(PALETTE_INTERACTION_SIZE, { width: 516, height: 320 });
+  assert.deepEqual(PALETTE_INTERACTION_WINDOW_SIZE, { width: 532, height: 336 });
   assert.equal(getInteractionPanelGeometry({ anchorY: 80, contentHeight: 155 }).panel.y, 8);
   assert.deepEqual(getInteractionPanelGeometry({ anchorY: 80, contentHeight: 155 }).shape, [
-    { x: 0, y: 0, width: 240, height: 320 },
-    { x: 256, y: 8, width: 260, height: 155 }
+    { x: 0, y: 0, width: 256, height: 336 },
+    { x: 256, y: 8, width: 276, height: 171 }
   ]);
   assert.equal(getInteractionPanelGeometry({ anchorY: 80, contentHeight: 155, width: 516 }), null);
   assert.equal(getInteractionPanelGeometry({ anchorY: 80, contentHeight: 181 }), null);
   assert.equal(getInteractionPanelGeometry({ anchorY: -1, contentHeight: 155 }), null);
 });
 
+test("padded shape confines the accepted shadow hit region to two exact rectangles", () => {
+  const panelHeight = 155;
+  const geometry = getInteractionPanelGeometry({ anchorY: 80, contentHeight: panelHeight });
+  const [mainHalo, panelHalo] = geometry.shape;
+  const nativeHitArea = mainHalo.width * mainHalo.height + panelHalo.width * panelHalo.height;
+  const visibleArea = PALETTE_SIZE.width * PALETTE_SIZE.height + PALETTE_INTERACTION_PANEL.width * panelHeight;
+
+  assert.deepEqual(mainHalo, { x: 0, y: 0, width: 256, height: 336 });
+  assert.deepEqual(panelHalo, { x: 256, y: 8, width: 276, height: 171 });
+  assert.equal(mainHalo.x + mainHalo.width, panelHalo.x, "the two padded rectangles meet without a full-width bridge");
+  assert.equal(nativeHitArea - visibleArea, 16_112, "the accepted extra hit area is exactly the two 8px halos and the panel-height gap");
+  assert.equal(PALETTE_INTERACTION_PANEL.gap - PALETTE_SHADOW_PADDING * 2, 0, "the 16px visual gap is fully consumed only across the panel's height");
+});
+
 test("Interaction Panel expands, clamps, and applies idempotent panel-only shape updates", () => {
   const calls = [];
-  const palette = createAttachedPaletteWindow(calls, { x: 1700, y: 100, width: 240, height: 320 });
+  const palette = createAttachedPaletteWindow(calls, { x: 1700, y: 100, ...PALETTE_WINDOW_SIZE });
   const screenApi = {
     getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })
   };
@@ -113,10 +175,10 @@ test("Interaction Panel expands, clamps, and applies idempotent panel-only shape
     panelHeight: 155,
     anchorY: 80
   });
-  assert.deepEqual(calls[0], ["setBounds", { x: 1404, y: 100, width: 516, height: 320 }]);
+  assert.deepEqual(calls[0], ["setBounds", { x: 1388, y: 100, ...PALETTE_INTERACTION_WINDOW_SIZE }]);
   assert.deepEqual(calls[1], ["setShape", [
-    { x: 0, y: 0, width: 240, height: 320 },
-    { x: 256, y: 8, width: 260, height: 155 }
+    { x: 0, y: 0, width: 256, height: 336 },
+    { x: 256, y: 8, width: 276, height: 171 }
   ]]);
 
   calls.length = 0;
@@ -125,21 +187,21 @@ test("Interaction Panel expands, clamps, and applies idempotent panel-only shape
 
   openInteractionPanel(palette, { anchorY: 180, contentHeight: 175 }, { screen: screenApi });
   assert.deepEqual(calls, [["setShape", [
-    { x: 0, y: 0, width: 240, height: 320 },
-    { x: 256, y: 93, width: 260, height: 175 }
+    { x: 0, y: 0, width: 256, height: 336 },
+    { x: 256, y: 93, width: 276, height: 191 }
   ]]]);
 
   calls.length = 0;
   assert.equal(closeInteractionPanel(palette), true);
   assert.deepEqual(calls, [
-    ["setBounds", { x: 1700, y: 100, width: 240, height: 320 }],
-    ["setShape", [{ x: 0, y: 0, width: 240, height: 320 }]]
+    ["setBounds", { x: 1700, y: 100, ...PALETTE_WINDOW_SIZE }],
+    ["setShape", [{ x: 0, y: 0, width: 256, height: 336 }]]
   ]);
 });
 
 test("Interaction Panel fails closed without setShape and never expands the native rectangle", () => {
   const calls = [];
-  const initialBounds = { x: 1700, y: 100, width: 240, height: 320 };
+  const initialBounds = { x: 1700, y: 100, ...PALETTE_WINDOW_SIZE };
   const palette = createAttachedPaletteWindow(calls, initialBounds);
   delete palette.setShape;
 
@@ -150,7 +212,7 @@ test("Interaction Panel fails closed without setShape and never expands the nati
 
 test("Interaction Panel restores base bounds when applying the shape union fails", () => {
   const calls = [];
-  const initialBounds = { x: 100, y: 100, width: 240, height: 320 };
+  const initialBounds = { x: 100, y: 100, ...PALETTE_WINDOW_SIZE };
   const palette = createAttachedPaletteWindow(calls, initialBounds);
   palette.setShape = (shape) => {
     calls.push(["setShape", shape]);
@@ -163,13 +225,13 @@ test("Interaction Panel restores base bounds when applying the shape union fails
   assert.equal(openInteractionPanel(palette, { anchorY: 80, contentHeight: 155 }, { screen: screenApi }), null);
   assert.deepEqual(palette.getBounds(), initialBounds);
   assert.deepEqual(calls, [
-    ["setBounds", { x: 100, y: 100, width: 516, height: 320 }],
+    ["setBounds", { x: 100, y: 100, ...PALETTE_INTERACTION_WINDOW_SIZE }],
     ["setShape", [
-      { x: 0, y: 0, width: 240, height: 320 },
-      { x: 256, y: 8, width: 260, height: 155 }
+      { x: 0, y: 0, width: 256, height: 336 },
+      { x: 256, y: 8, width: 276, height: 171 }
     ]],
     ["setBounds", initialBounds],
-    ["setShape", [{ x: 0, y: 0, width: 240, height: 320 }]]
+    ["setShape", [{ x: 0, y: 0, width: 256, height: 336 }]]
   ]);
 });
 
@@ -181,16 +243,16 @@ test("Interaction Panel close and hide restore the fixed main rectangle", () => 
 
   assert.equal(closeInteractionPanel(palette), true);
   assert.deepEqual(calls, [
-    ["setBounds", { x: 100, y: 100, width: 240, height: 320 }],
-    ["setShape", [{ x: 0, y: 0, width: 240, height: 320 }]]
+    ["setBounds", { x: 100, y: 100, ...PALETTE_WINDOW_SIZE }],
+    ["setShape", [{ x: 0, y: 0, width: 256, height: 336 }]]
   ]);
 
   openInteractionPanel(palette, { anchorY: 160, contentHeight: 155 });
   calls.length = 0;
   hidePaletteWindow(palette);
   assert.deepEqual(calls, [
-    ["setBounds", { x: 100, y: 100, width: 240, height: 320 }],
-    ["setShape", [{ x: 0, y: 0, width: 240, height: 320 }]],
+    ["setBounds", { x: 100, y: 100, ...PALETTE_WINDOW_SIZE }],
+    ["setShape", [{ x: 0, y: 0, width: 256, height: 336 }]],
     ["setOpacity", 0],
     ["setIgnoreMouseEvents", true],
     ["setFocusable", false]
@@ -215,6 +277,36 @@ test("Interaction Panel IPC exposes semantic bounded metrics rather than rendere
   assert.equal(handlers.get("palette:interaction-panel:open")({}, { x: 1, y: 2, width: 516, height: 320 }), null);
   listeners.get("palette:interaction-panel:close")();
   assert.ok(calls.some(([name]) => name === "setShape"));
+});
+
+test("D7 Interaction Panel IPC delegates only its bounded request to the detached controller", () => {
+  const handlers = new Map();
+  const listeners = new Map();
+  const received = [];
+  const request = {
+    metrics: { anchorY: 160, contentHeight: 100 },
+    presentation: { kind: "description", description: "Inspect the selected Command." }
+  };
+  registerInteractionPanelIpc({
+    handle: (name, handler) => handlers.set(name, handler),
+    on: (name, listener) => listeners.set(name, listener)
+  }, () => {
+    throw new Error("D7 must not use the attached host helper");
+  }, {
+    open: (payload) => {
+      received.push(["open", payload]);
+      return { panelTop: 110, panelHeight: 100, anchorY: 160 };
+    },
+    close: () => received.push(["close"])
+  });
+
+  assert.deepEqual(handlers.get("palette:interaction-panel:open")({}, request), {
+    panelTop: 110,
+    panelHeight: 100,
+    anchorY: 160
+  });
+  listeners.get("palette:interaction-panel:close")();
+  assert.deepEqual(received, [["open", request], ["close"]]);
 });
 
 test("Electron dependency and lockfile stay on the Resolve host baseline", () => {
@@ -246,10 +338,10 @@ test("palette window uses the complete Electron 36 fixed frameless contract", ()
       }
     }
 
-    const palette = createPaletteWindow(FakeBrowserWindow);
+    const palette = createPaletteWindow({}, FakeBrowserWindow);
     assert.deepEqual(palette.options, {
-      width: 240,
-      height: 320,
+      width: 256,
+      height: 336,
       show: false,
       frame: false,
       roundedCorners: false,
@@ -274,6 +366,464 @@ test("palette window uses the complete Electron 36 fixed frameless contract", ()
     assert.equal(palette.centered, true);
     assert.equal(typeof palette.listeners.get("blur"), "function");
   });
+});
+
+test("D6 standalone diagnostic uses an opaque full-bleed native Palette without a shape or Mica", () => {
+  withDevRenderer(() => {
+    class FakeBrowserWindow {
+      constructor(options) {
+        this.options = options;
+        this.listeners = new Map();
+        this.shapeCalls = [];
+      }
+
+      loadURL(url) {
+        this.loadedUrl = url;
+      }
+
+      center() {
+        this.centered = true;
+      }
+
+      setShape(shape) {
+        this.shapeCalls.push(shape);
+      }
+
+      on(event, listener) {
+        this.listeners.set(event, listener);
+      }
+    }
+
+    const palette = createPaletteWindow({ surface: PALETTE_SURFACE.D6_OPAQUE_FULL_BLEED }, FakeBrowserWindow);
+    assert.deepEqual(palette.options, {
+      width: 240,
+      height: 320,
+      show: false,
+      frame: false,
+      roundedCorners: true,
+      transparent: false,
+      thickFrame: true,
+      resizable: false,
+      maximizable: false,
+      minimizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      backgroundColor: "#151619",
+      webPreferences: {
+        preload: path.join(__dirname, "preload.js"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false
+      }
+    });
+    assert.equal(palette.loadedUrl, "http://127.0.0.1:5173/?palette-diagnostic=d6-opaque-full-bleed");
+    assert.deepEqual(palette.shapeCalls, []);
+    assert.equal(palette.centered, true);
+    assert.equal(typeof palette.listeners.get("blur"), "function");
+    assert.equal(Object.hasOwn(palette.options, "backgroundMaterial"), false);
+  });
+});
+
+test("D7 keeps the D6 main window and creates an opaque detached Panel with no native gap occupant", () => {
+  withDevRenderer(() => {
+    class FakeBrowserWindow {
+      constructor(options) {
+        this.options = options;
+        this.listeners = new Map();
+        this.calls = [];
+        this.webContents = {
+          listeners: new Map(),
+          once: (event, listener) => this.webContents.listeners.set(event, listener)
+        };
+      }
+
+      loadURL(url) {
+        this.loadedUrl = url;
+      }
+
+      center() {
+        this.centered = true;
+      }
+
+      once(event, listener) {
+        this.listeners.set(event, listener);
+      }
+
+      on() {}
+
+      isDestroyed() {
+        return false;
+      }
+
+      setIgnoreMouseEvents(value) {
+        this.calls.push(["setIgnoreMouseEvents", value]);
+      }
+
+      show() {
+        this.calls.push("show");
+      }
+
+      showInactive() {
+        this.calls.push("showInactive");
+      }
+
+      hide() {
+        this.calls.push("hide");
+      }
+
+      minimize() {
+        this.calls.push("minimize");
+      }
+
+      restore() {
+        this.calls.push("restore");
+      }
+
+      focus() {
+        this.calls.push("focus");
+      }
+    }
+
+    const main = createPaletteWindow({
+      surface: PALETTE_SURFACE.D6_OPAQUE_FULL_BLEED,
+      interactionPanel: PALETTE_INTERACTION_MODE.D7_TWO_WINDOW
+    }, FakeBrowserWindow);
+    const panel = createDetachedInteractionPanelWindow(FakeBrowserWindow);
+
+    assert.equal(main.options.width, 240);
+    assert.equal(main.options.height, 320);
+    assert.equal(main.options.transparent, false);
+    assert.equal(main.options.backgroundColor, "#151619");
+    assert.equal(main.options.roundedCorners, true);
+    assert.equal(main.options.thickFrame, true);
+    assert.match(main.loadedUrl, /palette-diagnostic=d6-opaque-full-bleed/);
+    assert.match(main.loadedUrl, /interaction-panel-diagnostic=d7-two-window/);
+
+    assert.deepEqual(panel.options, {
+      width: 260,
+      height: 60,
+      show: true,
+      opacity: 0,
+      frame: false,
+      roundedCorners: true,
+      transparent: false,
+      thickFrame: true,
+      resizable: false,
+      maximizable: false,
+      minimizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      focusable: false,
+      backgroundColor: "#151619",
+      webPreferences: {
+        preload: path.join(__dirname, "preload.js"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false
+      }
+    });
+    assert.equal(panel.loadedUrl, "http://127.0.0.1:5173/?view=interaction-panel");
+    assert.equal(Object.hasOwn(panel.options, "backgroundMaterial"), false);
+    assert.deepEqual(panel.calls, [["setIgnoreMouseEvents", true]], "the visible opacity-zero Panel ignores input immediately");
+    assert.equal(panel.listeners.has("ready-to-show"), false);
+    const ready = panel.webContents.listeners.get("did-finish-load");
+    assert.equal(typeof ready, "function");
+    ready();
+    assert.deepEqual(panel.calls, [["setIgnoreMouseEvents", true]], "renderer readiness has no native visibility or focus transition");
+  });
+});
+
+test("D7 renderer readiness cannot trigger a detached visibility or focus transition while the main Palette reveals", () => {
+  withDevRenderer(() => {
+    const panelCalls = [];
+    class FakeBrowserWindow {
+      constructor() {
+        this.webContents = {
+          listeners: new Map(),
+          once: (event, listener) => this.webContents.listeners.set(event, listener)
+        };
+      }
+
+      loadURL() {}
+      isDestroyed() { return false; }
+      setIgnoreMouseEvents(value) { panelCalls.push(["setIgnoreMouseEvents", value]); }
+      setOpacity(value) { panelCalls.push(["setOpacity", value]); }
+      setFocusable(value) { panelCalls.push(["setFocusable", value]); }
+      show() { panelCalls.push("show"); }
+      showInactive() { panelCalls.push("showInactive"); }
+      hide() { panelCalls.push("hide"); }
+      minimize() { panelCalls.push("minimize"); }
+      restore() { panelCalls.push("restore"); }
+      focus() { panelCalls.push("focus"); }
+    }
+
+    const panel = createDetachedInteractionPanelWindow(FakeBrowserWindow);
+    const mainCalls = [];
+    const main = createShowPaletteWindow(mainCalls);
+    showPaletteWindow(main);
+    panel.webContents.listeners.get("did-finish-load")();
+    showPaletteWindow(main);
+
+    assert.deepEqual(panelCalls, [["setIgnoreMouseEvents", true]]);
+    assert.ok(mainCalls.filter((call) => call === "show").length >= 1, "the D6 main can reveal around Panel readiness");
+  });
+});
+
+test("D7 Info requested before detached renderer readiness fails closed without moving or hiding the main Palette", () => {
+  const mainCalls = [];
+  const panelCalls = [];
+  const originalMainBounds = { x: 900, y: 300, width: 240, height: 320 };
+  const main = createAttachedPaletteWindow(mainCalls, originalMainBounds);
+  const panel = createDetachedPanelWindow(panelCalls);
+
+  assert.equal(openDetachedInteractionPanel(main, panel, {
+    metrics: { anchorY: 160, contentHeight: 100 },
+    presentation: { kind: "description", description: "Inspect the selected Command." }
+  }), null);
+  assert.deepEqual(main.getBounds(), originalMainBounds);
+  assert.deepEqual(mainCalls, []);
+  assert.deepEqual(panelCalls, []);
+  assert.equal(panelCalls.some((call) => ["show", "showInactive", "hide", "minimize", "restore"].includes(call)), false);
+});
+
+test("D7 accepts only a bounded read-only presentation snapshot and clamps its two-window composition", () => {
+  const mappings = {
+    kind: "mappings",
+    rows: [
+      { label: "Ctrl + Left Click", actionName: "Add Marker" },
+      { label: "Right Click", actionName: "Edit Marker" }
+    ]
+  };
+  assert.deepEqual(normalizeDetachedInteractionPanelPresentation(mappings), mappings);
+  assert.deepEqual(normalizeDetachedInteractionPanelPresentation({
+    kind: "description",
+    description: "Open the selected Command's details."
+  }), {
+    kind: "description",
+    description: "Open the selected Command's details."
+  });
+  assert.equal(normalizeDetachedInteractionPanelPresentation({ ...mappings, commandId: "timeline.addMarker" }), null);
+  assert.equal(normalizeDetachedInteractionPanelPresentation({
+    kind: "mappings",
+    rows: [{ label: "<button>", actionName: "Run" }, { label: "Ctrl", actionName: "Run again" }]
+  }), null);
+  assert.equal(normalizeDetachedInteractionPanelPresentation({ kind: "description", description: "<img src=x>" }), null);
+  assert.equal(normalizeDetachedInteractionPanelRequest({
+    metrics: { anchorY: 160, contentHeight: 90 },
+    presentation: mappings,
+    bounds: { x: 0, y: 0, width: 516, height: 320 }
+  }), null, "the renderer cannot supply screen coordinates or native bounds");
+
+  const screenApi = {
+    getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })
+  };
+  const rightBottom = getDetachedInteractionPanelGeometry(
+    { x: 1700, y: 1000, width: 240, height: 320 },
+    { anchorY: 300, contentHeight: 60 },
+    screenApi
+  );
+  assert.deepEqual(rightBottom.mainBounds, { x: 1404, y: 760, width: 240, height: 320 });
+  assert.deepEqual(rightBottom.panelBounds, { x: 1660, y: 1012, width: 260, height: 60 });
+  assert.equal(rightBottom.panelBounds.x - (rightBottom.mainBounds.x + rightBottom.mainBounds.width), 16);
+  assert.equal(rightBottom.panelBounds.x + rightBottom.panelBounds.width, 1920);
+  assert.equal(rightBottom.panelBounds.y + rightBottom.panelBounds.height, 1072);
+
+  const leftTop = getDetachedInteractionPanelGeometry(
+    { x: -2000, y: -100, width: 240, height: 320 },
+    { anchorY: 80, contentHeight: 155 },
+    { getDisplayMatching: () => ({ workArea: { x: -1920, y: 0, width: 1920, height: 1080 } }) }
+  );
+  assert.deepEqual(leftTop.mainBounds, { x: -1920, y: 0, width: 240, height: 320 });
+  assert.deepEqual(leftTop.panelBounds, { x: -1664, y: 8, width: 260, height: 155 });
+  assert.equal(leftTop.panelBounds.x - (leftTop.mainBounds.x + 240), 16);
+});
+
+test("D7 readiness has no native visibility transition, then opens, updates, and closes without native show/hide cycles", () => {
+  const mainCalls = [];
+  const panelCalls = [];
+  const originalMainBounds = { x: 1700, y: 100, width: 240, height: 320 };
+  const main = createAttachedPaletteWindow(mainCalls, originalMainBounds);
+  const panel = createDetachedPanelWindow(panelCalls);
+  const request = {
+    metrics: { anchorY: 80, contentHeight: 155 },
+    presentation: {
+      kind: "mappings",
+      rows: [
+        { label: "Ctrl + Click", actionName: "Add Marker" },
+        { label: "Right Click", actionName: "Edit Marker" }
+      ]
+    }
+  };
+  const screenApi = {
+    getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })
+  };
+
+  assert.equal(markDetachedInteractionPanelReady(panel), true);
+  assert.deepEqual(panelCalls, [], "readiness marks the already-visible opacity-zero Panel only");
+  assert.equal(markDetachedInteractionPanelReady(panel), false, "readiness is idempotent");
+  panelCalls.length = 0;
+
+  assert.deepEqual(openDetachedInteractionPanel(main, panel, request, { screen: screenApi }), {
+    panelTop: 8,
+    panelHeight: 155,
+    anchorY: 80
+  });
+  assert.deepEqual(mainCalls, [
+    ["setBounds", { x: 1404, y: 100, width: 240, height: 320 }],
+    ["focus"]
+  ]);
+  assert.deepEqual(panelCalls, [
+    ["setBounds", { x: 1660, y: 108, width: 260, height: 155 }],
+    ["setIgnoreMouseEvents", false],
+    ["send", "interaction-panel:presentation", request.presentation],
+    ["setOpacity", 1]
+  ]);
+  assert.equal(panelCalls.some(([name]) => name === "setFocusable"), false, "opening preserves the constructor-owned nonfocusable contract");
+  assert.equal(mainCalls.some(([name]) => name === "focus"), true, "main remains the focus authority");
+
+  mainCalls.length = 0;
+  panelCalls.length = 0;
+  openDetachedInteractionPanel(main, panel, request, { screen: screenApi });
+  assert.equal(mainCalls.some(([name]) => name === "setBounds"), false, "repeat opens do not translate the main again");
+  assert.equal(panelCalls.some(([name]) => name === "setBounds"), false, "repeat opens retain the panel bounds");
+  assert.equal(panelCalls.some(([name]) => name === "setFocusable"), false, "repeat opens never revisit Panel focusability");
+  assert.equal(panelCalls.some((call) => ["show", "hide", "minimize", "restore", "showInactive"].includes(call)), false);
+
+  mainCalls.length = 0;
+  panelCalls.length = 0;
+  assert.equal(closeDetachedInteractionPanel(main, panel), true);
+  assert.deepEqual(mainCalls, [
+    ["setBounds", originalMainBounds]
+  ]);
+  assert.deepEqual(panelCalls, [
+    ["setOpacity", 0],
+    ["setIgnoreMouseEvents", true],
+    ["send", "interaction-panel:presentation", null]
+  ]);
+  assert.equal(panelCalls.some(([name]) => name === "setFocusable"), false, "close never toggles the permanently nonfocusable Panel");
+});
+
+test("D7 no-state detached close is a native no-op", () => {
+  const mainCalls = [];
+  const panelCalls = [];
+  const main = createAttachedPaletteWindow(mainCalls, { x: 500, y: 300, width: 240, height: 320 });
+  const panel = createDetachedPanelWindow(panelCalls);
+
+  assert.equal(closeDetachedInteractionPanel(main, panel, { restoreFocus: true }), false);
+  assert.deepEqual(mainCalls, []);
+  assert.deepEqual(panelCalls, []);
+});
+
+test("D7 restores main focus only for an active Panel close that explicitly needs it", () => {
+  const mainCalls = [];
+  const panelCalls = [];
+  let focused = false;
+  const main = createAttachedPaletteWindow(mainCalls, { x: 900, y: 300, width: 240, height: 320 });
+  main.isFocused = () => focused;
+  main.focus = () => {
+    focused = true;
+    mainCalls.push(["focus"]);
+  };
+  const panel = createDetachedPanelWindow(panelCalls);
+  const request = {
+    metrics: { anchorY: 160, contentHeight: 100 },
+    presentation: { kind: "description", description: "Inspect the selected Command." }
+  };
+  const options = {
+    screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) }
+  };
+
+  markDetachedInteractionPanelReady(panel);
+  assert.ok(openDetachedInteractionPanel(main, panel, request, options));
+  mainCalls.length = 0;
+  panelCalls.length = 0;
+  focused = false;
+
+  assert.equal(closeDetachedInteractionPanel(main, panel, { ...options, restoreFocus: true }), true);
+  assert.equal(mainCalls.filter(([name]) => name === "focus").length, 1);
+  assert.equal(panelCalls.some(([name]) => name === "setFocusable"), false);
+});
+
+test("D7 ignores only a stale focused blur and preserves the ordinary blur-to-hide path", () => {
+  class FakeBrowserWindow {
+    constructor() {
+      this.listeners = new Map();
+    }
+
+    loadFile() {}
+    center() {}
+    on(event, listener) {
+      const listeners = this.listeners.get(event) || [];
+      listeners.push(listener);
+      this.listeners.set(event, listeners);
+    }
+    isDestroyed() { return false; }
+    isVisible() { return true; }
+    isFocused() { return this.focused; }
+    getOpacity() { return this.opacity; }
+    setOpacity(value) { this.opacity = value; this.calls.push(["setOpacity", value]); }
+    setIgnoreMouseEvents(value) { this.calls.push(["setIgnoreMouseEvents", value]); }
+    setFocusable(value) { this.calls.push(["setFocusable", value]); }
+    emitBlur() { this.listeners.get("blur").forEach((listener) => listener()); }
+  }
+
+  const d7 = createPaletteWindow({
+    surface: PALETTE_SURFACE.D6_OPAQUE_FULL_BLEED,
+    ignoreFocusedBlur: true
+  }, FakeBrowserWindow);
+  d7.calls = [];
+  d7.focused = true;
+  d7.opacity = 1;
+  d7.emitBlur();
+  assert.deepEqual(d7.calls, []);
+
+  d7.focused = false;
+  d7.opacity = 1;
+  d7.emitBlur();
+  assert.deepEqual(d7.calls, [
+    ["setOpacity", 0],
+    ["setIgnoreMouseEvents", true],
+    ["setFocusable", false]
+  ]);
+
+  const defaultPalette = createPaletteWindow({}, FakeBrowserWindow);
+  defaultPalette.calls = [];
+  defaultPalette.focused = true;
+  defaultPalette.opacity = 1;
+  defaultPalette.emitBlur();
+  assert.deepEqual(defaultPalette.calls, [
+    ["setOpacity", 0],
+    ["setIgnoreMouseEvents", true],
+    ["setFocusable", false]
+  ], "non-D7 blur behavior remains unchanged even when the window reports focused");
+});
+
+test("D7 fails closed when detached presentation delivery fails and restores the D6 main bounds", () => {
+  const mainCalls = [];
+  const panelCalls = [];
+  const originalMainBounds = { x: 1700, y: 100, width: 240, height: 320 };
+  const main = createAttachedPaletteWindow(mainCalls, originalMainBounds);
+  const panel = createDetachedPanelWindow(panelCalls);
+  panel.webContents.send = (_channel, presentation) => {
+    panelCalls.push(["send", presentation]);
+    if (presentation) throw new Error("renderer delivery failed");
+  };
+  markDetachedInteractionPanelReady(panel);
+  mainCalls.length = 0;
+  panelCalls.length = 0;
+
+  assert.equal(openDetachedInteractionPanel(main, panel, {
+    metrics: { anchorY: 80, contentHeight: 155 },
+    presentation: { kind: "description", description: "Inspect the current Command." }
+  }, {
+    screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) }
+  }), null);
+  assert.deepEqual(main.getBounds(), originalMainBounds);
+  assert.ok(panelCalls.some((call) => call[0] === "setOpacity" && call[1] === 0));
+  assert.ok(panelCalls.some((call) => call[0] === "setIgnoreMouseEvents" && call[1] === true));
+  assert.ok(panelCalls.some((call) => call[0] === "send" && call[1] === null), "failure clears stale detached content");
 });
 
 test("showing a natively hidden palette restores defaults before native show", () => {
@@ -310,7 +860,7 @@ test("showing the palette tolerates missing or destroyed windows", () => {
   assert.doesNotThrow(() => showPaletteWindow({ isDestroyed: () => true }));
 });
 
-test("palette anchors its top-left corner at the cursor before restoring visibility", () => {
+test("palette anchors its visible main top-left at the cursor inside the padded native envelope", () => {
   const calls = [];
   const window = createShowPaletteWindow(calls);
   const screenApi = {
@@ -321,12 +871,91 @@ test("palette anchors its top-left corner at the cursor before restoring visibil
   showPaletteWindow(window, { screen: screenApi });
 
   assert.deepEqual(calls, [
+    ["setPosition", 92, 92],
+    ["setFocusable", true],
+    ["setIgnoreMouseEvents", false],
+    ["setOpacity", 1],
+    "show"
+  ]);
+  assert.deepEqual({ x: calls[0][1] + PALETTE_SHADOW_PADDING, y: calls[0][2] + PALETTE_SHADOW_PADDING }, { x: 100, y: 100 });
+});
+
+test("D6 anchors its full-bleed native Palette at the cursor and keeps opacity conceal/reveal persistent", () => {
+  const calls = [];
+  let visible = false;
+  let opacity = 0;
+  const window = {
+    isDestroyed: () => false,
+    isVisible: () => visible,
+    getOpacity: () => opacity,
+    setPosition: (x, y) => calls.push(["setPosition", x, y]),
+    setFocusable: (value) => calls.push(["setFocusable", value]),
+    setIgnoreMouseEvents: (value) => calls.push(["setIgnoreMouseEvents", value]),
+    setOpacity: (value) => {
+      opacity = value;
+      calls.push(["setOpacity", value]);
+    },
+    show: () => {
+      visible = true;
+      calls.push("show");
+    },
+    focus: () => calls.push("focus"),
+    hide: () => calls.push("hide"),
+    minimize: () => calls.push("minimize"),
+    restore: () => calls.push("restore"),
+    webContents: { send: () => {} }
+  };
+  const options = {
+    surface: PALETTE_SURFACE.D6_OPAQUE_FULL_BLEED,
+    screen: {
+      getCursorScreenPoint: () => ({ x: 100, y: 100 }),
+      getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })
+    }
+  };
+
+  showPaletteWindow(window, options);
+  assert.deepEqual(calls, [
     ["setPosition", 100, 100],
     ["setFocusable", true],
     ["setIgnoreMouseEvents", false],
     ["setOpacity", 1],
     "show"
   ]);
+
+  calls.length = 0;
+  hidePaletteWindow(window);
+  assert.deepEqual(calls, [
+    ["setOpacity", 0],
+    ["setIgnoreMouseEvents", true],
+    ["setFocusable", false]
+  ]);
+
+  calls.length = 0;
+  showPaletteWindow(window, options);
+  assert.deepEqual(calls, [
+    ["setPosition", 100, 100],
+    ["setFocusable", true],
+    ["setIgnoreMouseEvents", false],
+    ["setOpacity", 1],
+    "focus"
+  ]);
+  assert.equal(calls.includes("show"), false);
+  assert.equal(calls.includes("hide"), false);
+  assert.equal(calls.includes("minimize"), false);
+  assert.equal(calls.includes("restore"), false);
+});
+
+test("D6 uses the 240×320 native footprint for work-area flipping", () => {
+  const calls = [];
+  const window = createShowPaletteWindow(calls);
+  showPaletteWindow(window, {
+    surface: PALETTE_SURFACE.D6_OPAQUE_FULL_BLEED,
+    screen: {
+      getCursorScreenPoint: () => ({ x: 1800, y: 900 }),
+      getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })
+    }
+  });
+  assert.deepEqual(calls[0], ["setPosition", 1560, 580]);
 });
 
 test("palette flips above-left when the display would overflow right or bottom", () => {
@@ -339,7 +968,7 @@ test("palette flips above-left when the display would overflow right or bottom",
 
   showPaletteWindow(window, { screen: screenApi });
 
-  assert.deepEqual(calls[0], ["setPosition", 1560, 580]);
+  assert.deepEqual(calls[0], ["setPosition", 1552, 572]);
 });
 
 test("palette flips at a negative-coordinate display right edge without a cursor gap", () => {
@@ -352,7 +981,7 @@ test("palette flips at a negative-coordinate display right edge without a cursor
 
   showPaletteWindow(window, { screen: screenApi });
 
-  assert.deepEqual(calls[0], ["setPosition", -340, 50]);
+  assert.deepEqual(calls[0], ["setPosition", -348, 42]);
 });
 
 test("palette clamps into the work area when its cursor-origin placement would overflow", () => {
@@ -365,15 +994,15 @@ test("palette clamps into the work area when its cursor-origin placement would o
 
   showPaletteWindow(window, { screen: screenApi });
 
-  assert.deepEqual(calls[0], ["setPosition", 0, 500]);
+  assert.deepEqual(calls[0], ["setPosition", 0, 492]);
 });
 
-test("palette keeps cursor-origin placement at top-left and independently flips each far edge", () => {
+test("palette keeps visible cursor-origin placement when unconstrained and clamps its padded envelope at each far edge", () => {
   const workArea = { x: 0, y: 0, width: 1920, height: 1080 };
   const cases = [
-    { cursor: { x: 0, y: 0 }, expected: ["setPosition", 0, 0] },
-    { cursor: { x: 1919, y: 500 }, expected: ["setPosition", 1679, 500] },
-    { cursor: { x: 500, y: 1079 }, expected: ["setPosition", 500, 759] }
+    { cursor: { x: 100, y: 100 }, expected: ["setPosition", 92, 92] },
+    { cursor: { x: 1919, y: 500 }, expected: ["setPosition", 1664, 492] },
+    { cursor: { x: 500, y: 1079 }, expected: ["setPosition", 492, 744] }
   ];
 
   for (const { cursor, expected } of cases) {
@@ -565,7 +1194,7 @@ test("palette blur conceals once while logically shown", () => {
       }
     }
 
-    const palette = createPaletteWindow(FakeBrowserWindow);
+    const palette = createPaletteWindow({}, FakeBrowserWindow);
     const blurListener = palette.listeners.get("blur");
 
     blurListener();
@@ -597,6 +1226,19 @@ test("both hosts share the fixed palette helper and register only semantic Inter
   }
 });
 
+test("D7 is isolated to the standalone Windows dev-renderer composition root", () => {
+  const standalone = fs.readFileSync(path.join(__dirname, "main.js"), "utf8");
+  const workflow = fs.readFileSync(path.join(__dirname, "../../workflow-plugin/main.js"), "utf8");
+
+  assert.match(standalone, /process\.platform === "win32" && !app\.isPackaged && shouldLoadDevRenderer\(\)/);
+  assert.match(standalone, /interactionPanel: PALETTE_INTERACTION_MODE\.D7_TWO_WINDOW/);
+  assert.match(standalone, /createDetachedInteractionPanelWindow/);
+  assert.match(standalone, /function createStandalonePaletteWindow\(\) \{[\s\S]*ensureDetachedInteractionPanelWindow\(\);[\s\S]*return window;/);
+  assert.match(standalone, /closeDetachedInteractionPanel\(window, detachedInteractionPanelWindow\);/);
+  assert.match(standalone, /closeDetachedInteractionPanel\(paletteWindow, null\);/);
+  assert.doesNotMatch(workflow, /D7_TWO_WINDOW|DetachedInteractionPanel|interaction-panel-diagnostic/);
+});
+
 test("both hosts toggle on the logical shown predicate", () => {
   for (const hostPath of [
     path.join(__dirname, "main.js"),
@@ -612,23 +1254,43 @@ test("preload exposes bounded Interaction Panel intent without a renderer bounds
   const preload = fs.readFileSync(path.join(__dirname, "preload.js"), "utf8");
   const app = fs.readFileSync(path.join(__dirname, "../renderer/App.jsx"), "utf8");
   const styles = fs.readFileSync(path.join(__dirname, "../renderer/styles.css"), "utf8");
+  const [detachedPreload, palettePreload] = preload.split("} else {");
 
   assert.doesNotMatch(preload, /setPaletteMode/);
   assert.doesNotMatch(preload, /palette:set-mode/);
   assert.match(preload, /openInteractionPanel: \(metrics\) => ipcRenderer\.invoke\("palette:interaction-panel:open", metrics\)/);
   assert.match(preload, /closeInteractionPanel: \(\) => ipcRenderer\.send\("palette:interaction-panel:close"\)/);
   assert.doesNotMatch(preload, /setBounds|setSize|palette:bounds/);
+  assert.match(preload, /view"\) === "interaction-panel"/);
+  assert.match(preload, /resolveCommandCenterPanel/);
+  assert.match(preload, /onPresentation: \(callback\)/);
+  assert.match(preload, /interaction-panel:presentation/);
+  assert.doesNotMatch(detachedPreload, /executeCommand|executeInteraction|listCommands|openSettings/);
+  assert.match(palettePreload, /executeCommand/);
   assert.doesNotMatch(app, /setPaletteMode/);
+  assert.match(app, /d7DetachedInteractionPanel/);
+  assert.match(app, /interaction-panel-measure/);
+  assert.match(app, /!d7DetachedInteractionPanel/);
   assert.match(styles, /\.palette-shell:focus/);
   assert.match(styles, /outline:\s*none/);
 });
 
-test("palette main and Settings keep rectangular paint while only the Interaction Panel occupies the expanded column", () => {
+test("Palette and Settings retain their qualified painted radii while native window geometry stays rectangular", () => {
   const styles = fs.readFileSync(path.join(__dirname, "../renderer/styles.css"), "utf8");
+  const app = fs.readFileSync(path.join(__dirname, "../renderer/App.jsx"), "utf8");
+  const sharedGeometry = JSON.parse(fs.readFileSync(path.join(__dirname, "../shared/palette-geometry.json"), "utf8"));
 
-  assert.match(styles, /\.settings-shell,\s*\.palette-main\s*\{[^}]*border:\s*1px solid var\(--color-border-strong\)[^}]*border-radius:\s*0[^}]*box-shadow:/s);
+  assert.equal(sharedGeometry.shadowPadding, PALETTE_SHADOW_PADDING, "native helper reads the shared shadow-padding authority");
+  assert.match(app, /import paletteGeometry from "\.\.\/shared\/palette-geometry\.json"/);
+  assert.match(app, /import \{ getPaletteShadowPadding, usesD7DetachedInteractionPanel \} from "\.\/paletteDiagnostic\.mjs"/);
+  assert.match(app, /shadowPadding:\s*PALETTE_SHADOW_PADDING/);
+  assert.match(app, /"--palette-shadow-padding": `\$\{paletteShadowPadding\}px`/);
+  assert.match(styles, /--palette-elevation:\s*0 2px 6px rgba\(0, 0, 0, 0\.45\)/);
+  assert.match(styles, /\.settings-shell,\s*\.palette-main\s*\{[^}]*border:\s*1px solid var\(--color-border-strong\)/s);
+  assert.match(styles, /\.settings-shell\s*\{[^}]*border-radius:\s*0[^}]*box-shadow:\s*0 18px 44px/s);
+  assert.match(styles, /\.palette-main\s*\{[^}]*top:\s*var\(--palette-shadow-padding\)[^}]*left:\s*var\(--palette-shadow-padding\)[^}]*border-radius:\s*8px[^}]*box-shadow:\s*var\(--palette-elevation\)/s);
   assert.match(styles, /\.palette-shell\s*\{[^}]*background:\s*transparent/s);
-  assert.match(styles, /\.interaction-panel\s*\{[^}]*left:\s*256px[^}]*width:\s*260px[^}]*max-height:\s*180px/s);
+  assert.match(styles, /\.interaction-panel\s*\{[^}]*top:\s*calc\(var\(--palette-shadow-padding\) \+ var\(--interaction-panel-top\)\)[^}]*left:\s*calc\(256px \+ var\(--palette-shadow-padding\)\)[^}]*width:\s*260px[^}]*max-height:\s*180px[^}]*border-radius:\s*4px[^}]*box-shadow:\s*var\(--palette-elevation\)/s);
   assert.match(styles, /--color-palette-surface:\s*#151619/);
   assert.match(styles, /--color-interaction-panel:\s*var\(--color-palette-surface\)/);
   assert.doesNotMatch(styles, /actions-panel|actions-view|panel-arrow/);

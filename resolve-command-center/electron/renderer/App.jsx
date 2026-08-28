@@ -28,6 +28,11 @@ import {
   X
 } from "lucide-react";
 import SettingsApp from "./SettingsApp.jsx";
+import DetachedInteractionPanelApp from "./DetachedInteractionPanelApp.jsx";
+import InteractionPanelContent from "./InteractionPanelContent.jsx";
+import paletteGeometry from "../shared/palette-geometry.json";
+import { createInteractionPanelPresentation } from "./interactionPanelPresentation.mjs";
+import { getPaletteShadowPadding, usesD7DetachedInteractionPanel } from "./paletteDiagnostic.mjs";
 import {
   canExecuteCommand,
   createPresentationCatalog,
@@ -39,7 +44,18 @@ import {
   rankCommands
 } from "./model.mjs";
 
-const browserPreview = !window.resolveCommandCenter;
+const hasElectronHost = Boolean(window.resolveCommandCenter);
+const browserPreview = !hasElectronHost;
+const PALETTE_SHADOW_PADDING = paletteGeometry.shadowPadding;
+const paletteShadowPadding = getPaletteShadowPadding({
+  hasElectronHost,
+  search: window.location.search,
+  shadowPadding: PALETTE_SHADOW_PADDING
+});
+const d7DetachedInteractionPanel = usesD7DetachedInteractionPanel({
+  hasElectronHost,
+  search: window.location.search
+});
 const api = window.resolveCommandCenter || {
   listCommands: async () => [],
   listInteractionBindings: async () => [],
@@ -229,23 +245,6 @@ function CommandRow({
   );
 }
 
-function InteractionRow({ interaction }) {
-  const inputTokens = interaction.label.split(" + ").filter(Boolean);
-  return (
-    <div className="interaction-row" role="listitem" aria-label={`${interaction.label}: ${interaction.actionName}`}>
-      <span className="interaction-input" aria-hidden="true">
-        {inputTokens.map((token, index) => (
-          <React.Fragment key={`${token}-${index}`}>
-            {index > 0 && <span className="interaction-plus">+</span>}
-            <kbd>{token}</kbd>
-          </React.Fragment>
-        ))}
-      </span>
-      <span className="interaction-action-name">{interaction.actionName}</span>
-    </div>
-  );
-}
-
 function PaletteApp() {
   const shellRef = useRef(null);
   const mainSurfaceRef = useRef(null);
@@ -291,7 +290,10 @@ function PaletteApp() {
     [selectedCommand, commands, bindings]
   );
   const hasSelectedCommand = Boolean(selectedCommand);
-  const interactionPanelUsesMappings = interactionRows.length > 1;
+  const interactionPresentation = useMemo(
+    () => createInteractionPanelPresentation(selectedCommand, interactionRows),
+    [selectedCommand, interactionRows]
+  );
   const eventFeedback = status
     ? { visible: status, accessible: status, error: true }
     : isExecuting
@@ -368,7 +370,7 @@ function PaletteApp() {
   }, [hasSelectedCommand, interactionPanelOpen]);
 
   useEffect(() => {
-    if (!interactionPanelOpen) return;
+    if (!interactionPanelOpen || d7DetachedInteractionPanel) return;
     requestAnimationFrame(() => interactionPanelRef.current?.focus());
   }, [interactionPanelOpen]);
 
@@ -393,7 +395,10 @@ function PaletteApp() {
       contentHeight: Math.round(panel.getBoundingClientRect().height)
     };
     let active = true;
-    Promise.resolve(api.openInteractionPanel(metrics))
+    const request = d7DetachedInteractionPanel
+      ? { metrics, presentation: interactionPresentation }
+      : metrics;
+    Promise.resolve(api.openInteractionPanel(request))
       .then((geometry) => {
         if (!active) return;
         if (!geometry) {
@@ -408,7 +413,7 @@ function PaletteApp() {
     return () => {
       active = false;
     };
-  }, [interactionPanelOpen, interactionRows.length, mode, selectedIndex]);
+  }, [interactionPanelOpen, interactionPresentation, interactionRows.length, mode, selectedIndex]);
 
   function enterSearch(text = "") {
     setQuery(text);
@@ -594,6 +599,7 @@ function PaletteApp() {
       className={browserPreview ? "palette-shell browser-preview" : "palette-shell"}
       data-mode={mode}
       data-interaction-panel-open={interactionPanelOpen || undefined}
+      style={{ "--palette-shadow-padding": `${paletteShadowPadding}px` }}
       tabIndex={-1}
       onKeyDown={handleKeyDown}
     >
@@ -720,27 +726,25 @@ function PaletteApp() {
         </div>
       </div>
 
-      {interactionPanelOpen && hasSelectedCommand && (
+      {interactionPanelOpen && hasSelectedCommand && !d7DetachedInteractionPanel && (
         <section
           id="interaction-panel"
           ref={interactionPanelRef}
           className="interaction-panel"
           style={{
-            top: `${interactionPanelGeometry?.panelTop ?? 8}px`
+            "--interaction-panel-top": `${interactionPanelGeometry?.panelTop ?? 8}px`
           }}
           aria-label="Command information"
           tabIndex={-1}
         >
-          {interactionPanelUsesMappings ? (
-            <div className="interaction-list" role="list">
-              {interactionRows.map((interaction, index) => (
-                <InteractionRow key={`${interaction.label}-${interaction.actionName}-${index}`} interaction={interaction} />
-              ))}
-            </div>
-          ) : (
-            <p className="interaction-description">{selectedCommand.description}</p>
-          )}
+          <InteractionPanelContent presentation={interactionPresentation} />
         </section>
+      )}
+
+      {interactionPanelOpen && hasSelectedCommand && d7DetachedInteractionPanel && (
+        <div ref={interactionPanelRef} className="interaction-panel-measure" aria-hidden="true">
+          <InteractionPanelContent presentation={interactionPresentation} />
+        </div>
       )}
 
       {eventFeedback && (
@@ -753,7 +757,11 @@ function PaletteApp() {
 }
 
 function App() {
-  return new URLSearchParams(window.location.search).get("view") === "settings"
+  const view = new URLSearchParams(window.location.search).get("view");
+  if (view === "interaction-panel") {
+    return <DetachedInteractionPanelApp />;
+  }
+  return view === "settings"
     ? <SettingsApp api={api} Icon={Icon} />
     : <PaletteApp />;
 }

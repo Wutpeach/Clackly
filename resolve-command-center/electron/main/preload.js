@@ -1,6 +1,24 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld("resolveCommandCenter", {
+const isDetachedInteractionPanel = new URLSearchParams(window.location.search).get("view") === "interaction-panel";
+
+if (isDetachedInteractionPanel) {
+  let presentation = null;
+  const presentationListeners = new Set();
+  ipcRenderer.on("interaction-panel:presentation", (_event, nextPresentation) => {
+    presentation = nextPresentation;
+    presentationListeners.forEach((listener) => listener(presentation));
+  });
+
+  contextBridge.exposeInMainWorld("resolveCommandCenterPanel", {
+    onPresentation: (callback) => {
+      presentationListeners.add(callback);
+      callback(presentation);
+      return () => presentationListeners.delete(callback);
+    }
+  });
+} else {
+  contextBridge.exposeInMainWorld("resolveCommandCenter", {
   listCommands: () => ipcRenderer.invoke("commands:list"),
   searchCommands: (query) => ipcRenderer.invoke("commands:search", query),
   executeCommand: (commandId) => ipcRenderer.invoke("commands:execute", commandId),
@@ -31,4 +49,5 @@ contextBridge.exposeInMainWorld("resolveCommandCenter", {
     ipcRenderer.on("settings:select-feature", listener);
     return () => ipcRenderer.removeListener("settings:select-feature", listener);
   }
-});
+  });
+}
