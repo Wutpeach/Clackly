@@ -49,6 +49,16 @@ test("browser preview calculates only local bounded panel presentation geometry"
   });
 });
 
+test("browser preview keeps its locale preference adapter isolated and broadcasts snapshots", async () => {
+  const api = createBrowserPreviewApi();
+  const changes = [];
+  const unsubscribe = api.onLocalizationChanged((snapshot) => changes.push(snapshot));
+  assert.equal((await api.getLocalizationSnapshot()).preference, "en");
+  assert.deepEqual(await api.setLocalePreference("zh-CN"), { preference: "zh-CN", effectiveLocale: "zh-CN" });
+  assert.deepEqual(changes, [{ preference: "zh-CN", effectiveLocale: "zh-CN" }]);
+  unsubscribe();
+});
+
 test("browser preview reads the canonical visual contract while remaining a hostless DOM composition", () => {
   const previewSource = fs.readFileSync(new URL("./browserPreview.mjs", import.meta.url), "utf8");
   const appSource = fs.readFileSync(new URL("./App.jsx", import.meta.url), "utf8");

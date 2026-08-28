@@ -912,6 +912,7 @@ async function runScenario(name, context) {
       return;
     } else if (name === "error-feedback") {
       const commandFailure = "Command bridge is unavailable. Open Settings to recover, then retry.";
+      const localizedFailure = "The command could not be completed.";
       await scenario.context.close();
       const errorScenario = await createScenario(browser, serverUrl, { ...host, commandFailure });
       const errorPage = errorScenario.page;
@@ -919,7 +920,7 @@ async function runScenario(name, context) {
       await errorPage.keyboard.press("Enter");
       const feedback = errorPage.locator(".palette-event-feedback.error");
       await feedback.waitFor();
-      assert.equal(await feedback.textContent(), commandFailure, "Error feedback retains the full source text for accessibility");
+      assert.equal(await feedback.textContent(), localizedFailure, "Error feedback presents the localized generic failure instead of raw bridge detail");
       const feedbackStyle = await feedback.evaluate((element) => {
         const rect = element.getBoundingClientRect();
         const style = getComputedStyle(element);
@@ -934,7 +935,7 @@ async function runScenario(name, context) {
       await errorPage.waitForTimeout(3100);
       assert.equal(await feedback.count(), 1, "Error feedback remains visible until the existing recovery/clear path resolves it");
       await closeScenario(errorScenario, name);
-      checks.push("Errors remain visible, retain full aria-live text, and use a compact readable three-line maximum rather than acknowledgement auto-dismissal");
+      checks.push("Errors remain visible as localized presentation copy, keep their full aria-live text, and use a compact readable three-line maximum rather than acknowledgement auto-dismissal");
       return;
     }
   } finally {
