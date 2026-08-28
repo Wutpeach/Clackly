@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 39
-- **Last Active**: 2026-08-28
+- **Total Sessions**: 40
+- **Last Active**: 2026-08-29
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~876 | Active |
+| `journal-1.md` | ~897 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 40 | 2026-08-29 | Restore D6 D7 architecture source of truth | `7d5cd8e` | `main` |
 | 39 | 2026-08-28 | Clackly Localization Foundation | `1b4f147`, `3ba0455`, `84d8c20` | `main` |
 | 38 | 2026-08-28 | Unify Windows native dual-window Palette | `80844f6ba2181382d060901d501f6a700742e48c` | `main` |
 | 37 | 2026-08-28 | Stabilize native D6 D7 Palette windows | `f59566a` | `main` |

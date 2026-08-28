@@ -874,3 +874,24 @@ Implemented English/Simplified Chinese localization, isolated Preferences persis
 ### Status
 
 [OK] **Completed**
+
+
+## Session 40: Restore D6 D7 architecture source of truth
+
+**Date**: 2026-08-29
+**Task**: Restore D6 D7 architecture source of truth
+**Branch**: `main`
+
+### Summary
+
+Aligned README, DESIGN, and frontend Trellis specs with the accepted Windows D6/D7 dual-window contract and hostless browser-preview authority boundary; verified documentation-only scope and archived the task.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7d5cd8e` | (see git log) |
+
+### Status
+
+[OK] **Completed**
