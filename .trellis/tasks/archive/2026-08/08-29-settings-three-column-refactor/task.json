@@ -1,0 +1,28 @@
+{
+  "id": "settings-three-column-refactor",
+  "name": "settings-three-column-refactor",
+  "title": "Refactor Settings into three-column architecture",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "Mabel-WIN",
+  "assignee": "Mabel-WIN",
+  "createdAt": "2026-08-29",
+  "completedAt": "2026-08-29",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "description": "Refactor Settings into a three-column renderer while preserving current visual and data authorities."
+  }
+}
