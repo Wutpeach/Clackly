@@ -1,6 +1,7 @@
 const path = require("node:path");
 
 const { AfterEffectsLauncher } = require("../capability/afterEffectsLaunch");
+const { WindowsAfterEffectsProcessProbe } = require("../capability/afterEffectsProcessProbe");
 const { createCapabilityRegistry } = require("../capability/registry");
 const { createMarkerCapability } = require("../capability/marker");
 const { createImageClipboardCapability } = require("../capability/imageClipboard");
@@ -35,7 +36,8 @@ function createClacklyCore({
   hostContextProvider,
   systemLanguagesProvider = () => [],
   markerBackends,
-  imageClipboard
+  imageClipboard,
+  afterEffectsProcessProbeFactory = (options) => new WindowsAfterEffectsProcessProbe(options)
 } = {}) {
   if (typeof appRoot !== "string" || appRoot.trim().length === 0) {
     throw new TypeError("Clackly Core requires an application root");
@@ -58,6 +60,9 @@ function createClacklyCore({
   if (!imageClipboard || typeof imageClipboard !== "object" || Array.isArray(imageClipboard)) {
     throw new TypeError("Clackly Core requires Image Clipboard host adapters");
   }
+  if (typeof afterEffectsProcessProbeFactory !== "function") {
+    throw new TypeError("Clackly Core requires an After Effects process probe factory");
+  }
 
   const shortcutManager = new ShortcutManager();
   const markerCapability = createMarkerCapability({
@@ -72,8 +77,17 @@ function createClacklyCore({
   const imageClipboardCapability = createImageClipboardCapability(imageClipboard);
   capabilityRegistry.register("media.clipboard-image.import", imageClipboardCapability);
 
+  const afterEffectsProcessProbe = afterEffectsProcessProbeFactory({
+    hostEnvironment: process.env
+  });
+  if (!afterEffectsProcessProbe || typeof afterEffectsProcessProbe.prewarm !== "function"
+    || typeof afterEffectsProcessProbe.query !== "function"
+    || typeof afterEffectsProcessProbe.dispose !== "function") {
+    throw new TypeError("Clackly Core requires an After Effects process probe lifecycle");
+  }
   const desktopLauncher = new AfterEffectsLauncher({
     hostEnvironment: process.env,
+    processProbe: afterEffectsProcessProbe,
     temporaryRoot
   });
   const runtimeManager = new RuntimeManager({
@@ -129,7 +143,9 @@ function createClacklyCore({
     featureCatalog,
     searchCommands: (query, pinnedIds) => commandSearch.search(query, pinnedIds),
     executeCommand,
-    runtimeManager
+    runtimeManager,
+    prewarmAfterEffectsProcessProbe: () => afterEffectsProcessProbe.prewarm(),
+    disposeAfterEffectsProcessProbe: () => afterEffectsProcessProbe.dispose()
   };
 }
 

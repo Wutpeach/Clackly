@@ -1198,6 +1198,76 @@ const result = await mediaPoolAdapter.importMediaToBin({ diskPath, binName: "Cli
 // importMediaToBin owns a finally block that restores its original folder.
 ```
 
+## Scenario: Host-Owned After Effects Process Probe
+
+### 1. Scope / Trigger
+
+- Trigger: changing how the Electron host determines whether the configured After Effects executable is already running before it sends or cold-starts an Export-to-AE plan.
+- The probe is host infrastructure. It must not move into the isolated Python worker, Command Engine, renderer, or Resolve adapter.
+
+### 2. Signatures
+
+- Probe: `new WindowsAfterEffectsProcessProbe({ hostEnvironment?, platform?, spawnProcess?, setTimer?, clearTimer?, startupTimeoutMs?, queryTimeoutMs? })`.
+- Lifecycle: `prewarm() -> Promise<boolean>`, `query() -> Promise<{ processCount: number, records: ProcessRecord[] }>`, and `dispose() -> void`.
+- Record: `{ status: "ok", path: string } | { status: "unresolved" }`.
+- Core lifecycle: `prewarmAfterEffectsProcessProbe() -> Promise<boolean>` and `disposeAfterEffectsProcessProbe() -> void`; the raw probe is not exposed.
+
+### 3. Contracts
+
+- One hidden `shell: false` Windows PowerShell child belongs to one Clackly Core and lives no longer than its Electron host.
+- The fixed helper protocol accepts only `QUERY <positive-safe-integer-id>`. It receives no AE configuration path, JSX, project data, or arbitrary command text.
+- `prewarm()` performs one real enumeration and discards it. Every Export-to-AE invocation calls `query()` again and therefore observes fresh process state rather than a cached prewarm result.
+- Queries serialize through one helper. Prewarm plus a concurrent user query must not start a second PowerShell process or let the user consume the discarded result.
+- Node owns canonical regular-file validation and case-insensitive Windows path identity. A matching configured executable means running; valid nonmatches mean stopped; any unresolved candidate without a validated match means unknown/fail-closed; a validated match wins over other unresolved candidates.
+- Startup, query, and output are bounded. Protocol/timeout/child failure rejects the current work, terminates the helper, and performs no retry for that export. A later command may start one replacement helper.
+- Both standalone and Workflow hosts start prewarm without delaying Palette/IPC/hotkey/Resolve readiness and call disposal during `will-quit`.
+
+### 4. Validation & Error Matrix
+
+- Missing `SystemRoot`, spawn/stdio failure, invalid READY, timeout, child exit, malformed/non-UTF-8/oversized output, wrong request id, unknown fields, inconsistent count, or record overflow -> `AFTER_EFFECTS_PROCESS_PROBE_FAILED`; terminate the helper.
+- Probe failure during launcher detection -> existing `AFTER_EFFECTS_LAUNCH_FAILED`; create no AE process or startup bootstrap.
+- Zero records or all canonical valid nonmatches -> confirmed stopped and use the existing cold path exactly once.
+- Exact configured canonical path -> confirmed running and send `-r <temporary-jsx>` exactly once.
+- Unresolved record without a match -> unknown/fail-closed. Exact match plus unresolved record -> confirmed running.
+- Helper failure during background prewarm -> host remains ready; a later user command may start a new helper but the failed prewarm does not retry itself.
+
+### 5. Good/Base/Bad Cases
+
+- Good: background prewarm pays the helper's first-query cost, discards the result, and request id 2 performs a new enumeration for the first export.
+- Base: one helper services repeated fresh queries at about a few milliseconds each and exits with the host.
+- Good: failure kills the helper and the next command creates one replacement without replaying the failed export.
+- Bad: cache `isAfterEffectsRunning` from startup or reuse the prewarm response for an export.
+- Bad: check only the process name, accept another AE installation, expose raw paths/errors in logs, or leave PowerShell alive after host shutdown.
+
+### 6. Tests Required
+
+- Assert fixed encoded script/arguments, hidden no-shell pipes, readiness, timeout/output/record bounds, strict schema/request ids, and no configuration/JSX on stdin.
+- Assert prewarm performs exactly one discarded enumeration; a concurrent user query receives a distinct later response through the same child.
+- Assert zero/match/nonmatch/unresolved/match-plus-unresolved truth-table behavior and canonical-path validation.
+- Assert unknown state performs zero AE spawn and zero bootstrap write; warm and cold modes spawn once with unchanged arguments.
+- Assert active/queued work rejects on failure, no same-command retry occurs, later restart works, and disposal is idempotent and terminates the real child.
+- Assert both hosts prewarm non-blockingly and dispose during `will-quit`; non-Windows paths spawn nothing.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+const runningAtStartup = await detectAfterEffects();
+// Stale state and no executable identity guarantee.
+if (runningAtStartup) sendToAfterEffects(plan);
+```
+
+#### Correct
+
+```javascript
+queueMicrotask(() => core.prewarmAfterEffectsProcessProbe().catch(() => {}));
+
+// Each export still asks for a fresh process-table enumeration.
+const records = await processProbe.query();
+const running = validateCanonicalConfiguredPath(records);
+```
+
 ## Forbidden Patterns
 
 - Machine-specific absolute paths in startup scripts.

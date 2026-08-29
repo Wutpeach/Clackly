@@ -184,6 +184,7 @@ if (!hasSingleInstanceLock) {
   app.on("second-instance", showPalette);
 
   app.whenReady().then(() => {
+    queueMicrotask(() => core.prewarmAfterEffectsProcessProbe().catch(() => {}));
     paletteWindow = composeStartup({
       initializeAfterEffectsPath: () => initializeAfterEffectsPath(core.configManager),
       createPaletteWindow: createStandalonePaletteWindow,
@@ -206,6 +207,7 @@ if (!hasSingleInstanceLock) {
   app.on("will-quit", () => {
     const { globalShortcut } = require("electron");
     globalShortcut.unregisterAll();
+    core.disposeAfterEffectsProcessProbe();
   });
 
   app.on("window-all-closed", () => {});

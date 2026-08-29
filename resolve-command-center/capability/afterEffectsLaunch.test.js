@@ -137,28 +137,20 @@ function runningFixture(t, overrides = {}) {
 }
 
 function psJson(records) {
-  return JSON.stringify({ ProcessCount: records.length, Records: records });
+  return { processCount: records.length, records };
 }
 
 function recordPath(value) {
-  return { Path: value, Error: null };
+  return { path: value, status: "ok" };
 }
 
-function recordError(message) {
-  return { Path: null, Error: message };
+function recordError() {
+  return { status: "unresolved" };
 }
 
-test("detectRunning applies the bounded PowerShell contract and reports false on zero processes", async (t) => {
+test("detectRunning reports false on zero processes", async (t) => {
   const base = runningFixture(t, {
-    execFile: (executable, args, options, callback) => {
-      assert.equal(executable, "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
-      assert.equal(options.timeout, 5000);
-      assert.equal(options.shell, false);
-      assert.equal(options.windowsHide, true);
-      assert.equal(options.encoding, "utf8");
-      assert.equal(options.env, base.launcher.hostEnvironment);
-      callback(null, psJson([]));
-    }
+    processProbe: { query: async () => psJson([]) }
   });
 
   assert.equal(await base.launcher.detectRunning(fs.realpathSync(base.executable)), false);
@@ -166,9 +158,7 @@ test("detectRunning applies the bounded PowerShell contract and reports false on
 
 test("detectRunning reports false for all-valid nonmatching processes", async (t) => {
   const base = runningFixture(t, {
-    execFile: (executable, args, options, callback) => (
-      callback(null, psJson([recordPath(fs.realpathSync(base.other))]))
-    )
+    processProbe: { query: async () => psJson([recordPath(fs.realpathSync(base.other))]) }
   });
 
   assert.equal(await base.launcher.detectRunning(fs.realpathSync(base.executable)), false);
@@ -176,12 +166,10 @@ test("detectRunning reports false for all-valid nonmatching processes", async (t
 
 test("detectRunning reports true when a later record matches the configured executable", async (t) => {
   const base = runningFixture(t, {
-    execFile: (executable, args, options, callback) => (
-      callback(null, psJson([
+    processProbe: { query: async () => psJson([
         recordPath(fs.realpathSync(base.other)),
         recordPath(fs.realpathSync(base.executable))
-      ]))
-    )
+      ]) }
   });
 
   assert.equal(await base.launcher.detectRunning(fs.realpathSync(base.executable)), true);
@@ -189,9 +177,7 @@ test("detectRunning reports true when a later record matches the configured exec
 
 test("detectRunning treats an unresolved record without a match as an unknown failure", async (t) => {
   const base = runningFixture(t, {
-    execFile: (executable, args, options, callback) => (
-      callback(null, psJson([recordError("path unavailable")]))
-    )
+    processProbe: { query: async () => psJson([recordError()]) }
   });
 
   await assert.rejects(
@@ -202,12 +188,10 @@ test("detectRunning treats an unresolved record without a match as an unknown fa
 
 test("a validated match wins over unresolved records", async (t) => {
   const base = runningFixture(t, {
-    execFile: (executable, args, options, callback) => (
-      callback(null, psJson([
-        recordError("path unavailable"),
+    processProbe: { query: async () => psJson([
+        recordError(),
         recordPath(fs.realpathSync(base.executable))
-      ]))
-    )
+      ]) }
   });
 
   assert.equal(await base.launcher.detectRunning(fs.realpathSync(base.executable)), true);
@@ -215,12 +199,10 @@ test("a validated match wins over unresolved records", async (t) => {
 
 test("unresolved records without a match fail closed even with valid nonmatches", async (t) => {
   const base = runningFixture(t, {
-    execFile: (executable, args, options, callback) => (
-      callback(null, psJson([
+    processProbe: { query: async () => psJson([
         recordPath(fs.realpathSync(base.other)),
-        recordError("path unavailable")
-      ]))
-    )
+        recordError()
+      ]) }
   });
 
   await assert.rejects(
@@ -231,9 +213,7 @@ test("unresolved records without a match fail closed even with valid nonmatches"
 
 test("an inaccessible running path without a match is an unknown failure", async (t) => {
   const base = runningFixture(t, {
-    execFile: (executable, args, options, callback) => (
-      callback(null, psJson([recordPath(path.join(base.root, "missing", "AfterFX.exe"))]))
-    )
+    processProbe: { query: async () => psJson([recordPath(path.join(base.root, "missing", "AfterFX.exe"))]) }
   });
 
   await assert.rejects(
@@ -242,10 +222,9 @@ test("an inaccessible running path without a match is an unknown failure", async
   );
 });
 
-test("a missing SystemRoot prerequisite is an unknown failure", async (t) => {
+test("an unavailable process probe is an unknown failure", async (t) => {
   const base = runningFixture(t, {
-    hostEnvironment: { APPDATA: "C:\\Users\\host\\AppData" },
-    execFile: () => assert.fail("probe must not run")
+    processProbe: { query: async () => { throw new Error("unavailable"); } }
   });
 
   await assert.rejects(
@@ -254,9 +233,9 @@ test("a missing SystemRoot prerequisite is an unknown failure", async (t) => {
   );
 });
 
-test("inconsistent counts, malformed JSON, and malformed records are unknown failures", async (t) => {
+test("inconsistent counts and malformed records are unknown failures", async (t) => {
   const base = runningFixture(t, {
-    execFile: (executable, args, options, callback) => callback(null, "not json")
+    processProbe: { query: async () => ({ processCount: 1, records: [] }) }
   });
   await assert.rejects(
     base.launcher.detectRunning(fs.realpathSync(base.executable)),
@@ -264,9 +243,7 @@ test("inconsistent counts, malformed JSON, and malformed records are unknown fai
   );
 
   const countMismatch = runningFixture(t, {
-    execFile: (executable, args, options, callback) => (
-      callback(null, JSON.stringify({ ProcessCount: 2, Records: [] }))
-    )
+    processProbe: { query: async () => ({ processCount: 2, records: [] }) }
   });
   await assert.rejects(
     countMismatch.launcher.detectRunning(fs.realpathSync(countMismatch.executable)),
@@ -274,9 +251,7 @@ test("inconsistent counts, malformed JSON, and malformed records are unknown fai
   );
 
   const emptyRecord = runningFixture(t, {
-    execFile: (executable, args, options, callback) => (
-      callback(null, psJson([{ Path: null, Error: null }]))
-    )
+    processProbe: { query: async () => psJson([{ status: "unexpected" }]) }
   });
   await assert.rejects(
     emptyRecord.launcher.detectRunning(fs.realpathSync(emptyRecord.executable)),
@@ -284,24 +259,21 @@ test("inconsistent counts, malformed JSON, and malformed records are unknown fai
   );
 });
 
-test("a probe timeout or subprocess failure is an unknown failure", async (t) => {
+test("a process probe failure is an unknown failure", async (t) => {
   const base = runningFixture(t, {
-    execFile: (executable, args, options, callback) => (
-      callback(Object.assign(new Error("Command timed out"), { code: "ETIMEDOUT" }))
-    )
+    processProbe: { query: async () => { throw new Error("timed out"); } }
   });
 
   await assert.rejects(
     base.launcher.detectRunning(fs.realpathSync(base.executable)),
     (error) => error.code === "AFTER_EFFECTS_LAUNCH_FAILED"
-      && error.details.causeCode === "ETIMEDOUT"
   );
 });
 
 test("non-Windows running detection never probes and reports false", async (t) => {
   const base = runningFixture(t, {
     platform: "darwin",
-    execFile: () => assert.fail("probe must not run")
+    processProbe: { query: async () => assert.fail("probe must not run") }
   });
 
   assert.equal(await base.launcher.detectRunning(fs.realpathSync(base.executable)), false);
@@ -309,15 +281,12 @@ test("non-Windows running detection never probes and reports false", async (t) =
 
 test("an unknown running state cleans up and performs zero spawn and bootstrap", async (t) => {
   const base = runningFixture(t, {
-    execFile: (executable, args, options, callback) => (
-      callback(Object.assign(new Error("timed out"), { code: "ETIMEDOUT" }))
-    )
+    processProbe: { query: async () => { throw new Error("timed out"); } }
   });
 
   await assert.rejects(
     base.launcher.execute(base.plan, { configuredExecutable: base.executable }),
     (error) => error.code === "AFTER_EFFECTS_LAUNCH_FAILED"
-      && error.details.causeCode === "ETIMEDOUT"
   );
   assert.equal(base.calls.length, 0);
   assert.deepEqual(
@@ -332,7 +301,7 @@ test("an unknown running state cleans up and performs zero spawn and bootstrap",
 
 test("a confirmed stopped state cold launches exactly once", async (t) => {
   const base = runningFixture(t, {
-    execFile: (executable, args, options, callback) => callback(null, psJson([]))
+    processProbe: { query: async () => psJson([]) }
   });
 
   assert.deepEqual(await base.launcher.execute(base.plan, {

@@ -1,12 +1,12 @@
 # Backend Development Guidelines
 
-> Best practices for backend development in this project.
+> Backend implementation contracts for Clackly capabilities, local processes, Resolve integration, and host lifecycle.
 
 ---
 
 ## Overview
 
-This directory contains guidelines for backend development. Fill in each file with your project's specific conventions.
+For capability dispatch, managed script execution, Resolve integration, and host-owned process lifecycle, [Quality Guidelines](./quality-guidelines.md) is the active source of truth.
 
 ---
 
@@ -17,7 +17,7 @@ This directory contains guidelines for backend development. Fill in each file wi
 | [Directory Structure](./directory-structure.md) | Module organization and file layout | To fill |
 | [Database Guidelines](./database-guidelines.md) | ORM patterns, queries, migrations | To fill |
 | [Error Handling](./error-handling.md) | Error types, handling strategies | To fill |
-| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
+| [Quality Guidelines](./quality-guidelines.md) | Capability, Runtime, Resolve, and host-process contracts | Active |
 | [Logging Guidelines](./logging-guidelines.md) | Structured logging, log levels | To fill |
 
 ---

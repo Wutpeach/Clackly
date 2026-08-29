@@ -2,8 +2,8 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { execFile: defaultExecFile, spawn } = require("node:child_process");
-const { runExecFile } = require("./powerShell");
+const { spawn } = require("node:child_process");
+const { WindowsAfterEffectsProcessProbe } = require("./afterEffectsProcessProbe");
 
 const PLAN_TYPE = "after-effects-jsx";
 const JSX_ARGUMENT = "$CLACKLY_JSX";
@@ -38,63 +38,47 @@ function samePath(left, right, platform) {
 
 class AfterEffectsLauncher {
   constructor({
-    execFile = defaultExecFile,
     fileSystem = fs,
     hostEnvironment = process.env,
     isRunning,
     platform = process.platform,
+    processProbe,
     spawnProcess = spawn,
     temporaryRoot = os.tmpdir()
   } = {}) {
     if (!hostEnvironment || typeof hostEnvironment !== "object"
-      || typeof execFile !== "function"
       || typeof spawnProcess !== "function" || typeof temporaryRoot !== "string") {
       throw new TypeError("After Effects Launcher requires host environment, process, and temp inputs");
     }
-    this.execFile = execFile;
     this.fileSystem = fileSystem;
     this.hostEnvironment = hostEnvironment;
-    this.isRunning = isRunning || ((executable) => this.detectRunning(executable));
     this.platform = platform;
+    this.processProbe = processProbe || new WindowsAfterEffectsProcessProbe({
+      hostEnvironment,
+      platform
+    });
+    if (!this.processProbe || typeof this.processProbe.query !== "function") {
+      throw new TypeError("After Effects Launcher requires a process probe query");
+    }
+    this.isRunning = isRunning || ((executable) => this.detectRunning(executable));
     this.spawnProcess = spawnProcess;
     this.temporaryRoot = fileSystem.realpathSync(temporaryRoot);
   }
 
   async detectRunning(executable) {
     if (this.platform !== "win32") return false;
-    const systemRoot = Object.entries(this.hostEnvironment)
-      .find(([key]) => key.toLowerCase() === "systemroot")?.[1];
-    if (typeof systemRoot !== "string" || !systemRoot.trim()) {
-      throw launchError("AFTER_EFFECTS_LAUNCH_FAILED", "After Effects running state could not be determined", {
-        cause: "missing SystemRoot"
-      });
-    }
-    const powershell = path.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-    let output;
-    try {
-      output = await runExecFile(this.execFile, powershell, [
-        "-NoProfile", "-Command",
-        "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); $ErrorActionPreference='SilentlyContinue'; $records = @(Get-Process -Name AfterFX | ForEach-Object { $entry = [PSCustomObject]@{ Path = $null; Error = $null }; try { $entry.Path = $_.Path } catch { $entry.Error = $_.Exception.Message }; if (-not $entry.Path) { $entry.Error = 'path unavailable' }; $entry }); [PSCustomObject]@{ ProcessCount = $records.Count; Records = $records } | ConvertTo-Json -Compress"
-      ], { env: this.hostEnvironment });
-    } catch (error) {
-      throw launchError("AFTER_EFFECTS_LAUNCH_FAILED", "After Effects running state could not be determined", {
-        cause: error?.message || String(error),
-        ...(typeof error?.code === "string" ? { causeCode: error.code } : {})
-      });
-    }
-
     let payload;
     try {
-      payload = JSON.parse(output);
+      payload = await this.processProbe.query();
     } catch (_error) {
       throw launchError("AFTER_EFFECTS_LAUNCH_FAILED", "After Effects running state could not be determined", {
-        cause: "malformed process output"
+        cause: "process probe unavailable"
       });
     }
     if (!payload || typeof payload !== "object"
-      || !Number.isInteger(payload.ProcessCount)
-      || !Array.isArray(payload.Records)
-      || payload.Records.length !== payload.ProcessCount) {
+      || !Number.isInteger(payload.processCount)
+      || !Array.isArray(payload.records)
+      || payload.records.length !== payload.processCount) {
       throw launchError("AFTER_EFFECTS_LAUNCH_FAILED", "After Effects running state could not be determined", {
         cause: "inconsistent process count"
       });
@@ -102,15 +86,15 @@ class AfterEffectsLauncher {
 
     let matched = false;
     let unresolved = false;
-    for (const record of payload.Records) {
+    for (const record of payload.records) {
       if (!record || typeof record !== "object" || Array.isArray(record)) {
         throw launchError("AFTER_EFFECTS_LAUNCH_FAILED", "After Effects running state could not be determined", {
           cause: "malformed process record"
         });
       }
-      const hasPath = typeof record.Path === "string" && record.Path.length > 0;
-      const hasError = typeof record.Error === "string" && record.Error.length > 0;
-      if ((hasPath && hasError) || (!hasPath && !hasError)) {
+      const hasPath = record.status === "ok" && typeof record.path === "string" && record.path.length > 0;
+      const unresolvedRecord = record.status === "unresolved";
+      if (!hasPath && !unresolvedRecord) {
         throw launchError("AFTER_EFFECTS_LAUNCH_FAILED", "After Effects running state could not be determined", {
           cause: "malformed process record"
         });
@@ -121,7 +105,7 @@ class AfterEffectsLauncher {
       }
       let candidate;
       try {
-        candidate = canonicalFile(this.fileSystem, record.Path, "Running After Effects executable");
+        candidate = canonicalFile(this.fileSystem, record.path, "Running After Effects executable");
       } catch (_error) {
         unresolved = true;
         continue;

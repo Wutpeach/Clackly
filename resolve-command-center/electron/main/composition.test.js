@@ -92,6 +92,15 @@ test("host-specific lifecycle differences remain in each Host", () => {
   assert.doesNotMatch(standalone, /app\.setPath\("userData"/);
 });
 
+test("both hosts prewarm and dispose the Core-owned process probe without delaying host startup", () => {
+  for (const source of [standalone, workflow]) {
+    assert.match(source, /queueMicrotask\(\(\) => core\.prewarmAfterEffectsProcessProbe\(\)\.catch\(\(\) => \{\}\)\)/);
+    assert.match(source, /core\.disposeAfterEffectsProcessProbe\(\)/);
+  }
+  assert.match(workflow, /app\.whenReady\(\)\.then\(async \(\) => \{\s*queueMicrotask\(/s);
+  assert.match(standalone, /app\.whenReady\(\)\.then\(\(\) => \{\s*queueMicrotask\(/s);
+});
+
 test("both hosts keep the IPC surface and host bootstrap", () => {
   for (const source of [standalone, workflow]) {
     assert.match(source, /registerFeatureUiIpc/);

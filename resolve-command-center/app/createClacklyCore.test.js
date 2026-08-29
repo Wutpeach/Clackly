@@ -111,6 +111,32 @@ test("Core constructs a single RuntimeManager and never resolves host context ea
   assert.equal(hostCalls, 0);
 });
 
+test("Core owns one narrow After Effects process-probe lifecycle", async (t) => {
+  const calls = [];
+  const processProbe = {
+    prewarm() {
+      calls.push("prewarm");
+      return Promise.resolve(true);
+    },
+    query: async () => ({ processCount: 0, records: [] }),
+    dispose() {
+      calls.push("dispose");
+    }
+  };
+  const { core, cleanup } = createCore({
+    afterEffectsProcessProbeFactory: (options) => {
+      calls.push(options.hostEnvironment === process.env ? "create" : "wrong-environment");
+      return processProbe;
+    }
+  });
+  t.after(cleanup);
+
+  assert.equal(await core.prewarmAfterEffectsProcessProbe(), true);
+  core.disposeAfterEffectsProcessProbe();
+  assert.deepEqual(calls, ["create", "prewarm", "dispose"]);
+  assert.equal(Object.hasOwn(core, "afterEffectsProcessProbe"), false);
+});
+
 test("hostContextProvider failures surface unchanged through script execution", async (t) => {
   const workflowStyleError = new Error("Failed to get Resolve object from Workflow Integration");
   const { core, cleanup } = createCore({
@@ -227,5 +253,17 @@ test("Core rejects missing dependencies", () => {
       markerBackends: {}
     }),
     /Image Clipboard host adapters/
+  );
+  assert.throws(
+    () => createClacklyCore({
+      appRoot,
+      appDataPath: "x",
+      temporaryRoot: "x",
+      hostContextProvider: async () => ({}),
+      markerBackends: {},
+      imageClipboard: {},
+      afterEffectsProcessProbeFactory: null
+    }),
+    /process probe factory/
   );
 });
