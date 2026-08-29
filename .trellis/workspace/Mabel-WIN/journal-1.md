@@ -895,3 +895,24 @@ Aligned README, DESIGN, and frontend Trellis specs with the accepted Windows D6/
 ### Status
 
 [OK] **Completed**
+
+
+## Session 41: Settings visual alignment
+
+**Date**: 2026-08-29
+**Task**: Settings visual alignment
+**Branch**: `main`
+
+### Summary
+
+Aligned Settings with the current Palette and Interaction visual language, added isolated renderer-paint evidence, and archived the completed task.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bf3a0182465d659bf314d0bc4c40667f66955ba9` | (see git log) |
+
+### Status
+
+[OK] **Completed**
