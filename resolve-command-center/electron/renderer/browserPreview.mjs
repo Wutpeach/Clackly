@@ -80,7 +80,7 @@ const BROWSER_PREVIEW_STATUSES = [
 ];
 
 export const SETTINGS_PREVIEW_SCENARIOS = Object.freeze([
-  "general-empty",
+  "application-empty",
   "typical-ready",
   "missing-config-long-path",
   "zh-cn-multi-help",
@@ -96,6 +96,8 @@ const SETTINGS_PREVIEW_FEATURES = [
     description: "Send the selected Resolve timeline range to After Effects using the configured executable and output folder.",
     category: "Workflow",
     icon: "send",
+    version: "1.0.0",
+    providers: ["script", "electron-host"],
     keywords: ["after effects", "export", "workflow"],
     configSchema: {
       afterEffectsPath: {
@@ -145,6 +147,8 @@ const SETTINGS_PREVIEW_FEATURES = [
     description: "Save a clipboard image and import it into the Resolve Media Pool.",
     category: "Media",
     icon: "image",
+    version: "1.0.0",
+    providers: ["electron-host", "resolve-api"],
     keywords: ["clipboard", "image", "media"],
     configSchema: {},
     localizations: {
@@ -163,6 +167,8 @@ const SETTINGS_PREVIEW_FEATURES = [
     description: "Add a marker at the current Resolve timeline position.",
     category: "Timeline",
     icon: "marker",
+    version: "1.0.0",
+    providers: ["resolve-api", "shortcut"],
     keywords: ["marker", "timeline"],
     configSchema: {},
     localizations: {
@@ -248,8 +254,8 @@ function settingsPreviewStatus(id, overrides = {}) {
 const LONG_WINDOWS_AFTER_EFFECTS_PATH = "C:\\Program Files\\Blackmagic Design\\DaVinci Resolve\\Support\\Developer\\Workflow Integrations\\Clackly\\After Effects 2025\\AfterFX.exe";
 
 const SETTINGS_PREVIEW_FIXTURES = Object.freeze({
-  "general-empty": {
-    selectedId: "general",
+  "application-empty": {
+    selectedFeatureId: null,
     features: [],
     statuses: [],
     commands: [],
@@ -257,7 +263,7 @@ const SETTINGS_PREVIEW_FIXTURES = Object.freeze({
     configs: {}
   },
   "typical-ready": {
-    selectedId: "settings-preview.export",
+    selectedFeatureId: "settings-preview.export",
     features: SETTINGS_PREVIEW_FEATURES,
     statuses: SETTINGS_PREVIEW_FEATURES.map((feature) => settingsPreviewStatus(feature.capability)),
     commands: SETTINGS_PREVIEW_COMMANDS,
@@ -272,10 +278,11 @@ const SETTINGS_PREVIEW_FIXTURES = Object.freeze({
     }
   },
   "missing-config-long-path": {
-    selectedId: "settings-preview.export",
+    selectedFeatureId: "settings-preview.export",
     features: [SETTINGS_PREVIEW_FEATURES[0]],
     statuses: [settingsPreviewStatus("settings-preview.export", {
       status: "missing-config",
+      message: "Output folder is required before export.",
       details: { missing: ["Output folder"], action: "open-settings" }
     })],
     commands: SETTINGS_PREVIEW_COMMANDS,
@@ -291,7 +298,7 @@ const SETTINGS_PREVIEW_FIXTURES = Object.freeze({
   },
   "zh-cn-multi-help": {
     locale: "zh-CN",
-    selectedId: "settings-preview.export",
+    selectedFeatureId: "settings-preview.export",
     features: [SETTINGS_PREVIEW_FEATURES[0]],
     statuses: [settingsPreviewStatus("settings-preview.export")],
     commands: SETTINGS_PREVIEW_COMMANDS,
@@ -306,16 +313,16 @@ const SETTINGS_PREVIEW_FIXTURES = Object.freeze({
     }
   },
   busy: {
-    selectedId: "settings-preview.export",
-    pendingConfig: true,
-    features: [SETTINGS_PREVIEW_FEATURES[0]],
-    statuses: [settingsPreviewStatus("settings-preview.export")],
+    selectedFeatureId: "settings-preview.export",
+    pendingConfigFor: ["settings-preview.export"],
+    features: SETTINGS_PREVIEW_FEATURES,
+    statuses: SETTINGS_PREVIEW_FEATURES.map((feature) => settingsPreviewStatus(feature.capability)),
     commands: SETTINGS_PREVIEW_COMMANDS,
     bindings: SETTINGS_PREVIEW_BINDINGS,
     configs: {}
   },
   error: {
-    selectedId: "settings-preview.export",
+    selectedFeatureId: "settings-preview.export",
     saveError: "Settings preview save failed",
     features: [SETTINGS_PREVIEW_FEATURES[0]],
     statuses: [settingsPreviewStatus("settings-preview.export")],
@@ -414,7 +421,7 @@ export function createBrowserPreviewApi({ search } = {}) {
       return clone(fixtureStatuses.find((status) => status.id === featureId) || fixtureStatuses[0]);
     },
     getConfig: async (capabilityId) => {
-      if (fixture?.pendingConfig) return new Promise(() => {});
+      if (fixture?.pendingConfigFor?.includes(capabilityId)) return new Promise(() => {});
       return clone(fixtureConfigs?.[capabilityId] || {});
     },
     saveConfig: async (capabilityId, values) => {
@@ -438,10 +445,10 @@ export function createBrowserPreviewApi({ search } = {}) {
       return () => listeners.delete(callback);
     },
     onSettingsFeatureSelected: (callback) => {
-      if (!fixture?.selectedId || typeof callback !== "function") return () => {};
+      if (typeof fixture?.selectedFeatureId !== "string" || typeof callback !== "function") return () => {};
       const frame = typeof requestAnimationFrame === "function"
-        ? requestAnimationFrame(() => callback(fixture.selectedId))
-        : setTimeout(() => callback(fixture.selectedId), 0);
+        ? requestAnimationFrame(() => callback(fixture.selectedFeatureId))
+        : setTimeout(() => callback(fixture.selectedFeatureId), 0);
       return () => {
         if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame);
         else clearTimeout(frame);

@@ -16,6 +16,17 @@ test("lifecycle warning sentences and compact labels remain distinct in both loc
   assert.equal(translate("zh-CN", "status.label.unavailable"), "不可用");
 });
 
+test("Settings inspector copy is localized for application, search, and effective status", () => {
+  assert.equal(translate("en", "settings.application"), "Clackly Settings");
+  assert.equal(translate("en", "settings.contextInspector"), "Context Inspector");
+  assert.equal(translate("en", "settings.error.save"), "Could not save settings. Review the fields and try again.");
+  assert.equal(translate("en", "settings.status.needsSetup"), "Needs Setup");
+  assert.equal(translate("zh-CN", "settings.searchFeatures"), "搜索功能");
+  assert.equal(translate("zh-CN", "settings.current"), "当前功能");
+  assert.equal(translate("zh-CN", "settings.error.refresh"), "无法刷新功能状态，请重试。");
+  assert.equal(translate("zh-CN", "settings.status.missingConfig.reason"), "缺少必要配置。");
+});
+
 test("CommonJS resource entry re-exports the shared ESM authority", async () => {
   const commonJs = require("./resources");
   const esm = await import("./resources.mjs");

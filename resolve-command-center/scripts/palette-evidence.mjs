@@ -57,30 +57,36 @@ const SCENARIOS = new Set([
   "interaction-host-unavailable",
   "error-feedback",
   "browser-preview",
-  "settings-general-empty",
+  "settings-application-empty",
   "settings-typical-ready",
   "settings-missing-config-long-path",
   "settings-zh-cn-multi-help",
   "settings-busy",
   "settings-error",
+  "settings-search-match",
+  "settings-search-empty",
   "settings-reduced-motion"
 ]);
 const SETTINGS_EVIDENCE_SCENARIOS = new Set([
-  "settings-general-empty",
+  "settings-application-empty",
   "settings-typical-ready",
   "settings-missing-config-long-path",
   "settings-zh-cn-multi-help",
   "settings-busy",
   "settings-error",
+  "settings-search-match",
+  "settings-search-empty",
   "settings-reduced-motion"
 ]);
 const SETTINGS_FIXTURE_BY_SCENARIO = Object.freeze({
-  "settings-general-empty": "general-empty",
+  "settings-application-empty": "application-empty",
   "settings-typical-ready": "typical-ready",
   "settings-missing-config-long-path": "missing-config-long-path",
   "settings-zh-cn-multi-help": "zh-cn-multi-help",
   "settings-busy": "busy",
   "settings-error": "error",
+  "settings-search-match": "typical-ready",
+  "settings-search-empty": "typical-ready",
   "settings-reduced-motion": "typical-ready"
 });
 const MIME_TYPES = new Map([
@@ -373,16 +379,23 @@ async function inspectSettingsLayout(page, label) {
     };
     const shell = document.querySelector(".settings-shell");
     const sidebar = document.querySelector(".feature-sidebar");
-    const detail = document.querySelector(".feature-detail");
+    const configuration = document.querySelector(".settings-configuration");
+    const inspector = document.querySelector(".settings-inspector");
     const footer = document.querySelector(".settings-actions");
     const titlebar = document.querySelector(".settings-titlebar");
-    const detailIcon = document.querySelector(".feature-detail-icon");
+    const detailIcon = document.querySelector(".settings-configuration-icon");
     const selectedButton = document.querySelector(".feature-button.selected");
     const selectedIcon = selectedButton?.querySelector("svg");
     const selectedStyle = selectedButton ? getComputedStyle(selectedButton) : null;
-    const lifecycle = document.querySelector(".feature-lifecycle");
+    const effectiveStatus = document.querySelector(".feature-effective-status");
+    const readyDot = document.querySelector(".feature-ready-dot");
+    const search = document.querySelector(".feature-search");
+    const inspectorActions = [...document.querySelectorAll(".inspector-actions .secondary-button")].map((element) => {
+      const style = getComputedStyle(element);
+      return { height: style.height, borderWidth: style.borderWidth, borderColor: style.borderColor, background: style.backgroundColor, icons: element.querySelectorAll("svg").length };
+    });
     const control = document.querySelector(".settings-field input:not([type=checkbox]), .settings-field select");
-    const candidates = [...document.querySelectorAll(".feature-button, .feature-detail-header, .feature-lifecycle, .settings-field, .feature-help-row, .settings-actions button")]
+    const candidates = [...document.querySelectorAll(".feature-button, .feature-search, .settings-configuration-header, .settings-field, .inspector-interaction-row, .settings-actions button, .inspector-actions button")]
       .filter((element) => getComputedStyle(element).display !== "none")
       .map(rect);
     return {
@@ -392,15 +405,19 @@ async function inspectSettingsLayout(page, label) {
       bodyScrollWidth: document.body.scrollWidth,
       shell: rect(shell),
       sidebar: rect(sidebar),
-      detail: rect(detail),
+      configuration: rect(configuration),
+      inspector: rect(inspector),
       footer: rect(footer),
       titlebar: titlebar ? { rect: rect(titlebar), background: getComputedStyle(titlebar).backgroundColor, borderBottom: getComputedStyle(titlebar).borderBottomWidth } : null,
       detailIcon: detailIcon ? { rect: rect(detailIcon), background: getComputedStyle(detailIcon).backgroundColor, border: getComputedStyle(detailIcon).borderWidth } : null,
       selected: selectedStyle ? { background: selectedStyle.backgroundColor, text: selectedStyle.color, icon: selectedIcon ? getComputedStyle(selectedIcon).color : null, height: selectedStyle.height } : null,
-      lifecycle: lifecycle ? { background: getComputedStyle(lifecycle).backgroundColor, topBorder: getComputedStyle(lifecycle).borderTopWidth, bottomBorder: getComputedStyle(lifecycle).borderBottomWidth } : null,
+      effectiveStatus: effectiveStatus ? { text: effectiveStatus.textContent.trim(), color: getComputedStyle(effectiveStatus).color } : null,
+      readyDot: readyDot ? getComputedStyle(readyDot).backgroundColor : null,
+      search: search ? { height: getComputedStyle(search).height, borderRadius: getComputedStyle(search).borderRadius } : null,
+      inspectorActions,
       control: control ? { height: getComputedStyle(control).height, background: getComputedStyle(control).backgroundColor, borderRadius: getComputedStyle(control).borderRadius } : null,
       footerShadow: footer ? getComputedStyle(footer).boxShadow : null,
-      title: getComputedStyle(document.querySelector(".feature-detail h1")).fontSize,
+      title: getComputedStyle(document.querySelector(".settings-configuration h1")).fontSize,
       section: getComputedStyle(document.querySelector(".settings-section > h2")).fontSize,
       navLabel: getComputedStyle(document.querySelector(".feature-button")).fontSize,
       candidates
@@ -413,9 +430,11 @@ async function inspectSettingsLayout(page, label) {
   assert.ok(layout.bodyScrollWidth <= SETTINGS_VIEWPORT.width, `${label}: Settings body has no horizontal overflow`);
   assert.equal(Math.round(layout.shell.width), SETTINGS_VIEWPORT.width, `${label}: Settings shell keeps native-sized width`);
   assert.equal(Math.round(layout.shell.height), SETTINGS_VIEWPORT.height, `${label}: Settings shell keeps native-sized height`);
-  assert.equal(Math.round(layout.sidebar.width), 220, `${label}: Settings preserves the existing 220px navigation pane`);
-  assert.ok(layout.detail.left >= layout.sidebar.right - 0.5, `${label}: Settings preserves the separate detail pane`);
-  assert.ok(layout.footer.top >= layout.detail.top && layout.footer.bottom <= layout.detail.bottom + 0.5, `${label}: fixed Settings footer remains inside the detail pane`);
+  assert.equal(Math.round(layout.sidebar.width), 190, `${label}: Settings uses the approved compact Feature navigation column`);
+  assert.equal(Math.round(layout.inspector.width), 220, `${label}: Settings uses the approved Context Inspector column`);
+  assert.ok(layout.configuration.left >= layout.sidebar.right - 0.5, `${label}: Configuration starts after Feature navigation`);
+  assert.ok(layout.configuration.right <= layout.inspector.left + 0.5, `${label}: Configuration stops before Context Inspector`);
+  assert.ok(layout.footer.top >= layout.configuration.top && layout.footer.bottom <= layout.configuration.bottom + 0.5, `${label}: fixed Settings footer remains inside Configuration`);
   assert.equal(Math.round(layout.footer.height), 34, `${label}: Settings action strip follows the compact 34px rhythm`);
   assert.equal(layout.footerShadow, "none", `${label}: Settings footer uses a quiet hairline instead of an upward shadow`);
   assert.equal(layout.titlebar?.background, PALETTE_SURFACE, `${label}: titlebar shares the continuous Palette ink surface`);
@@ -423,17 +442,28 @@ async function inspectSettingsLayout(page, label) {
   assert.equal(layout.title, "16px", `${label}: compact detail title follows the shared instrument hierarchy`);
   assert.equal(layout.section, "14px", `${label}: section heading follows the 14px role`);
   assert.equal(layout.navLabel, "13px", `${label}: navigation label follows the 13px role`);
+  assert.ok(layout.detailIcon, `${label}: Configuration has a compact current-generation icon`);
   assert.ok(layout.detailIcon && Math.round(layout.detailIcon.rect.width) === 16 && Math.round(layout.detailIcon.rect.height) === 16, `${label}: detail icon stays in the shared 14–16px slot`);
   assert.equal(layout.detailIcon.background, "rgba(0, 0, 0, 0)", `${label}: detail icon has no accent tile fill`);
   assert.equal(layout.detailIcon.border, "0px", `${label}: detail icon has no tile border`);
-  assert.equal(layout.selected.background, "rgb(231, 232, 234)", `${label}: selected Settings row uses the exact Palette light-neutral anchor`);
-  assert.equal(layout.selected.text, "rgb(23, 25, 29)", `${label}: selected Settings row uses the exact Palette dark foreground`);
-  assert.equal(layout.selected.icon, layout.selected.text, `${label}: selected Settings icon remains monochrome with its label`);
-  assert.equal(layout.selected.height, "30px", `${label}: Settings navigation follows the 30px Palette row rhythm`);
-  if (layout.lifecycle) {
-    assert.equal(layout.lifecycle.background, "rgba(0, 0, 0, 0)", `${label}: Feature Status is a flat readout rather than a filled card`);
-    assert.equal(layout.lifecycle.topBorder, "1px", `${label}: Feature Status uses a top hairline`);
-    assert.equal(layout.lifecycle.bottomBorder, "1px", `${label}: Feature Status uses a bottom hairline`);
+  if (layout.selected) {
+    assert.equal(layout.selected.background, "rgb(231, 232, 234)", `${label}: selected Settings row uses the exact Palette light-neutral anchor`);
+    assert.equal(layout.selected.text, "rgb(23, 25, 29)", `${label}: selected Settings row uses the exact Palette dark foreground`);
+    assert.equal(layout.selected.icon, layout.selected.text, `${label}: selected Settings icon remains monochrome with its label`);
+    assert.equal(layout.selected.height, "30px", `${label}: Settings navigation follows the 30px Palette row rhythm`);
+  }
+  assert.equal(layout.search?.height, "30px", `${label}: Feature search uses the compact shared control rhythm`);
+  assert.equal(layout.search?.borderRadius, "4px", `${label}: Feature search reuses the Palette field radius`);
+  for (const action of layout.inspectorActions) {
+    assert.equal(action.height, "30px", `${label}: Inspector lifecycle actions use the shared compact control height`);
+    assert.equal(action.borderWidth, "1px", `${label}: Inspector lifecycle actions remain visibly bordered secondary controls`);
+    assert.notEqual(action.borderColor, "rgba(0, 0, 0, 0)", `${label}: Inspector lifecycle actions do not read as borderless metadata`);
+    assert.equal(action.icons, 1, `${label}: Inspector lifecycle actions use one monochrome Lucide icon`);
+  }
+  if (layout.effectiveStatus?.text === "Ready" || layout.effectiveStatus?.text === "已就绪") {
+    assert.equal(layout.readyDot, "rgb(99, 193, 116)", `${label}: only real Ready receives the semantic green dot`);
+  } else {
+    assert.equal(layout.readyDot, null, `${label}: non-Ready status does not receive a success dot`);
   }
   if (layout.control) {
     assert.equal(layout.control.height, "30px", `${label}: Settings fields follow the compact control rhythm`);
@@ -851,15 +881,37 @@ async function runScenario(name, context) {
     if (SETTINGS_EVIDENCE_SCENARIOS.has(name)) {
       assert.equal(await page.evaluate(() => Boolean(window.resolveCommandCenter)), false, `${name}: Settings fixture has no injected Electron host authority`);
       assert.equal(await page.locator(".clackly-browser-preview-agentation").count(), 0, `${name}: Settings fixture does not mount the Palette preview tool`);
-      await page.locator(".feature-detail h1").waitFor();
-      if (name === "settings-missing-config-long-path") {
+      await page.locator(".settings-configuration h1").waitFor();
+      if (name === "settings-typical-ready") {
+        assert.equal(await page.locator(".settings-titlebar img").count(), 0, "Settings titlebar renders no Clackly wordmark image");
+        assert.equal(await page.locator(".settings-titlebar").innerText(), "Settings", "Settings titlebar keeps only the localized compact title");
+        const inspector = page.getByLabel("Context Inspector");
+        await inspector.waitFor();
+        assert.match(await inspector.innerText(), /Version\s*1\.0\.0/, "Ready Settings About renders version metadata");
+        assert.match(await inspector.innerText(), /Providers\s*Script, Electron Host/, "Ready Settings About formats existing provider ids for readable presentation");
+        const interaction = page.locator(".settings-inspector .inspector-interaction-command");
+        assert.deepEqual(await interaction.locator(".inspector-interaction-action-name").allInnerTexts(), [
+          "Export to After Effects",
+          "Export Audio to After Effects",
+          "Export Video to After Effects"
+        ], "Ready Settings Inspector renders registered English action Command names");
+        assert.doesNotMatch((await interaction.allInnerTexts()).join("\n"), /Send timeline (audio|video) to After Effects\./, "Ready Settings Inspector rejects action Command descriptions");
+      } else if (name === "settings-missing-config-long-path") {
         const pathInput = page.locator("#setting-afterEffectsPath");
         await pathInput.scrollIntoViewIfNeeded();
         assert.match(await pathInput.inputValue(), /^C:\\Program Files\\Blackmagic Design\\DaVinci Resolve\\/);
-        await page.locator(".feature-lifecycle-heading p").filter({ hasText: "Needs setup" }).waitFor();
+        await page.locator(".feature-effective-status").filter({ hasText: "Needs Setup" }).waitFor();
+        assert.equal(await page.locator(".feature-status-reason").innerText(), "Output folder is required before export.", "abnormal Settings status prefers the trusted concise lifecycle message");
       } else if (name === "settings-zh-cn-multi-help") {
-        await page.getByRole("heading", { name: "交互帮助" }).scrollIntoViewIfNeeded();
-        assert.ok(await page.locator(".feature-help-input kbd").count() >= 5, "Simplified Chinese fixture preserves multi-row keycap help");
+        await page.getByRole("heading", { name: "交互" }).scrollIntoViewIfNeeded();
+        assert.ok(await page.locator(".inspector-interaction-input kbd").count() >= 5, "Simplified Chinese fixture preserves multi-row keycap help");
+        const interaction = page.locator(".settings-inspector .inspector-interaction-command");
+        assert.deepEqual(await interaction.locator(".inspector-interaction-action-name").allInnerTexts(), [
+          "导出到 After Effects",
+          "导出音频到 After Effects",
+          "导出视频到 After Effects"
+        ], "Simplified Chinese Settings Inspector renders localized registered action Command names");
+        assert.doesNotMatch((await interaction.allInnerTexts()).join("\n"), /将时间线(音频|视频)发送到 After Effects。/, "Simplified Chinese Settings Inspector rejects action Command descriptions");
         assert.equal(await page.locator("html").getAttribute("lang"), "zh-CN", "Simplified Chinese fixture applies the localized document language");
       } else if (name === "settings-busy") {
         const save = page.getByRole("button", { name: "Working…" });
@@ -868,7 +920,21 @@ async function runScenario(name, context) {
       } else if (name === "settings-error") {
         await page.getByRole("button", { name: "Save" }).click();
         await page.locator(".settings-feedback.error").waitFor();
-        assert.equal(await page.locator(".settings-feedback.error").innerText(), "The command could not be completed.", "error fixture keeps localized existing feedback semantics");
+        assert.equal(await page.locator(".settings-feedback.error").innerText(), "Could not save settings. Review the fields and try again.", "error fixture gives Save-specific localized recovery feedback");
+      } else if (name === "settings-search-match") {
+        const search = page.getByRole("searchbox", { name: "Search Features" });
+        await search.fill("clipboard");
+        assert.deepEqual(await page.locator(".feature-navigation .feature-current-category .feature-button").allInnerTexts(), ["Export to After Effects"], "Feature search retains the filtered-out selected Feature in one explicit Current group");
+        assert.deepEqual(await page.locator(".feature-navigation .feature-category:not(.feature-current-category) .feature-button").allInnerTexts(), ["Paste Clipboard Image"], "Feature search keeps matching Feature rows in their original category group");
+        assert.equal(await page.locator(".settings-configuration h1").innerText(), "Export to After Effects", "typing in Feature search does not switch the current Configuration context");
+        assert.equal(await page.locator(".feature-navigation-footer .feature-button").count(), 1, "application Settings destination remains fixed outside filtering");
+      } else if (name === "settings-search-empty") {
+        const search = page.getByRole("searchbox", { name: "Search Features" });
+        await search.fill("not a Feature");
+        await page.locator(".feature-search-empty").waitFor();
+        assert.equal(await page.locator(".feature-navigation .feature-current-category .feature-button").count(), 1, "Feature search retains only the real current Feature when no result matches");
+        assert.equal(await page.locator(".feature-navigation .feature-category:not(.feature-current-category) .feature-button").count(), 0, "Feature search hides empty result groups instead of showing stale rows");
+        assert.equal(await page.locator(".feature-search-empty").innerText(), "No matching Features.", "Feature search exposes a truthful accessible empty state");
       } else if (name === "settings-reduced-motion") {
         const motion = await page.locator(".feature-button").first().evaluate((element) => getComputedStyle(element).transitionDuration);
         const saveMotion = await page.getByRole("button", { name: "Save" }).evaluate((element) => getComputedStyle(element).transitionDuration);
@@ -877,7 +943,20 @@ async function runScenario(name, context) {
       }
       await inspectSettingsLayout(page, name);
       evidence.push(await screenshot(page, output, `${name}.png`));
-      checks.push(`${name}: hostless local Settings fixture rendered the unchanged two-pane Settings UI at 760×560 with continuous Palette ink, exact #E7E8EA/#17191D selection, flat status readout, inset controls, and compact action strip; screenshot is renderer-paint evidence only and does not validate Electron or Resolve.`);
+      if (name === "settings-busy") {
+        const application = page.getByRole("button", { name: "Clackly Settings" });
+        assert.equal(await application.isDisabled(), false, "pending config keeps navigation available to cancel the selected Feature load");
+        await page.getByRole("button", { name: "Add Timeline Marker" }).click();
+        await page.getByRole("heading", { name: "Add Timeline Marker" }).waitFor();
+        assert.equal(await page.getByRole("button", { name: "Refresh" }).isDisabled(), false, "changing Feature while its previous config request is pending does not strand busy state");
+        await page.getByRole("button", { name: "Export to After Effects", exact: true }).click();
+        await page.getByRole("button", { name: "Working…" }).waitFor();
+        await application.click();
+        await page.getByRole("heading", { name: "Clackly Settings" }).waitFor();
+        await page.waitForFunction(() => !document.querySelector("#locale-preference")?.disabled);
+        assert.equal(await page.getByRole("combobox", { name: "Language" }).isDisabled(), false, "application fallback cancels the pending config request without retaining busy state");
+      }
+      checks.push(`${name}: hostless local Settings fixture rendered the approved three-column Settings UI at 760×560 with local Feature search, application footer, configuration action strip, inspector-only effective status and real binding rows; screenshot is renderer-paint evidence only and does not validate Electron or Resolve.`);
       return;
     } else if (name === "browser-preview") {
       await inspectBrowserPreviewLayout(page, name);
@@ -942,6 +1021,8 @@ async function runScenario(name, context) {
       assert.equal(footer.buttons[0], "Settings", "Settings remains the leftmost footer affordance");
       expect(footer.buttons[1].startsWith("Pin "), "Pin follows Settings in the footer");
       assert.equal(footer.buttons[2], "Open interaction info", "Metadata-backed Info stays on the Footer right");
+      await page.getByRole("button", { name: "Settings" }).focus();
+      assert.equal(await page.getByRole("button", { name: "Settings" }).evaluate((element) => getComputedStyle(element).outlineColor), "rgb(231, 232, 234)", "Palette focus uses shared light-neutral emphasis");
       const commandRows = page.locator(".launcher-view .command-row");
       for (let index = 0; index < await commandRows.count(); index += 1) {
         await commandRows.nth(index).focus();
@@ -952,6 +1033,9 @@ async function runScenario(name, context) {
       checks.push(`default command shell: visible 240×320 inside a 256×336 shared shadow envelope, Settings→Pin left, universal selected-Command Info right, no legacy Ctrl/K or Actions copy, compact command rows, unified ${surfaces.content} main/Footer surface with inset Search and ${surfaces.mutedContrast[0].ratio.toFixed(2)}:1 readable Footer text`);
     } else if (name === "pinned-recent") {
       await page.getByRole("button", { name: /pin export to after effects/i }).click();
+      const pin = page.locator(".pin-indicator").first();
+      await pin.waitFor();
+      assert.equal(await pin.evaluate((element) => getComputedStyle(element).backgroundColor), "rgb(231, 232, 234)", "Palette pin uses shared light-neutral emphasis");
       await focusShell(page);
       await page.keyboard.press("ArrowDown");
       await page.keyboard.press("Enter");

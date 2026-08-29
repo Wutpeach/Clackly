@@ -211,18 +211,21 @@ const interactionPanelUsesMappings = interactionRows.length > 1;
 ### 1. Scope / Trigger
 
 - Trigger: exposing Capability Metadata or configuration in Electron UI.
-- Applies to FeatureCatalog, Settings BrowserWindow lifecycle, preload/IPC, SettingsRenderer, and the unified feature detail panel.
+- Applies to FeatureCatalog, Settings BrowserWindow lifecycle, preload/IPC, SettingsRenderer, the renderer-local Settings projection, and the inspector-only status/interaction presentation.
 
 ### 2. Signatures
 
 - `new FeatureCatalog({ capabilityRegistry }).getAllFeatures() -> CapabilityMetadata[]`.
 - Preload APIs: `listFeatures()`, `listInteractionBindings()`, `getConfig(capabilityId)`, `saveConfig(capabilityId, values)`, `resetConfig(capabilityId)`, `pickPath("path" | "folder")`, `openSettings()`, and `closeSettings()`.
 - `SettingsRenderer({ schema, values, onChange, onPick, disabled })`.
+- Renderer-only projections: `filterFeaturesByQuery(features, query) -> Feature[]` and `getEffectiveFeatureStatus(record, t) -> { kind, label, reason }`.
 
 ### 3. Contracts
 
 - One registered Capability is one feature; there is no second feature manifest, registry, feature-id branch, or feature-specific page.
-- Feature identity and schema come from Capability Metadata. Help targets Commands through `command.capability === feature.id` and derives rows from normalized bindings plus action Command descriptions.
+- Feature identity and schema come from Capability Metadata. Application selection is structurally `selectedFeatureId === null`; `Clackly Settings` is a fixed navigation footer destination, never a FeatureCatalog record, Capability, config schema, or lifecycle record.
+- Feature search is renderer-local and case-insensitive over already localized Feature `name`, `category`, and `description`, using deterministic locale-independent casing. It filters before category grouping, hides empty groups, preserves the current selection, and exposes a truthful accessible no-results state. If a nonmatching selected Feature is still current, one renderer-local localized Current group retains that real row without a duplicate or selection change. It adds no IPC, persistence, ranking, shortcut, or remote lookup.
+- Feature identity and schema remain FeatureCatalog-owned. Inspector help targets Commands through `command.capability === feature.id` and derives rows from `getInteractionHelpCommands()` / normalized bindings plus registered action Command names; it never hand-authors shortcut strings.
 - Standalone Electron and Workflow Integration register the same feature/config/picker channels through the shared IPC helper.
 - Resolve 20.3.2.9 with bundled Electron 36.3.2 is the qualified desktop host; local Electron must remain exactly pinned to that API baseline.
 - Settings is one fixed frameless `760x560` window with the exact Electron 36 BrowserWindow options `show: false`, `frame: false`, `roundedCorners: false`, `transparent: true`, `thickFrame: false`, `resizable: false`, `maximizable: false`, `minimizable: false`, `fullscreenable: false`, `alwaysOnTop: false`, `autoHideMenuBar: true`, `backgroundColor: "#00000000"`, and `title: "Clackly Settings"`. Its renderer `.settings-shell` must paint the opaque `--color-window` background across the full `100vw x 100vh` viewport so the transparent compositor surface never shows through. Do not use the Electron 37+ `accentColor` API, and do not add DWM/Python/timer/native-hook workarounds for the Resolve-host opaque frameless edge — the verified fix is the transparent surface plus the opaque renderer shell (live-validated 2026-08-06).
@@ -231,11 +234,16 @@ const interactionPanelUsesMappings = interactionRows.length > 1;
 - Launcher and Search remain on the fixed visible `240x320` Palette main surface. On Windows, Interaction Info is D7's detached `260px` native Panel; on non-Windows it remains the documented attached fallback. Renderer code never supplies window dimensions or native placement.
 - The existing renderer bundle selects Settings through a main-process-owned `?view=settings` marker. Renderer code never sends dimensions.
 - Draft values remain local until Save. Save and Reset route through ConfigManager; path and folder fields route through Electron native dialogs.
+- Feature context alone calls config/status APIs. Application context renders Preferences-owned Language with immediate localization persistence and package-owned About/version; it never calls Feature config/status APIs.
 - FeatureCatalog clones schemas with resolved labels from the shared backend utility. SettingsRenderer maps only the seven validated schema types to native controls and renders `field.label` without fallback formatting.
+- The `760x560` Settings renderer is a stable `190px / minmax(0, 1fr) / 220px` Navigation / Configuration / Context Inspector grid. Each column owns bounded scrolling where needed; navigation and center action footers remain fixed. Its compact titlebar has only the localized Settings title plus existing drag/close controls; it does not render a Clackly wordmark.
+- Context Inspector derives exactly one effective status from unchanged lifecycle records: missing/loading -> Checking, disabled -> Disabled, ready -> Ready, missing-config/missing-dependency -> Needs Setup, and unavailable/error -> Unavailable. Only Ready has a small semantic green dot; abnormal statuses may show a concise status-record message or localized fallback, never a parsed message branch. Installed, Enabled, and Readiness are not parallel Settings labels. Refresh and Enable/Disable are bordered compact secondary controls with monochrome Lucide Refresh/Power icons.
+- Shared primary emphasis is light-neutral `#E7E8EA` with `#17191D` foreground for focus, Palette pin, checkbox, Settings selection, and Save. Orange is separately named warning semantics only; project-owned logo SVG artwork remains unchanged.
 
 ### 4. Validation & Error Matrix
 
 - Empty feature catalog -> truthful empty state.
+- Nonempty local search with no match -> hide matching Feature groups, retain the application footer and current configuration context, render the selected Feature only in the localized Current group when applicable, and announce localized no-results copy.
 - Empty schema -> “No settings required”; Save disabled.
 - Missing help -> “No interaction help available.”
 - Picker cancellation -> `null`; draft remains unchanged.
@@ -245,7 +253,8 @@ const interactionPanelUsesMappings = interactionRows.length > 1;
 ### 5. Good/Base/Bad Cases
 
 - Good: registering a new Capability with metadata and a schema makes it appear in the shared Settings window without renderer edits.
-- Base: `marker.add` appears under Timeline, renders its metadata and binding-derived Interaction Help, and truthfully shows that no settings are required.
+- Base: `marker.add` appears under Timeline, renders schema-driven configuration in the center, binding-derived Interaction rows in the inspector, and truthfully shows that no settings are required.
+- Good: selecting the fixed `Clackly Settings` footer switches to Preferences-owned Language and package About without creating a synthetic Feature or calling Feature config/status APIs.
 - Good: both Electron hosts call the shared IPC registrar and shared Settings window helper while retaining their own Capability providers.
 - Bad: adding a renderer branch such as `if (feature.id === "marker.add")`, a feature-specific BrowserWindow, or a second renderer bundle.
 - Bad: reading `config.json`, importing ConfigStorage, resolving a Capability implementation, or calling Resolve APIs from renderer code.
@@ -254,10 +263,12 @@ const interactionPanelUsesMappings = interactionRows.length > 1;
 
 - Assert catalog ordering, full defensive metadata, exact category filtering, and discovery after registration.
 - Assert all seven schema types map to their native controls, resolved explicit/fallback labels are immutable, and feature category grouping preserves registry order.
+- Assert effective-status truth tables and local Feature filtering for localized name/category/description, whitespace/case normalization, hidden empty groups, no-results, and unchanged current selection.
+- Assert the three column grid, localized wordmark-free Settings titlebar, application footer boundary, Current search-context row, Inspector-only About/one-status/real-interaction rows, Ready-only green dot, bordered secondary lifecycle actions, light-neutral focus/pin/checkbox/Save emphasis, and no legacy Installed/Enabled/Readiness labels.
 - Assert feature/config/picker IPC semantics, picker cancellation, ConfigManager reset preservation, and complete-save validation.
 - Assert the exact Electron dependency/lockfile baseline and both complete BrowserWindow option contracts — the Settings contract test asserts the exact options object including `transparent: true` and `backgroundColor: "#00000000"`, and the palette contract stays separate — plus Settings close IPC, fixed dimensions, and existing-window restore/focus behavior.
 - Run `npm test`, `npm run build`, and boundary searches for renderer Capability/Resolve/storage coupling.
-- After any Settings surface-contract change, package, install, and run the packaged Resolve manual A/B (first open, reopen, titlebar/sidebar/controls focus moves) — no cyan/blue edge and no first-open/reopen flicker; standalone Electron cannot reproduce Resolve-host opaque frameless behavior.
+- After any Settings surface-contract change, run headless `npm run settings:evidence` with application, ready, missing-config/long-path, Simplified Chinese multi-interaction, busy, error, search-match, search-empty, and reduced-motion fixtures. Then package/install and run the packaged Resolve manual A/B (first open, reopen, titlebar/sidebar/controls focus moves) — no cyan/blue edge and no first-open/reopen flicker; standalone Electron cannot reproduce Resolve-host opaque frameless behavior.
 
 ### 7. Wrong vs Correct
 
@@ -272,8 +283,11 @@ if (feature.id === "marker.add") {
 #### Correct
 
 ```javascript
+const selectedFeatureId = null; // application context, never a FeatureCatalog entry
 const features = await window.resolveCommandCenter.listFeatures();
-return <SettingsRenderer schema={feature.configSchema} values={draft} />;
+return selectedFeatureId === null
+  ? <LanguagePreference />
+  : <SettingsRenderer schema={feature.configSchema} values={draft} />;
 ```
 
 #### Wrong
@@ -308,7 +322,7 @@ new BrowserWindow({
 
 - Preload: `listFeatureStatuses()`, `refreshFeatureStatuses(featureId?)`, `setFeatureEnabled(featureId, enabled)`, `openSettings(featureId?)`, and `onSettingsFeatureSelected(callback)`.
 - Lifecycle record: `{ id, installed, enabled, status, message, details: { missing: string[], action: "open-settings" | null } }`.
-- Renderer projections: `joinFeatureStatuses`, `isFeatureVisible`, `canExecuteFeature`, `getFeatureWarning`, `getRecoveryAction`, and `canExecuteCommand`.
+- Renderer projections: `joinFeatureStatuses`, `isFeatureVisible`, `canExecuteFeature`, `getFeatureWarning`, `getEffectiveFeatureStatus`, `getRecoveryAction`, and `canExecuteCommand`.
 
 ### 3. Contracts
 
@@ -316,7 +330,7 @@ new BrowserWindow({
 - Feature visibility uses `installed`; execution requires installed + enabled + ready; warnings use enabled/status; recovery uses structured `details.action`.
 - A functional Command without a matching installed lifecycle record fails closed: do not display or execute it.
 - Renderer may display `message` but must not parse it or branch on its wording.
-- Settings shows one generic Enable/Disable control, status details, and a compact non-ready/disabled sidebar indicator with hover and focus description.
+- Settings Inspector shows one generic Enable/Disable control and exactly one pure effective status: Checking, Disabled, Ready, Needs Setup, or Unavailable. It shows a reason only outside Ready and one small semantic green dot only for the real Ready projection; the compact non-ready/disabled sidebar indicator keeps its hover/focus description.
 - Save, Reset, and Enable/Disable refresh lifecycle without replacing unsaved draft configuration.
 - `open-settings` focuses/reuses the native Settings singleton and selects the affected Feature through a semantic main-process event.
 - Launcher and Search intercept non-ready activation generically; no unregistered presentation fixtures enter lifecycle projection.
@@ -337,7 +351,7 @@ new BrowserWindow({
 
 ### 5. Good/Base/Bad Cases
 
-- Good: a new registered Capability automatically receives Settings status UI and palette gating without renderer edits.
+- Good: a new registered Capability automatically receives Settings Inspector status UI and Palette gating without renderer edits.
 - Base: `marker.add` reports provider readiness through the generic record and remains associated through `command.capability`.
 - Good: sidebar tooltip is available on both hover and keyboard focus with `aria-describedby`.
 - Bad: `if (command.capability === "ae.export")`, provider checks, config-schema completeness logic, or `message.includes(...)` in renderer code.
@@ -345,7 +359,7 @@ new BrowserWindow({
 
 ### 6. Tests Required
 
-- Pure model tests cover joins, visibility, execution, warnings, recovery, and missing-status fail-closed behavior.
+- Pure model tests cover joins, visibility, execution, warnings, recovery, missing-status fail-closed behavior, and the effective-status truth table including ready-only dot eligibility.
 - IPC tests cover list/refresh/set-enabled and targeted Settings selection.
 - Build and boundary searches prove no renderer Capability/provider/config/message parsing or command-specific lifecycle branch.
 - Manually verify ready, loading, disabled, missing config/dependency, unavailable, error, focus tooltip, and Settings recovery states when fixtures exist.

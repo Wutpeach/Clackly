@@ -5,12 +5,14 @@ import {
   canExecuteFeature,
   createPresentationCatalog,
   getCommandHint,
+  getEffectiveFeatureStatus,
   getFeatureWarning,
   getInteractionHelp,
   getInteractionHelpCommands,
   getRecoveryAction,
   getSettingsControl,
   groupFeaturesByCategory,
+  filterFeaturesByQuery,
   groupCommands,
   isCommandPresentable,
   isFeatureVisible,
@@ -312,4 +314,54 @@ test("feature grouping preserves catalog category and feature order", () => {
 
   assert.deepEqual(groups.map(([category]) => category), ["Timeline", "Edit"]);
   assert.deepEqual(groups[0][1].map(({ id }) => id), ["first", "third"]);
+});
+
+test("Settings projects one effective lifecycle status without changing status records", () => {
+  const t = (key) => key;
+  const ready = { id: "feature", installed: true, enabled: true, status: "ready" };
+
+  assert.deepEqual(getEffectiveFeatureStatus(null, t), {
+    kind: "checking", label: "settings.status.checking", reason: "settings.status.checking.reason"
+  });
+  assert.deepEqual(getEffectiveFeatureStatus({ ...ready, status: "loading" }, t), {
+    kind: "checking", label: "settings.status.checking", reason: "settings.status.checking.reason"
+  });
+  assert.deepEqual(getEffectiveFeatureStatus({ ...ready, enabled: false }, t), {
+    kind: "disabled", label: "settings.status.disabled", reason: "settings.status.disabled.reason"
+  });
+  assert.deepEqual(getEffectiveFeatureStatus(ready, t), {
+    kind: "ready", label: "settings.status.ready", reason: null
+  });
+  assert.deepEqual(getEffectiveFeatureStatus({ ...ready, status: "missing-config" }, t), {
+    kind: "needs-setup", label: "settings.status.needsSetup", reason: "settings.status.missingConfig.reason"
+  });
+  assert.deepEqual(getEffectiveFeatureStatus({ ...ready, status: "missing-config", message: "Output folder is required." }, t), {
+    kind: "needs-setup", label: "settings.status.needsSetup", reason: "Output folder is required."
+  });
+  assert.deepEqual(getEffectiveFeatureStatus({ ...ready, status: "missing-dependency" }, t), {
+    kind: "needs-setup", label: "settings.status.needsSetup", reason: "settings.status.missingDependency.reason"
+  });
+  assert.deepEqual(getEffectiveFeatureStatus({ ...ready, status: "unavailable" }, t), {
+    kind: "unavailable", label: "settings.status.unavailable", reason: "settings.status.unavailable.reason"
+  });
+  assert.deepEqual(getEffectiveFeatureStatus({ ...ready, status: "error" }, t), {
+    kind: "unavailable", label: "settings.status.unavailable", reason: "settings.status.unavailable.reason"
+  });
+});
+
+test("Settings Feature search filters localized name, category, and description without changing groups", () => {
+  const features = [
+    { id: "export", name: "导出到 After Effects", category: "工作流程", description: "发送当前时间线选区" },
+    { id: "clipboard", name: "Paste Clipboard Image", category: "媒体", description: "Import a clipboard image" },
+    { id: "marker", name: "Add Timeline Marker", category: "Timeline", description: "Create a marker" }
+  ];
+
+  assert.equal(filterFeaturesByQuery(features, "   "), features);
+  assert.deepEqual(filterFeaturesByQuery(features, "after effects").map(({ id }) => id), ["export"]);
+  assert.deepEqual(filterFeaturesByQuery(features, "媒体").map(({ id }) => id), ["clipboard"]);
+  assert.deepEqual(filterFeaturesByQuery(features, "时间线").map(({ id }) => id), ["export"]);
+  assert.deepEqual(filterFeaturesByQuery(features, "CLIPBOARD image").map(({ id }) => id), ["clipboard"]);
+  assert.deepEqual(filterFeaturesByQuery([{ id: "image-import", name: "IMAGE Import", category: "Media", description: "" }], "image").map(({ id }) => id), ["image-import"], "Feature search normalizes uppercase ASCII I deterministically");
+  assert.deepEqual(groupFeaturesByCategory(filterFeaturesByQuery(features, "clipboard")).map(([category]) => category), ["媒体"]);
+  assert.deepEqual(filterFeaturesByQuery(features, "not found"), []);
 });

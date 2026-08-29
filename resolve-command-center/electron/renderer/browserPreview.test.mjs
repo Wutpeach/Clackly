@@ -121,7 +121,7 @@ test("browser preview keeps its locale preference adapter isolated and broadcast
 
 test("Settings fixtures are explicit, hostless preview data with defensive copies", async () => {
   assert.deepEqual(SETTINGS_PREVIEW_SCENARIOS, [
-    "general-empty",
+    "application-empty",
     "typical-ready",
     "missing-config-long-path",
     "zh-cn-multi-help",
@@ -132,8 +132,10 @@ test("Settings fixtures are explicit, hostless preview data with defensive copie
   assert.equal(getBrowserSettingsFixture("?view=settings&settings-preview=unknown"), null, "unknown preview values keep the ordinary empty hostless Settings state");
 
   const fixture = getBrowserSettingsFixture("?view=settings&settings-preview=typical-ready");
-  assert.equal(fixture.selectedId, "settings-preview.export");
+  assert.equal(fixture.selectedFeatureId, "settings-preview.export");
   assert.equal(fixture.features.length, 3, "typical fixture covers the three-category navigation range");
+  assert.equal(fixture.features[0].version, "1.0.0", "typical fixture exposes realistic About version metadata");
+  assert.deepEqual(fixture.features[0].providers, ["script", "electron-host"], "typical fixture exposes realistic About provider metadata");
   fixture.features[0].name = "Mutated locally";
   assert.equal(getBrowserSettingsFixture("?view=settings&settings-preview=typical-ready").features[0].name, "Export to After Effects");
 
@@ -148,6 +150,14 @@ test("Settings fixtures are explicit, hostless preview data with defensive copie
   assert.equal((await api.listFeatures())[0].name, "Export to After Effects", "fixture callers receive defensive data copies");
   await assert.rejects(api.executeCommand("settings-preview.export"), /cannot execute outside Electron/i);
   await assert.rejects(api.executeInteraction({ target: "settings-preview.export" }), /cannot execute outside Electron/i);
+
+  const busyApi = createBrowserPreviewApi({ search: "?view=settings&settings-preview=busy" });
+  const pendingExportConfig = busyApi.getConfig("settings-preview.export");
+  assert.deepEqual(await busyApi.getConfig("settings-preview.marker"), {}, "busy fixture isolates the pending config request to its selected Feature");
+  let pendingSettled = false;
+  pendingExportConfig.then(() => { pendingSettled = true; });
+  await Promise.resolve();
+  assert.equal(pendingSettled, false, "busy fixture retains an independently cancellable pending Feature config request");
 });
 
 test("Settings fixtures simulate only local presentation selection and error states", async () => {

@@ -24,6 +24,47 @@ export function getFeatureWarning(status, t = defaultT) {
   };
 }
 
+export function getEffectiveFeatureStatus(status, t = defaultT) {
+  const statusMessage = typeof status?.message === "string" ? status.message.trim() : "";
+  const reason = (fallback) => statusMessage || t(fallback);
+  if (!status || status.status === "loading") {
+    return {
+      kind: "checking",
+      label: t("settings.status.checking"),
+      reason: reason("settings.status.checking.reason")
+    };
+  }
+  if (!status.enabled) {
+    return {
+      kind: "disabled",
+      label: t("settings.status.disabled"),
+      reason: reason("settings.status.disabled.reason")
+    };
+  }
+  if (status.status === "ready") {
+    return { kind: "ready", label: t("settings.status.ready"), reason: null };
+  }
+  if (status.status === "missing-config") {
+    return {
+      kind: "needs-setup",
+      label: t("settings.status.needsSetup"),
+      reason: reason("settings.status.missingConfig.reason")
+    };
+  }
+  if (status.status === "missing-dependency") {
+    return {
+      kind: "needs-setup",
+      label: t("settings.status.needsSetup"),
+      reason: reason("settings.status.missingDependency.reason")
+    };
+  }
+  return {
+    kind: "unavailable",
+    label: t("settings.status.unavailable"),
+    reason: reason("settings.status.unavailable.reason")
+  };
+}
+
 export function getRecoveryAction(status) {
   return status?.details?.action === "open-settings" ? "open-settings" : null;
 }
@@ -196,6 +237,18 @@ export function groupFeaturesByCategory(features) {
     groups.set(feature.category, group);
   }
   return [...groups.entries()];
+}
+
+export function filterFeaturesByQuery(features, query) {
+  const tokens = String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return features;
+  return features.filter((feature) => {
+    const haystack = [feature.name, feature.category, feature.description]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return tokens.every((token) => haystack.includes(token));
+  });
 }
 import { translate } from "../../localization/resources.mjs";
 const defaultT = (key, params) => translate("en", key, params);

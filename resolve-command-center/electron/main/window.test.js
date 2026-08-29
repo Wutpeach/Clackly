@@ -1397,6 +1397,7 @@ test("preload exposes bounded Interaction Panel intent without a renderer bounds
 test("Palette and Settings retain their qualified painted radii while native window geometry stays rectangular", () => {
   const styles = fs.readFileSync(path.join(__dirname, "../renderer/styles.css"), "utf8");
   const app = fs.readFileSync(path.join(__dirname, "../renderer/App.jsx"), "utf8");
+  const settingsApp = fs.readFileSync(path.join(__dirname, "../renderer/SettingsApp.jsx"), "utf8");
   const sharedGeometry = JSON.parse(fs.readFileSync(path.join(__dirname, "../shared/palette-geometry.json"), "utf8"));
 
   assert.equal(sharedGeometry.shadowPadding, PALETTE_SHADOW_PADDING, "native helper reads the shared shadow-padding authority");
@@ -1415,8 +1416,9 @@ test("Palette and Settings retain their qualified painted radii while native win
   assert.doesNotMatch(styles, /--radius-window/);
   assert.match(styles, /\.settings-titlebar\s*\{[^}]*background:\s*var\(--color-palette-surface\)[^}]*box-shadow:\s*none/s);
   assert.doesNotMatch(styles, /\.settings-titlebar\s*\{[^}]*linear-gradient/s);
-  assert.match(styles, /\.settings-titlebar-brand::before\s*\{/s);
-  assert.match(styles, /\.settings-titlebar-brand img\s*\{/s);
+  assert.match(settingsApp, /<span className="settings-titlebar-label">\{t\("settings\.label"\)\}<\/span>/);
+  assert.doesNotMatch(settingsApp, /clackly-logo|logoUrl|settings-titlebar-brand/);
+  assert.doesNotMatch(styles, /settings-titlebar-brand/);
   assert.doesNotMatch(styles, /palette-enter/);
 });
 
