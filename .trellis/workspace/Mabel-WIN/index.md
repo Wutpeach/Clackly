@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 43
+- **Total Sessions**: 44
 - **Last Active**: 2026-08-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~960 | Active |
+| `journal-1.md` | ~981 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 44 | 2026-08-29 | Search matching policy repair | `fa8873b` | `main` |
 | 43 | 2026-08-29 | Search & Ranking Foundation | `ab2950e` | `main` |
 | 42 | 2026-08-29 | Settings three-column refactor and inspector polish | `52f62ec` | `main` |
 | 41 | 2026-08-29 | Settings visual alignment | `bf3a0182465d659bf314d0bc4c40667f66955ba9` | `main` |

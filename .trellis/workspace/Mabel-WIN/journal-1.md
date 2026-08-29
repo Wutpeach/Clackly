@@ -958,3 +958,24 @@ Added Core-owned localized/pinyin Command Search, text-first adaptive ranking, d
 ### Status
 
 [OK] **Completed**
+
+
+## Session 44: Search matching policy repair
+
+**Date**: 2026-08-29
+**Task**: Search matching policy repair
+**Branch**: `main`
+
+### Summary
+
+Separated visible Command-name navigation from hidden keyword discovery, removed keyword initials, added weak-Latin token policy and bounded name polyphony, aligned headless evidence, passed isolated full/package gates, and installed the Workflow package.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fa8873b` | (see git log) |
+
+### Status
+
+[OK] **Completed**
