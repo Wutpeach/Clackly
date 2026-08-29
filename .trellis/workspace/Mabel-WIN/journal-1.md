@@ -1021,3 +1021,25 @@ Measured packaged real-host Export-to-AE latency, identified Python/Resolve and 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 47: Optimize After Effects running-state detection
+
+**Date**: 2026-08-29
+**Task**: Optimize After Effects running-state detection
+**Branch**: `main`
+
+### Summary
+
+Implemented a host-owned persistent hidden PowerShell helper for fresh After Effects process detection, added one discarded background prewarm query so the first real export uses a distinct fast query, qualified steady detection at about 5 ms, packaged and installed the Workflow, and recorded successful user acceptance in Resolve.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a23878b` | (see git log) |
+| `425c3bb` | (see git log) |
+
+### Status
+
+[OK] **Completed**

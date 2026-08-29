@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 46
+- **Total Sessions**: 47
 - **Last Active**: 2026-08-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1023 | Active |
+| `journal-1.md` | ~1045 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 47 | 2026-08-29 | Optimize After Effects running-state detection | `a23878b`, `425c3bb` | `main` |
 | 46 | 2026-08-29 | Profile Export to AE latency | `4ee08d0` | `main` |
 | 45 | 2026-08-29 | Motion Foundation accepted | `31c3fe6` | `main` |
 | 44 | 2026-08-29 | Search matching policy repair | `fa8873b` | `main` |
