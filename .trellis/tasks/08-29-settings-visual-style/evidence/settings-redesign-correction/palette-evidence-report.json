@@ -1,0 +1,121 @@
+{
+  "scope": "Developer-only Playwright Settings renderer-paint evidence. Explicit hostless Settings fixtures use cloned renderer-local presentation data and no Electron host authority.",
+  "limitations": [
+    "This proves built/packaged Settings renderer DOM, CSS, keyboard, and pointer behavior only.",
+    "It does not prove Electron native-window transparency, DWM, taskbar, focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."
+  ],
+  "playwrightVersion": "1.62.1",
+  "browser": {
+    "channel": "explicit browser executable",
+    "version": "151.0.4129.107",
+    "headless": true
+  },
+  "renderer": "built",
+  "rendererRoot": "D:\\Clackly\\resolve-command-center\\dist\\renderer",
+  "output": "D:\\Clackly\\.trellis\\tasks\\08-29-settings-visual-style\\evidence\\settings-redesign-correction",
+  "viewports": {
+    "visibleMain": {
+      "width": 240,
+      "height": 320
+    },
+    "visibleInteraction": {
+      "width": 516,
+      "height": 320
+    },
+    "nativeMain": {
+      "width": 256,
+      "height": 336
+    },
+    "nativeInteraction": {
+      "width": 532,
+      "height": 336
+    },
+    "browserPreview": {
+      "width": 800,
+      "height": 600
+    },
+    "browserPreviewSmall": {
+      "width": 220,
+      "height": 280
+    },
+    "shadowPadding": 8,
+    "deviceScaleFactor": 1
+  },
+  "commands": [
+    {
+      "id": "timeline.exportToAfterEffects",
+      "name": "Export to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportAudioToAfterEffects",
+      "name": "Export Audio to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportVideoToAfterEffects",
+      "name": "Export Video to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportCurrentToAfterEffects",
+      "name": "Export Playhead Clip to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportBlueRangeToAfterEffects",
+      "name": "Export Blue Marker Range Video to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "timeline.exportCyanRangeToAfterEffects",
+      "name": "Export Blue Marker Range with Audio to After Effects",
+      "category": "Export",
+      "capability": "ae.export"
+    },
+    {
+      "id": "media.clipboard-image.import",
+      "name": "Paste Clipboard Image",
+      "category": "Media",
+      "capability": "media.clipboard-image.import"
+    },
+    {
+      "id": "timeline.addMarker",
+      "name": "Add Marker",
+      "category": "Timeline",
+      "capability": "marker.add"
+    }
+  ],
+  "scenarios": [
+    "settings-general-empty",
+    "settings-typical-ready",
+    "settings-missing-config-long-path",
+    "settings-zh-cn-multi-help",
+    "settings-busy",
+    "settings-error",
+    "settings-reduced-motion"
+  ],
+  "screenshots": [
+    "D:\\Clackly\\.trellis\\tasks\\08-29-settings-visual-style\\evidence\\settings-redesign-correction\\settings-general-empty.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-29-settings-visual-style\\evidence\\settings-redesign-correction\\settings-typical-ready.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-29-settings-visual-style\\evidence\\settings-redesign-correction\\settings-missing-config-long-path.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-29-settings-visual-style\\evidence\\settings-redesign-correction\\settings-zh-cn-multi-help.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-29-settings-visual-style\\evidence\\settings-redesign-correction\\settings-busy.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-29-settings-visual-style\\evidence\\settings-redesign-correction\\settings-error.png",
+    "D:\\Clackly\\.trellis\\tasks\\08-29-settings-visual-style\\evidence\\settings-redesign-correction\\settings-reduced-motion.png"
+  ],
+  "assertions": [
+    "settings-general-empty: hostless local Settings fixture rendered the unchanged two-pane Settings UI at 760×560 with continuous Palette ink, exact #E7E8EA/#17191D selection, flat status readout, inset controls, and compact action strip; screenshot is renderer-paint evidence only and does not validate Electron or Resolve.",
+    "settings-typical-ready: hostless local Settings fixture rendered the unchanged two-pane Settings UI at 760×560 with continuous Palette ink, exact #E7E8EA/#17191D selection, flat status readout, inset controls, and compact action strip; screenshot is renderer-paint evidence only and does not validate Electron or Resolve.",
+    "settings-missing-config-long-path: hostless local Settings fixture rendered the unchanged two-pane Settings UI at 760×560 with continuous Palette ink, exact #E7E8EA/#17191D selection, flat status readout, inset controls, and compact action strip; screenshot is renderer-paint evidence only and does not validate Electron or Resolve.",
+    "settings-zh-cn-multi-help: hostless local Settings fixture rendered the unchanged two-pane Settings UI at 760×560 with continuous Palette ink, exact #E7E8EA/#17191D selection, flat status readout, inset controls, and compact action strip; screenshot is renderer-paint evidence only and does not validate Electron or Resolve.",
+    "settings-busy: hostless local Settings fixture rendered the unchanged two-pane Settings UI at 760×560 with continuous Palette ink, exact #E7E8EA/#17191D selection, flat status readout, inset controls, and compact action strip; screenshot is renderer-paint evidence only and does not validate Electron or Resolve.",
+    "settings-error: hostless local Settings fixture rendered the unchanged two-pane Settings UI at 760×560 with continuous Palette ink, exact #E7E8EA/#17191D selection, flat status readout, inset controls, and compact action strip; screenshot is renderer-paint evidence only and does not validate Electron or Resolve.",
+    "settings-reduced-motion: hostless local Settings fixture rendered the unchanged two-pane Settings UI at 760×560 with continuous Palette ink, exact #E7E8EA/#17191D selection, flat status readout, inset controls, and compact action strip; screenshot is renderer-paint evidence only and does not validate Electron or Resolve."
+  ]
+}

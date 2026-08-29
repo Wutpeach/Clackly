@@ -41,6 +41,7 @@ const INTERACTION_WINDOW_VIEWPORT = {
 };
 const BROWSER_PREVIEW_VIEWPORT = { width: 800, height: 600 };
 const BROWSER_PREVIEW_SMALL_VIEWPORT = { width: 220, height: 280 };
+const SETTINGS_VIEWPORT = { width: 760, height: 560 };
 const BROWSER_PREVIEW_SAFE_EDGE = 16;
 const INTERACTION_PANEL = { inset: 8, minHeight: 60, maxHeight: 180 };
 const PALETTE_SURFACE = "rgb(21, 22, 25)";
@@ -55,8 +56,33 @@ const SCENARIOS = new Set([
   "interaction-lifecycle",
   "interaction-host-unavailable",
   "error-feedback",
-  "browser-preview"
+  "browser-preview",
+  "settings-general-empty",
+  "settings-typical-ready",
+  "settings-missing-config-long-path",
+  "settings-zh-cn-multi-help",
+  "settings-busy",
+  "settings-error",
+  "settings-reduced-motion"
 ]);
+const SETTINGS_EVIDENCE_SCENARIOS = new Set([
+  "settings-general-empty",
+  "settings-typical-ready",
+  "settings-missing-config-long-path",
+  "settings-zh-cn-multi-help",
+  "settings-busy",
+  "settings-error",
+  "settings-reduced-motion"
+]);
+const SETTINGS_FIXTURE_BY_SCENARIO = Object.freeze({
+  "settings-general-empty": "general-empty",
+  "settings-typical-ready": "typical-ready",
+  "settings-missing-config-long-path": "missing-config-long-path",
+  "settings-zh-cn-multi-help": "zh-cn-multi-help",
+  "settings-busy": "busy",
+  "settings-error": "error",
+  "settings-reduced-motion": "typical-ready"
+});
 const MIME_TYPES = new Map([
   [".html", "text/html; charset=utf-8"],
   [".js", "text/javascript; charset=utf-8"],
@@ -316,6 +342,107 @@ async function createBrowserPreviewScenario(browser, serverUrl) {
   await page.locator(".clackly-browser-preview-agentation").waitFor();
   await page.waitForTimeout(80);
   return { context, page, problems };
+}
+
+async function createSettingsPreviewScenario(browser, serverUrl, fixture, { reducedMotion = false } = {}) {
+  const context = await browser.newContext({
+    viewport: SETTINGS_VIEWPORT,
+    deviceScaleFactor: 1,
+    ...(reducedMotion ? { reducedMotion: "reduce" } : {})
+  });
+  const page = await context.newPage();
+  const problems = [];
+  page.on("console", (message) => { if (message.type() === "error") problems.push(`console: ${message.text()}`); });
+  page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
+  const url = new URL(serverUrl);
+  url.searchParams.set("view", "settings");
+  url.searchParams.set("settings-preview", fixture);
+  await page.goto(url.toString(), { waitUntil: "networkidle" });
+  await page.locator(".settings-shell").waitFor();
+  await page.locator(".settings-titlebar").waitFor();
+  await page.waitForTimeout(80);
+  return { context, page, problems };
+}
+
+async function inspectSettingsLayout(page, label) {
+  const viewport = page.viewportSize();
+  const layout = await page.evaluate(() => {
+    const rect = (element) => {
+      const value = element?.getBoundingClientRect();
+      return value ? { left: value.left, top: value.top, right: value.right, bottom: value.bottom, width: value.width, height: value.height } : null;
+    };
+    const shell = document.querySelector(".settings-shell");
+    const sidebar = document.querySelector(".feature-sidebar");
+    const detail = document.querySelector(".feature-detail");
+    const footer = document.querySelector(".settings-actions");
+    const titlebar = document.querySelector(".settings-titlebar");
+    const detailIcon = document.querySelector(".feature-detail-icon");
+    const selectedButton = document.querySelector(".feature-button.selected");
+    const selectedIcon = selectedButton?.querySelector("svg");
+    const selectedStyle = selectedButton ? getComputedStyle(selectedButton) : null;
+    const lifecycle = document.querySelector(".feature-lifecycle");
+    const control = document.querySelector(".settings-field input:not([type=checkbox]), .settings-field select");
+    const candidates = [...document.querySelectorAll(".feature-button, .feature-detail-header, .feature-lifecycle, .settings-field, .feature-help-row, .settings-actions button")]
+      .filter((element) => getComputedStyle(element).display !== "none")
+      .map(rect);
+    return {
+      documentWidth: document.documentElement.clientWidth,
+      documentHeight: document.documentElement.clientHeight,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      shell: rect(shell),
+      sidebar: rect(sidebar),
+      detail: rect(detail),
+      footer: rect(footer),
+      titlebar: titlebar ? { rect: rect(titlebar), background: getComputedStyle(titlebar).backgroundColor, borderBottom: getComputedStyle(titlebar).borderBottomWidth } : null,
+      detailIcon: detailIcon ? { rect: rect(detailIcon), background: getComputedStyle(detailIcon).backgroundColor, border: getComputedStyle(detailIcon).borderWidth } : null,
+      selected: selectedStyle ? { background: selectedStyle.backgroundColor, text: selectedStyle.color, icon: selectedIcon ? getComputedStyle(selectedIcon).color : null, height: selectedStyle.height } : null,
+      lifecycle: lifecycle ? { background: getComputedStyle(lifecycle).backgroundColor, topBorder: getComputedStyle(lifecycle).borderTopWidth, bottomBorder: getComputedStyle(lifecycle).borderBottomWidth } : null,
+      control: control ? { height: getComputedStyle(control).height, background: getComputedStyle(control).backgroundColor, borderRadius: getComputedStyle(control).borderRadius } : null,
+      footerShadow: footer ? getComputedStyle(footer).boxShadow : null,
+      title: getComputedStyle(document.querySelector(".feature-detail h1")).fontSize,
+      section: getComputedStyle(document.querySelector(".settings-section > h2")).fontSize,
+      navLabel: getComputedStyle(document.querySelector(".feature-button")).fontSize,
+      candidates
+    };
+  });
+  assert.deepEqual(viewport, SETTINGS_VIEWPORT, `${label}: renderer evidence uses the shipped 760×560 Settings viewport`);
+  assert.equal(layout.documentWidth, SETTINGS_VIEWPORT.width, `${label}: Settings document width stays fixed`);
+  assert.equal(layout.documentHeight, SETTINGS_VIEWPORT.height, `${label}: Settings document height stays fixed`);
+  assert.ok(layout.documentScrollWidth <= SETTINGS_VIEWPORT.width, `${label}: Settings document has no horizontal overflow`);
+  assert.ok(layout.bodyScrollWidth <= SETTINGS_VIEWPORT.width, `${label}: Settings body has no horizontal overflow`);
+  assert.equal(Math.round(layout.shell.width), SETTINGS_VIEWPORT.width, `${label}: Settings shell keeps native-sized width`);
+  assert.equal(Math.round(layout.shell.height), SETTINGS_VIEWPORT.height, `${label}: Settings shell keeps native-sized height`);
+  assert.equal(Math.round(layout.sidebar.width), 220, `${label}: Settings preserves the existing 220px navigation pane`);
+  assert.ok(layout.detail.left >= layout.sidebar.right - 0.5, `${label}: Settings preserves the separate detail pane`);
+  assert.ok(layout.footer.top >= layout.detail.top && layout.footer.bottom <= layout.detail.bottom + 0.5, `${label}: fixed Settings footer remains inside the detail pane`);
+  assert.equal(Math.round(layout.footer.height), 34, `${label}: Settings action strip follows the compact 34px rhythm`);
+  assert.equal(layout.footerShadow, "none", `${label}: Settings footer uses a quiet hairline instead of an upward shadow`);
+  assert.equal(layout.titlebar?.background, PALETTE_SURFACE, `${label}: titlebar shares the continuous Palette ink surface`);
+  assert.equal(layout.titlebar?.borderBottom, "1px", `${label}: titlebar uses a weak structural hairline`);
+  assert.equal(layout.title, "16px", `${label}: compact detail title follows the shared instrument hierarchy`);
+  assert.equal(layout.section, "14px", `${label}: section heading follows the 14px role`);
+  assert.equal(layout.navLabel, "13px", `${label}: navigation label follows the 13px role`);
+  assert.ok(layout.detailIcon && Math.round(layout.detailIcon.rect.width) === 16 && Math.round(layout.detailIcon.rect.height) === 16, `${label}: detail icon stays in the shared 14–16px slot`);
+  assert.equal(layout.detailIcon.background, "rgba(0, 0, 0, 0)", `${label}: detail icon has no accent tile fill`);
+  assert.equal(layout.detailIcon.border, "0px", `${label}: detail icon has no tile border`);
+  assert.equal(layout.selected.background, "rgb(231, 232, 234)", `${label}: selected Settings row uses the exact Palette light-neutral anchor`);
+  assert.equal(layout.selected.text, "rgb(23, 25, 29)", `${label}: selected Settings row uses the exact Palette dark foreground`);
+  assert.equal(layout.selected.icon, layout.selected.text, `${label}: selected Settings icon remains monochrome with its label`);
+  assert.equal(layout.selected.height, "30px", `${label}: Settings navigation follows the 30px Palette row rhythm`);
+  if (layout.lifecycle) {
+    assert.equal(layout.lifecycle.background, "rgba(0, 0, 0, 0)", `${label}: Feature Status is a flat readout rather than a filled card`);
+    assert.equal(layout.lifecycle.topBorder, "1px", `${label}: Feature Status uses a top hairline`);
+    assert.equal(layout.lifecycle.bottomBorder, "1px", `${label}: Feature Status uses a bottom hairline`);
+  }
+  if (layout.control) {
+    assert.equal(layout.control.height, "30px", `${label}: Settings fields follow the compact control rhythm`);
+    assert.equal(layout.control.background, "rgba(0, 0, 0, 0.12)", `${label}: Settings fields use the Palette inset fill`);
+  }
+  for (const candidate of layout.candidates) {
+    assert.ok(candidate.left >= -0.5 && candidate.right <= SETTINGS_VIEWPORT.width + 0.5, `${label}: visible Settings content stays inside the viewport`);
+  }
+  return layout;
 }
 
 async function inspectLayout(page, label) {
@@ -712,12 +839,47 @@ async function closeScenario(scenario, label) {
 
 async function runScenario(name, context) {
   const { browser, serverUrl, host, output, evidence, checks } = context;
-  const scenario = name === "browser-preview"
-    ? await createBrowserPreviewScenario(browser, serverUrl)
-    : await createScenario(browser, serverUrl, host);
+  const scenario = SETTINGS_EVIDENCE_SCENARIOS.has(name)
+    ? await createSettingsPreviewScenario(browser, serverUrl, SETTINGS_FIXTURE_BY_SCENARIO[name], {
+      reducedMotion: name === "settings-reduced-motion"
+    })
+    : name === "browser-preview"
+      ? await createBrowserPreviewScenario(browser, serverUrl)
+      : await createScenario(browser, serverUrl, host);
   const { page } = scenario;
   try {
-    if (name === "browser-preview") {
+    if (SETTINGS_EVIDENCE_SCENARIOS.has(name)) {
+      assert.equal(await page.evaluate(() => Boolean(window.resolveCommandCenter)), false, `${name}: Settings fixture has no injected Electron host authority`);
+      assert.equal(await page.locator(".clackly-browser-preview-agentation").count(), 0, `${name}: Settings fixture does not mount the Palette preview tool`);
+      await page.locator(".feature-detail h1").waitFor();
+      if (name === "settings-missing-config-long-path") {
+        const pathInput = page.locator("#setting-afterEffectsPath");
+        await pathInput.scrollIntoViewIfNeeded();
+        assert.match(await pathInput.inputValue(), /^C:\\Program Files\\Blackmagic Design\\DaVinci Resolve\\/);
+        await page.locator(".feature-lifecycle-heading p").filter({ hasText: "Needs setup" }).waitFor();
+      } else if (name === "settings-zh-cn-multi-help") {
+        await page.getByRole("heading", { name: "交互帮助" }).scrollIntoViewIfNeeded();
+        assert.ok(await page.locator(".feature-help-input kbd").count() >= 5, "Simplified Chinese fixture preserves multi-row keycap help");
+        assert.equal(await page.locator("html").getAttribute("lang"), "zh-CN", "Simplified Chinese fixture applies the localized document language");
+      } else if (name === "settings-busy") {
+        const save = page.getByRole("button", { name: "Working…" });
+        await save.waitFor();
+        assert.equal(await save.isDisabled(), true, "busy fixture preserves disabled fixed actions");
+      } else if (name === "settings-error") {
+        await page.getByRole("button", { name: "Save" }).click();
+        await page.locator(".settings-feedback.error").waitFor();
+        assert.equal(await page.locator(".settings-feedback.error").innerText(), "The command could not be completed.", "error fixture keeps localized existing feedback semantics");
+      } else if (name === "settings-reduced-motion") {
+        const motion = await page.locator(".feature-button").first().evaluate((element) => getComputedStyle(element).transitionDuration);
+        const saveMotion = await page.getByRole("button", { name: "Save" }).evaluate((element) => getComputedStyle(element).transitionDuration);
+        assert.equal(motion, "0s", "reduced motion removes Settings navigation transitions");
+        assert.equal(saveMotion, "0s", "reduced motion removes Settings action transitions");
+      }
+      await inspectSettingsLayout(page, name);
+      evidence.push(await screenshot(page, output, `${name}.png`));
+      checks.push(`${name}: hostless local Settings fixture rendered the unchanged two-pane Settings UI at 760×560 with continuous Palette ink, exact #E7E8EA/#17191D selection, flat status readout, inset controls, and compact action strip; screenshot is renderer-paint evidence only and does not validate Electron or Resolve.`);
+      return;
+    } else if (name === "browser-preview") {
       await inspectBrowserPreviewLayout(page, name);
       await assertShadowFitsPaddedShell(page, name);
       const agentation = page.locator(".clackly-browser-preview-agentation");
@@ -980,16 +1142,24 @@ async function run() {
   const browser = await chromium.launch({ headless: !options.headed, ...(executablePath ? { executablePath } : {}) });
   const evidence = [];
   const checks = [];
+  const settingsOnly = [...options.scenarios].every((scenario) => SETTINGS_EVIDENCE_SCENARIOS.has(scenario));
   try {
     for (const scenario of SCENARIOS) {
       if (options.scenarios.has(scenario)) await runScenario(scenario, { browser, serverUrl: url, host, output: options.output, evidence, checks });
     }
     const report = {
-      scope: "Developer-only Playwright renderer evidence. Browser-process host stubs expose registered Commands, normalized interaction bindings, and semantic Interaction Panel intent; root browser preview intentionally omits that host API and uses only its isolated renderer-local presentation adapter plus local Agentation toolbar.",
-      limitations: [
-        "This proves built/packaged renderer DOM, CSS, keyboard, and pointer behavior only.",
-        "It does not prove Electron setShape/DWM composition, transparent-gap hit testing, cursor placement, native focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."
-      ],
+      scope: settingsOnly
+        ? "Developer-only Playwright Settings renderer-paint evidence. Explicit hostless Settings fixtures use cloned renderer-local presentation data and no Electron host authority."
+        : "Developer-only Playwright renderer evidence. Browser-process host stubs expose registered Commands, normalized interaction bindings, and semantic Interaction Panel intent; root browser preview intentionally omits that host API and uses only its isolated renderer-local presentation adapter plus local Agentation toolbar.",
+      limitations: settingsOnly
+        ? [
+          "This proves built/packaged Settings renderer DOM, CSS, keyboard, and pointer behavior only.",
+          "It does not prove Electron native-window transparency, DWM, taskbar, focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."
+        ]
+        : [
+          "This proves built/packaged renderer DOM, CSS, keyboard, and pointer behavior only.",
+          "It does not prove Electron setShape/DWM composition, transparent-gap hit testing, cursor placement, native focus, package installation, Resolve Workflow lifecycle, or Resolve command execution."
+        ],
       playwrightVersion,
       browser: { channel: executablePath ? "explicit browser executable" : "Playwright Chromium", version: browser.version(), headless: !options.headed },
       renderer: options.renderer,

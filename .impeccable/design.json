@@ -1,21 +1,21 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-28T21:15:12.2381461+08:00",
+  "generatedAt": "2026-08-29T00:00:00+08:00",
   "title": "Design System: Clackly",
   "extensions": {
     "colorMeta": {
       "accent": { "role": "primary", "displayName": "Resolve Signal Orange", "tonalRamp": ["#341309", "#60230E", "#913717", "#C34F22", "#F36A2D", "#F89567", "#FBC0A4", "#FDE9DE"] },
       "accent-hover": { "role": "primary", "displayName": "Signal Orange Bright", "tonalRamp": ["#351608", "#682A10", "#9B401C", "#CE592B", "#FF7A3D", "#FFA078", "#FFC8AD", "#FDECE3"] },
       "accent-soft": { "role": "primary", "displayName": "Signal Orange Wash", "tonalRamp": ["rgba(243,106,45,0.05)", "rgba(243,106,45,0.08)", "rgba(243,106,45,0.11)", "rgba(243,106,45,0.13)", "rgba(243,106,45,0.15)", "rgba(243,106,45,0.19)", "rgba(243,106,45,0.24)", "rgba(243,106,45,0.3)"] },
-      "window-bg": { "role": "neutral", "displayName": "Settings Night", "tonalRamp": ["#0A0B0E", "#101216", "#1B1E24", "#2B3038", "#434A55", "#66707D", "#99A1AB", "#E7E9EC"] },
-      "settings-titlebar-top": { "role": "neutral", "displayName": "Settings Graphite", "tonalRamp": ["#111316", "#202327", "#343940", "#4C535C", "#6E7782", "#9AA1A9", "#C9CDD1", "#F1F2F3"] },
+      "window-bg": { "role": "neutral", "displayName": "Shared Settings Ink", "tonalRamp": ["#0D0E10", "#151619", "#24262A", "#3A3D42", "#585D63", "#858A91", "#BFC2C7", "#F1F2F4"] },
+      "settings-titlebar-top": { "role": "neutral", "displayName": "Settings Continuous Ink", "tonalRamp": ["#0D0E10", "#151619", "#24262A", "#3A3D42", "#585D63", "#858A91", "#BFC2C7", "#F1F2F4"] },
       "palette-surface": { "role": "neutral", "displayName": "Palette Ink", "tonalRamp": ["#0D0E10", "#151619", "#24262A", "#3A3D42", "#585D63", "#858A91", "#BFC2C7", "#F1F2F4"] },
       "interaction-panel": { "role": "neutral", "displayName": "Shared Information Ink", "tonalRamp": ["#0D0E10", "#151619", "#24262A", "#3A3D42", "#585D63", "#858A91", "#BFC2C7", "#F1F2F4"] },
       "palette-control-fill": { "role": "neutral", "displayName": "Inset Control Shade", "tonalRamp": ["rgba(0,0,0,0.04)", "rgba(0,0,0,0.07)", "rgba(0,0,0,0.1)", "rgba(0,0,0,0.12)", "rgba(0,0,0,0.16)", "rgba(0,0,0,0.22)", "rgba(0,0,0,0.3)", "rgba(0,0,0,0.42)"] },
       "palette-muted": { "role": "neutral", "displayName": "Subdued Palette Text", "tonalRamp": ["rgba(255,255,255,0.18)", "rgba(255,255,255,0.28)", "rgba(255,255,255,0.38)", "rgba(255,255,255,0.47)", "rgba(255,255,255,0.58)", "rgba(255,255,255,0.68)", "rgba(255,255,255,0.8)", "rgba(255,255,255,0.92)"] },
       "palette-separator": { "role": "neutral", "displayName": "Faint Palette Hairline", "tonalRamp": ["rgba(255,255,255,0.02)", "rgba(255,255,255,0.04)", "rgba(255,255,255,0.055)", "rgba(255,255,255,0.08)", "rgba(255,255,255,0.12)", "rgba(255,255,255,0.18)", "rgba(255,255,255,0.28)", "rgba(255,255,255,0.4)"] },
       "panel-bg": { "role": "neutral", "displayName": "Inset Graphite", "tonalRamp": ["#0E0F13", "#15181E", "#262B33", "#404754", "#626B79", "#929AA4", "#C6CAD0", "#F1F2F4"] },
-      "header-bottom": { "role": "neutral", "displayName": "Settings Header Lower Graphite", "tonalRamp": ["#101214", "#1C1F23", "#30343A", "#494E56", "#6B717A", "#989EA6", "#C9CDD1", "#F2F3F4"] },
+      "header-bottom": { "role": "neutral", "displayName": "Shared Settings Hairline Surface", "tonalRamp": ["#0D0E10", "#151619", "#24262A", "#3A3D42", "#585D63", "#858A91", "#BFC2C7", "#F1F2F4"] },
       "row-hover": { "role": "neutral", "displayName": "Soft Row Hover", "tonalRamp": ["rgba(255,255,255,0.02)", "rgba(255,255,255,0.032)", "rgba(255,255,255,0.042)", "rgba(255,255,255,0.052)", "rgba(255,255,255,0.065)", "rgba(255,255,255,0.12)", "rgba(255,255,255,0.18)", "rgba(255,255,255,0.28)"] },
       "row-selected": { "role": "neutral", "displayName": "Selection Light", "tonalRamp": ["#34363A", "#55585D", "#797C82", "#A8ABB0", "#E7E8EA", "#EFF0F2", "#F5F6F7", "#FBFBFC"] },
       "row-selected-foreground": { "role": "neutral", "displayName": "Selection Ink", "tonalRamp": ["#0C0E10", "#17191D", "#292C31", "#41464D", "#626973", "#9198A1", "#C5C9CE", "#F0F1F3"] },
@@ -89,17 +89,17 @@
       "css": ".ds-interaction-panel{width:260px;min-height:60px;max-height:180px;padding:12px;overflow:auto;color:rgba(255,255,255,.92);background:#151619;font-family:'HarmonyOS Sans','Segoe UI',system-ui,sans-serif}.ds-interaction-row{display:grid;grid-template-columns:minmax(86px,auto) minmax(0,1fr);align-items:center;min-height:30px;gap:10px}.ds-interaction-row span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}.ds-interaction-row kbd{height:20px;padding:0 6px;border:1px solid rgba(255,255,255,.13);border-radius:4px;color:#e5e7eb;background:rgba(0,0,0,.18);font-size:10px;font-weight:500;line-height:18px}.ds-interaction-row b{color:rgba(255,255,255,.4);font-size:9px}.ds-interaction-row strong{color:rgba(255,255,255,.65);font-size:11px;font-weight:500;line-height:1.3;overflow-wrap:anywhere}"
     },
     {
-      "name": "Settings Shell",
-      "kind": "card",
+      "name": "Settings Instrument Surface",
+      "kind": "custom",
       "refersTo": "settings-shell",
-      "description": "Independent square Settings surface, intentionally separate from the native Palette treatment.",
-      "html": "<section class=\"ds-settings-shell\"><header><i></i><strong>CLACKLY SETTINGS</strong></header><p>Feature controls remain outside the Palette.</p></section>",
-      "css": ".ds-settings-shell{width:380px;min-height:180px;overflow:hidden;border:1px solid rgba(255,255,255,.13);border-radius:0;color:rgba(255,255,255,.92);background:#101216;box-shadow:0 18px 44px rgba(0,0,0,.35);font-family:'HarmonyOS Sans','Segoe UI',system-ui,sans-serif}.ds-settings-shell header{display:flex;align-items:center;gap:11px;height:48px;padding:0 16px;background:linear-gradient(180deg,#202327,#1c1f23);box-shadow:inset 0 0 0 1px rgba(255,255,255,.025),0 2px 2px -2px rgba(0,0,0,.8);font-size:12px;letter-spacing:.12em}.ds-settings-shell header i{width:2px;height:24px;border-radius:2px;background:#f36a2d}.ds-settings-shell p{margin:20px 16px;color:rgba(255,255,255,.65);font-size:13px;line-height:1.4}"
+      "description": "Independent native Settings window geometry with the current Palette/Interaction Panel visual grammar: continuous ink, compact rows, neutral selection, inset controls, and a quiet action strip.",
+      "html": "<section class=\"ds-settings-shell\"><header><strong>Settings</strong><button aria-label=\"Close\">×</button></header><div class=\"ds-settings-workspace\"><nav><button aria-current=\"page\"><svg viewBox=\"0 0 24 24\"></svg><span>General</span></button></nav><main><h2>Export to After Effects</h2><label>Output folder<input value=\"D:\\Resolve Exports\"></label><footer><button>Reset</button><button>Save</button></footer></main></div></section>",
+      "css": ".ds-settings-shell{width:380px;min-height:180px;overflow:hidden;border:1px solid rgba(255,255,255,.08);border-radius:0;color:rgba(255,255,255,.92);background:#151619;font-family:'HarmonyOS Sans','Segoe UI',system-ui,sans-serif}.ds-settings-shell header{display:flex;align-items:center;justify-content:space-between;height:36px;padding:0 12px;border-bottom:1px solid rgba(255,255,255,.055);background:#151619;font-size:11px;font-weight:500}.ds-settings-workspace{display:grid;grid-template-columns:110px minmax(0,1fr);min-height:144px}.ds-settings-workspace nav{padding:8px;border-right:1px solid rgba(255,255,255,.055)}.ds-settings-workspace nav button{display:grid;grid-template-columns:16px minmax(0,1fr);align-items:center;gap:7px;width:100%;height:30px;padding:0 7px;border:0;border-radius:3px;color:#17191d;background:#e7e8ea;font:500 13px/1.25 inherit;text-align:left}.ds-settings-workspace nav svg{width:16px;height:16px;stroke:currentColor}.ds-settings-workspace main{padding:12px}.ds-settings-workspace h2{margin:0 0 12px;font-size:16px;line-height:1.2}.ds-settings-workspace label{display:grid;gap:5px;color:rgba(255,255,255,.65);font-size:13px;font-weight:500}.ds-settings-workspace input{height:30px;padding:0 8px;border:1px solid rgba(255,255,255,.12);border-radius:4px;color:rgba(255,255,255,.92);background:rgba(0,0,0,.12)}.ds-settings-workspace footer{display:flex;justify-content:flex-end;gap:6px;height:30px;margin:12px -12px -12px;padding:3px 8px;border-top:1px solid rgba(255,255,255,.055)}.ds-settings-workspace footer button{height:24px;padding:0 9px;border:0;border-radius:3px;color:rgba(255,255,255,.65);background:transparent;font-size:11px;font-weight:500}.ds-settings-workspace footer button:last-child{color:#17191d;background:#f36a2d}"
     }
   ],
   "narrative": {
     "northStar": "The Resolve Precision Instrument",
-    "overview": "Clackly is a compact professional control surface that appears inside the editor's Resolve workflow, performs one focused job, and returns attention to the timeline. Its visual language combines Resolve-grade dark tonal restraint with the immediacy of Spotlight and FX Console. It rejects oversized cards, generous empty space, and playful consumer-launcher softness.\n\nOn Windows, that instrument is a stable native two-window composition: a fixed main Palette and an independent information Panel. The host owns native window behavior; the renderer owns only Palette content and the bounded information presentation. The browser page is a visual DOM simulation of the same shared contract, never evidence of native behavior.",
+    "overview": "Clackly is a compact professional control surface that appears inside the editor's Resolve workflow, performs one focused job, and returns attention to the timeline. Its visual language combines Resolve-grade dark tonal restraint with the immediacy of Spotlight and FX Console. It rejects oversized cards, generous empty space, and playful consumer-launcher softness.\n\nOn Windows, that instrument is a stable native two-window composition: a fixed main Palette and an independent information Panel. The host owns native window behavior; the renderer owns only Palette content and the bounded information presentation. Settings keeps its independent native window contract, but its painted UI follows the same current Palette and Interaction Information grammar rather than a separate legacy Settings theme. The browser page is a visual DOM simulation of the same shared contract, never evidence of native behavior.",
     "keyCharacteristics": [
       "Dense, keyboard-first, and operational.",
       "Dark neutral surfaces separated by tone, hairlines, and restrained depth.",
@@ -108,7 +108,7 @@
       "Windows native Palette visibility changes immediately and without authored entry or exit motion."
     ],
     "rules": [
-      { "name": "The Orange Signal Rule", "body": "Use the accent only for Settings or brand identity, focus indication, pinned indicators, and essential state. Palette selection is always a light neutral anchor with dark foreground; orange never becomes a Palette row fill.", "section": "colors" },
+      { "name": "The Orange Signal Rule", "body": "Use the accent only for brand identity, focus indication, pinned indicators, the primary Save action, and essential warning/error state. Palette and Settings selection use the shared #E7E8EA light-neutral anchor with #17191D foreground; orange never becomes a selected-row fill or location rail.", "section": "colors" },
       { "name": "The Single-Line Command Rule", "body": "Command names and supporting metadata stay on one line and truncate before row height changes. Interaction action labels wrap naturally inside their own Panel because complete action names outrank horizontal compression there.", "section": "typography" },
       { "name": "The Workspace Preservation Rule", "body": "Every layout occupies only the space required for the current command task and never turns into a full application window.", "section": "layout" },
       { "name": "The Native Depth Rule", "body": "Treat immediate opacity `0/1` as a stable visibility state, not an animation. Do not add scale, fade, blur, translation, taskbar animation, or timing choreography to Palette reveal or concealment.", "section": "elevation" }
@@ -119,7 +119,8 @@
       "Do keep the Windows main and information Panel as independent opaque native windows with a genuinely empty gap.",
       "Do preserve the path-only custom SVG wordmark and mark, and use `lucide-react` SVG components for interface icons.",
       "Do render only registered Command metadata and use the truthful empty state when none is available.",
-      "Do keep Settings on its existing separate square-window contract."
+      "Do keep Settings on its existing separate square-window contract.",
+      "Do make Settings visibly use the current Palette/Interaction Panel row, selection, field, keycap, and footer grammar."
     ],
     "donts": [
       "Don't add a rendered bridge, connector, or occupied hit area between the Windows native windows.",
@@ -127,7 +128,8 @@
       "Don't represent browser-preview output as proof of DWM, HWND separation, focus, hit testing, z-order, or Resolve acceptance.",
       "Don't use large glow, full-orange rows, gradient text, decorative glass effects, oversized whitespace, or card-heavy consumer layouts.",
       "Don't let UI code know how Resolve actions are implemented.",
-      "Don't make Settings adopt the Palette's native D6/D7 treatment."
+      "Don't make Settings adopt the Palette's native D6/D7 treatment or let native-window independence create a separate legacy Settings visual system.",
+      "Don't use an orange Settings selection, gradient/branded titlebar, framed Feature Status card, oversized padding, or a tall application-style footer."
     ]
   }
 }

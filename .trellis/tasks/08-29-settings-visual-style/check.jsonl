@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Routes the checker to the complete frontend quality guidance and forbidden renderer/host coupling patterns without truncating the injected context."}
+{"file":".trellis/tasks/08-29-settings-visual-style/research/settings-visual-audit.md","reason":"Provides the evidence-backed visual gaps and state matrix the final check must verify."}

@@ -37,6 +37,20 @@ function SettingsTitlebar({ api, Icon, t }) {
   );
 }
 
+function InteractionHelpInput({ label }) {
+  const tokens = label.split(" + ").filter(Boolean);
+  return (
+    <span className="feature-help-input" aria-label={label}>
+      {tokens.map((token, index) => (
+        <React.Fragment key={`${token}-${index}`}>
+          {index > 0 && <span className="feature-help-plus" aria-hidden="true">+</span>}
+          <kbd aria-hidden="true">{token}</kbd>
+        </React.Fragment>
+      ))}
+    </span>
+  );
+}
+
 function SettingsApp({ api, Icon }) {
   const { effectiveLocale, preference, setLocalePreference, t } = useLocalization();
   const [features, setFeatures] = useState([]);
@@ -268,7 +282,7 @@ function SettingsApp({ api, Icon }) {
               disabled={busy}
               onClick={() => setSelectedId("general")}
             >
-              <Icon name="settings" size={17} />
+              <Icon name="settings" size={16} />
               <span>{t("settings.general")}</span>
             </button>
           </section>
@@ -289,7 +303,7 @@ function SettingsApp({ api, Icon }) {
                   disabled={busy}
                   onClick={() => setSelectedId(feature.id)}
                 >
-                  <Icon name={feature.icon} size={17} />
+                  <Icon name={feature.icon} size={16} />
                   <span>{feature.name}</span>
                   {warning && (
                     <span
@@ -314,7 +328,7 @@ function SettingsApp({ api, Icon }) {
           <section className="feature-detail" aria-labelledby="general-title">
             <div className="feature-detail-scroll">
               <header className="feature-detail-header">
-                <span className="feature-detail-icon"><Icon name="settings" size={26} /></span>
+                <span className="feature-detail-icon" aria-hidden="true"><Icon name="settings" size={16} /></span>
                 <div><h1 id="general-title">{t("settings.general")}</h1></div>
               </header>
               <section className="settings-section general-settings" aria-labelledby="language-heading">
@@ -350,7 +364,7 @@ function SettingsApp({ api, Icon }) {
           <section className="feature-detail" aria-labelledby="feature-title">
           <div className="feature-detail-scroll">
             <header className="feature-detail-header">
-              <span className="feature-detail-icon"><Icon name={selectedFeature.icon} size={26} /></span>
+              <span className="feature-detail-icon" aria-hidden="true"><Icon name={selectedFeature.icon} size={16} /></span>
               <div>
                 <span className="feature-category-label">{selectedFeature.category}</span>
                 <h1 id="feature-title">{selectedFeature.name}</h1>
@@ -410,7 +424,7 @@ function SettingsApp({ api, Icon }) {
                   <h3>{command.name}</h3>
                   {command.help.map((entry, index) => (
                     <div className="feature-help-row" key={`${entry.label}-${index}`}>
-                      <span>{entry.label}</span>
+                      <InteractionHelpInput label={entry.label} />
                       <p>{entry.description}</p>
                     </div>
                   ))}

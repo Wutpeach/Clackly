@@ -5,15 +5,15 @@ colors:
   accent: "#F36A2D"
   accent-hover: "#FF7A3D"
   accent-soft: "rgba(243,106,45,0.15)"
-  window-bg: "#101216"
-  settings-titlebar-top: "#202327"
+  window-bg: "#151619"
+  settings-titlebar-top: "#151619"
   palette-surface: "#151619"
   interaction-panel: "#151619"
   palette-control-fill: "rgba(0,0,0,0.12)"
   palette-muted: "rgba(255,255,255,0.47)"
   palette-separator: "rgba(255,255,255,0.055)"
   panel-bg: "#15181E"
-  header-bottom: "#1C1F23"
+  header-bottom: "#151619"
   row-hover: "rgba(255,255,255,0.052)"
   row-selected: "#E7E8EA"
   row-selected-foreground: "#17191D"
@@ -113,7 +113,7 @@ components:
     padding: "12px"
     width: "260px"
   settings-shell:
-    backgroundColor: "{colors.window-bg}"
+    backgroundColor: "{colors.palette-surface}"
     rounded: "{rounded.settings-shell}"
     width: "760px"
     height: "560px"
@@ -127,7 +127,7 @@ components:
 
 Clackly is a compact professional control surface that appears inside the editor's Resolve workflow, performs one focused job, and returns attention to the timeline. Its visual language combines Resolve-grade dark tonal restraint with the immediacy of Spotlight and FX Console. It rejects oversized cards, generous empty space, and playful consumer-launcher softness.
 
-On Windows, that instrument is a stable native two-window composition: a fixed main Palette and an independent information Panel. The host owns native window behavior; the renderer owns only Palette content and the bounded information presentation. The browser page is a visual DOM simulation of the same shared contract, never evidence of native behavior.
+On Windows, that instrument is a stable native two-window composition: a fixed main Palette and an independent information Panel. The host owns native window behavior; the renderer owns only Palette content and the bounded information presentation. The browser page is a visual DOM simulation of the same shared contract, never evidence of native behavior. Settings is native-window independent, but its painted surface belongs to this same current-generation instrument rather than to a separate desktop-settings theme.
 
 **Architecture authority.** The approved D6/D7 contract as encoded by the native host policy and window helpers defines Windows behavior. `electron/shared/palette-geometry.json` owns the shared dimensions and visual tokens consumed by native helpers and renderers. The hostless root browser preview consumes those sources through an isolated, non-executable presentation adapter; it neither defines the production contract nor validates native behavior.
 
@@ -141,9 +141,9 @@ On Windows, that instrument is a stable native two-window composition: a fixed m
 
 ## Colors
 
-The Palette main field, Footer, and information Panel use one shared neutral surface token. Search and keycaps inset slightly into that field; subtle borders and white-on-black tonal contrast create separation without a second dark toolbar. Settings retains its independent titlebar treatment and base window tone.
+The Palette main field, Footer, information Panel, and painted Settings shell use one shared neutral ink field. Search, Settings fields, and keycaps inset slightly into that field; subtle borders and white-on-black tonal contrast create separation without a second dark toolbar or a Settings-only color world.
 
-**The Orange Signal Rule.** Use the accent only for Settings or brand identity, focus indication, pinned indicators, and essential state. Palette selection is always a light neutral anchor with dark foreground; orange never becomes a Palette row fill.
+**The Orange Signal Rule.** Use the accent only for brand identity, focus indication, pinned indicators, the primary Save action, and essential warning/error state. Palette and Settings selection are always a light neutral anchor with dark foreground; orange never becomes a selected-row fill or location rail.
 
 ## Typography
 
@@ -176,7 +176,7 @@ Inside the surfaces, depth stays quiet: a faint inner highlight, subtle borders,
 
 Windows D6 is frameless, opaque, and full bleed, with native DWM corners and shadow. The Palette renderer preserves the small main-radius contract inside that native treatment. Windows D7 follows the same native outer-window policy; browser and compatibility representations preserve the smaller Panel-radius contract. The `16px` gap is empty desktop space, not part of either window.
 
-Settings is deliberately separate: its native window may use transparency, but its visible `760×560px` shell is fully painted, square, and `0px` radius. It retains the ordinary Settings lifecycle and non-Palette titlebar treatment, and does not inherit D6/D7 corners, shadow, focus, taskbar, or layout rules. Interface icons remain monochrome `lucide-react` symbols with a fixed optical stroke; the Clackly logo and mark remain project-owned path SVGs with no `<text>` or font dependency.
+Settings is deliberately separate: its native window may use transparency, but its visible `760×560px` shell is fully painted, square, and `0px` radius. It retains the ordinary Settings lifecycle, drag/close behavior, taskbar treatment, and two-pane geometry; it does not inherit D6/D7 corners, shadow, focus, or layout rules. That native separation does not create a second visual language: its paint follows the continuous Palette/Panel ink surface, compact list rhythm, weak hairlines, and inset controls. Interface icons remain monochrome `lucide-react` symbols with a fixed optical stroke; the Clackly logo and mark remain project-owned path SVGs with no `<text>` or font dependency.
 
 ## Components
 
@@ -204,7 +204,15 @@ The content is shared across the native detached renderer, compatibility fallbac
 
 ### Settings
 
-Settings remains a separate native window with a fully painted square visible shell and its existing singleton show/focus lifecycle. Its titlebar, feature controls, and normal taskbar behavior are intentionally independent from the compact Palette and must not absorb D6/D7 styling or behavior.
+Settings remains a separate native window with a fully painted square visible shell and its existing singleton show/focus lifecycle. The Palette Main and Interaction Information content are its visual authority; only D6/D7 native geometry and lifecycle stay separate.
+
+- **Titlebar:** keep the existing drag and close contract, but paint a compact continuous ink strip with only a weak bottom hairline. The wordmark is quiet; do not use a branded gradient, tall orange rule, or app-header depth.
+- **Navigation:** preserve the left feature navigation and categories. Rows follow the `30px` command-row rhythm with `3px` radius, `16px` monochrome icons, transparent rest state, and the shared low-contrast neutral hover. Selection is exactly `#E7E8EA` with `#17191D` text and icon—no orange wash or location rail.
+- **Detail:** use a compact `14–16px` monochrome icon and a direct title/description path. Category metadata stays subdued. Do not promote status administration before the actual editable settings.
+- **Lifecycle/status:** present status as a compact, flat, hairline-separated operational readout. It is not a framed card, a colored tile, or an app-dashboard summary.
+- **Fields and help:** fields use the Palette's inset `rgba(0,0,0,0.12)` treatment, weak borders, `30–34px` controls, and `3–4px` radii. Interaction Help uses the existing read-only Interaction Information keycap grammar.
+- **Action area:** preserve its fixed feedback, Reset, Save semantics, but render a `30px`-class quiet continuous footer with a single weak top hairline. Reset stays neutral; Save is the sole orange filled action.
+- **Density and motion:** favor direct operational scan paths, compact gaps, subdued metadata, and no authored reveal/hide animation.
 
 ## Do's and Don'ts
 
@@ -216,6 +224,7 @@ Settings remains a separate native window with a fully painted square visible sh
 - **Do** preserve the path-only custom SVG wordmark and mark, and use `lucide-react` SVG components for interface icons.
 - **Do** keep production Command presentation Registry-only and use the truthful empty state when no registered Commands exist; only the hostless root browser preview may use isolated representative presentation data.
 - **Do** keep Settings on its existing separate square-window contract.
+- **Do** make Settings visibly use the current Palette/Interaction Panel row, selection, field, keycap, and footer grammar.
 
 ### Don't:
 
@@ -224,4 +233,5 @@ Settings remains a separate native window with a fully painted square visible sh
 - **Don't** represent browser-preview output as proof of DWM, HWND separation, focus, hit testing, z-order, or Resolve acceptance.
 - **Don't** use large glow, full-orange rows, gradient text, decorative glass effects, oversized whitespace, or card-heavy consumer layouts.
 - **Don't** let UI code know how Resolve actions are implemented.
-- **Don't** make Settings adopt the Palette's native D6/D7 treatment.
+- **Don't** make Settings adopt the Palette's native D6/D7 treatment or let native-window independence become a separate legacy Settings visual system.
+- **Don't** use an orange Settings selection, gradient/branded titlebar, framed Feature Status card, oversized padding, or a tall application-style footer.

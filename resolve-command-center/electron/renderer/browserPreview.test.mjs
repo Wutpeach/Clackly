@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createBrowserPreviewApi, shouldRenderBrowserPreviewAgentation } from "./browserPreview.mjs";
+import {
+  createBrowserPreviewApi,
+  getBrowserSettingsFixture,
+  SETTINGS_PREVIEW_SCENARIOS,
+  shouldRenderBrowserPreviewAgentation
+} from "./browserPreview.mjs";
 import { getInteractionHelp } from "./model.mjs";
 
 test("browser preview keeps representative presentation data isolated and non-executable", async () => {
@@ -112,4 +117,49 @@ test("browser preview keeps its locale preference adapter isolated and broadcast
   assert.deepEqual(await api.setLocalePreference("zh-CN"), { preference: "zh-CN", effectiveLocale: "zh-CN" });
   assert.deepEqual(changes, [{ preference: "zh-CN", effectiveLocale: "zh-CN" }]);
   unsubscribe();
+});
+
+test("Settings fixtures are explicit, hostless preview data with defensive copies", async () => {
+  assert.deepEqual(SETTINGS_PREVIEW_SCENARIOS, [
+    "general-empty",
+    "typical-ready",
+    "missing-config-long-path",
+    "zh-cn-multi-help",
+    "busy",
+    "error"
+  ]);
+  assert.equal(getBrowserSettingsFixture("?settings-preview=typical-ready"), null, "fixtures require the Settings view marker");
+  assert.equal(getBrowserSettingsFixture("?view=settings&settings-preview=unknown"), null, "unknown preview values keep the ordinary empty hostless Settings state");
+
+  const fixture = getBrowserSettingsFixture("?view=settings&settings-preview=typical-ready");
+  assert.equal(fixture.selectedId, "settings-preview.export");
+  assert.equal(fixture.features.length, 3, "typical fixture covers the three-category navigation range");
+  fixture.features[0].name = "Mutated locally";
+  assert.equal(getBrowserSettingsFixture("?view=settings&settings-preview=typical-ready").features[0].name, "Export to After Effects");
+
+  const api = createBrowserPreviewApi({ search: "?view=settings&settings-preview=missing-config-long-path" });
+  const features = await api.listFeatures();
+  const statuses = await api.listFeatureStatuses();
+  const config = await api.getConfig("settings-preview.export");
+  assert.equal(features[0].id, "settings-preview.export");
+  assert.equal(statuses[0].status, "missing-config");
+  assert.match(config.afterEffectsPath, /^C:\\Program Files\\Blackmagic Design\\/);
+  features[0].name = "Changed locally";
+  assert.equal((await api.listFeatures())[0].name, "Export to After Effects", "fixture callers receive defensive data copies");
+  await assert.rejects(api.executeCommand("settings-preview.export"), /cannot execute outside Electron/i);
+  await assert.rejects(api.executeInteraction({ target: "settings-preview.export" }), /cannot execute outside Electron/i);
+});
+
+test("Settings fixtures simulate only local presentation selection and error states", async () => {
+  const selected = await new Promise((resolve) => {
+    const api = createBrowserPreviewApi({ search: "?view=settings&settings-preview=zh-cn-multi-help" });
+    api.onSettingsFeatureSelected(resolve);
+  });
+  assert.equal(selected, "settings-preview.export");
+
+  const localized = createBrowserPreviewApi({ search: "?view=settings&settings-preview=zh-cn-multi-help" });
+  assert.deepEqual(await localized.getLocalizationSnapshot(), { preference: "zh-CN", effectiveLocale: "zh-CN" });
+
+  const errorApi = createBrowserPreviewApi({ search: "?view=settings&settings-preview=error" });
+  await assert.rejects(errorApi.saveConfig("settings-preview.export", {}), /Settings preview save failed/);
 });

@@ -1405,7 +1405,7 @@ test("Palette and Settings retain their qualified painted radii while native win
   assert.match(app, /getPaletteVisualStyle\(paletteShadowPadding\)/);
   assert.match(styles, /--palette-elevation:\s*var\(--palette-external-shadow\)/);
   assert.match(styles, /\.settings-shell,\s*\.palette-main\s*\{[^}]*border:\s*1px solid var\(--color-border-strong\)/s);
-  assert.match(styles, /\.settings-shell\s*\{[^}]*border-radius:\s*0[^}]*box-shadow:\s*0 18px 44px/s);
+  assert.match(styles, /\.settings-shell\s*\{[^}]*border-radius:\s*0[^}]*box-shadow:\s*inset 0 1px/s);
   assert.match(styles, /\.palette-main\s*\{[^}]*top:\s*var\(--palette-shadow-padding\)[^}]*left:\s*var\(--palette-shadow-padding\)[^}]*width:\s*var\(--palette-main-width\)[^}]*height:\s*var\(--palette-main-height\)[^}]*border-radius:\s*var\(--palette-main-radius\)[^}]*box-shadow:\s*var\(--palette-elevation\)/s);
   assert.match(styles, /\.palette-shell\s*\{[^}]*background:\s*transparent/s);
   assert.match(styles, /\.interaction-panel\s*\{[^}]*top:\s*calc\(var\(--palette-shadow-padding\) \+ var\(--interaction-panel-top\)\)[^}]*left:\s*calc\(var\(--palette-main-width\) \+ var\(--interaction-panel-gap\) \+ var\(--palette-shadow-padding\)\)[^}]*width:\s*var\(--interaction-panel-width\)[^}]*max-height:\s*var\(--interaction-panel-max-height\)[^}]*border-radius:\s*var\(--interaction-panel-radius\)[^}]*box-shadow:\s*var\(--palette-elevation\)/s);
@@ -1413,7 +1413,8 @@ test("Palette and Settings retain their qualified painted radii while native win
   assert.match(styles, /--color-interaction-panel:\s*var\(--color-palette-surface\)/);
   assert.doesNotMatch(styles, /actions-panel|actions-view|panel-arrow/);
   assert.doesNotMatch(styles, /--radius-window/);
-  assert.match(styles, /\.settings-titlebar\s*\{[^}]*var\(--header-surface-shadow\)/s);
+  assert.match(styles, /\.settings-titlebar\s*\{[^}]*background:\s*var\(--color-palette-surface\)[^}]*box-shadow:\s*none/s);
+  assert.doesNotMatch(styles, /\.settings-titlebar\s*\{[^}]*linear-gradient/s);
   assert.match(styles, /\.settings-titlebar-brand::before\s*\{/s);
   assert.match(styles, /\.settings-titlebar-brand img\s*\{/s);
   assert.doesNotMatch(styles, /palette-enter/);
