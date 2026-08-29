@@ -1107,15 +1107,20 @@ async function runScenario(name, context) {
       checks.push("real UI Pin plus Command execution projects nonempty Pinned and Recent sections without duplicates");
     } else if (name === "search-results") {
       await page.locator(".launcher-search").click();
-      await page.locator(".search-control input").fill("clipboard");
+      const input = page.locator(".search-control input");
+      await input.fill("clipboard");
       await page.waitForFunction(() => (
         document.querySelector(".search-control input")?.value === "clipboard"
         && document.querySelectorAll(".search-view .command-row").length === 1
       ));
       assert.equal(await page.locator(".search-view .command-row").count(), 1, "Search uses the shared policy to filter the evidence catalog");
-      await page.locator(".search-control input").fill("a");
-      await page.waitForFunction(() => document.querySelectorAll(".search-view .command-row").length > 1);
-      assert.ok(await page.locator(".search-view .command-row").count() > 1, "Search keeps multiple real command results");
+      await input.fill("ar");
+      await page.waitForFunction(() => (
+        document.querySelector(".search-control input")?.value === "ar"
+        && document.querySelectorAll(".search-view .command-row").length > 1
+      ));
+      assert.equal((await readState(page)).searchRequests.at(-1)?.query, "ar", "Search evidence uses a discovery-eligible query rather than a weak one-letter token");
+      assert.ok(await page.locator(".search-view .command-row").count() > 1, "Search keeps multiple real command results for discovery-eligible input");
       assert.equal(await page.locator(".launcher-view").count(), 0, "Search mode removes launcher sections from the DOM");
       assert.equal(await page.getByRole("button", { name: "Back to launcher" }).count(), 0, "Search footer has no duplicate Back control");
       assert.equal(await page.locator(".search-control kbd").textContent(), "ESC", "Search keeps the in-field Escape hint");

@@ -35,7 +35,10 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - Command Registry requires non-empty `description`, `category`, and `icon`, returns only the fixed Command shape, and has no matching/ranking policy.
 - `presentation` defaults to `visible`. `getCommands()` and `getCommandById()` return every installed Command including internal ones, so Interaction dispatch and help can resolve internal action descriptions.
 - `CommandSearchService` owns one current-locale derived projection, pinyin transliteration, text-first lexicographic relevance, Pin tie-breaking, usage tie-breaking, and output filtering. It is the only production owner of `commands:search`; the Registry and renderer do not match or rank Commands.
-- Search includes localized name/keywords, English name/keywords, generated full pinyin/initials, and stable ID. It excludes descriptions/categories and internal Commands through the generic `isCommandPresentable()` predicate; no layer branches on Command IDs or capabilities.
+- Search keeps navigation and discovery projection channels separate: `localizedName`, `englishName`, `nameFullPinyin`, `namePinyinInitials`, `commandId`, `localizedKeywords`, `englishKeywords`, and `keywordFullPinyin`. It excludes descriptions/categories and internal Commands through the generic `isCommandPresentable()` predicate; no layer branches on Command IDs or capabilities.
+- Name pinyin holds the primary reading plus deduplicated, bounded library-supplied alternatives made by replacing one primary syllable at a time; it never forms a Cartesian product. Keyword pinyin uses the primary compact full reading only: keyword initials, abbreviation combinations, and generated fields never cross Search IPC or enter manifests, localization resources, or usage storage.
+- `isWeakLatinToken(token)` is true only for one normalized Latin letter. A weak token can use only localized/English name and name-pinyin exact/prefix signals. Every other token is discovery-eligible independently, so a multi-token query cannot use hidden keyword/ID/substrings for a weak token; non-Latin input remains eligible for keyword discovery.
+- Nonempty text order is localized name exact/prefix, English name exact/prefix, name full-pinyin exact/prefix, name initials exact/prefix, eligible Command-ID exact/prefix, localized/English keyword exact/prefix, keyword full-pinyin exact/prefix, name substring, then eligible ID/keyword/keyword-pinyin substring. The complete text tuple remains ahead of Pin and usage.
 - Nonempty Search orders the complete text tuple before Pin, decayed usage, last-use time, count, and Registry order. Empty Search orders Pin, decayed usage, last-use time, count, and Registry order. Scores are dynamic only: `ln(1 + count) × 0.5^(age / 30 days)`.
 - `CommandUsageStorage` exclusively owns `command-usage.json`; it never writes Preferences, capability config, Feature state, or bindings. Read/write failure is diagnostic-only and produces an empty Search snapshot or skipped record.
 - Both hosts inject their adapters, paths, and `hostContextProvider` into `createClacklyCore()`. That shared Composition Root creates the Capability Registry, usage history, Search service, and Command executor once; Host lifecycle, window/IPC, recovery, and InteractionManager remain outside the Root.
@@ -65,6 +68,9 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - No usable backend -> throw `CapabilityUnavailableError` with the capability id and checked backends.
 - Selected backend execution fails -> propagate the same error; do not try keyboard or another backend.
 - Shortcut mapping missing or keyboard executor absent -> ShortcutManager refuses execution without sending input.
+- A single Latin `d` -> cannot surface `media.clipboard-image.import` through its hidden `导入 -> daoru` keyword pinyin, while `da`, `dao`, `daoru`, and `导入` may discover it.
+- `粘贴剪贴板图像` -> supports `z`, `zhan`, `nian`, `ntjtbtx`, and `ztjtbtx` through name-only projection; `dr`, `dm`, and `dcsjx` never come from keyword initials.
+- The visible export Command -> retains `dao`, `daochu`, `daochushijianxian`, and its actual name initials `dcdae`; hidden keyword initials such as `dcsjx` are intentionally unavailable.
 
 ### 5. Good/Base/Bad Cases
 
@@ -88,7 +94,8 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - Assert catalog listing returns only `id`, `name`, `category`, and `icon`.
 - Assert missing, malformed, id-mismatched, and sparse-provider metadata cannot register.
 - Assert handwritten capabilities without `executor` remain valid and malformed script executor metadata cannot register.
-- Assert Command Search covers localized/English metadata, generated pinyin/initials, IDs, multi-token relevance, Pins, decayed usage, locale replacement, and deterministic fallback while Registry remains metadata-only.
+- Assert Command Search projects its explicit navigation/discovery field shape; covers localized/English metadata, bounded name-only polyphony, primary-only keyword pinyin, IDs, token-aware weak-Latin eligibility, multi-token relevance, Pins, decayed usage, locale replacement, and deterministic fallback while Registry remains metadata-only.
+- Assert production Clipboard Image and Export metadata: weak `d`/`dr`/`dm` and hidden-keyword initials do not leak, while useful direct keyword/full-pinyin and visible-name navigation remain available; assert a visible-name result outranks a pinned/high-usage keyword discovery result.
 - Assert exact default-visible, list/Search/internal filtering, and one generic presentability predicate with no Command-id branches.
 - Assert usage persists only stable facts in its dedicated document, remains defensive across restart, and records only accepted/started direct and Interaction-dispatched Commands.
 - Assert Command Registry requires presentation fields, defensively clones keywords, and omits unsupported help/executor fields.
@@ -117,6 +124,24 @@ const executeCommand = createCommandExecutor({
   capabilityRegistry,
   configManager,
 });
+```
+
+### Search Wrong vs Correct
+
+#### Wrong
+
+```javascript
+const pinyin = [localized.name, ...localized.keywords].map(transliterate);
+fields.pinyinInitials = pinyin.map(({ initials }) => initials);
+```
+
+#### Correct
+
+```javascript
+const namePinyin = transliterateName(localized.name);
+fields.nameFullPinyin = namePinyin.full;
+fields.namePinyinInitials = namePinyin.initials;
+fields.keywordFullPinyin = localized.keywords.map((keyword) => transliterate(keyword).full);
 ```
 
 ## Scenario: Script Capability Runtime

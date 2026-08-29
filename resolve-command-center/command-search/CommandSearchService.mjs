@@ -1,6 +1,6 @@
 import { isCommandPresentable } from "../command-engine/presentation.mjs";
 import { localizeMetadata } from "../localization/metadata.mjs";
-import { normalizeText, transliterate } from "./transliteration.mjs";
+import { normalizeText, transliterate, transliterateName } from "./transliteration.mjs";
 
 export const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -9,17 +9,20 @@ export const RELEVANCE = Object.freeze({
   LOCALIZED_NAME_PREFIX: 2,
   ENGLISH_NAME_EXACT: 3,
   ENGLISH_NAME_PREFIX: 4,
-  LOCALIZED_KEYWORD_EXACT: 5,
-  LOCALIZED_KEYWORD_PREFIX: 6,
-  ENGLISH_KEYWORD_EXACT: 7,
-  ENGLISH_KEYWORD_PREFIX: 8,
+  NAME_FULL_PINYIN_EXACT: 5,
+  NAME_FULL_PINYIN_PREFIX: 6,
+  NAME_PINYIN_INITIALS_EXACT: 7,
+  NAME_PINYIN_INITIALS_PREFIX: 8,
   COMMAND_ID_EXACT: 9,
-  COMMAND_ID_PREFIX: 9,
-  FULL_PINYIN_EXACT: 10,
-  FULL_PINYIN_PREFIX: 10,
-  PINYIN_INITIALS_EXACT: 11,
-  PINYIN_INITIALS_PREFIX: 11,
-  SUBSTRING: 12
+  COMMAND_ID_PREFIX: 10,
+  LOCALIZED_KEYWORD_EXACT: 11,
+  LOCALIZED_KEYWORD_PREFIX: 12,
+  ENGLISH_KEYWORD_EXACT: 13,
+  ENGLISH_KEYWORD_PREFIX: 14,
+  KEYWORD_FULL_PINYIN_EXACT: 15,
+  KEYWORD_FULL_PINYIN_PREFIX: 16,
+  NAME_SUBSTRING: 17,
+  DISCOVERY_SUBSTRING: 18
 });
 
 function compactText(value) {
@@ -35,8 +38,8 @@ function createProjectionEntry(command, sourceIndex, effectiveLocale) {
   const localized = localizeMetadata(command, effectiveLocale);
   const localizedName = [createSearchField(localized.name)].filter(Boolean);
   const localizedKeywords = (localized.keywords || []).map(createSearchField).filter(Boolean);
-  const localizedText = [localized.name, ...(localized.keywords || [])];
-  const pinyin = localizedText.map(transliterate);
+  const namePinyin = transliterateName(localized.name);
+  const keywordPinyin = (localized.keywords || []).map(transliterate);
 
   return {
     sourceIndex,
@@ -44,11 +47,12 @@ function createProjectionEntry(command, sourceIndex, effectiveLocale) {
     fields: {
       localizedName,
       englishName: [createSearchField(localized.englishName)].filter(Boolean),
+      nameFullPinyin: namePinyin.full.map(createSearchField).filter(Boolean),
+      namePinyinInitials: namePinyin.initials.map(createSearchField).filter(Boolean),
+      commandId: [createSearchField(localized.id)].filter(Boolean),
       localizedKeywords,
       englishKeywords: (localized.englishKeywords || []).map(createSearchField).filter(Boolean),
-      fullPinyin: pinyin.map(({ full }) => createSearchField(full)).filter(Boolean),
-      pinyinInitials: pinyin.map(({ initials }) => createSearchField(initials)).filter(Boolean),
-      commandId: [createSearchField(localized.id)].filter(Boolean)
+      keywordFullPinyin: keywordPinyin.map(({ full }) => createSearchField(full)).filter(Boolean)
     }
   };
 }
@@ -73,32 +77,58 @@ function fieldsFor(entry, fieldName) {
   return Array.isArray(entry.fields[fieldName]) ? entry.fields[fieldName] : [];
 }
 
-function bestFieldMatch(entry, rawQuery) {
-  const query = { normalized: normalizeText(rawQuery), compact: compactText(rawQuery) };
-  if (!query.normalized) return null;
+export function isWeakLatinToken(token) {
+  return /^[a-z]$/.test(compactText(token));
+}
 
-  const rankedFields = [
-    ["localizedName", RELEVANCE.LOCALIZED_NAME_EXACT, RELEVANCE.LOCALIZED_NAME_PREFIX],
-    ["englishName", RELEVANCE.ENGLISH_NAME_EXACT, RELEVANCE.ENGLISH_NAME_PREFIX],
-    ["localizedKeywords", RELEVANCE.LOCALIZED_KEYWORD_EXACT, RELEVANCE.LOCALIZED_KEYWORD_PREFIX],
-    ["englishKeywords", RELEVANCE.ENGLISH_KEYWORD_EXACT, RELEVANCE.ENGLISH_KEYWORD_PREFIX],
-    ["commandId", RELEVANCE.COMMAND_ID_EXACT, RELEVANCE.COMMAND_ID_PREFIX],
-    ["fullPinyin", RELEVANCE.FULL_PINYIN_EXACT, RELEVANCE.FULL_PINYIN_PREFIX],
-    ["pinyinInitials", RELEVANCE.PINYIN_INITIALS_EXACT, RELEVANCE.PINYIN_INITIALS_PREFIX]
-  ];
-
-  // The field/class sequence deliberately encodes the published relevance
-  // order. A localized prefix stays ahead of an English exact match.
+function bestDirectFieldMatch(entry, query, rankedFields) {
   for (const [fieldName, exactClass, prefixClass] of rankedFields) {
     const matches = fieldsFor(entry, fieldName).map((field) => fieldMatches(field, query));
     if (matches.includes("exact")) return { relevance: exactClass, kind: "exact" };
     if (matches.includes("prefix")) return { relevance: prefixClass, kind: "prefix" };
   }
+  return null;
+}
 
-  for (const [fieldName] of rankedFields) {
-    if (fieldsFor(entry, fieldName).some((field) => fieldMatches(field, query) === "substring")) {
-      return { relevance: RELEVANCE.SUBSTRING, kind: "substring" };
-    }
+function anySubstringMatch(entry, query, fieldNames) {
+  return fieldNames.some((fieldName) => fieldsFor(entry, fieldName)
+    .some((field) => fieldMatches(field, query) === "substring"));
+}
+
+function bestFieldMatch(entry, rawQuery) {
+  const query = { normalized: normalizeText(rawQuery), compact: compactText(rawQuery) };
+  if (!query.normalized) return null;
+
+  const nameFields = [
+    ["localizedName", RELEVANCE.LOCALIZED_NAME_EXACT, RELEVANCE.LOCALIZED_NAME_PREFIX],
+    ["englishName", RELEVANCE.ENGLISH_NAME_EXACT, RELEVANCE.ENGLISH_NAME_PREFIX],
+    ["nameFullPinyin", RELEVANCE.NAME_FULL_PINYIN_EXACT, RELEVANCE.NAME_FULL_PINYIN_PREFIX],
+    ["namePinyinInitials", RELEVANCE.NAME_PINYIN_INITIALS_EXACT, RELEVANCE.NAME_PINYIN_INITIALS_PREFIX]
+  ];
+  const discoveryFields = [
+    ["commandId", RELEVANCE.COMMAND_ID_EXACT, RELEVANCE.COMMAND_ID_PREFIX],
+    ["localizedKeywords", RELEVANCE.LOCALIZED_KEYWORD_EXACT, RELEVANCE.LOCALIZED_KEYWORD_PREFIX],
+    ["englishKeywords", RELEVANCE.ENGLISH_KEYWORD_EXACT, RELEVANCE.ENGLISH_KEYWORD_PREFIX],
+    ["keywordFullPinyin", RELEVANCE.KEYWORD_FULL_PINYIN_EXACT, RELEVANCE.KEYWORD_FULL_PINYIN_PREFIX]
+  ];
+
+  // The field/class sequence deliberately encodes the published relevance
+  // order. A localized prefix stays ahead of an English exact match.
+  const nameMatch = bestDirectFieldMatch(entry, query, nameFields);
+  if (nameMatch) return nameMatch;
+
+  // A one-letter Latin token stays navigable through visible names and their
+  // pinyin, but must never discover a command through hidden metadata.
+  if (isWeakLatinToken(rawQuery)) return null;
+
+  const discoveryMatch = bestDirectFieldMatch(entry, query, discoveryFields);
+  if (discoveryMatch) return discoveryMatch;
+
+  if (anySubstringMatch(entry, query, ["localizedName", "englishName", "nameFullPinyin", "namePinyinInitials"])) {
+    return { relevance: RELEVANCE.NAME_SUBSTRING, kind: "substring" };
+  }
+  if (anySubstringMatch(entry, query, ["commandId", "localizedKeywords", "englishKeywords", "keywordFullPinyin"])) {
+    return { relevance: RELEVANCE.DISCOVERY_SUBSTRING, kind: "substring" };
   }
   return null;
 }

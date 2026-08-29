@@ -6,9 +6,11 @@ const {
   RELEVANCE,
   THIRTY_DAYS_MS,
   decayedUsageScore,
+  isWeakLatinToken,
   normalizePinnedIds,
   textRelevance
 } = require("./CommandSearchService.mjs");
+const { getCommands, resetCommandCache } = require("../command-engine/registry");
 
 function command(overrides = {}) {
   return {
@@ -52,22 +54,86 @@ function ids(response) {
   return response.commands.map(({ id }) => id);
 }
 
-test("Search projects localized metadata with English fallback, generated pinyin, ids, and bounded substring matching", () => {
+test("Search projects distinct navigation and discovery fields without exposing generated data", () => {
   const hidden = command({ id: "timeline.hidden", presentation: "internal" });
   const { service } = createService({ commands: [command(), hidden] });
 
-  for (const query of ["导出", "dao", "daochu", "dcsjx", "Export to After Effects", "after effects", "export", "timeline", "timeline.export"]) {
+  for (const query of ["导出", "dao", "daochu", "daochushijianxian", "dcdae", "Export to After Effects", "after effects", "export", "timeline", "timeline.export"]) {
     assert.deepEqual(ids(service.search(query, [])), ["timeline.exportToAfterEffects"], query);
   }
+  assert.deepEqual(ids(service.search("dcsjx", [])), [], "hidden keyword initials are never projected");
   assert.deepEqual(ids(service.search("fect", [])), ["timeline.exportToAfterEffects"], "substring fallback remains bounded to Search fields");
   assert.deepEqual(ids(service.search("dao timeline", [])), ["timeline.exportToAfterEffects"], "every multi-token query token must match");
   assert.deepEqual(ids(service.search("missing dao", [])), []);
   assert.deepEqual(ids(service.search("", [])), ["timeline.exportToAfterEffects"], "internal Commands never appear");
 
+  const fields = service.getProjection().entries[0].fields;
+  assert.deepEqual(Object.keys(fields), [
+    "localizedName",
+    "englishName",
+    "nameFullPinyin",
+    "namePinyinInitials",
+    "commandId",
+    "localizedKeywords",
+    "englishKeywords",
+    "keywordFullPinyin"
+  ]);
+  assert.equal(Object.hasOwn(fields, "fullPinyin"), false);
+  assert.equal(Object.hasOwn(fields, "pinyinInitials"), false);
+  assert.deepEqual(fields.keywordFullPinyin.map(({ compact }) => compact), ["daochu", "daochushijianxian", "shijianxian"]);
+
   const result = service.search("导出", []);
   assert.equal(Object.hasOwn(result.commands[0], "pinyin"), false, "generated pinyin never crosses the Search boundary");
   result.commands[0].keywords.push("changed");
   assert.deepEqual(service.search("导出", []).commands[0].keywords, ["导出", "导出时间线", "时间线"]);
+});
+
+test("production Clipboard Image and Export metadata keep name navigation separate from hidden discovery", () => {
+  resetCommandCache();
+  const { service } = createService({ commands: getCommands() });
+  const clipboardId = "media.clipboard-image.import";
+  const exportId = "timeline.exportToAfterEffects";
+  const markerId = "timeline.addMarker";
+  const has = (query, commandId) => ids(service.search(query, [])).includes(commandId);
+
+  assert.equal(has("d", clipboardId), false, "weak Latin cannot use 导入 -> daoru");
+  assert.equal(has("d", markerId), false, "weak Latin cannot use Command-ID substring discovery");
+  for (const query of ["da", "dao", "daoru", "导入"]) {
+    assert.equal(has(query, clipboardId), true, query);
+  }
+  for (const query of ["dr", "dm", "d import"]) {
+    assert.equal(has(query, clipboardId), false, query);
+  }
+  for (const query of ["z", "zhan", "nian", "ntjtbtx", "ztjtbtx"]) {
+    assert.equal(has(query, clipboardId), true, query);
+  }
+
+  for (const query of ["dao", "daochu", "daochushijianxian", "dcdae"]) {
+    assert.equal(has(query, exportId), true, query);
+  }
+  assert.equal(has("dcsjx", exportId), false, "hidden keyword initials stay unavailable");
+});
+
+test("weak Latin tokens only navigate through visible Command names and their pinyin", () => {
+  const visibleName = command({
+    id: "visible.delta",
+    name: "Delta Navigation",
+    keywords: []
+  });
+  const hiddenDiscovery = command({
+    id: "delta.discovery",
+    name: "Bravo Command",
+    keywords: ["delta"],
+    localizations: { "zh-CN": { name: "布拉沃命令", keywords: ["导入"] } }
+  });
+  const { service } = createService({ commands: [visibleName, hiddenDiscovery], locale: "en" });
+
+  assert.deepEqual(ids(service.search("d", [])), ["visible.delta"], "a visible English name remains one-letter navigable");
+  assert.deepEqual(ids(service.search("a", [])), [], "weak tokens cannot use Command IDs or keyword prefixes");
+  assert.deepEqual(ids(service.search("o", [])), [], "weak tokens cannot use generic substring fallback");
+  assert.deepEqual(ids(service.search("d delta", [])), ["visible.delta"], "each token applies its own discovery eligibility");
+  assert.equal(isWeakLatinToken("Ｄ"), true, "normalization happens before weak-token classification");
+  assert.equal(isWeakLatinToken("导"), false, "single-character CJK discovery remains eligible");
 });
 
 test("Search replaces its one-locale projection instead of retaining stale localized terms", () => {
