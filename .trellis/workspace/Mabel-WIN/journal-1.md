@@ -1043,3 +1043,24 @@ Implemented a host-owned persistent hidden PowerShell helper for fresh After Eff
 ### Status
 
 [OK] **Completed**
+
+
+## Session 48: Profile Python and Resolve export latency
+
+**Date**: 2026-08-29
+**Task**: Profile Python and Resolve export latency
+**Branch**: `main`
+
+### Summary
+
+Captured nine local Resolve Export-to-AE samples, measured warm exports around 0.46-0.47 seconds, identified the short-lived Python worker envelope as the dominant remaining cost, retained bounded anonymous evidence, removed all temporary instrumentation, and rebuilt and reinstalled the clean Workflow.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `26ed7e1` | (see git log) |
+
+### Status
+
+[OK] **Completed**
