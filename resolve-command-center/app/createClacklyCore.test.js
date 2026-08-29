@@ -60,6 +60,13 @@ test("Core returns working application services with marker and script capabilit
     ok: true,
     backend: "resolveScriptApi"
   });
+  const usagePath = path.join(appDataPath, "Clackly", "command-usage.json");
+  const usage = JSON.parse(fs.readFileSync(usagePath, "utf8"));
+  assert.equal(usage["timeline.addMarker"].usageCount, 1);
+  assert.equal(Number.isSafeInteger(usage["timeline.addMarker"].lastUsedAt), true);
+  assert.deepEqual(Object.keys(usage["timeline.addMarker"]).sort(), ["lastUsedAt", "usageCount"]);
+  assert.deepEqual(core.searchCommands("marker", []).commands.map(({ id }) => id), ["timeline.addMarker"]);
+  assert.deepEqual(core.searchCommands("", []).usedCommandIds, ["timeline.addMarker"]);
 
   assert.deepEqual(core.featureCatalog.getAllFeatures().map(({ id }) => id).sort(), [
     "ae.export",

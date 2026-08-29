@@ -1,3 +1,5 @@
+import { isCommandPresentable } from "../../command-engine/presentation.mjs";
+
 export function joinFeatureStatuses(items, statuses) {
   const byId = new Map((statuses || []).map((status) => [status.id, status]));
   return items.map((item) => ({
@@ -74,9 +76,7 @@ export function canExecuteCommand(command) {
   return canExecuteFeature(command.featureStatus);
 }
 
-export function isCommandPresentable(command) {
-  return Boolean(command) && command.presentation !== "internal";
-}
+export { isCommandPresentable };
 
 export function createPresentationCatalog(realCommands, statuses = []) {
   return joinFeatureStatuses(realCommands, statuses)
@@ -127,42 +127,7 @@ export function getInteractionHelp(targetCommand, commands, bindings, t = defaul
   });
 }
 
-function matches(command, query) {
-  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) {
-    return true;
-  }
-
-  const haystack = [command.id, command.name, ...(command.keywords || []), command.englishName, ...(command.englishKeywords || [])]
-    .join(" ")
-    .toLowerCase();
-  return tokens.every((token) => haystack.includes(token));
-}
-
-export function rankCommands(commands, query, pinnedIds = new Set(), recentIds = new Set()) {
-  const normalizedQuery = query.trim().toLowerCase();
-
-  return commands
-    .filter((command) => matches(command, normalizedQuery))
-    .map((command, sourceIndex) => ({
-      command,
-      sourceIndex,
-      exact: normalizedQuery !== "" && (
-        command.name.toLowerCase() === normalizedQuery || command.id.toLowerCase() === normalizedQuery
-      ),
-      pinned: pinnedIds.has(command.id),
-      recent: recentIds.has(command.id)
-    }))
-    .sort((left, right) =>
-      Number(right.exact) - Number(left.exact) ||
-      Number(right.pinned) - Number(left.pinned) ||
-      Number(right.recent) - Number(left.recent) ||
-      left.sourceIndex - right.sourceIndex
-    )
-    .map(({ command }) => command);
-}
-
-export function projectLauncherSections(commands, pinnedIds = new Set(), recentIds = new Set(), t = defaultT) {
+export function projectLauncherSections(commands, pinnedIds = new Set(), usedCommandIds = new Set(), t = defaultT) {
   const sections = {
     pinned: [],
     recent: [],
@@ -172,7 +137,7 @@ export function projectLauncherSections(commands, pinnedIds = new Set(), recentI
   for (const command of commands) {
     if (pinnedIds.has(command.id)) {
       sections.pinned.push(command);
-    } else if (recentIds.has(command.id)) {
+    } else if (usedCommandIds.has(command.id)) {
       sections.recent.push(command);
     } else {
       sections.commands.push(command);

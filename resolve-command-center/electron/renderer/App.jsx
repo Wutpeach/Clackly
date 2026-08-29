@@ -36,6 +36,7 @@ import paletteGeometry from "../shared/palette-geometry.json";
 import { getPaletteVisualStyle } from "./paletteVisualStyle.mjs";
 import { shouldRenderBrowserPreviewAgentation } from "./browserPreview.mjs";
 import { api } from "./api.mjs";
+import { createSearchRequestGate, findSelectedCommandIndex } from "./searchRequest.mjs";
 import { useLocalization } from "./LocalizationContext.jsx";
 import { localizeCommands, presentError } from "../../localization/presentation.mjs";
 import { createInteractionPanelPresentation } from "./interactionPanelPresentation.mjs";
@@ -47,8 +48,7 @@ import {
   getFeatureWarning,
   getInteractionHelp,
   getRecoveryAction,
-  projectLauncherSections,
-  rankCommands
+  projectLauncherSections
 } from "./model.mjs";
 
 const hasElectronHost = Boolean(window.resolveCommandCenter);
@@ -70,6 +70,7 @@ const showBrowserPreviewAgentation = shouldRenderBrowserPreviewAgentation({
   search: window.location.search
 });
 const BrowserPreviewAgentation = lazy(() => import("./BrowserPreviewAgentation.jsx"));
+const LAUNCHER_ROW_LIMIT = 9;
 
 const ICONS = {
   marker: Bookmark,
@@ -233,8 +234,13 @@ function PaletteApp() {
   const mainSurfaceRef = useRef(null);
   const searchRef = useRef(null);
   const interactionPanelRef = useRef(null);
+  const searchRequestGate = useRef(createSearchRequestGate()).current;
+  const pendingPinSelectionRef = useRef(null);
+  const featureStatusesRef = useRef([]);
   const [mode, setMode] = useState("launcher");
   const [commands, setCommands] = useState([]);
+  const [searchResponse, setSearchResponse] = useState({ commands: [], usedCommandIds: [] });
+  const [searchRefreshRevision, setSearchRefreshRevision] = useState(0);
   const [featureStatuses, setFeatureStatuses] = useState([]);
   const [bindings, setBindings] = useState([]);
   const [query, setQuery] = useState("");
@@ -243,25 +249,26 @@ function PaletteApp() {
   const [hoveredCommandId, setHoveredCommandId] = useState(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [pinnedIds, setPinnedIds] = useState(() => new Set());
-  const [recentIds, setRecentIds] = useState(() => new Set());
   const [interactionPanelOpen, setInteractionPanelOpen] = useState(false);
   const [interactionPanelGeometry, setInteractionPanelGeometry] = useState(null);
   const localizedCommands = useMemo(() => localizeCommands(commands, effectiveLocale), [commands, effectiveLocale]);
-  const catalog = useMemo(
-    () => createPresentationCatalog(localizedCommands, featureStatuses),
-    [localizedCommands, featureStatuses]
+  const searchCatalog = useMemo(
+    () => createPresentationCatalog(searchResponse.commands, featureStatuses),
+    [searchResponse.commands, featureStatuses]
   );
+  const usedCommandIds = useMemo(() => new Set(searchResponse.usedCommandIds), [searchResponse.usedCommandIds]);
+  const activeSearchQuery = mode === "search" ? query : "";
 
   const launcherCommands = useMemo(
-    () => rankCommands(catalog, "", pinnedIds, recentIds).slice(0, 9),
-    [catalog, pinnedIds, recentIds]
+    () => searchCatalog.slice(0, LAUNCHER_ROW_LIMIT),
+    [searchCatalog]
   );
   const searchCommands = useMemo(
-    () => rankCommands(catalog, query, pinnedIds, recentIds),
-    [catalog, query, pinnedIds, recentIds]
+    () => searchCatalog,
+    [searchCatalog]
   );
   const launcherSections = useMemo(
-    () => projectLauncherSections(launcherCommands, pinnedIds, recentIds, t).map(([id, label, sectionCommands]) => ({
+    () => projectLauncherSections(launcherCommands, pinnedIds, usedCommandIds, t).map(([id, label, sectionCommands]) => ({
       id,
       label,
       entries: sectionCommands.map((command) => ({
@@ -269,7 +276,7 @@ function PaletteApp() {
         index: launcherCommands.indexOf(command)
       }))
     })),
-    [launcherCommands, pinnedIds, recentIds, t]
+    [launcherCommands, pinnedIds, usedCommandIds, t]
   );
   const activeCommands = mode === "search" ? searchCommands : launcherCommands;
   const selectedCommand = activeCommands[selectedIndex] || null;
@@ -287,6 +294,10 @@ function PaletteApp() {
     : isExecuting
       ? { visible: t("palette.running"), accessible: t("palette.running"), error: false }
       : null;
+
+  useEffect(() => {
+    featureStatusesRef.current = featureStatuses;
+  }, [featureStatuses]);
 
   useEffect(() => {
     let mounted = true;
@@ -311,6 +322,7 @@ function PaletteApp() {
     refreshCatalog();
 
     const unsubscribe = api.onPaletteShown(() => {
+      pendingPinSelectionRef.current = null;
       setMode("launcher");
       setQuery("");
       setSelectedIndex(0);
@@ -321,6 +333,7 @@ function PaletteApp() {
       setInteractionPanelGeometry(null);
       api.closeInteractionPanel();
       refreshCatalog();
+      setSearchRefreshRevision((current) => current + 1);
       requestAnimationFrame(() => shellRef.current?.focus());
     });
 
@@ -330,7 +343,40 @@ function PaletteApp() {
     };
   }, []);
 
+  useEffect(() => {
+    const revision = searchRequestGate.begin();
+    let active = true;
+    Promise.resolve(api.searchCommands(activeSearchQuery, [...pinnedIds]))
+      .then((response) => {
+        if (!active || !searchRequestGate.isCurrent(revision)) return;
+        if (!response || !Array.isArray(response.commands) || !Array.isArray(response.usedCommandIds)) {
+          throw new TypeError("Command Search returned an invalid response");
+        }
+        setSearchResponse(response);
+        const toggledCommandId = pendingPinSelectionRef.current;
+        if (toggledCommandId) {
+          const orderedVisibleCommands = createPresentationCatalog(response.commands, featureStatusesRef.current);
+          setSelectedIndex(findSelectedCommandIndex(
+            orderedVisibleCommands,
+            toggledCommandId,
+            mode === "launcher" ? LAUNCHER_ROW_LIMIT : Infinity
+          ));
+          pendingPinSelectionRef.current = null;
+        }
+      })
+      .catch((error) => {
+        if (active && searchRequestGate.isCurrent(revision)) {
+          pendingPinSelectionRef.current = null;
+          setStatus(presentError(error, t));
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [activeSearchQuery, pinnedIds, effectiveLocale, searchRefreshRevision, t]);
+
   useLayoutEffect(() => {
+    pendingPinSelectionRef.current = null;
     closeInteractionPanel(false);
     setSelectedIndex(0);
     setStatus("");
@@ -342,10 +388,16 @@ function PaletteApp() {
   }, [mode]);
 
   useLayoutEffect(() => {
+    pendingPinSelectionRef.current = null;
     closeInteractionPanel(false);
     setSelectedIndex(0);
     setHoveredCommandId(null);
-  }, [query]);
+  }, [query, effectiveLocale]);
+
+  useLayoutEffect(() => {
+    closeInteractionPanel(false);
+    setHoveredCommandId(null);
+  }, [pinnedIds]);
 
   useLayoutEffect(() => {
     if (!interactionPanelOpen) return;
@@ -416,14 +468,14 @@ function PaletteApp() {
   function toggleSelectedPin() {
     if (!selectedCommand) return;
     const commandId = selectedCommand.id;
+    pendingPinSelectionRef.current = commandId;
+    // Immediately invalidate an in-flight request for the previous Pin set.
+    // The next effect owns the replacement request and consumes this intent.
+    searchRequestGate.begin();
     const next = new Set(pinnedIds);
     if (next.has(commandId)) next.delete(commandId);
     else next.add(commandId);
     setPinnedIds(next);
-
-    const reordered = rankCommands(catalog, mode === "search" ? query : "", next, recentIds);
-    const nextIndex = reordered.findIndex((command) => command.id === commandId);
-    setSelectedIndex(mode === "launcher" && nextIndex >= 9 ? 0 : Math.max(0, nextIndex));
   }
 
   async function executeCommand(command) {
@@ -446,11 +498,12 @@ function PaletteApp() {
     setStatus("");
     try {
       await api.executeCommand(command.id);
-      setRecentIds((current) => new Set([command.id, ...current]));
       setIsExecuting(false);
+      setSearchRefreshRevision((current) => current + 1);
     } catch (error) {
       setStatus(presentError(error, t));
       setIsExecuting(false);
+      setSearchRefreshRevision((current) => current + 1);
       requestAnimationFrame(() => (mode === "search" ? searchRef.current : shellRef.current)?.focus());
     }
   }
@@ -489,14 +542,15 @@ function PaletteApp() {
         altKey: event.altKey
       });
       if (result.matched) {
-        setRecentIds((current) => new Set([result.command, ...current]));
         setIsExecuting(false);
+        setSearchRefreshRevision((current) => current + 1);
       } else {
         setIsExecuting(false);
       }
     } catch (error) {
       setStatus(presentError(error, t));
       setIsExecuting(false);
+      setSearchRefreshRevision((current) => current + 1);
       requestAnimationFrame(() => (mode === "search" ? searchRef.current : shellRef.current)?.focus());
     }
   }

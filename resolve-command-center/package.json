@@ -14,7 +14,7 @@
     "package:verify": "node scripts/verify-package.js",
     "palette:evidence": "node scripts/palette-evidence.mjs",
     "settings:evidence": "node scripts/palette-evidence.mjs --renderer built --scenario settings-application-empty,settings-typical-ready,settings-missing-config-long-path,settings-zh-cn-multi-help,settings-busy,settings-error,settings-search-match,settings-search-empty,settings-reduced-motion",
-    "test": "node --test app/*.test.js preferences/*.test.js localization/*.test.js interaction/*.test.js config/*.test.js capability/*.test.js script-runtime/*.test.js script-runtime/providers/*.test.js feature-status/*.test.js feature-ui/*.test.js shortcut/*.test.js command-engine/*.test.js execution-adapter/*.test.js resolve/*.test.js electron/main/*.test.js electron/renderer/*.test.mjs scripts/*.test.js && python -m unittest discover -s bridge -p \"test_*.py\" && python -m unittest discover -s resolve -p \"test_*.py\" && python -m unittest discover -s script-runtime -p \"test_*.py\" && python -m unittest discover -s resolve2ae_core/tests -p \"test_*.py\" && python -m unittest discover -s scripts -p \"test_*.py\"",
+    "test": "node --test app/*.test.js preferences/*.test.js localization/*.test.js interaction/*.test.js config/*.test.js capability/*.test.js script-runtime/*.test.js script-runtime/providers/*.test.js feature-status/*.test.js feature-ui/*.test.js shortcut/*.test.js command-engine/*.test.js command-search/*.test.js command-usage/*.test.js execution-adapter/*.test.js resolve/*.test.js electron/main/*.test.js electron/renderer/*.test.mjs scripts/*.test.js && python -m unittest discover -s bridge -p \"test_*.py\" && python -m unittest discover -s resolve -p \"test_*.py\" && python -m unittest discover -s script-runtime -p \"test_*.py\" && python -m unittest discover -s resolve2ae_core/tests -p \"test_*.py\" && python -m unittest discover -s scripts -p \"test_*.py\"",
     "workflow:install": "powershell -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1",
     "workflow:install:package": "powershell -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1 -Mode Copy -PackageRoot release/win-unpacked"
   },
@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "lucide-react": "^1.27.0",
+    "pinyin-pro": "^3.29.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

@@ -1,0 +1,9 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend layer index and applicable pre-development routing."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Composition Root, Command Registry/executor, Interaction dispatch, persistence, and test contracts that the Search/usage implementation must preserve or update."}
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend layer index and active Palette guideline routing."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Palette Search/Pin/Recent, localization, preload/IPC, browser preview, and renderer boundary contracts."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Define one Search/usage payload owner across storage, Core, IPC, and renderer."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Remove duplicate Registry/renderer Search and reuse localization/projection helpers."}
+{"file":".trellis/tasks/08-29-search-ranking-foundation/research/current-state.md","reason":"Repository-grounded current pipeline, duplicate authorities, execution lifecycle, persistence owners, and affected boundaries."}
+{"file":".trellis/tasks/08-29-search-ranking-foundation/research/pinyin-library.md","reason":"Selected pinyin-pro dependency, bounded wrapper contract, alternatives, and dependency evidence."}
+{"file":".trellis/tasks/08-29-search-ranking-foundation/research/applicable-specs.md","reason":"Exact relevant sections from large backend/frontend specs, preventing context-injection truncation from hiding late-file localization and renderer contracts."}

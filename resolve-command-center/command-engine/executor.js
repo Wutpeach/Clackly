@@ -4,6 +4,7 @@ function createCommandExecutor({
   capabilityRegistry,
   configManager,
   featureStatusManager,
+  usageHistory,
   findCommand = getCommandById
 }) {
   if (!capabilityRegistry || typeof capabilityRegistry.get !== "function") {
@@ -32,8 +33,14 @@ function createCommandExecutor({
 
     featureStatusManager?.assertEnabled(command.capability);
     configManager.assertConfigured(command.capability);
+    const config = configManager.forCapability(command.capability);
+    try {
+      usageHistory?.record?.(command.id);
+    } catch (_usageError) {
+      // Recommendation history is strictly subordinate to command execution.
+    }
     return capability.execute(command, {
-      config: configManager.forCapability(command.capability)
+      config
     });
   };
 }

@@ -6,6 +6,7 @@ const test = require("node:test");
 const appRoot = path.resolve(__dirname, "../..");
 const standalone = fs.readFileSync(path.join(appRoot, "electron", "main", "main.js"), "utf8");
 const workflow = fs.readFileSync(path.join(appRoot, "workflow-plugin", "main.js"), "utf8");
+const preload = fs.readFileSync(path.join(appRoot, "electron", "main", "preload.js"), "utf8");
 const coreSource = fs.readFileSync(path.join(appRoot, "app", "createClacklyCore.js"), "utf8");
 
 // Architecture canary: hosts delegate shared application wiring to the Composition
@@ -45,6 +46,9 @@ test("Core owns the shared application wiring without Electron or Resolve global
     /new FeatureCatalog/,
     /new FeatureStatusManager/,
     /FeatureStateStorage\.fromAppData/,
+    /CommandUsageStorage/,
+    /CommandUsageHistory/,
+    /CommandSearchService/,
     /createCommandExecutor/,
     /runtime-probe\.json/,
     /CLACKLY_PYTHON_EXECUTABLE/
@@ -100,4 +104,12 @@ test("both hosts keep the IPC surface and host bootstrap", () => {
       assert.match(source, new RegExp(channel));
     }
   }
+});
+
+test("both hosts expose one Core-owned Search contract through preload", () => {
+  for (const source of [standalone, workflow]) {
+    assert.match(source, /ipcMain\.handle\("commands:search", \(_event, query, pinnedIds\) => core\.searchCommands\(query, pinnedIds\)\)/);
+    assert.doesNotMatch(source, /commandMatches/);
+  }
+  assert.match(preload, /searchCommands: \(query, pinnedIds\) => ipcRenderer\.invoke\("commands:search", query, pinnedIds\)/);
 });

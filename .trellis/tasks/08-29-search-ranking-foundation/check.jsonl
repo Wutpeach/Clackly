@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify Command execution authority, accepted/start usage timing, persistence separation, and Composition Root ownership."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify single Search IPC, locale lifecycle, Palette presentation-only role, Pin/Recent stability, and browser-preview isolation."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace metadata -> projection -> ranking -> IPC -> presentation and execution -> usage storage round trips."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Audit for duplicate matching, normalization, localization, and payload decoding."}
+{"file":".trellis/tasks/08-29-search-ranking-foundation/research/current-state.md","reason":"Compare final ownership and changed paths against the repository baseline."}
+{"file":".trellis/tasks/08-29-search-ranking-foundation/research/pinyin-library.md","reason":"Verify the third-party library remains transliteration-only and no generated pinyin enters metadata."}
+{"file":".trellis/tasks/08-29-search-ranking-foundation/research/applicable-specs.md","reason":"Audit every applicable backend/frontend contract even when the large source specs are truncated during context injection."}

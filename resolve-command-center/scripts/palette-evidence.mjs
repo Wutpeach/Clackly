@@ -22,6 +22,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { inflateSync } from "node:zlib";
 import { chromium } from "playwright";
+import { CommandSearchService } from "../command-search/CommandSearchService.mjs";
 
 const require = createRequire(import.meta.url);
 const { version: playwrightVersion } = require("playwright/package.json");
@@ -46,6 +47,8 @@ const BROWSER_PREVIEW_SAFE_EDGE = 16;
 const INTERACTION_PANEL = { inset: 8, minHeight: 60, maxHeight: 180 };
 const PALETTE_SURFACE = "rgb(21, 22, 25)";
 const INTERACTION_SURFACE = PALETTE_SURFACE;
+const EVIDENCE_SEARCH_PATH = "/__clackly-evidence-search";
+const EVIDENCE_SEARCH_NOW = 1_800_000_000_000;
 const SCENARIOS = new Set([
   "default",
   "pinned-recent",
@@ -258,7 +261,15 @@ async function startStaticServer(rendererRoot) {
   const server = createServer(async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url || "/", "http://127.0.0.1").pathname);
+      if (request.method === "POST" && pathname === EVIDENCE_SEARCH_PATH) {
+        const payload = await readEvidenceSearchPayload(request);
+        const result = createEvidenceSearchResult(payload);
+        response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+        response.end(JSON.stringify(result));
+        return;
+      }
       if (pathname === "/favicon.ico") return response.writeHead(204).end();
+      if (request.method !== "GET" && request.method !== "HEAD") return response.writeHead(405).end("Method not allowed");
       const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
       const target = path.resolve(root, relative);
       if (target !== root && !target.startsWith(`${root}${path.sep}`)) return response.writeHead(403).end("Forbidden");
@@ -274,25 +285,68 @@ async function startStaticServer(rendererRoot) {
   return { server, url: `http://127.0.0.1:${address.port}/` };
 }
 
+async function readEvidenceSearchPayload(request) {
+  const chunks = [];
+  let byteLength = 0;
+  for await (const chunk of request) {
+    byteLength += chunk.length;
+    if (byteLength > 1024 * 1024) throw new Error("Evidence Search request is too large");
+    chunks.push(chunk);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+function createEvidenceSearchResult(payload) {
+  const usedCommandIds = Array.isArray(payload?.usedCommandIds) ? payload.usedCommandIds : [];
+  const usage = Object.fromEntries(usedCommandIds
+    .filter((commandId) => typeof commandId === "string" && commandId.trim().length > 0)
+    .map((commandId) => [commandId, { usageCount: 1, lastUsedAt: EVIDENCE_SEARCH_NOW }]));
+  const commandSearch = new CommandSearchService({
+    getCommands: () => Array.isArray(payload?.commands) ? payload.commands : [],
+    localizationService: { getSnapshot: () => ({ effectiveLocale: "en" }) },
+    usageHistory: { getSnapshot: () => usage },
+    now: () => EVIDENCE_SEARCH_NOW
+  });
+  return commandSearch.search(payload?.query, payload?.pinnedIds);
+}
+
 async function createScenario(browser, serverUrl, host) {
   const context = await browser.newContext({ viewport: PALETTE_WINDOW_VIEWPORT, deviceScaleFactor: 1 });
   await context.addInitScript((seed) => {
     const clone = (value) => JSON.parse(JSON.stringify(value));
-    const state = { executedCommands: [], interactions: [], hideCount: 0, settingsCount: 0, interactionPanelMetrics: [], interactionPanelCloseCount: 0, onShown: null };
+    const state = { executedCommands: [], usedCommandIds: [], searchRequests: [], interactions: [], hideCount: 0, settingsCount: 0, interactionPanelMetrics: [], interactionPanelCloseCount: 0, onShown: null };
     const emitShown = () => requestAnimationFrame(() => state.onShown?.());
     window.__clacklyPaletteEvidence = state;
     window.resolveCommandCenter = {
       listCommands: async () => clone(seed.commands),
+      searchCommands: async (query, pinnedIds) => {
+        const request = {
+          commands: clone(seed.commands),
+          query,
+          pinnedIds: Array.isArray(pinnedIds) ? clone(pinnedIds) : pinnedIds,
+          usedCommandIds: clone(state.usedCommandIds)
+        };
+        state.searchRequests.push(clone({ query, pinnedIds: request.pinnedIds }));
+        const response = await fetch("/__clackly-evidence-search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(request)
+        });
+        if (!response.ok) throw new Error(`Evidence Search failed (${response.status})`);
+        return response.json();
+      },
       listInteractionBindings: async () => clone(seed.bindings),
       executeCommand: async (commandId) => {
         if (seed.commandFailure) throw new Error(seed.commandFailure);
         return new Promise((resolve) => requestAnimationFrame(() => {
           state.executedCommands.push(commandId);
+          if (!state.usedCommandIds.includes(commandId)) state.usedCommandIds.push(commandId);
           resolve({ commandId });
         }));
       },
       executeInteraction: async (interaction) => {
         state.interactions.push(clone(interaction));
+        if (seed.interactionFailure) throw new Error(seed.interactionFailure);
         return { matched: false };
       },
       listFeatures: async () => [],
@@ -1053,7 +1107,14 @@ async function runScenario(name, context) {
       checks.push("real UI Pin plus Command execution projects nonempty Pinned and Recent sections without duplicates");
     } else if (name === "search-results") {
       await page.locator(".launcher-search").click();
+      await page.locator(".search-control input").fill("clipboard");
+      await page.waitForFunction(() => (
+        document.querySelector(".search-control input")?.value === "clipboard"
+        && document.querySelectorAll(".search-view .command-row").length === 1
+      ));
+      assert.equal(await page.locator(".search-view .command-row").count(), 1, "Search uses the shared policy to filter the evidence catalog");
       await page.locator(".search-control input").fill("a");
+      await page.waitForFunction(() => document.querySelectorAll(".search-view .command-row").length > 1);
       assert.ok(await page.locator(".search-view .command-row").count() > 1, "Search keeps multiple real command results");
       assert.equal(await page.locator(".launcher-view").count(), 0, "Search mode removes launcher sections from the DOM");
       assert.equal(await page.getByRole("button", { name: "Back to launcher" }).count(), 0, "Search footer has no duplicate Back control");
@@ -1175,9 +1236,12 @@ async function runScenario(name, context) {
       const errorScenario = await createScenario(browser, serverUrl, { ...host, commandFailure });
       const errorPage = errorScenario.page;
       await focusShell(errorPage);
+      await errorPage.waitForFunction(() => window.__clacklyPaletteEvidence.searchRequests.length > 0);
+      const directSearchCount = (await readState(errorPage)).searchRequests.length;
       await errorPage.keyboard.press("Enter");
       const feedback = errorPage.locator(".palette-event-feedback.error");
       await feedback.waitFor();
+      await errorPage.waitForFunction((count) => window.__clacklyPaletteEvidence.searchRequests.length > count, directSearchCount);
       assert.equal(await feedback.textContent(), localizedFailure, "Error feedback presents the localized generic failure instead of raw bridge detail");
       const feedbackStyle = await feedback.evaluate((element) => {
         const rect = element.getBoundingClientRect();
@@ -1193,6 +1257,15 @@ async function runScenario(name, context) {
       await errorPage.waitForTimeout(3100);
       assert.equal(await feedback.count(), 1, "Error feedback remains visible until the existing recovery/clear path resolves it");
       await closeScenario(errorScenario, name);
+      const interactionScenario = await createScenario(browser, serverUrl, { ...host, interactionFailure: commandFailure });
+      const interactionPage = interactionScenario.page;
+      await focusShell(interactionPage);
+      await interactionPage.waitForFunction(() => window.__clacklyPaletteEvidence.searchRequests.length > 0);
+      const interactionSearchCount = (await readState(interactionPage)).searchRequests.length;
+      await interactionPage.locator(".command-row").first().click();
+      await interactionPage.locator(".palette-event-feedback.error").waitFor();
+      await interactionPage.waitForFunction((count) => window.__clacklyPaletteEvidence.searchRequests.length > count, interactionSearchCount);
+      await closeScenario(interactionScenario, `${name}-interaction`);
       checks.push("Errors remain visible as localized presentation copy, keep their full aria-live text, and use a compact readable three-line maximum rather than acknowledgement auto-dismissal");
       return;
     }

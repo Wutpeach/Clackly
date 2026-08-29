@@ -19,7 +19,7 @@ const {
 const { createNativeDualWindowHost } = require("./nativeDualWindowHost");
 const { registerPaletteHotkey } = require("./hotkey");
 const { composeStartup } = require("./composeStartup");
-const { getCommands, searchCommands } = require("../../command-engine/registry");
+const { getCommands } = require("../../command-engine/registry");
 const { initializeAfterEffectsPath } = require("../../capability/afterEffectsPath");
 const { BindingStorage } = require("../../interaction/BindingStorage");
 const { InteractionManager } = require("../../interaction/InteractionManager");
@@ -138,7 +138,7 @@ function togglePalette() {
 
 function registerIpcHandlers() {
   ipcMain.handle("commands:list", () => getCommands());
-  ipcMain.handle("commands:search", (_event, query) => searchCommands(query));
+  ipcMain.handle("commands:search", (_event, query, pinnedIds) => core.searchCommands(query, pinnedIds));
   ipcMain.handle("commands:execute", async (_event, commandId) => {
     const result = await executeStandaloneCommand(commandId);
     hidePalette();

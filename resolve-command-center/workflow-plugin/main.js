@@ -19,7 +19,7 @@ const {
 const { createNativeDualWindowHost } = require("../electron/main/nativeDualWindowHost");
 const { getPaletteAccelerator, registerPaletteHotkey } = require("../electron/main/hotkey");
 const { composeStartup } = require("../electron/main/composeStartup");
-const { getCommandById, getCommands, searchCommands } = require("../command-engine/registry");
+const { getCommandById, getCommands } = require("../command-engine/registry");
 const { initializeAfterEffectsPath } = require("../capability/afterEffectsPath");
 const { BindingStorage } = require("../interaction/BindingStorage");
 const { InteractionManager } = require("../interaction/InteractionManager");
@@ -222,7 +222,7 @@ function togglePalette() {
 
 function registerIpcHandlers() {
   ipcMain.handle("commands:list", () => getCommands());
-  ipcMain.handle("commands:search", (_event, query) => searchCommands(query));
+  ipcMain.handle("commands:search", (_event, query, pinnedIds) => core.searchCommands(query, pinnedIds));
   ipcMain.handle("commands:execute", async (_event, commandId) => {
     const result = await executeWorkflowCommand(commandId);
     hidePalette();

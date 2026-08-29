@@ -1,4 +1,5 @@
 import paletteGeometry from "../shared/palette-geometry.json" with { type: "json" };
+import { CommandSearchService } from "../../command-search/CommandSearchService.mjs";
 
 const BROWSER_PREVIEW_COMMANDS = [
   {
@@ -399,6 +400,11 @@ export function createBrowserPreviewApi({ search } = {}) {
     return languages.some((language) => /^(zh-cn|zh-sg)|(?:^|-)hans(?:-|$)/i.test(language || "")) ? "zh-CN" : "en";
   };
   const getSnapshot = () => ({ preference, effectiveLocale: resolveEffectiveLocale() });
+  const previewSearch = new CommandSearchService({
+    getCommands: () => clone(fixture?.commands || BROWSER_PREVIEW_COMMANDS),
+    localizationService: { getSnapshot },
+    usageHistory: { getSnapshot: () => ({}) }
+  });
   return {
     getLocalizationSnapshot: async () => getSnapshot(),
     setLocalePreference: async (locale) => {
@@ -409,6 +415,7 @@ export function createBrowserPreviewApi({ search } = {}) {
       return snapshot;
     },
     listCommands: async () => clone(fixture?.commands || BROWSER_PREVIEW_COMMANDS),
+    searchCommands: async (query, pinnedIds) => previewSearch.search(query, pinnedIds),
     listInteractionBindings: async () => clone(fixture?.bindings || BROWSER_PREVIEW_BINDINGS),
     executeCommand: async () => { throw new Error(PREVIEW_EXECUTION_ERROR); },
     executeInteraction: async () => { throw new Error(PREVIEW_EXECUTION_ERROR); },

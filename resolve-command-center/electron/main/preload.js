@@ -22,7 +22,7 @@ if (isDetachedInteractionPanel) {
   listCommands: () => ipcRenderer.invoke("commands:list"),
   getLocalizationSnapshot: () => ipcRenderer.invoke("localization:get-snapshot"),
   setLocalePreference: (locale) => ipcRenderer.invoke("preferences:set-locale", locale),
-  searchCommands: (query) => ipcRenderer.invoke("commands:search", query),
+  searchCommands: (query, pinnedIds) => ipcRenderer.invoke("commands:search", query, pinnedIds),
   executeCommand: (commandId) => ipcRenderer.invoke("commands:execute", commandId),
   executeInteraction: (event) => ipcRenderer.invoke("interactions:execute", event),
   listInteractionBindings: () => ipcRenderer.invoke("interactions:list"),

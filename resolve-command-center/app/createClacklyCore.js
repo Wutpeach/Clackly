@@ -6,6 +6,10 @@ const { createMarkerCapability } = require("../capability/marker");
 const { createImageClipboardCapability } = require("../capability/imageClipboard");
 const { registerScriptCapabilities } = require("../capability/registerScripts");
 const { createCommandExecutor } = require("../command-engine/executor");
+const { getCommands } = require("../command-engine/registry");
+const { CommandSearchService } = require("../command-search/CommandSearchService.mjs");
+const { CommandUsageHistory } = require("../command-usage/CommandUsageHistory");
+const { CommandUsageStorage } = require("../command-usage/CommandUsageStorage");
 const { ConfigManager } = require("../config/ConfigManager");
 const { ConfigStorage } = require("../config/ConfigStorage");
 const { Preferences } = require("../preferences/Preferences");
@@ -96,6 +100,14 @@ function createClacklyCore({
   // remains the only capability-domain authority for config.json.
   const preferences = new Preferences({ appDataPath });
   const localizationService = new LocalizationService({ preferences, systemLanguagesProvider });
+  const usageHistory = new CommandUsageHistory({
+    storage: CommandUsageStorage.fromAppData(appDataPath)
+  });
+  const commandSearch = new CommandSearchService({
+    getCommands,
+    localizationService,
+    usageHistory
+  });
   const featureStatusManager = new FeatureStatusManager({
     capabilityRegistry,
     configManager,
@@ -104,7 +116,8 @@ function createClacklyCore({
   const executeCommand = createCommandExecutor({
     capabilityRegistry,
     configManager,
-    featureStatusManager
+    featureStatusManager,
+    usageHistory
   });
 
   return {
@@ -114,6 +127,7 @@ function createClacklyCore({
     localizationService,
     featureStatusManager,
     featureCatalog,
+    searchCommands: (query, pinnedIds) => commandSearch.search(query, pinnedIds),
     executeCommand,
     runtimeManager
   };

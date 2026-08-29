@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { isCommandPresentable } = require("./presentation.mjs");
 
 const DEFAULT_COMMAND_DIR = path.join(__dirname, "commands");
 
@@ -159,41 +160,14 @@ function resetCommandCache() {
   cachedCommands = null;
 }
 
-function commandMatches(command, query) {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) {
-    return true;
-  }
-
-  const haystack = [command.id, command.name, ...command.keywords]
-    .join(" ")
-    .toLowerCase();
-
-  return normalizedQuery
-    .split(/\s+/)
-    .every((token) => haystack.includes(token));
-}
-
-function searchCommands(query) {
-  const text = typeof query === "string" ? query : "";
-  return getCommands().filter((command) => (
-    isCommandPresentable(command) && commandMatches(command, text)
-  ));
-}
-
 function getCommandById(commandId) {
   return getCommands().find((command) => command.id === commandId) || null;
-}
-
-function isCommandPresentable(command) {
-  return Boolean(command) && command.presentation !== "internal";
 }
 
 module.exports = {
   loadCommands,
   getCommands,
   resetCommandCache,
-  searchCommands,
   getCommandById,
   isCommandPresentable
 };

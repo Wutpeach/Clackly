@@ -7,7 +7,7 @@
     "icon": "send",
     "keywords": ["after effects", "ae", "export", "timeline"],
     "capability": "ae.export",
-    "localizations": { "zh-CN": { "name": "导出到 After Effects", "description": "将当前 Resolve 选择自动发送到 After Effects", "category": "导出", "keywords": ["导出", "After Effects", "AE", "时间线"] } }
+    "localizations": { "zh-CN": { "name": "导出到 After Effects", "description": "将当前 Resolve 选择自动发送到 After Effects", "category": "导出", "keywords": ["导出", "导出时间线", "After Effects", "AE", "时间线"] } }
   },
   {
     "id": "timeline.exportAudioToAfterEffects",

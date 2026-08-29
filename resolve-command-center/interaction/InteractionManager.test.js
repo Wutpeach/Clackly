@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const { InteractionManager } = require("./InteractionManager");
+const { createCommandExecutor } = require("../command-engine/executor");
 
 function mouse(button, modifiers = {}) {
   return {
@@ -167,6 +168,41 @@ test("modified clicks dispatch internal compatibility alias actions without extr
     "timeline.exportVideoToAfterEffects",
     "timeline.exportCyanRangeToAfterEffects"
   ]);
+});
+
+test("matched interaction records its actual internal action only at the shared executor boundary", async () => {
+  const records = [];
+  const executed = [];
+  const internalAction = { id: "timeline.exportAudioToAfterEffects", capability: "ae.export", presentation: "internal" };
+  const executeCommand = createCommandExecutor({
+    capabilityRegistry: { get: () => ({ execute: async (command) => executed.push(command.id) }) },
+    configManager: { assertConfigured() {}, forCapability: () => ({ get() {} }) },
+    usageHistory: { record: (commandId) => records.push(commandId) },
+    findCommand: (commandId) => commandId === internalAction.id ? internalAction : null
+  });
+  const manager = new InteractionManager({
+    bindingStorage: {
+      load: () => ({
+        audio: {
+          target: "timeline.exportToAfterEffects",
+          trigger: { type: "mouse", button: "left", modifiers: ["CTRL"] },
+          action: { command: internalAction.id }
+        }
+      })
+    },
+    executeCommand
+  });
+
+  assert.equal((await manager.handle({
+    target: "timeline.exportToAfterEffects",
+    type: "mouse",
+    button: 0,
+    ctrlKey: true,
+    shiftKey: false,
+    altKey: false
+  })).command, internalAction.id);
+  assert.deepEqual(records, [internalAction.id]);
+  assert.deepEqual(executed, [internalAction.id]);
 });
 
 test("unmodified left-click on the Image Clipboard card executes the command exactly once", async () => {

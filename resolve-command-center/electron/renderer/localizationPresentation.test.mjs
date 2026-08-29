@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { localizeCommands, localizeFeatureMetadata, presentError } from "../../localization/presentation.mjs";
-import { rankCommands } from "./model.mjs";
 
-test("localized Command metadata falls back per field and preserves English plus stable-id search", () => {
+test("localized Command metadata falls back per field and preserves English Search inputs", () => {
   const [command] = localizeCommands([{
     id: "vendor.command",
     name: "English command",
@@ -15,9 +14,8 @@ test("localized Command metadata falls back per field and preserves English plus
   assert.equal(command.name, "中文命令");
   assert.equal(command.description, "English description");
   assert.deepEqual(command.keywords, ["中文关键词"]);
-  assert.deepEqual(rankCommands([command], "中文关键词").map(({ id }) => id), ["vendor.command"]);
-  assert.deepEqual(rankCommands([command], "english-keyword").map(({ id }) => id), ["vendor.command"]);
-  assert.deepEqual(rankCommands([command], "vendor.command").map(({ id }) => id), ["vendor.command"]);
+  assert.equal(command.englishName, "English command");
+  assert.deepEqual(command.englishKeywords, ["english-keyword"]);
 });
 
 test("feature/config display overlays stay presentation-only", () => {

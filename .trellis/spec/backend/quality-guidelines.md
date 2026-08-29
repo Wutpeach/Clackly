@@ -20,8 +20,10 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - Command manifest: `{ id: string, name: string, description: string, category: string, icon: string, keywords: string[], capability: string, presentation?: "visible" | "internal" }`
 - Capability metadata: `{ id: string, name: string, description: string, category: string, icon: string, version: string, type: string, providers: string[], executor?: { type: "script", runtime: string, entry: string }, configSchema: object }`
 - Capability registry: `createCapabilityRegistry() -> { register(capabilityId, capability), get(capabilityId), getMetadata(capabilityId), getAllCapabilities() }`
-- Command executor: `createCommandExecutor({ capabilityRegistry, configManager, findCommand? }) -> executeCommand(commandId)`
-- Command registry lookup: `getCommands() -> Command[]`, `getCommandById(id) -> Command | null`, `searchCommands(query) -> Command[]`, and `isCommandPresentable(command) -> boolean`.
+- Command executor: `createCommandExecutor({ capabilityRegistry, configManager, usageHistory?, findCommand? }) -> executeCommand(commandId)`
+- Command registry lookup: `getCommands() -> Command[]`, `getCommandById(id) -> Command | null`, and `isCommandPresentable(command) -> boolean`.
+- Command Search: `searchCommands(query, pinnedIds) -> { commands: LocalizedVisibleCommand[], usedCommandIds: string[] }`.
+- Command usage persistence: `%APPDATA%/Clackly/command-usage.json` maps stable Command IDs to `{ usageCount, lastUsedAt }` only.
 - Capability execution: `capability.execute(command, { config })`, where `config.get(key)` is scoped to that capability.
 - Marker capability: `createMarkerCapability(backends) -> { metadata, add(options?), execute(command, context?), selectBackend() }`
 - Unavailable error: `CapabilityUnavailableError(capability, attemptedBackends)`
@@ -30,10 +32,14 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 ### 3. Contracts
 
 - `command-engine/` validates and routes the `capability` string only. It must not import Resolve APIs, bridge transport, or keyboard implementations.
-- Command Registry requires non-empty `description`, `category`, and `icon`, returns only the fixed Command shape, and keeps search limited to id/name/keywords.
+- Command Registry requires non-empty `description`, `category`, and `icon`, returns only the fixed Command shape, and has no matching/ranking policy.
 - `presentation` defaults to `visible`. `getCommands()` and `getCommandById()` return every installed Command including internal ones, so Interaction dispatch and help can resolve internal action descriptions.
-- `searchCommands()` and every target presentation surface exclude `presentation: "internal"`. One generic `isCommandPresentable()` predicate owns that filter; no layer branches on Command ids or capabilities.
-- Both hosts inject their adapters, paths, and `hostContextProvider` into `createClacklyCore()`. That shared Composition Root creates the Capability Registry, registers shared capabilities, and constructs the Command executor once; Host lifecycle, window/IPC, recovery, and InteractionManager remain outside the Root.
+- `CommandSearchService` owns one current-locale derived projection, pinyin transliteration, text-first lexicographic relevance, Pin tie-breaking, usage tie-breaking, and output filtering. It is the only production owner of `commands:search`; the Registry and renderer do not match or rank Commands.
+- Search includes localized name/keywords, English name/keywords, generated full pinyin/initials, and stable ID. It excludes descriptions/categories and internal Commands through the generic `isCommandPresentable()` predicate; no layer branches on Command IDs or capabilities.
+- Nonempty Search orders the complete text tuple before Pin, decayed usage, last-use time, count, and Registry order. Empty Search orders Pin, decayed usage, last-use time, count, and Registry order. Scores are dynamic only: `ln(1 + count) × 0.5^(age / 30 days)`.
+- `CommandUsageStorage` exclusively owns `command-usage.json`; it never writes Preferences, capability config, Feature state, or bindings. Read/write failure is diagnostic-only and produces an empty Search snapshot or skipped record.
+- Both hosts inject their adapters, paths, and `hostContextProvider` into `createClacklyCore()`. That shared Composition Root creates the Capability Registry, usage history, Search service, and Command executor once; Host lifecycle, window/IPC, recovery, and InteractionManager remain outside the Root.
+- The executor records usage only after Command/Capability/Feature/config gates and capability-scoped config creation, immediately before `Capability.execute`. Started failures count; rejected gates and presentation activity do not.
 - Registered capabilities keep descriptive data under `capability.metadata`; `register(capabilityId, capability)` and `get(capabilityId)` retain their existing execution-object behavior.
 - Every capability declares `metadata.configSchema`; use `{}` when it has no settings. Registry registration validates the schema before storing the capability.
 - Handwritten capabilities may omit `metadata.executor`. Metadata-discovered script capabilities declare `executor.type = "script"`; Command metadata never declares an executor or runtime.
@@ -82,8 +88,9 @@ Backend code includes local bridge processes, Resolve scripting integration, Wor
 - Assert catalog listing returns only `id`, `name`, `category`, and `icon`.
 - Assert missing, malformed, id-mismatched, and sparse-provider metadata cannot register.
 - Assert handwritten capabilities without `executor` remain valid and malformed script executor metadata cannot register.
-- Assert command registry preserves search while returning capability metadata.
-- Assert exact default-visible, list/search/internal filtering, and one generic presentability predicate with no Command-id branches.
+- Assert Command Search covers localized/English metadata, generated pinyin/initials, IDs, multi-token relevance, Pins, decayed usage, locale replacement, and deterministic fallback while Registry remains metadata-only.
+- Assert exact default-visible, list/Search/internal filtering, and one generic presentability predicate with no Command-id branches.
+- Assert usage persists only stable facts in its dedicated document, remains defensive across restart, and records only accepted/started direct and Interaction-dispatched Commands.
 - Assert Command Registry requires presentation fields, defensively clones keywords, and omits unsupported help/executor fields.
 - Assert ShortcutManager mapping, no-executor behavior, and injected-executor request shape.
 - Assert bridge availability uses `/health` and marker execution preserves the existing command-id HTTP payload.

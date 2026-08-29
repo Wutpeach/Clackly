@@ -9,8 +9,7 @@ const {
   getCommandById,
   isCommandPresentable,
   loadCommands,
-  resetCommandCache,
-  searchCommands
+  resetCommandCache
 } = require("./registry");
 
 function loadFixture(t, command) {
@@ -33,7 +32,7 @@ function fixture(overrides = {}) {
   };
 }
 
-test("timeline.addMarker preserves registry search with capability metadata", () => {
+test("timeline.addMarker preserves Registry metadata and defensive cloning", () => {
   resetCommandCache();
 
   const command = getCommandById("timeline.addMarker");
@@ -48,13 +47,10 @@ test("timeline.addMarker preserves registry search with capability metadata", ()
     presentation: "visible",
     localizations: undefined
   });
-  assert.deepEqual(searchCommands("marker").map(({ id }) => id), ["timeline.addMarker"]);
-  assert.deepEqual(searchCommands("current frame"), []);
-
   command.keywords.push("changed");
   assert.deepEqual(getCommandById("timeline.addMarker").keywords, ["marker", "mark", "timeline", "red"]);
-  const searchResult = searchCommands("marker").find(({ id }) => id === "timeline.addMarker");
-  searchResult.keywords[0] = "changed";
+  const listedResult = getCommands().find(({ id }) => id === "timeline.addMarker");
+  listedResult.keywords[0] = "changed";
   assert.equal(getCommandById("timeline.addMarker").keywords[0], "marker");
 });
 
@@ -71,14 +67,11 @@ test("Paste Clipboard Image command registration uses the standard metadata cont
     presentation: "visible",
     localizations: undefined
   });
-  assert.deepEqual(searchCommands("clipboard image").map(({ id }) => id), [
-    "media.clipboard-image.import"
-  ]);
 });
 
-test("only the visible After Effects export Command is searchable while internal actions stay executable", () => {
+test("only the visible After Effects export Command is presentable while internal actions stay executable", () => {
   resetCommandCache();
-  const commands = searchCommands("after effects");
+  const commands = getCommands().filter(isCommandPresentable).filter(({ capability }) => capability === "ae.export");
   assert.deepEqual(commands.map(({ id }) => id), ["timeline.exportToAfterEffects"]);
   assert.equal(commands.some((command) => "runtime" in command || "mode" in command), false);
 
@@ -94,18 +87,14 @@ test("only the visible After Effects export Command is searchable while internal
   ]);
   assert.equal(all.every((command) => command.presentation === "visible" || command.presentation === "internal"), true);
   assert.equal(getCommandById("timeline.exportAudioToAfterEffects").presentation, "internal");
+  const manifest = fs.readFileSync(path.join(__dirname, "commands", "after-effects.json"), "utf8");
+  assert.match(manifest, /"导出时间线"/);
+  assert.doesNotMatch(manifest, /"pinyin"|daochu|dcsjx/i, "pinyin stays derived rather than authored metadata");
 });
 
-test("internal Commands execute and resolve by id but never appear in search", () => {
+test("internal Commands execute and resolve by id but never become presentable", () => {
   resetCommandCache();
-  assert.deepEqual(searchCommands(""), getCommands().filter((command) => command.presentation !== "internal"));
-  for (const query of ["", "audio", "video", "blue", "cyan", "after effects", "export"]) {
-    assert.equal(
-      searchCommands(query).some((command) => command.presentation === "internal"),
-      false,
-      `internal Command leaked into search for ${JSON.stringify(query)}`
-    );
-  }
+  assert.deepEqual(getCommands().filter(isCommandPresentable), getCommands().filter((command) => command.presentation !== "internal"));
   assert.equal(isCommandPresentable(getCommandById("timeline.exportToAfterEffects")), true);
   assert.equal(isCommandPresentable(getCommandById("timeline.exportAudioToAfterEffects")), false);
   assert.equal(isCommandPresentable(null), false);

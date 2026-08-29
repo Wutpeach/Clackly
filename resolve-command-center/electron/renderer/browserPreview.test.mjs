@@ -28,6 +28,11 @@ test("browser preview keeps representative presentation data isolated and non-ex
   ]);
   assert.equal(statuses[0].id, "preview.palette");
 
+  await api.setLocalePreference("zh-CN");
+  const search = await api.searchCommands("预览", []);
+  assert.deepEqual(search.usedCommandIds, []);
+  assert.deepEqual(search.commands.map(({ id }) => id), ["preview.primary", "preview.secondary"]);
+
   commands[0].name = "Changed locally";
   assert.equal((await api.listCommands())[0].name, "Preview Color Grade", "preview callers receive defensive data copies");
   await assert.rejects(api.executeCommand("preview.primary"), /cannot execute outside Electron/i);

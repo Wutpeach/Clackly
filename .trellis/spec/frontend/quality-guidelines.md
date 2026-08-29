@@ -25,7 +25,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 
 - Renderer API exposed by preload:
   - `window.resolveCommandCenter.listCommands() -> Promise<Command[]>`
-  - `window.resolveCommandCenter.searchCommands(query: string) -> Promise<Command[]>`
+  - `window.resolveCommandCenter.searchCommands(query: string, pinnedIds: string[]) -> Promise<{ commands: LocalizedVisibleCommand[], usedCommandIds: string[] }>`
   - `window.resolveCommandCenter.executeCommand(commandId: string) -> Promise<object>`
   - `window.resolveCommandCenter.listInteractionBindings() -> Promise<BindingRecord[]>`
   - `window.resolveCommandCenter.hidePalette() -> void`
@@ -37,11 +37,12 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 
 ### 3. Contracts
 
-- Renderer search uses command metadata only: `id`, `name`, and `keywords`.
+- `commands:search` is the sole production Search entry in both hosts. The renderer submits the string query and its explicit Pin IDs, then consumes the already ordered localized visible Commands plus `usedCommandIds`.
+- The renderer owns query, Pins, selection, and presentation only. It has no matcher, text-ranking, usage score, persisted Recent state, or Search storage import. `usedCommandIds` feeds the existing `RECENT` section membership only; it cannot re-rank Commands.
 - `presentation` defaults to `visible`; internal Commands stay executable and resolvable for interaction descriptions but never appear in Launcher, Search, or Settings help targets. One shared `isCommandPresentable()` predicate owns that filter in both the command registry and the renderer presentation model; no renderer branch names a Command id or capability.
-- Production renderer presentation contains registered Commands only, and pinned/recent state starts empty. Only the root browser preview path without `window.resolveCommandCenter` may use an isolated renderer-local presentation adapter with representative Commands, lifecycle status, and normalized bindings; it is never registry, preload, IPC, or Resolve authority and never executes a real command.
+- Production renderer presentation contains registered Commands only. Renderer Pin state starts empty, while `RECENT` membership may immediately reflect persisted Core usage through `usedCommandIds`. Only the root browser preview path without `window.resolveCommandCenter` may use an isolated renderer-local presentation adapter with representative Commands, lifecycle status, and normalized bindings; it is never registry, preload, IPC, or Resolve authority and never executes a real command.
 - `agentation@3.0.2` (PolyForm-Shield-1.0.0) is a development-only browser feedback tool. Lazy-load and mount its official `<Agentation />` only on that same hostless root Palette preview gate; do not render it in Electron dev/packaged renderers, Resolve, or Settings. It remains local annotation/structured-copy UI only: no registry/IPC/Resolve access, callbacks, endpoint, webhook, or automatic external submission.
-- Launcher, Search, ranking, icons, accessibility names, and generic hints preserve registered Command Metadata; renderer code contains no Command-id presentation override.
+- Launcher and Search retain Core-provided Search order after Feature visibility filtering. Icons, accessibility names, and generic hints preserve registered Command Metadata; renderer code contains no Command-id presentation override.
 - Renderer execution sends only the selected `commandId`.
 - Per-command shortcut badges are absent until an authoritative presentation contract exists. The universal selected-Command Footer Info control is derived from interaction metadata and is not command shortcut metadata or a host-wide hotkey.
 - Launcher and Search always occupy the fixed visible `240x320` Palette main rectangle. Interaction Panel open/closed remains Palette-local presentation state. The renderer sends only bounded integer `{ anchorY, contentHeight }` metrics plus a validated read-only presentation snapshot; it never supplies screen coordinates, bounds, width, height, shapes, padding, resize policy, commands, query, selection, or arbitrary HTML.
@@ -84,7 +85,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 ### 5. Good/Base/Bad Cases
 
 - Good: Adding command intent metadata and registering its capability in each supported host.
-- Base: `marker` query matches `timeline.addMarker` via registry search.
+- Base: `marker` query reaches Core Command Search through preload and returns its ordered localized response.
 - Good: Opening Interaction Info on Windows D7 keeps the opaque `240x320` main at left, opens the separately native `260px` Panel at its clamped anchor with no HWND in the real `16px` gap, and restores exact original main bounds on close/hide/failure.
 - Base: Windows standalone dev, built, packaged, and Workflow select identical D6/D7 construction and opacity/mouse lifecycle; non-Windows selects the attached transparent compatibility fallback.
 - Good: registering a Command with declared description/category/icon makes it appear correctly without renderer edits.
@@ -93,7 +94,8 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 
 ### 6. Tests Required
 
-- Assert query matching returns expected command ids for names and keywords.
+- Assert preload Search accepts query plus Pin IDs and returns the `{ commands, usedCommandIds }` contract; Palette ignores stale asynchronous Search responses and does not recreate matching/ranking/usage state.
+- Assert query matching returns expected localized/English/pinyin command IDs through shared Command Search, not Registry or renderer matching.
 - Assert presentation category text alone does not match a command.
 - Assert registered Command presentation is preserved, an empty registered catalog stays empty, and no shortcut/prototype entries are synthesized in production presentation.
 - Assert Launcher and Search exclude `presentation: "internal"` Commands while `listCommands()`/`getCommandById()` still return them, and that the shared presentability predicate has no Command-id branches.

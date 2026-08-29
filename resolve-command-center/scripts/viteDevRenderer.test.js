@@ -30,6 +30,7 @@ function installRendererApi() {
     getLocalizationSnapshot: async () => ({ preference: "en", effectiveLocale: "en" }),
     setLocalePreference: async () => ({ preference: "en", effectiveLocale: "en" }),
     listCommands: async () => [command],
+    searchCommands: async () => ({ commands: [command], usedCommandIds: [] }),
     listInteractionBindings: async () => [],
     executeCommand: async () => ({ commandId: command.id }),
     executeInteraction: async () => ({ matched: false }),
