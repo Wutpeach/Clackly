@@ -4,7 +4,7 @@
 
 Define a lightweight, unified, controlled, and reusable motion foundation for Clackly's Electron renderer, grounded in the current repository. The foundation should prevent components from independently accumulating arbitrary transitions, keyframes, timeouts, and spring settings while preserving the stable Host/native window architecture.
 
-This task is planning-only. It must determine whether Motion for React (`motion` / `motion/react`) is a good fit before any dependency or product-code change is proposed.
+This task began as planning-only. After the repository research and `design.md` passed Architecture Review, the user explicitly approved the bounded first implementation slice on 2026-08-29. The approved implementation remains limited to the Search validation candidate.
 
 ## Confirmed Facts
 
@@ -52,19 +52,20 @@ This task is planning-only. It must determine whether Motion for React (`motion`
 
 - Recommend one bounded Motion adoption slice rather than a broad animation rollout or a dependency-free rejection.
 - Keep simple hover, focus, press, selection, and loading animation in CSS.
-- If implementation is later approved, use a Renderer-local strict `LazyMotion`/`domAnimation` boundary and one repository-derived `softPresence` preset; defer layout/`domMax` until a real separate need exists.
+- Use a Renderer-local strict `LazyMotion`/`domAnimation` boundary and one repository-derived `softPresence` preset; defer layout/`domMax` until a real separate need exists.
 - Validate first against the existing Launcher/Search content-mode transition. Settings feedback presence is optional and must be omitted if the first candidate already proves the contract.
 - Keep the detached D7 Interaction Panel outside the first Motion boundary, and never change Host/native files to support Renderer motion.
 
 ## Acceptance Criteria
 
-- [ ] The audit lists relevant implementations with file and line anchors and clearly separates presentation motion from state/async timing and Host/native lifecycle.
-- [ ] The compatibility assessment reaches an evidence-backed adopt / do-not-adopt recommendation for Motion for React.
-- [ ] The proposed dependency and ownership boundary prevents Motion from crossing into D6/D7 or any native window authority.
-- [ ] The preset-layer recommendation is explicitly justified and, if recommended, contains only repository-evidenced primitives plus a reduced-motion contract.
-- [ ] One or two real, low-risk validation candidates are named with rationale, acceptance behavior, and explicit exclusions.
-- [ ] The plan includes a bounded implementation scope, validation strategy, rollback points, and architecture/scope-creep risks.
-- [ ] `prd.md`, `design.md`, and `implement.md` record the converged repository-grounded plan; no product code or dependency is changed in this planning task.
+- [x] The audit lists relevant implementations with file and line anchors and clearly separates presentation motion from state/async timing and Host/native lifecycle.
+- [x] The compatibility assessment reaches an evidence-backed adopt / do-not-adopt recommendation for Motion for React.
+- [x] The dependency and ownership boundary prevents Motion from crossing into D6/D7 or any native window authority.
+- [x] The preset layer contains only the repository-evidenced `softPresence` vocabulary plus its reduced-motion contract.
+- [x] Search is the sole first-slice validation candidate; the optional Settings candidate is not implemented.
+- [x] Normal, reduced-motion, and interruption evidence proves immediate input/focus/Escape behavior and fixed Palette geometry.
+- [x] Focused tests, full tests, production build, Windows packaging verification, size measurement, and source-boundary audits pass.
+- [x] Resolve-host manual acceptance after restart confirms D6/D7 native behavior remains unchanged.
 
 ## Out of Scope
 
@@ -74,4 +75,4 @@ This task is planning-only. It must determine whether Motion for React (`motion`
 - Refactoring `window.js`.
 - A large design-token system, universal animation DSL, or speculative API.
 - Replacing every existing CSS transition.
-- Implementation, dependency installation, or package-lock changes during this phase.
+- Any Motion consumer beyond Search in the first implementation slice.

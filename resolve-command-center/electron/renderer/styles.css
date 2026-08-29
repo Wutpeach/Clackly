@@ -51,7 +51,6 @@
   --color-palette-selected: #e7e8ea;
   --color-palette-selected-foreground: #17191d;
   --motion-fast: 100ms;
-  --motion-mode: 120ms;
   color: var(--color-text-primary);
   background: transparent;
   font-family: "HarmonyOS Sans", "Segoe UI", system-ui, sans-serif;
@@ -331,7 +330,6 @@ kbd {
   min-height: 0;
   padding: 0 8px;
   background: var(--color-palette-surface);
-  animation: mode-enter var(--motion-mode) cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .interaction-panel {
@@ -1387,13 +1385,6 @@ kbd {
   background: var(--settings-hover);
 }
 
-@keyframes mode-enter {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-}
-
 @keyframes status-spin {
   to {
     transform: rotate(360deg);
@@ -1401,10 +1392,8 @@ kbd {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .search-view {
-    animation: none;
-  }
-
+  .launcher-search,
+  .footer-control,
   .command-row,
   .feature-button,
   .settings-picker-control button,

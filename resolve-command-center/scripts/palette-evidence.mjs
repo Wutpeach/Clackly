@@ -53,6 +53,9 @@ const SCENARIOS = new Set([
   "default",
   "pinned-recent",
   "search-results",
+  "motion-normal",
+  "motion-reduced",
+  "motion-interruption",
   "command-baseline",
   "interaction-single-description",
   "interaction-panel",
@@ -310,8 +313,12 @@ function createEvidenceSearchResult(payload) {
   return commandSearch.search(payload?.query, payload?.pinnedIds);
 }
 
-async function createScenario(browser, serverUrl, host) {
-  const context = await browser.newContext({ viewport: PALETTE_WINDOW_VIEWPORT, deviceScaleFactor: 1 });
+async function createScenario(browser, serverUrl, host, { reducedMotion = "no-preference" } = {}) {
+  const context = await browser.newContext({
+    viewport: PALETTE_WINDOW_VIEWPORT,
+    deviceScaleFactor: 1,
+    ...(reducedMotion ? { reducedMotion } : {})
+  });
   await context.addInitScript((seed) => {
     const clone = (value) => JSON.parse(JSON.stringify(value));
     const state = { executedCommands: [], usedCommandIds: [], searchRequests: [], interactions: [], hideCount: 0, settingsCount: 0, interactionPanelMetrics: [], interactionPanelCloseCount: 0, onShown: null };
@@ -899,6 +906,72 @@ async function focusShell(page) {
   await page.locator(".palette-shell").focus();
 }
 
+async function inspectSoftPresence(page) {
+  return page.locator(".search-view").evaluate((element) => {
+    const style = getComputedStyle(element);
+    const animations = element.getAnimations().map((animation) => {
+      const effect = animation.effect;
+      return {
+        duration: effect?.getTiming?.().duration ?? null,
+        easing: effect?.getTiming?.().easing ?? null,
+        keyframes: effect?.getKeyframes?.().map(({ opacity, transform, easing }) => ({ opacity, transform, easing })) ?? []
+      };
+    });
+    return {
+      preset: element.dataset.motionPreset,
+      opacity: Number(style.opacity),
+      transform: style.transform,
+      animationName: style.animationName,
+      reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+      animations,
+      recordedAnimations: window.__clacklyMotionEvidence || [],
+      transformSamples: window.__clacklyMotionSamples || []
+    };
+  });
+}
+
+async function captureSoftPresenceAnimations(page) {
+  await page.evaluate(() => {
+    window.__clacklyMotionEvidence = [];
+    window.__clacklyMotionSamples = [];
+    let framesRemaining = 8;
+    const sampleTransform = () => {
+      const search = document.querySelector(".search-view");
+      if (search) window.__clacklyMotionSamples.push(getComputedStyle(search).transform);
+      framesRemaining -= 1;
+      if (framesRemaining > 0) requestAnimationFrame(sampleTransform);
+    };
+    requestAnimationFrame(sampleTransform);
+    const nativeAnimate = Element.prototype.animate;
+    Element.prototype.animate = function captureMotionAnimation(keyframes, options) {
+      if (this.matches?.(".search-view")) {
+        window.__clacklyMotionEvidence.push({
+          keyframes: Array.isArray(keyframes)
+            ? keyframes.map(({ opacity, transform }) => ({ opacity, transform }))
+            : { opacity: keyframes.opacity, transform: keyframes.transform },
+          options: typeof options === "object" ? { duration: options.duration, easing: options.easing } : options
+        });
+      }
+      return nativeAnimate.call(this, keyframes, options);
+    };
+  });
+}
+
+function assertNormalSoftPresence(presence, label) {
+  assert.equal(presence.preset, "softPresence", `${label}: Search uses the sole approved softPresence preset`);
+  assert.equal(presence.animationName, "none", `${label}: Search no longer uses a CSS keyframe`);
+  assert.ok(presence.opacity >= 0 && presence.opacity <= 1, `${label}: Search presence interpolates only an in-range opacity`);
+  const transformFrames = ({ keyframes }) => (Array.isArray(keyframes)
+    ? keyframes.map(({ transform }) => transform)
+    : keyframes.transform);
+  const transformAnimation = presence.recordedAnimations.find((animation) => transformFrames(animation)?.includes("translateY(3px)"));
+  const transformSample = presence.transformSamples.find((transform) => transform === "matrix(1, 0, 0, 1, 0, 3)" || transform === "translateY(3px)");
+  const transition = transformAnimation || presence.recordedAnimations.find(({ options }) => options?.duration === 120);
+  assert.ok(transformSample, `${label}: Search presence starts at the approved 3px vertical displacement (reduced=${presence.reducedMotion}; samples=${JSON.stringify(presence.transformSamples)})`);
+  assert.equal(transition?.options?.duration, 120, `${label}: Search presence keeps the approved 120ms duration`);
+  assert.match(transition?.options?.easing || "", /cubic-bezier\(0\.16, 1, 0\.3, 1\)/, `${label}: Search presence keeps the approved easing`);
+}
+
 async function openInteractionPanel(page, method = "tab") {
   await focusShell(page);
   await page.setViewportSize(INTERACTION_WINDOW_VIEWPORT);
@@ -929,7 +1002,7 @@ async function runScenario(name, context) {
     })
     : name === "browser-preview"
       ? await createBrowserPreviewScenario(browser, serverUrl)
-      : await createScenario(browser, serverUrl, host);
+      : await createScenario(browser, serverUrl, host, { reducedMotion: name === "motion-reduced" ? "reduce" : "no-preference" });
   const { page } = scenario;
   try {
     if (SETTINGS_EVIDENCE_SCENARIOS.has(name)) {
@@ -1132,6 +1205,70 @@ async function runScenario(name, context) {
       await page.locator(".launcher-view").waitFor();
       assert.equal(await page.locator(".search-view").count(), 0, "Search Escape returns to Launcher without hiding the Palette");
       checks.push("Search remains a separate multi-result Command DOM mode with no Launcher sections, has no footer Back control, retains its ESC hint, and Escape returns to Launcher");
+    } else if (name === "motion-normal") {
+      const before = await page.locator(".palette-main").boundingBox();
+      await captureSoftPresenceAnimations(page);
+      await page.locator(".launcher-search").evaluate((button) => button.click());
+      const input = page.locator(".search-control input");
+      await input.waitFor();
+      await page.waitForFunction(() => window.__clacklyMotionSamples?.length > 0);
+      const presence = await inspectSoftPresence(page);
+      assertNormalSoftPresence(presence, name);
+      await input.fill("clipboard");
+      assert.equal(await input.inputValue(), "clipboard", "motion-normal: typing is available before the short presence transition completes");
+      assert.equal(await page.evaluate(() => document.activeElement?.classList.contains("search-control") || document.activeElement?.matches(".search-control input")), true, "motion-normal: Search input receives focus immediately");
+      await inspectLayout(page, name);
+      const after = await page.locator(".palette-main").boundingBox();
+      assert.deepEqual(after, before, "motion-normal: Search presence does not change outer Palette geometry");
+      evidence.push(await screenshot(page, output, "motion-normal.png"));
+      await page.keyboard.press("Escape");
+      await page.locator(".launcher-view").waitFor();
+      await page.waitForFunction(() => document.activeElement?.classList.contains("palette-shell"));
+      assert.equal(await page.locator(".search-view").count(), 0, "motion-normal: Escape applies the Launcher state without awaiting motion");
+      checks.push("normal softPresence uses the approved 120ms/3px/easing presence parameters inside Search only; typing, Escape, focus, and the fixed 240×320 Palette geometry remain immediate");
+    } else if (name === "motion-reduced") {
+      const launcherTransition = await page.locator(".launcher-search").evaluate((element) => getComputedStyle(element).transitionDuration);
+      const footerTransition = await page.locator(".footer-control").first().evaluate((element) => getComputedStyle(element).transitionDuration);
+      assert.match(launcherTransition, /^0s(?:, 0s)*$/, "motion-reduced: Launcher Search CSS feedback is disabled");
+      assert.match(footerTransition, /^0s(?:, 0s)*$/, "motion-reduced: Footer CSS feedback is disabled");
+      await page.locator(".launcher-search").click();
+      const input = page.locator(".search-control input");
+      await input.waitFor();
+      const presence = await inspectSoftPresence(page);
+      assert.equal(presence.preset, "softPresence", "motion-reduced: Search remains on the approved presence route");
+      assert.equal(presence.transform, "none", "motion-reduced: Search has no spatial displacement");
+      assert.ok(presence.opacity >= 0 && presence.opacity <= 1, "motion-reduced: any retained cue is opacity-only");
+      await input.fill("clipboard");
+      assert.equal(await input.inputValue(), "clipboard", "motion-reduced: typing remains immediate");
+      assert.equal(await page.evaluate(() => document.activeElement?.matches(".search-control input")), true, "motion-reduced: Search input focus remains immediate");
+      await inspectLayout(page, name);
+      evidence.push(await screenshot(page, output, "motion-reduced.png"));
+      await page.keyboard.press("Escape");
+      await page.locator(".launcher-view").waitFor();
+      await page.waitForFunction(() => document.activeElement?.classList.contains("palette-shell"));
+      checks.push("reduced motion removes Search spatial displacement while preserving an immediate keyboard-ready opacity-only state cue and disabling the remaining Launcher/Footer CSS feedback");
+    } else if (name === "motion-interruption") {
+      for (let iteration = 0; iteration < 3; iteration += 1) {
+        await page.locator(".launcher-search").click();
+        await page.locator(".search-view").waitFor();
+        await page.waitForFunction(() => document.activeElement?.matches(".search-control input"));
+        await page.keyboard.press("Escape");
+        await page.locator(".launcher-view").waitFor();
+      }
+      await page.waitForTimeout(160);
+      assert.equal(await page.locator(".launcher-view").count(), 1, "motion-interruption: rapid toggles leave exactly one Launcher view");
+      assert.equal(await page.locator(".search-view").count(), 0, "motion-interruption: rapid toggles leave no stale Search view");
+      await page.waitForFunction(() => document.activeElement?.classList.contains("palette-shell"));
+      await page.locator(".launcher-search").click();
+      const input = page.locator(".search-control input");
+      await input.waitFor();
+      await input.fill("export");
+      assert.equal(await input.inputValue(), "export", "motion-interruption: a fresh Search remains immediately usable after interruptions");
+      assert.equal(await page.locator(".launcher-view").count(), 0, "motion-interruption: final Search leaves exactly one visible mode");
+      assert.equal(await page.locator(".search-view").count(), 1, "motion-interruption: final Search does not retain a duplicate mode");
+      await inspectLayout(page, name);
+      evidence.push(await screenshot(page, output, "motion-interruption.png"));
+      checks.push("three rapid Launcher/Search interruptions settle to exactly one current mode with restored Launcher focus; a subsequent Search accepts input immediately without changing Palette geometry");
     } else if (name === "command-baseline") {
       await focusShell(page);
       await page.keyboard.press("ArrowDown");

@@ -1,6 +1,6 @@
 # Motion Foundation implementation plan
 
-Implementation requires a later explicit approval. This task remains planning-only.
+Architecture Review passed and the user explicitly approved this bounded implementation on 2026-08-29. The scope is locked to the Search validation candidate; the optional Settings candidate remains deferred.
 
 ## 1. Capture baselines and protect boundaries
 
@@ -47,6 +47,8 @@ Run from `resolve-command-center/`:
 - After automated checks pass, install the Workflow package before requesting manual Resolve validation.
 - In a local Resolve project, verify repeated Palette reveal/conceal remains immediate and motionless; Search presence stays inside the already-visible Renderer; D7 open/close, geometry, focus, and hit testing remain unchanged; Settings window open/close remains unchanged.
 - If any rollback trigger in `design.md` fires, restore the CSS Search keyframe and remove Motion/foundation/dependency changes. Keep only independently valid reduced-motion test/coverage improvements.
+
+Final acceptance: the packaged Workflow was installed before handoff, and the user reported Resolve-host validation passed on 2026-08-29. No rollback trigger fired.
 
 ## Files expected to change
 

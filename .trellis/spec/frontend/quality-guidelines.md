@@ -546,6 +546,70 @@ onContextMenu={(event) => executeInteraction(command, event)}
 
 ---
 
+## Scenario: Renderer Motion Foundation Boundary
+
+### 1. Scope / Trigger
+
+- Trigger: adding or changing authored DOM/SVG presence or other approved presentation motion in a product renderer.
+- This contract does not apply to Electron window lifecycle, geometry, native opacity, hit testing, focus, D6 reveal/conceal, D7 lifecycle/positioning, or Settings window lifecycle.
+
+### 2. Signatures
+
+- `MotionBoundary({ children }) -> JSX.Element`: synchronous `LazyMotion features={domAnimation}` with `strict` and `MotionConfig reducedMotion="user"`.
+- `SoftPresence({ children, className, ariaLabel }) -> JSX.Element`: the sole approved `softPresence` consumer surface.
+- `softPresence`: immutable `{ initial: { opacity: 0, y: 3 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.12, ease: [0.16, 1, 0.3, 1] } }`.
+
+### 3. Contracts
+
+- Raw `motion` / `framer-motion` imports stay under `electron/renderer/motion/`. Product components consume the local foundation only.
+- The Palette renderer alone is wrapped by `MotionBoundary`; Settings and `DetachedInteractionPanelApp` remain outside it.
+- `softPresence` owns only the existing Launcher-to-Search content entrance. Palette state, focus, typing, Escape, input readiness, and outer `240x320` geometry never wait for animation completion.
+- Reduced motion removes spatial displacement before first paint. A short, non-blocking opacity cue may remain; text, focus, ARIA, and state remain authoritative.
+- Adding another preset or consumer requires a real repository scenario and separate review. `domMax`, spring, stagger, layout projection, shared layout, wrapper families, and variants factories are not part of this foundation.
+
+### 4. Validation & Error Matrix
+
+- Raw dependency import outside the local foundation -> regression-test failure.
+- Reduced-motion Search with any transform -> Playwright evidence failure.
+- Interrupted Launcher/Search switching leaves duplicate or stale content -> Playwright evidence failure.
+- Renderer motion changes native bounds, focus policy, hit testing, or opacity lifecycle -> architecture failure and rollback.
+- Dependency cost grows materially beyond the reviewed baseline without an approved consumer -> rollback or separate architecture review.
+
+### 5. Good/Base/Bad Cases
+
+- Good: Search content uses `SoftPresence`, accepts input immediately, and removes its 3px transform for reduced motion.
+- Base: hover/selection feedback and the Settings status spinner remain CSS-owned with complete reduced-motion coverage.
+- Bad: importing `motion/react` in `App.jsx`, animating the Palette shell, or waiting for an `onAnimationComplete` callback before updating state or focus.
+
+### 6. Tests Required
+
+- Assert raw dependency imports are confined to `electron/renderer/motion/`, the boundary is strict `domAnimation`, and only `softPresence` is exposed.
+- Assert the replaced CSS `mode-enter` keyframe is absent and Launcher/Footer transitions are disabled under `prefers-reduced-motion: reduce`.
+- Against the built renderer, prove normal 120ms/3px/easing behavior, reduced opacity-only behavior, immediate keyboard/focus/Escape/input behavior, fixed Palette geometry, and rapid interruption settling to exactly one current mode.
+- Run focused renderer tests, `npm test`, `npm run build`, Windows package size comparison, `npm run package:verify`, and a prohibited-path diff audit.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```jsx
+import { motion } from "motion/react";
+
+<motion.main animate={{ opacity: 1, scale: 1 }} onAnimationComplete={focusSearch} />
+```
+
+#### Correct
+
+```jsx
+import SoftPresence from "./motion/softPresence.jsx";
+
+{mode === "search" && (
+  <SoftPresence className="search-view" ariaLabel={t("palette.search")}>
+    {searchContent}
+  </SoftPresence>
+)}
+```
+
 ## Forbidden Patterns
 
 - Command-specific UI branches for execution behavior.

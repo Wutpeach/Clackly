@@ -32,6 +32,8 @@ import {
 import SettingsApp from "./SettingsApp.jsx";
 import DetachedInteractionPanelApp from "./DetachedInteractionPanelApp.jsx";
 import InteractionPanelContent from "./InteractionPanelContent.jsx";
+import MotionBoundary from "./motion/MotionBoundary.jsx";
+import SoftPresence from "./motion/softPresence.jsx";
 import paletteGeometry from "../shared/palette-geometry.json";
 import { getPaletteVisualStyle } from "./paletteVisualStyle.mjs";
 import { shouldRenderBrowserPreviewAgentation } from "./browserPreview.mjs";
@@ -699,7 +701,7 @@ function PaletteApp() {
         )}
 
         {mode === "search" && (
-          <section className="search-view" aria-label={t("palette.search")}>
+          <SoftPresence className="search-view" ariaLabel={t("palette.search")}>
             <div className="search-control">
               <Icon name="search" size={18} />
               <input
@@ -740,7 +742,7 @@ function PaletteApp() {
                 </div>
               )}
             </div>
-          </section>
+          </SoftPresence>
         )}
 
         <div className="palette-footer-area">
@@ -819,7 +821,9 @@ function App() {
 
   return (
     <>
-      <PaletteApp />
+      <MotionBoundary>
+        <PaletteApp />
+      </MotionBoundary>
       {showBrowserPreviewAgentation && (
         <Suspense fallback={null}>
           <BrowserPreviewAgentation />
