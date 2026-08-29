@@ -1000,3 +1000,24 @@ Added the renderer-local Motion boundary and sole softPresence preset for Search
 ### Status
 
 [OK] **Completed**
+
+
+## Session 46: Profile Export to AE latency
+
+**Date**: 2026-08-29
+**Task**: Profile Export to AE latency
+**Branch**: `main`
+
+### Summary
+
+Measured packaged real-host Export-to-AE latency, identified Python/Resolve and PowerShell AE detection as the dominant costs, documented repeated audio timeout evidence, removed temporary profiling, rebuilt and installed the clean Workflow, and preserved bounded evidence.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4ee08d0` | (see git log) |
+
+### Status
+
+[OK] **Completed**
