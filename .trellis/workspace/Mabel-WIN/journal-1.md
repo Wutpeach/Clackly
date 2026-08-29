@@ -937,3 +937,24 @@ Refactored Settings into Navigation, Configuration, and Context Inspector; remov
 ### Status
 
 [OK] **Completed**
+
+
+## Session 43: Search & Ranking Foundation
+
+**Date**: 2026-08-29
+**Task**: Search & Ranking Foundation
+**Branch**: `main`
+
+### Summary
+
+Added Core-owned localized/pinyin Command Search, text-first adaptive ranking, dedicated usage-history persistence, Palette IPC consumption, regression coverage, Windows packaging, and Workflow installation; Resolve-native acceptance remains manual.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ab2950e` | (see git log) |
+
+### Status
+
+[OK] **Completed**
