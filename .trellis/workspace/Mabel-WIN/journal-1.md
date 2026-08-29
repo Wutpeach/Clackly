@@ -979,3 +979,24 @@ Separated visible Command-name navigation from hidden keyword discovery, removed
 ### Status
 
 [OK] **Completed**
+
+
+## Session 45: Motion Foundation accepted
+
+**Date**: 2026-08-29
+**Task**: Motion Foundation accepted
+**Branch**: `main`
+
+### Summary
+
+Added the renderer-local Motion boundary and sole softPresence preset for Search, completed reduced-motion and interruption evidence, preserved D6/D7 native ownership, passed automated gates, and recorded successful Resolve-host acceptance.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `31c3fe6` | (see git log) |
+
+### Status
+
+[OK] **Completed**
