@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 41
+- **Total Sessions**: 42
 - **Last Active**: 2026-08-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~918 | Active |
+| `journal-1.md` | ~939 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 42 | 2026-08-29 | Settings three-column refactor and inspector polish | `52f62ec` | `main` |
 | 41 | 2026-08-29 | Settings visual alignment | `bf3a0182465d659bf314d0bc4c40667f66955ba9` | `main` |
 | 40 | 2026-08-29 | Restore D6 D7 architecture source of truth | `7d5cd8e` | `main` |
 | 39 | 2026-08-28 | Clackly Localization Foundation | `1b4f147`, `3ba0455`, `84d8c20` | `main` |

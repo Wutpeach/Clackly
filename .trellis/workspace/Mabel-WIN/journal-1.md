@@ -916,3 +916,24 @@ Aligned Settings with the current Palette and Interaction visual language, added
 ### Status
 
 [OK] **Completed**
+
+
+## Session 42: Settings three-column refactor and inspector polish
+
+**Date**: 2026-08-29
+**Task**: Settings three-column refactor and inspector polish
+**Branch**: `main`
+
+### Summary
+
+Refactored Settings into Navigation, Configuration, and Context Inspector; removed the Settings wordmark; added truthful Current search context, effective status projection, real interaction bindings, localized recovery feedback, visual evidence, and Workflow installation.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `52f62ec` | (see git log) |
+
+### Status
+
+[OK] **Completed**
