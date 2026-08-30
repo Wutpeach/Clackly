@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/08-30-ab-test-persistent-python-export-worker/research/current-state.md","reason":"Use the measured A baseline, minimal RuntimeManager seam, approved lifecycle decisions, and identified risks."}
+{"file":".trellis/tasks/archive/2026-08/08-29-profile-python-resolve-export-latency/evidence/analysis.md","reason":"Treat the corrected real-host A medians and phase attribution as the comparison authority."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Preserve Script Runtime, isolated launcher, Runtime Probe, managed distribution, Resolve2AE, AE launch, and host-process contracts."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace the persistent protocol through Runtime composition, Python loop, two hosts, package staging, and cleanup."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse narrow helpers without prematurely extracting a generic supervisor from two divergent child-process protocols."}

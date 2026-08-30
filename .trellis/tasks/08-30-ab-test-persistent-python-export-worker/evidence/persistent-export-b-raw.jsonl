@@ -1,0 +1,6 @@
+{"schema":"persistent-export-b/1","command":"timeline.exportToAfterEffects","outcome":"success","commandTotalMs":5572.153,"persistentRequestMs":67.909,"workerState":"prewarmed","probeCache":"hit","aeState":"running"}
+{"schema":"persistent-export-b/1","command":"timeline.exportToAfterEffects","outcome":"success","commandTotalMs":120.502,"persistentRequestMs":51.995,"workerState":"warm","probeCache":"hit","aeState":"running"}
+{"schema":"persistent-export-b/1","command":"timeline.exportToAfterEffects","outcome":"success","commandTotalMs":124.694,"persistentRequestMs":64.992,"workerState":"warm","probeCache":"hit","aeState":"running"}
+{"schema":"persistent-export-b/1","command":"timeline.exportToAfterEffects","outcome":"success","commandTotalMs":101.401,"persistentRequestMs":46.652,"workerState":"warm","probeCache":"hit","aeState":"running"}
+{"schema":"persistent-export-b/1","command":"timeline.exportToAfterEffects","outcome":"success","commandTotalMs":104.377,"persistentRequestMs":49.299,"workerState":"warm","probeCache":"hit","aeState":"running"}
+{"schema":"persistent-export-b/1","command":"timeline.exportAudioToAfterEffects","outcome":"success","commandTotalMs":95.9,"persistentRequestMs":27.747,"workerState":"warm","probeCache":"hit","aeState":"running"}
