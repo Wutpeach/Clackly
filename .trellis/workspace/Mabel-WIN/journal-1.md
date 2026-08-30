@@ -1064,3 +1064,24 @@ Captured nine local Resolve Export-to-AE samples, measured warm exports around 0
 ### Status
 
 [OK] **Completed**
+
+
+## Session 49: Persistent Python export worker A/B
+
+**Date**: 2026-08-30
+**Task**: Persistent Python export worker A/B
+**Branch**: `main`
+
+### Summary
+
+Qualified a temporary prewarmed persistent Python B arm for Export-to-AE: steady default median 112.440 ms versus 464.559 ms A, verified timeout and ResolveAdapterError replacement with no retry/orphan, then removed all B code and reinstalled hash-matched clean A. Visual AE composition inspection was deferred; permanent adoption requires a separate task.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a3ff37a` | (see git log) |
+
+### Status
+
+[OK] **Completed**
