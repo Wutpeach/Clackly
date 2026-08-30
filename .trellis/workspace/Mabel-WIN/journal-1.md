@@ -1116,3 +1116,24 @@ Adopted the qualified persistent managed-Python Export-to-AE boundary, contracte
 ### Status
 
 [OK] **Completed**
+
+
+## Session 51: Add optional 1080p AE preview comp
+
+**Date**: 2026-08-30
+**Task**: Add optional 1080p AE preview comp
+**Branch**: `main`
+
+### Summary
+
+Added the default-off ae.export preview-comp setting, shared Python config flow, and a non-destructive 1920x1080 Fit wrapper around the canonical source composition. Verified 3840x2160 and non-16:9 scaling, unchanged disabled snapshots, full tests, and production build.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7e3327c` | (see git log) |
+
+### Status
+
+[OK] **Completed**
