@@ -1016,6 +1016,13 @@ def process_and_send(
                     jsx.append(f"  }}")
                     jsx.append(f"}} catch(e) {{}}")
 
+    if config.get('create1080pPreviewComp') is True:
+        jsx.append("var previewComp = app.project.items.addComp(comp.name + '_Preview_1080p', 1920, 1080, 1, comp.duration, comp.frameRate);")
+        jsx.append("var previewLayer = previewComp.layers.add(comp);")
+        jsx.append("previewLayer.property('Position').setValue([previewComp.width / 2, previewComp.height / 2]);")
+        jsx.append("var previewFitPercent = Math.min(previewComp.width / comp.width, previewComp.height / comp.height) * 100;")
+        jsx.append("previewLayer.property('Scale').setValue([previewFitPercent, previewFitPercent]);")
+
     jsx.append(f"app.endUndoGroup();")
     # Host Electron writes this returned JSX into its desktop temp directory.
     if not config.get('debug_mode', False):

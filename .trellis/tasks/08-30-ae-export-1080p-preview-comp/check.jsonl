@@ -1,0 +1,2 @@
+{"file":".trellis/tasks/08-30-ae-export-1080p-preview-comp/research/applicable-contracts.md","reason":"Audit the exact source-comp, Settings, persistent-worker, and host-launch ownership boundaries without truncated spec injection."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify the boolean reaches all three Commands through the one shared path with no boundary-specific duplicate logic."}

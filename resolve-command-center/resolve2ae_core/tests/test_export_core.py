@@ -472,6 +472,93 @@ class ExportCoreSnapshotTests(unittest.TestCase):
         )
         self._assert_matches_snapshot("mixed_video_audio", actual)
 
+    def test_opt_in_preview_comp_preserves_source_and_fits_each_axis_uniformly(self) -> None:
+        for width, height, expected_fit_percent in (
+            (3840, 2160, 50.0),
+            (2048, 1536, 70.3125),
+        ):
+            with self.subTest(source_resolution=(width, height)):
+                clip = FakeVideoItem(start=0, end=24, name="PreviewSource")
+                timeline = FakeTimeline(
+                    video_tracks={1: [clip]},
+                    export_success=False,
+                    resolution=(str(width), str(height)),
+                )
+                actual = self._run_export(
+                    f"preview_{width}x{height}",
+                    timeline,
+                    {
+                        "prefix": "Link",
+                        "debug_mode": False,
+                        "create1080pPreviewComp": True,
+                    },
+                )
+                jsx = actual["jsx"]
+                source_comp = (
+                    "var comp = app.project.items.addComp("
+                    "'Link_Timeline_single_1700000000', "
+                    f"{width}, {height}, 1, 1.0, 24.0);"
+                )
+                preview_comp = (
+                    "var previewComp = app.project.items.addComp("
+                    "comp.name + '_Preview_1080p', 1920, 1080, 1, "
+                    "comp.duration, comp.frameRate);"
+                )
+                preview_layer = "var previewLayer = previewComp.layers.add(comp);"
+                preview_position = (
+                    "previewLayer.property('Position').setValue("
+                    "[previewComp.width / 2, previewComp.height / 2]);"
+                )
+                preview_fit = (
+                    "var previewFitPercent = Math.min("
+                    "previewComp.width / comp.width, previewComp.height / comp.height) * 100;"
+                )
+                preview_scale = (
+                    "previewLayer.property('Scale').setValue("
+                    "[previewFitPercent, previewFitPercent]);"
+                )
+
+                self.assertIn(source_comp, jsx)
+                self.assertIn("comp.openInViewer();", jsx)
+                self.assertIn("// Clip: PreviewSource", jsx)
+                self.assertIn("var layer = comp.layers.add(fileItem);", jsx)
+                self.assertEqual(jsx.count(preview_comp), 1)
+                self.assertEqual(jsx.count(preview_layer), 1)
+                self.assertIn(preview_position, jsx)
+                self.assertIn(preview_fit, jsx)
+                self.assertIn(preview_scale, jsx)
+                self.assertLess(jsx.index(source_comp), jsx.index("comp.openInViewer();"))
+                self.assertLess(jsx.index("// Clip: PreviewSource"), jsx.index(preview_comp))
+                self.assertLess(jsx.index(preview_scale), jsx.index("app.endUndoGroup();"))
+                self.assertNotIn("comp.width =", jsx)
+                self.assertNotIn("comp.height =", jsx)
+                self.assertNotIn("comp.name =", jsx)
+
+                preview_block = jsx[jsx.index(preview_comp):jsx.index("app.endUndoGroup();")].lower()
+                self.assertNotIn("crop", preview_block)
+                self.assertNotIn("fill", preview_block)
+                self.assertNotIn("stretch", preview_block)
+                self.assertNotIn("mask", preview_block)
+
+                fit_percent = min(1920 / width, 1080 / height) * 100
+                self.assertEqual(fit_percent, expected_fit_percent)
+
+    def test_false_preview_option_appends_no_wrapper_jsx(self) -> None:
+        clip = FakeVideoItem(start=0, end=24, name="PreviewDisabled")
+        timeline = FakeTimeline(video_tracks={1: [clip]}, export_success=False)
+        actual = self._run_export(
+            "preview_disabled",
+            timeline,
+            {
+                "prefix": "Link",
+                "debug_mode": False,
+                "create1080pPreviewComp": False,
+            },
+        )
+
+        self.assertNotIn("previewComp", actual["jsx"])
+        self.assertNotIn("previewLayer", actual["jsx"])
+
     def test_mixed_single_and_mixed_blue_run_video_otio_enrichment(self) -> None:
         transform_params = [
             {"Parameter ID": "ZoomX", "Parameter Value": 1.2},

@@ -24,6 +24,7 @@ def execute(context):
     config = {
         "prefix": prefix.strip() if isinstance(prefix, str) and prefix.strip() else "Link",
         "debug_mode": False,
+        "create1080pPreviewComp": context.config.get("create1080pPreviewComp") is True,
     }
     result = process_and_send(
         context.resolve,

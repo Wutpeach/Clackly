@@ -15,9 +15,11 @@ class Logger:
 
 
 class Context:
-    def __init__(self, command_id, ae_path, prefix=""):
+    def __init__(self, command_id, ae_path, prefix="", config_overrides=None):
         self.command_id = command_id
         self.config = {"aePath": ae_path, "prefix": prefix}
+        if config_overrides:
+            self.config.update(config_overrides)
         self.logger = Logger()
         self.resolve = "resolve"
         self.project = "project"
@@ -37,28 +39,36 @@ class Resolve2AEExportTests(unittest.TestCase):
             ae_path = Path(directory, "AfterFX.exe")
             ae_path.touch()
             for command_id, (mode, target_policy, media_policy) in resolve2ae_export.COMMAND_POLICIES.items():
-                with self.subTest(command_id=command_id):
-                    context = Context(command_id, str(ae_path), "  Shot  ")
-                    success = {
-                        "ok": True,
-                        "code": "exported",
-                        "mode": mode,
-                        "target_policy": target_policy,
-                        "media_policy": media_policy,
-                        "clip_count": 2,
-                        "message": "Sent 2 Clips",
-                    }
-                    with patch.object(
-                        resolve2ae_export, "process_and_send", return_value=success
-                    ) as process:
-                        self.assertEqual(resolve2ae_export.execute(context), success)
-                    self.assertEqual(process.call_args.args[:3], (
-                        "resolve", "project", str(ae_path)
-                    ))
-                    self.assertEqual(process.call_args.args[4], {
-                        "prefix": "Shot", "debug_mode": False
-                    })
-                    self.assertEqual(process.call_args.args[5:], (mode, target_policy, media_policy))
+                for config_case, overrides, expected_value in (
+                    ("missing", {}, False),
+                    ("null", {"create1080pPreviewComp": None}, False),
+                    ("false", {"create1080pPreviewComp": False}, False),
+                    ("true", {"create1080pPreviewComp": True}, True),
+                ):
+                    with self.subTest(command_id=command_id, config_case=config_case):
+                        context = Context(command_id, str(ae_path), "  Shot  ", overrides)
+                        success = {
+                            "ok": True,
+                            "code": "exported",
+                            "mode": mode,
+                            "target_policy": target_policy,
+                            "media_policy": media_policy,
+                            "clip_count": 2,
+                            "message": "Sent 2 Clips",
+                        }
+                        with patch.object(
+                            resolve2ae_export, "process_and_send", return_value=success
+                        ) as process:
+                            self.assertEqual(resolve2ae_export.execute(context), success)
+                        self.assertEqual(process.call_args.args[:3], (
+                            "resolve", "project", str(ae_path)
+                        ))
+                        self.assertEqual(process.call_args.args[4], {
+                            "prefix": "Shot",
+                            "debug_mode": False,
+                            "create1080pPreviewComp": expected_value,
+                        })
+                        self.assertEqual(process.call_args.args[5:], (mode, target_policy, media_policy))
 
     def test_uses_default_prefix_and_propagates_controlled_failures(self):
         with tempfile.TemporaryDirectory() as directory:

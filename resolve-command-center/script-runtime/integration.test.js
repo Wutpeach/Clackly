@@ -108,7 +108,12 @@ test("bundled After Effects manifests expose one Feature, one visible Command, a
   const definitions = loadCapabilityDefinitions();
   const aeDefinitions = definitions.filter(({ id }) => id === "ae.export");
   assert.equal(aeDefinitions.length, 1);
-  assert.deepEqual(Object.keys(aeDefinitions[0].configSchema), ["aePath", "prefix"]);
+  assert.deepEqual(Object.keys(aeDefinitions[0].configSchema), ["aePath", "prefix", "create1080pPreviewComp"]);
+  assert.deepEqual(aeDefinitions[0].configSchema.create1080pPreviewComp, {
+    type: "boolean",
+    label: "Create 1080p Preview Comp",
+    localizations: { "zh-CN": { label: "创建 1080p 预览合成" } }
+  });
   assert.equal(aeDefinitions[0].executor.entry, "scripts/resolve2ae_export.py");
 
   const commands = loadCommands().filter(({ capability }) => capability === "ae.export");
@@ -127,7 +132,12 @@ test("bundled After Effects manifests expose one Feature, one visible Command, a
     .getAllFeatures()
     .filter(({ id }) => id === "ae.export");
   assert.equal(features.length, 1);
-  assert.deepEqual(Object.keys(features[0].configSchema), ["aePath", "prefix"]);
+  assert.deepEqual(Object.keys(features[0].configSchema), ["aePath", "prefix", "create1080pPreviewComp"]);
+  assert.deepEqual(features[0].configSchema.create1080pPreviewComp, {
+    type: "boolean",
+    label: "Create 1080p Preview Comp",
+    localizations: { "zh-CN": { label: "创建 1080p 预览合成" } }
+  });
 });
 
 test("the bundled After Effects entry runs through the real Python command path", async () => {

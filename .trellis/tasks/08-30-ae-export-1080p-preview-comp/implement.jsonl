@@ -1,0 +1,3 @@
+{"file":".trellis/tasks/08-30-ae-export-1080p-preview-comp/research/applicable-contracts.md","reason":"Inject the exact repository ownership and Trellis contract sections without truncating the large quality-guideline files."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace the new boolean across metadata, scoped config, persistent runtime transport, Python entry, and export-core JSX ownership."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Keep one shared configuration and export implementation for all three Commands without new generalized layout abstractions."}

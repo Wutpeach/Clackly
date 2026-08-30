@@ -554,7 +554,7 @@ initializeAfterEffectsPath(configManager);
 
 ### 1. Scope / Trigger
 
-- Trigger: resolving the currently supported Resolve timeline range, mapping it to target clips for After Effects export, or converting an export Command id into a selection/media policy before Resolve access.
+- Trigger: resolving the currently supported Resolve timeline range, mapping it to target clips for After Effects export, converting an export Command id into a selection/media policy before Resolve access, or changing optional After Effects composition presentation around the canonical export.
 - Raw timeline facts stay in `resolve/adapter.py`; Blue duration-marker qualification and range construction stay in `resolve/timeline_range.py`; Export policy stays in `resolve2ae_core/export.py`; Command policy mapping stays in `scripts/resolve2ae_export.py`.
 
 ### 2. Signatures
@@ -564,6 +564,8 @@ initializeAfterEffectsPath(configManager);
 - Range resolution: `resolve_timeline_range(timeline_start_frame, markers) -> TimelineRange | None` from already acquired raw Resolve facts.
 - Raw facts: `read_timeline_start_frame(timeline)` and `read_timeline_markers(timeline)` call the matching Resolve API directly and preserve its raw result or error.
 - Execution: `process_and_send(..., mode, target_policy, media_policy)`, `_terminal_result(ok, code, mode, target_policy, media_policy, clip_count, message)`.
+- Preview config: optional Capability boolean `ae.export.create1080pPreviewComp`; absent or `false` is disabled, and `true` enables one presentation wrapper for every product Command through the shared execution path.
+- Preview JSX: `addComp(comp.name + "_Preview_1080p", 1920, 1080, 1, comp.duration, comp.frameRate)`; add `comp` once, center at `[previewComp.width / 2, previewComp.height / 2]`, then set equal Scale axes from `Math.min(previewComp.width / comp.width, previewComp.height / comp.height) * 100`.
 - Product Command/wrapper triples: exactly `timeline.exportToAfterEffects -> ("auto", "auto", "mixed")`, `timeline.exportAudioToAfterEffects -> ("audio-only", "auto", "audio")`, and `timeline.exportVideoToAfterEffects -> ("video-only", "auto", "video")`.
 - Wrapper mapping: `scripts/resolve2ae_export.py` maps only those three current AE Command ids to the product triples and passes all three arguments. Retired current-only, explicit Blue-range, and Cyan-range ids have no Command registration or wrapper mapping and are rejected before Resolve access.
 - Core validation: `process_and_send()` retains its six exact `SUPPORTED_COMMAND_TRIPLES`: the three product triples plus `("single", "single", "mixed")`, `("video-range", "blue-range", "video")`, and `("mixed-range", "blue-range", "mixed")` for Core selection compatibility/regression coverage. The retained Core triples are not product Commands or wrapper routes.
@@ -581,6 +583,10 @@ initializeAfterEffectsPath(configManager);
 - OTIO enrichment runs whenever any target record has `track_type == "video"` (`has_video`); `content_type` remains a display projection and never suppresses video processing. Video-only export writes `layer.audioEnabled = false;` for every video layer including linked audio.
 - Result contracts are layer-specific: Core success carries the seven public keys plus the private `__clacklyDesktopLaunch` directive; Core controlled failure emits exactly the seven keys; the Wrapper converts `ok: false` into a script error; RuntimeManager strips the launch directive from successful public output.
 - The wrapper rejects every non-product Command id before Resolve access. `process_and_send()` separately validates its six Core triples before Resolve access; its retained internal triples do not create a Command or wrapper route.
+- The timeline-resolution source composition remains the canonical export: its name, dimensions, layers, timing, and `openInViewer()` behavior stay unchanged. When enabled, preview construction is appended only after all source layers and before `app.endUndoGroup()`; it references rather than replaces the source composition.
+- `ae.export` Capability metadata owns the optional boolean and localized field label. `scripts/resolve2ae_export.py` only adapts that scoped value into the shared Core config; Settings remains generic and schema-driven.
+- Disabled or absent preview config appends no JSX, preserving existing export snapshots byte-for-byte. Enabled preview naming extends the existing source prefix/timeline/scope/timestamp convention with only `_Preview_1080p`.
+- Fit is uniform and unclipped: using the minimum width/height ratio keeps both scaled source axes within 1920 x 1080. Composition layout policy stays in `resolve2ae_core/export.py`; Command manifests, Resolve adapters, RuntimeManager, persistent bootstrap/launcher, and the host After Effects launcher do not gain preview knowledge.
 
 ### 4. Validation & Error Matrix
 
@@ -591,6 +597,8 @@ initializeAfterEffectsPath(configManager);
 - `GetMarkers()` failure -> auto playhead fallback, explicit propagation; `GetStartFrame()` failure -> propagation for every policy.
 - Non-integer or empty `TimelineRange` -> constructor `TypeError`/`ValueError`; negative but increasing ranges remain valid.
 - No target clips for the requested media -> existing controlled no-clips failure with a media-appropriate message.
+- Missing preview key or explicit `false` -> no wrapper JSX; invalid non-boolean stored/submitted value -> existing ConfigManager type rejection before execution.
+- Enabled preview -> exactly one 1920 x 1080 wrapper with source-derived duration/frame rate, one centered nested source layer, and identical X/Y Fit scale.
 
 ### 5. Good/Base/Bad Cases
 
@@ -598,6 +606,9 @@ initializeAfterEffectsPath(configManager);
 - Good: marker frame `10`, timeline start `1000`, and duration `5` resolves to `[1010, 1015)`; clips touching only `1010` or `1015` are excluded.
 - Good: mixed single with a disabled top video track falls back to the next enabled video while retaining linked-audio de-duplication.
 - Base: one visible Command with no Blue marker exports the topmost playhead video plus its linked audio.
+- Good: 3840 x 2160 fits at 50%; 2048 x 1536 fits at 70.3125%, proving height can be the limiting ratio.
+- Base: preview disabled or absent produces the existing source-only JSX without changing snapshot baselines.
+- Bad: resize or rename `comp`, open a replacement comp instead, hard-code 50%, use different X/Y scales, or implement preview policy in Settings, a Command, the persistent worker, or AfterEffectsLauncher.
 - Bad: catch every resolver exception and return `None`; this changes explicit errors and can hide range-construction failures.
 - Bad: make Export branch on `TimelineRange.source` or move playhead fallback into the resolver.
 - Bad: gating OTIO/video-property enrichment on `content_type == "video"` so a mixed selection skips video processing.
@@ -609,6 +620,8 @@ initializeAfterEffectsPath(configManager);
 - Assert the full 3x3 selection matrix, Cyan ignore, Blue absence, explicit missing Blue, policy-specific API/scan errors, half-open overlap with no trimming, independent topmost fallback, and mixed de-duplication.
 - Assert the three product Command/wrapper triples and rejected retired ids, the retained Core-internal selection triples, exact Core failure/success transport, Wrapper script error, RuntimeManager stripped success/typed failure, and multiple video layers all muted in video-only coverage.
 - Assert mixed-single and mixed-Blue transformed/speed/crop/lens/blend/LUT regressions that prove OTIO enrichment still runs, plus linked-A/V video-only silence assertions.
+- Assert the localized optional schema field reaches all three product Commands through the shared entry; missing/null-like test fixtures/false adapt to disabled while literal true enables it.
+- Assert disabled snapshots remain unchanged and enabled JSX preserves source construction order/content, creates one deterministic 1920 x 1080 wrapper after source layers, reuses source timing, nests and centers the source once, and uses the runtime minimum-ratio formula with equal axes for both 16:9 and non-16:9 sources.
 
 ### 7. Wrong vs Correct
 
@@ -630,6 +643,12 @@ timeline_start = read_timeline_start_frame(timeline)
 markers = read_timeline_markers(timeline)
 timeline_range = resolve_timeline_range(timeline_start, markers)
 # Export decides whether None means playhead fallback or MissingMarkerError.
+
+if config.get("create1080pPreviewComp") is True:
+    # Append declarative JSX after source-layer generation; comp stays canonical.
+    jsx.append("var previewLayer = previewComp.layers.add(comp);")
+    jsx.append("var fit = Math.min(previewComp.width / comp.width, previewComp.height / comp.height) * 100;")
+    jsx.append("previewLayer.property('Scale').setValue([fit, fit]);")
 ```
 
 ---
