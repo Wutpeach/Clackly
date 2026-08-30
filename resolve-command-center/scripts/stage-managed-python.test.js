@@ -71,6 +71,13 @@ test("Runtime staging source contains no interpreter or PATH lookup", () => {
   ]) assert.doesNotMatch(source, forbidden);
 });
 
+test("Runtime staging and package verification retain the persistent Export-to-AE Bootstrap", () => {
+  const source = fs.readFileSync(scriptPath, "utf8");
+  const verifier = fs.readFileSync(path.join(__dirname, "verify-package.js"), "utf8");
+  assert.match(source, /persistent_bootstrap\.py/);
+  assert.match(verifier, /clackly\/persistent_bootstrap\.py/);
+});
+
 test("production hosts inject live Resolve version and Core owns packaged Runtime wiring", () => {
   const standalone = fs.readFileSync(path.join(appRoot, "electron", "main", "main.js"), "utf8");
   const workflow = fs.readFileSync(path.join(appRoot, "workflow-plugin", "main.js"), "utf8");

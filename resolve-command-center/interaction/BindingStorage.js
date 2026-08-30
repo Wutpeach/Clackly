@@ -5,10 +5,10 @@ const { ConfigStorage } = require("../config/ConfigStorage");
 const { normalizeTrigger } = require("./trigger");
 
 const PRIMARY_AE_TARGET = "timeline.exportToAfterEffects";
-const LEGACY_AE_TARGETS = new Set([
-  "timeline.exportCurrentToAfterEffects",
-  "timeline.exportBlueRangeToAfterEffects",
-  "timeline.exportCyanRangeToAfterEffects"
+const LEGACY_AE_COMMAND_MIGRATIONS = new Map([
+  ["timeline.exportCurrentToAfterEffects", PRIMARY_AE_TARGET],
+  ["timeline.exportBlueRangeToAfterEffects", "timeline.exportVideoToAfterEffects"],
+  ["timeline.exportCyanRangeToAfterEffects", "timeline.exportAudioToAfterEffects"]
 ]);
 
 const OLD_DEFAULT_BINDINGS = {
@@ -168,8 +168,11 @@ function sameBindings(left, right) {
   });
 }
 
-function hasLegacyAeTargets(bindings) {
-  return Object.values(bindings).some((binding) => LEGACY_AE_TARGETS.has(binding.target));
+function hasLegacyAeReferences(bindings) {
+  return Object.values(bindings).some((binding) => (
+    LEGACY_AE_COMMAND_MIGRATIONS.has(binding.target)
+    || LEGACY_AE_COMMAND_MIGRATIONS.has(binding.action.command)
+  ));
 }
 
 function defaultMigrationWarning(message) {
@@ -201,7 +204,7 @@ class BindingStorage {
       || sameBindings(bindings, PRE_IMAGE_CLIPBOARD_DEFAULT_BINDINGS)) {
       return this.save(DEFAULT_BINDINGS);
     }
-    if (hasLegacyAeTargets(bindings)) {
+    if (hasLegacyAeReferences(bindings)) {
       return this.migrateCustomizedRoot(bindings);
     }
     return bindings;
@@ -223,9 +226,16 @@ class BindingStorage {
 
     const groups = new Map();
     for (const entry of entries) {
-      const binding = LEGACY_AE_TARGETS.has(entry.binding.target)
-        ? { ...entry.binding, target: PRIMARY_AE_TARGET }
-        : entry.binding;
+      const migratedTarget = LEGACY_AE_COMMAND_MIGRATIONS.has(entry.binding.target)
+        ? PRIMARY_AE_TARGET
+        : entry.binding.target;
+      const migratedAction = LEGACY_AE_COMMAND_MIGRATIONS.get(entry.binding.action.command)
+        || entry.binding.action.command;
+      const binding = {
+        ...entry.binding,
+        target: migratedTarget,
+        action: { command: migratedAction }
+      };
       const signature = JSON.stringify([
         binding.target,
         binding.trigger.type,

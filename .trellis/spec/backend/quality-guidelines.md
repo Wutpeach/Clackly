@@ -179,7 +179,7 @@ fields.keywordFullPinyin = localized.keywords.map((keyword) => transliterate(key
 - `context.command_id` is read-only. Both JavaScript producers and the Python runner reject a missing, blank, or non-string Command id before feature execution.
 - Before importing `DaVinciResolveScript`, the shared adapter tries existing importability, then existing `RESOLVE_SCRIPT_API/Modules` and standard Windows ProgramData module directories without duplicating `sys.path` entries.
 - Python scripts are trusted local Capability code. ScriptContext is an API boundary, not an OS/filesystem sandbox.
-- One subprocess is used per execution. Add pooling only after measured startup cost justifies shared runtime state.
+- RuntimeLauncher remains one subprocess per operation. The three Windows Export-to-AE actions are the sole exception: RuntimeManager may route their fixed managed entry through the dedicated persistent worker described in the Managed Python Runtime Distribution scenario.
 - `RESOLVE_COMMAND_CENTER_PYTHON_CMD` belongs to the legacy bridge launcher and may contain arguments. PythonProvider must not treat it as a single executable; use its executable-only constructor injection when customization is needed.
 
 ### 4. Validation & Error Matrix
@@ -564,27 +564,29 @@ initializeAfterEffectsPath(configManager);
 - Range resolution: `resolve_timeline_range(timeline_start_frame, markers) -> TimelineRange | None` from already acquired raw Resolve facts.
 - Raw facts: `read_timeline_start_frame(timeline)` and `read_timeline_markers(timeline)` call the matching Resolve API directly and preserve its raw result or error.
 - Execution: `process_and_send(..., mode, target_policy, media_policy)`, `_terminal_result(ok, code, mode, target_policy, media_policy, clip_count, message)`.
-- Supported execution triples: exactly `("auto", "auto", "mixed")`, `("audio-only", "auto", "audio")`, `("video-only", "auto", "video")`, `("single", "single", "mixed")`, `("video-range", "blue-range", "video")`, `("mixed-range", "blue-range", "mixed")`.
-- Wrapper mapping: `scripts/resolve2ae_export.py` maps the six AE Command ids to their triples and passes all three arguments.
+- Product Command/wrapper triples: exactly `timeline.exportToAfterEffects -> ("auto", "auto", "mixed")`, `timeline.exportAudioToAfterEffects -> ("audio-only", "auto", "audio")`, and `timeline.exportVideoToAfterEffects -> ("video-only", "auto", "video")`.
+- Wrapper mapping: `scripts/resolve2ae_export.py` maps only those three current AE Command ids to the product triples and passes all three arguments. Retired current-only, explicit Blue-range, and Cyan-range ids have no Command registration or wrapper mapping and are rejected before Resolve access.
+- Core validation: `process_and_send()` retains its six exact `SUPPORTED_COMMAND_TRIPLES`: the three product triples plus `("single", "single", "mixed")`, `("video-range", "blue-range", "video")`, and `("mixed-range", "blue-range", "mixed")` for Core selection compatibility/regression coverage. The retained Core triples are not product Commands or wrapper routes.
 
 ### 3. Contracts
 
 - The resolver accepts only exact-color Blue markers with `int(duration) > 1`, chooses the lowest numeric marker frame independently of enumeration order, adds the timeline start offset once, and returns a half-open absolute range. A missing start fact uses the legacy `86400`; Cyan, point, malformed-info, and malformed-duration markers are ignored.
 - `TimelineRange` owns exact integer start/end frames, `end_frame_exclusive > start_frame`, and the only current source token. It does not reject negative frames, clamp to timeline bounds, or validate FPS.
-- `auto` consumes the resolved range when present and otherwise falls back to the playhead single. `single` does not read markers. `blue-range` requires a resolved range. These policies, `MissingMarkerError`, FPS/timecode behavior, and clip overlap remain Export concerns; consumers do not branch on `range.source`.
+- `auto` consumes the resolved range when present and otherwise falls back to the playhead single. The retained Core-internal `single` policy does not read markers, and the retained Core-internal `blue-range` policy requires a resolved range. These policies, `MissingMarkerError`, FPS/timecode behavior, and clip overlap remain Export concerns; consumers do not branch on `range.source`.
 - Marker API/scan errors retain their compatibility boundary: `auto` falls back, including retaining a valid candidate accumulated before a malformed qualifying frame; `blue-range` propagates the original error. Start-frame API errors propagate for every policy.
 - `TimelineRangeScanError` is an internal extraction-compatibility detail, not a Range result or consumer contract. Only the resolver, Export's legacy catch boundary, and focused tests may reference it; upstream runtime, Command, Capability, and future generic consumers must not depend on it.
 - Batch membership is the half-open overlap `clip_start < range.end_frame_exclusive and clip_end > range.start_frame`. The range controls membership only and never trims selected clips.
 - `single` selects the independent topmost enabled video and audio records; mixed de-duplicates linked audio against the video record, and each requested class falls back to the available counterpart when absent.
-- `blue-range` targets include video intersecting the Blue range plus de-duplicated linked audio for mixed; explicit compatibility aliases fail with the existing missing-marker terminal when no Blue marker exists.
+- The retained Core-internal `blue-range` branch targets video intersecting the Blue range plus de-duplicated linked audio for mixed; its direct compatibility/regression triples keep the existing missing-marker terminal when no Blue marker exists.
 - OTIO enrichment runs whenever any target record has `track_type == "video"` (`has_video`); `content_type` remains a display projection and never suppresses video processing. Video-only export writes `layer.audioEnabled = false;` for every video layer including linked audio.
 - Result contracts are layer-specific: Core success carries the seven public keys plus the private `__clacklyDesktopLaunch` directive; Core controlled failure emits exactly the seven keys; the Wrapper converts `ok: false` into a script error; RuntimeManager strips the launch directive from successful public output.
-- Rejection of any triple outside the six supported ones happens before Resolve access.
+- The wrapper rejects every non-product Command id before Resolve access. `process_and_send()` separately validates its six Core triples before Resolve access; its retained internal triples do not create a Command or wrapper route.
 
 ### 4. Validation & Error Matrix
 
-- Unsupported `(mode, target_policy, media_policy)` triple -> rejected before Resolve access.
-- Missing Blue for an explicit compatibility alias -> existing `missing-marker` terminal result; auto without Blue -> playhead, not an error.
+- Unsupported wrapper Command id, including every retired id -> rejected before Resolve access with no Core call.
+- Unsupported Core `(mode, target_policy, media_policy)` triple -> rejected before Resolve access.
+- Missing Blue for a retained direct Core `blue-range` triple -> existing `missing-marker` terminal result; product `auto` without Blue -> playhead, not an error.
 - Malformed marker info/duration -> skip the entry; malformed qualifying frame -> preserve the existing policy-specific scan failure and any earlier candidate.
 - `GetMarkers()` failure -> auto playhead fallback, explicit propagation; `GetStartFrame()` failure -> propagation for every policy.
 - Non-integer or empty `TimelineRange` -> constructor `TypeError`/`ValueError`; negative but increasing ranges remain valid.
@@ -605,7 +607,7 @@ initializeAfterEffectsPath(configManager);
 
 - Assert TimelineRange invariants, exact Blue/duration qualification, numeric-vs-lexical keys (`"100"`/`"20"`), enumeration independence, malformed facts, absolute offset, `86400`, and end-exclusive construction.
 - Assert the full 3x3 selection matrix, Cyan ignore, Blue absence, explicit missing Blue, policy-specific API/scan errors, half-open overlap with no trimming, independent topmost fallback, and mixed de-duplication.
-- Assert the six supported and rejected execution triples, exact Core failure/success transport, Wrapper script error, RuntimeManager stripped success/typed failure, and multiple video layers all muted in video-only coverage.
+- Assert the three product Command/wrapper triples and rejected retired ids, the retained Core-internal selection triples, exact Core failure/success transport, Wrapper script error, RuntimeManager stripped success/typed failure, and multiple video layers all muted in video-only coverage.
 - Assert mixed-single and mixed-Blue transformed/speed/crop/lens/blend/LUT regressions that prove OTIO enrichment still runs, plus linked-A/V video-only silence assertions.
 
 ### 7. Wrong vs Correct
@@ -1077,7 +1079,7 @@ const help = getInteractionHelp(command, commands, bindings);
 
 ### 3. Contracts
 
-- Production Python Features route through `PythonProvider -> RuntimeManager -> RuntimeResolver -> RuntimeProbe/cache -> RuntimeLauncher`; only `RuntimeLauncher` starts the process.
+- Production Python Features route through `PythonProvider -> RuntimeManager -> RuntimeResolver -> RuntimeProbe/cache`. RuntimeLauncher starts the one-shot Probe and every unrelated script; only the three Windows Export-to-AE Command ids at `scripts/resolve2ae_export.py` may use PersistentScriptLauncher.
 - Hosts supply a canonical live Resolve version. Feature, Capability, Provider, and Manifest code never invent one.
 - Managed selection and executable-only Override are authoritative and never search `PATH`, Conda, uv, virtual environments, Store aliases, or the legacy bridge command.
 - Resolve-dependent scripts execute only after a successful success-only cached Probe. Fingerprint changes, failures, and native crashes require a new Probe; business execution is never retried.
@@ -1086,6 +1088,8 @@ const help = getInteractionHelp(command, commands, bindings);
 - The host launcher revalidates `ae.export.aePath`, requires the exact fixed `-r` JSX argument contract, bounds JSX, creates the script inside the canonical host temp root, and starts After Effects with `shell: false` plus the normal host environment. It retains the running/cold bootstrap behavior and never retries.
 - Windows staging verifies the committed lock before extraction, disables ambient `site`, copies production Python sources, and emits Runtime/license/Sigstore/SPDX/application-SBOM inventory.
 - Electron packages the Runtime outside asar at `process.resourcesPath/runtimes`.
+- Persistent Export-to-AE uses one hidden managed interpreter with strict READY/PREPARED/JSON-line frames, a 1 MiB response envelope, one active request plus bounded FIFO, and one worker-lifetime isolated temporary directory. Background preparation imports the fixed entry and platform identity without touching Resolve; each request creates a new ScriptContext and reacquires Resolve/project/timeline.
+- The parent starts the 10,000 ms request deadline on write. Timeout, malformed/oversized output, stdin/stdout failure, EOF, native crash, live health-key change, or ResolveAdapterError retirement kills once, waits for close and cleanup, rejects queued work, never retries the failed command, and allows only a later command to start a replacement. Both hosts prewarm and dispose the Python worker independently of the PowerShell AE process probe.
 
 ### 4. Validation & Error Matrix
 
@@ -1106,7 +1110,7 @@ const help = getInteractionHelp(command, commands, bindings);
 
 ### 6. Tests Required
 
-- Assert Manager order is Resolve -> Probe/cache -> one execution launch and preserves ScriptContext/log/error/result contracts.
+- Assert Manager order is Resolve -> Probe/cache -> one execution launch and preserves ScriptContext/log/error/result contracts; assert only the three Windows Export-to-AE actions select the persistent launcher while Probe, non-Windows, unsupported entries, and other scripts remain one-shot.
 - Assert Python never starts After Effects, the host launcher validates and spawns exactly once with the host environment, and internal launch metadata is stripped before Provider output.
 - Assert malformed Override, host context, lock, hashes, staging paths, payloads, and envelopes fail closed.
 - Stage/package the locked Runtime, inventory exactly one interpreter plus notices/SBOM, and execute it under hostile Python environment variables.

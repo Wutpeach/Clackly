@@ -80,11 +80,15 @@ test("only the visible After Effects export Command is presentable while interna
   assert.deepEqual(aeIds, [
     "timeline.exportToAfterEffects",
     "timeline.exportAudioToAfterEffects",
-    "timeline.exportVideoToAfterEffects",
+    "timeline.exportVideoToAfterEffects"
+  ]);
+  for (const retired of [
     "timeline.exportCurrentToAfterEffects",
     "timeline.exportBlueRangeToAfterEffects",
     "timeline.exportCyanRangeToAfterEffects"
-  ]);
+  ]) {
+    assert.equal(getCommandById(retired), null);
+  }
   assert.equal(all.every((command) => command.presentation === "visible" || command.presentation === "internal"), true);
   assert.equal(getCommandById("timeline.exportAudioToAfterEffects").presentation, "internal");
   const manifest = fs.readFileSync(path.join(__dirname, "commands", "after-effects.json"), "utf8");

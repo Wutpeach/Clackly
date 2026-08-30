@@ -20,6 +20,7 @@ const { FeatureStateStorage } = require("../feature-status/FeatureStateStorage")
 const { FeatureStatusManager } = require("../feature-status/FeatureStatusManager");
 const { ShortcutManager } = require("../shortcut/ShortcutManager");
 const { RuntimeManager } = require("../script-runtime/runtime/manager");
+const { PersistentScriptLauncher } = require("../script-runtime/runtime/persistent");
 const { resolveRuntimeRoot } = require("../script-runtime/runtime/paths");
 const packageMetadata = require("../package.json");
 
@@ -37,7 +38,8 @@ function createClacklyCore({
   systemLanguagesProvider = () => [],
   markerBackends,
   imageClipboard,
-  afterEffectsProcessProbeFactory = (options) => new WindowsAfterEffectsProcessProbe(options)
+  afterEffectsProcessProbeFactory = (options) => new WindowsAfterEffectsProcessProbe(options),
+  persistentScriptLauncherFactory = (options) => new PersistentScriptLauncher(options)
 } = {}) {
   if (typeof appRoot !== "string" || appRoot.trim().length === 0) {
     throw new TypeError("Clackly Core requires an application root");
@@ -62,6 +64,9 @@ function createClacklyCore({
   }
   if (typeof afterEffectsProcessProbeFactory !== "function") {
     throw new TypeError("Clackly Core requires an After Effects process probe factory");
+  }
+  if (typeof persistentScriptLauncherFactory !== "function") {
+    throw new TypeError("Clackly Core requires a persistent Export Runtime factory");
   }
 
   const shortcutManager = new ShortcutManager();
@@ -90,6 +95,15 @@ function createClacklyCore({
     processProbe: afterEffectsProcessProbe,
     temporaryRoot
   });
+  const persistentScriptLauncher = persistentScriptLauncherFactory({
+    parentEnvironment: process.env,
+    temporaryRoot
+  });
+  if (!persistentScriptLauncher || typeof persistentScriptLauncher.execute !== "function"
+    || typeof persistentScriptLauncher.prewarm !== "function"
+    || typeof persistentScriptLauncher.dispose !== "function") {
+    throw new TypeError("Clackly Core requires a persistent Export Runtime lifecycle");
+  }
   const runtimeManager = new RuntimeManager({
     runtimeRoot: resolveRuntimeRoot({
       appRoot
@@ -97,6 +111,7 @@ function createClacklyCore({
     cachePath: path.join(appDataPath, "Clackly", "runtime-probe.json"),
     clacklyVersion: packageMetadata.version,
     desktopLauncher,
+    scriptLauncher: persistentScriptLauncher,
     hostContextProvider,
     scriptRoot: appRoot,
     ...(process.env.CLACKLY_PYTHON_EXECUTABLE
@@ -144,6 +159,8 @@ function createClacklyCore({
     searchCommands: (query, pinnedIds) => commandSearch.search(query, pinnedIds),
     executeCommand,
     runtimeManager,
+    prewarmExportPythonWorker: () => runtimeManager.prewarmExportPythonWorker(),
+    disposeExportPythonWorker: () => runtimeManager.disposeExportPythonWorker(),
     prewarmAfterEffectsProcessProbe: () => afterEffectsProcessProbe.prewarm(),
     disposeAfterEffectsProcessProbe: () => afterEffectsProcessProbe.dispose()
   };

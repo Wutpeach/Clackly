@@ -111,7 +111,7 @@ test("interaction manager exactly matches mouse bindings and delegates once", as
   await assert.rejects(manager.handle({}), /target/);
 });
 
-test("modified clicks dispatch internal compatibility alias actions without extra-modifier matches", async () => {
+test("modified clicks dispatch the three current export actions without extra-modifier matches", async () => {
   const calls = [];
   const bindings = {
     mixed: {
@@ -129,10 +129,10 @@ test("modified clicks dispatch internal compatibility alias actions without extr
       trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT"] },
       action: { command: "timeline.exportVideoToAfterEffects" }
     },
-    legacy: {
+    audioRight: {
       target: "timeline.exportToAfterEffects",
       trigger: { type: "mouse", button: "right", modifiers: [] },
-      action: { command: "timeline.exportCyanRangeToAfterEffects" }
+      action: { command: "timeline.exportAudioToAfterEffects" }
     }
   };
   const manager = new InteractionManager({
@@ -159,14 +159,14 @@ test("modified clicks dispatch internal compatibility alias actions without extr
     (await manager.handle(event(0, { ctrlKey: true, shiftKey: true }))).command,
     "timeline.exportVideoToAfterEffects"
   );
-  assert.equal((await manager.handle(event(2))).command, "timeline.exportCyanRangeToAfterEffects");
+  assert.equal((await manager.handle(event(2))).command, "timeline.exportAudioToAfterEffects");
   assert.deepEqual(await manager.handle(event(0, { shiftKey: true })), { matched: false });
   assert.deepEqual(await manager.handle(event(0, { ctrlKey: true, altKey: true })), { matched: false });
   assert.deepEqual(calls, [
     "timeline.exportToAfterEffects",
     "timeline.exportAudioToAfterEffects",
     "timeline.exportVideoToAfterEffects",
-    "timeline.exportCyanRangeToAfterEffects"
+    "timeline.exportAudioToAfterEffects"
   ]);
 });
 

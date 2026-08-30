@@ -137,6 +137,34 @@ test("Core owns one narrow After Effects process-probe lifecycle", async (t) => 
   assert.equal(Object.hasOwn(core, "afterEffectsProcessProbe"), false);
 });
 
+test("Core owns the persistent Export-to-AE worker lifecycle separately from the PowerShell probe", async (t) => {
+  const calls = [];
+  const persistentWorker = {
+    execute() {},
+    prewarm() {
+      calls.push("prewarm");
+      return Promise.resolve(true);
+    },
+    dispose() {
+      calls.push("dispose");
+    }
+  };
+  const { core, cleanup } = createCore({
+    persistentScriptLauncherFactory: (options) => {
+      calls.push(options.parentEnvironment === process.env ? "create" : "wrong-environment");
+      return persistentWorker;
+    }
+  });
+  t.after(cleanup);
+
+  core.runtimeManager.prewarmExportPythonWorker = () => persistentWorker.prewarm();
+  core.runtimeManager.disposeExportPythonWorker = () => persistentWorker.dispose();
+  assert.equal(await core.prewarmExportPythonWorker(), true);
+  core.disposeExportPythonWorker();
+  assert.deepEqual(calls, ["create", "prewarm", "dispose"]);
+  assert.equal(Object.hasOwn(core, "persistentWorker"), false);
+});
+
 test("hostContextProvider failures surface unchanged through script execution", async (t) => {
   const workflowStyleError = new Error("Failed to get Resolve object from Workflow Integration");
   const { core, cleanup } = createCore({

@@ -70,6 +70,14 @@ function nativeCrashFor(exitCode, platform) {
     : null;
 }
 
+function isNativePythonCrash({ exitCode, signal, stderr, platform }) {
+  return Boolean(
+    signal
+    || nativeCrashFor(exitCode, platform)
+    || (platform === "win32" && exitCode === 3 && /^Fatal Python error:/m.test(stderr || ""))
+  );
+}
+
 class RuntimeLauncher {
   constructor({
     bootstrapPath = path.resolve(__dirname, "bootstrap.py"),
@@ -247,9 +255,12 @@ class RuntimeLauncher {
             ...(terminationError ? { terminationError: diagnostic(terminationError) } : {}),
             process
           });
-        } else if (process.signal || process.nativeCrash
-          || (this.platform === "win32" && process.exitCode === 3
-            && /^Fatal Python error:/m.test(process.stderr))) {
+        } else if (isNativePythonCrash({
+          exitCode: process.exitCode,
+          signal: process.signal,
+          stderr: process.stderr,
+          platform: this.platform
+        })) {
           primary = executionError("RUNTIME_NATIVE_CRASH", "Runtime process terminated abnormally", {
             signal: process.signal,
             exitCode: process.exitCode,
@@ -408,4 +419,4 @@ class RuntimeLauncher {
   }
 }
 
-module.exports = { RuntimeLauncher, serializeRequest };
+module.exports = { RuntimeLauncher, isNativePythonCrash, nativeCrashFor, serializeRequest };

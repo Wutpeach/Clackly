@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Permanent adoption changes the managed Runtime execution and packaging contract while preserving the one-shot Probe and host-owned AE launch boundaries."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"PowerShell and Python remain separate state machines; implementation may share only narrow pure helpers that reduce verified behavioral drift."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"The route crosses Capability, Provider, RuntimeManager, managed Python protocol, Core, both hosts, packaging, and host-owned AE launch."}
+{"file":".trellis/tasks/08-30-adopt-persistent-python-export-worker/research/process-supervision-reuse.md","reason":"Use the researched separate-process/separate-state-machine decision and permanent adoption risks."}
+{"file":".trellis/tasks/08-30-adopt-persistent-python-export-worker/research/export-command-contraction.md","reason":"Keep exactly three current media actions, migrate persisted legacy bindings once, and remove the retired current/range/Cyan command ids."}
+{"file":".trellis/tasks/archive/2026-08/08-30-ab-test-persistent-python-export-worker/research/current-state.md","reason":"Recreate the measured B boundary from the archived seam, lifecycle, and approved behavioral decisions."}

@@ -118,6 +118,7 @@ try {
   $ClacklyRoot = Join-Path $ProfileRoot "clackly"
   New-Item -ItemType Directory -Path $ClacklyRoot -Force | Out-Null
   Copy-Item -LiteralPath (Join-Path $ProjectRoot "script-runtime\runtime\bootstrap.py") -Destination (Join-Path $ClacklyRoot "bootstrap.py")
+  Copy-Item -LiteralPath (Join-Path $ProjectRoot "script-runtime\runtime\persistent_bootstrap.py") -Destination (Join-Path $ClacklyRoot "persistent_bootstrap.py")
   Copy-Item -LiteralPath (Join-Path $ProjectRoot "script-runtime\python_runner.py") -Destination $ClacklyRoot
   foreach ($Directory in @("resolve", "scripts", "resolve2ae_core")) {
     $Target = Join-Path $ClacklyRoot $Directory

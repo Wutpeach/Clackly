@@ -304,6 +304,7 @@ if (!hasSingleInstanceLock) {
 
   app.whenReady().then(async () => {
     queueMicrotask(() => core.prewarmAfterEffectsProcessProbe().catch(() => {}));
+    queueMicrotask(() => core.prewarmExportPythonWorker().catch(() => {}));
     try {
       await initializeWorkflowIntegration();
     } catch (error) {
@@ -329,6 +330,7 @@ if (!hasSingleInstanceLock) {
   app.on("will-quit", () => {
     const { globalShortcut } = require("electron");
     globalShortcut.unregisterAll();
+    core.disposeExportPythonWorker();
     core.disposeAfterEffectsProcessProbe();
     cleanupWorkflowIntegration();
   });

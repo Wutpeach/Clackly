@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Review the permanent Runtime signatures, error matrix, host ownership, distribution inventory, and required live gates."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reject accidental stateful supervisor coupling and verify any extracted helper is stateless and identical for its consumers."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace config, envelopes, errors, launch plans, lifecycle, and cleanup across every changed layer."}
+{"file":".trellis/tasks/08-30-adopt-persistent-python-export-worker/research/process-supervision-reuse.md","reason":"Check implementation against the researched separation boundary, first-use risk, Workflow restart semantics, and rollback seam."}
+{"file":".trellis/tasks/08-30-adopt-persistent-python-export-worker/research/export-command-contraction.md","reason":"Verify only the three current actions remain executable and legacy bindings migrate without reviving Cyan or explicit-range behavior."}

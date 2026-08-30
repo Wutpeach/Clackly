@@ -25,6 +25,14 @@ class Context:
 
 class Resolve2AEExportTests(unittest.TestCase):
     def test_maps_all_commands_and_returns_success(self):
+        self.assertEqual(
+            set(resolve2ae_export.COMMAND_POLICIES),
+            {
+                "timeline.exportToAfterEffects",
+                "timeline.exportAudioToAfterEffects",
+                "timeline.exportVideoToAfterEffects",
+            },
+        )
         with tempfile.TemporaryDirectory() as directory:
             ae_path = Path(directory, "AfterFX.exe")
             ae_path.touch()
@@ -77,6 +85,13 @@ class Resolve2AEExportTests(unittest.TestCase):
             resolve2ae_export.execute(Context("timeline.exportToAfterEffects", "missing.exe"))
         with self.assertRaisesRegex(ValueError, "Unsupported After Effects export Command"):
             resolve2ae_export.execute(Context("unknown.command", "missing.exe"))
+        for retired in (
+            "timeline.exportCurrentToAfterEffects",
+            "timeline.exportBlueRangeToAfterEffects",
+            "timeline.exportCyanRangeToAfterEffects",
+        ):
+            with self.assertRaisesRegex(ValueError, "Unsupported After Effects export Command"):
+                resolve2ae_export.execute(Context(retired, str(ae_path)))
 
 
 if __name__ == "__main__":

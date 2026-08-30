@@ -92,10 +92,12 @@ test("host-specific lifecycle differences remain in each Host", () => {
   assert.doesNotMatch(standalone, /app\.setPath\("userData"/);
 });
 
-test("both hosts prewarm and dispose the Core-owned process probe without delaying host startup", () => {
+test("both hosts prewarm and dispose the separate Core-owned process helpers without delaying host startup", () => {
   for (const source of [standalone, workflow]) {
     assert.match(source, /queueMicrotask\(\(\) => core\.prewarmAfterEffectsProcessProbe\(\)\.catch\(\(\) => \{\}\)\)/);
+    assert.match(source, /queueMicrotask\(\(\) => core\.prewarmExportPythonWorker\(\)\.catch\(\(\) => \{\}\)\)/);
     assert.match(source, /core\.disposeAfterEffectsProcessProbe\(\)/);
+    assert.match(source, /core\.disposeExportPythonWorker\(\)/);
   }
   assert.match(workflow, /app\.whenReady\(\)\.then\(async \(\) => \{\s*queueMicrotask\(/s);
   assert.match(standalone, /app\.whenReady\(\)\.then\(\(\) => \{\s*queueMicrotask\(/s);

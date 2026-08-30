@@ -7,9 +7,6 @@ COMMAND_POLICIES = {
     "timeline.exportToAfterEffects": ("auto", "auto", "mixed"),
     "timeline.exportAudioToAfterEffects": ("audio-only", "auto", "audio"),
     "timeline.exportVideoToAfterEffects": ("video-only", "auto", "video"),
-    "timeline.exportCurrentToAfterEffects": ("single", "single", "mixed"),
-    "timeline.exportBlueRangeToAfterEffects": ("video-range", "blue-range", "video"),
-    "timeline.exportCyanRangeToAfterEffects": ("mixed-range", "blue-range", "mixed"),
 }
 
 

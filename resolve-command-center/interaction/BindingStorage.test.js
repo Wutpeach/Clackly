@@ -327,11 +327,19 @@ test("structural migration prefers original primary targets and warns once with 
   const loaded = storage.load();
   assert.equal(loaded["timeline.exportToAfterEffects.left-click"].action.command, "timeline.exportToAfterEffects");
   assert.equal(Object.hasOwn(loaded, "timeline.exportCyanRangeToAfterEffects.left-click"), false);
-  assert.equal(loaded["timeline.exportToAfterEffects.ctrl-left-click"].action.command, "timeline.exportCurrentToAfterEffects");
+  assert.equal(loaded["timeline.exportToAfterEffects.ctrl-left-click"].action.command, "timeline.exportToAfterEffects");
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /kept timeline\.exportToAfterEffects\.left-click \(timeline\.exportToAfterEffects\)/);
-  assert.match(warnings[0], /skipped timeline\.exportCyanRangeToAfterEffects\.left-click \(timeline\.exportCyanRangeToAfterEffects\)/);
+  assert.match(warnings[0], /skipped timeline\.exportCyanRangeToAfterEffects\.left-click \(timeline\.exportAudioToAfterEffects\)/);
   assert.match(warnings[0], /Backup written to .*bindings\.json\.backup/);
+  for (const binding of Object.values(loaded)) {
+    assert.equal(binding.target.includes("exportCurrentToAfterEffects"), false);
+    assert.equal(binding.target.includes("exportBlueRangeToAfterEffects"), false);
+    assert.equal(binding.target.includes("exportCyanRangeToAfterEffects"), false);
+    assert.equal(binding.action.command.includes("exportCurrentToAfterEffects"), false);
+    assert.equal(binding.action.command.includes("exportBlueRangeToAfterEffects"), false);
+    assert.equal(binding.action.command.includes("exportCyanRangeToAfterEffects"), false);
+  }
 
   // Idempotent reload: no re-migration, no second warning.
   assert.deepEqual(storage.load(), loaded);
@@ -358,7 +366,7 @@ test("structural migration uses lexical precedence when no original primary exis
   const loaded = storage.load();
   assert.deepEqual(Object.keys(loaded), ["a.legacy.left-click"]);
   assert.equal(loaded["a.legacy.left-click"].target, "timeline.exportToAfterEffects");
-  assert.equal(loaded["a.legacy.left-click"].action.command, "timeline.exportBlueRangeToAfterEffects");
+  assert.equal(loaded["a.legacy.left-click"].action.command, "timeline.exportVideoToAfterEffects");
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /kept a\.legacy\.left-click/);
   assert.match(warnings[0], /skipped z\.legacy\.left-click/);

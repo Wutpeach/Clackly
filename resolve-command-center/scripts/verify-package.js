@@ -30,6 +30,7 @@ for (const file of [
   "python.exe", "python313.dll", "python313.zip", "python313._pth", "runtime.json",
   "LICENSE.txt", "THIRD_PARTY_NOTICES.md", "python-embed.sigstore",
   "python-embed.spdx.json", "application.spdx.json", "clackly/bootstrap.py",
+  "clackly/persistent_bootstrap.py",
   "clackly/python_runner.py", "clackly/scripts/resolve2ae_export.py"
 ]) {
   assert(fs.statSync(path.join(profileRoot, ...file.split("/"))).isFile(), `Missing packaged file: ${file}`);

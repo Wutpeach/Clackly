@@ -1,3 +1,4 @@
+const fs = require("node:fs");
 const path = require("node:path");
 const { RuntimeError } = require("./errors");
 const { RuntimeLauncher, serializeRequest } = require("./launcher");
@@ -7,6 +8,11 @@ const { RuntimeResolver } = require("./resolver");
 
 const VERSION = /^(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){2,}$/;
 const DESKTOP_LAUNCH_FIELD = "__clacklyDesktopLaunch";
+const EXPORT_TO_AE_COMMANDS = new Set([
+  "timeline.exportToAfterEffects",
+  "timeline.exportAudioToAfterEffects",
+  "timeline.exportVideoToAfterEffects"
+]);
 
 function isPlainObject(value) {
   try {
@@ -45,9 +51,12 @@ class RuntimeManager {
     hostContextProvider,
     scriptRoot,
     bootstrapPath = path.resolve(__dirname, "bootstrap.py"),
+    persistentBootstrapPath = path.resolve(__dirname, "persistent_bootstrap.py"),
+    scriptLauncher,
     desktopLauncher,
     modulePath,
-    libraryPath
+    libraryPath,
+    fileSystem = fs
   } = {}) {
     if (!resolver) {
       const registry = loadRuntimeRegistry({ ...(runtimeRoot ? { runtimeRoot } : {}) });
@@ -56,7 +65,9 @@ class RuntimeManager {
     if (!probe) probe = new RuntimeProbe({ launcher, cachePath, platform, architecture });
     if (!resolver || typeof resolver.resolve !== "function"
       || !probe || typeof probe.probe !== "function"
-      || !launcher || typeof launcher.execute !== "function") {
+      || !launcher || typeof launcher.execute !== "function"
+      || (scriptLauncher && (typeof scriptLauncher.execute !== "function"
+        || typeof scriptLauncher.prewarm !== "function" || typeof scriptLauncher.dispose !== "function"))) {
       throw new TypeError("Runtime Manager requires Resolver, Probe, and Launcher collaborators");
     }
     if (!VERSION.test(clacklyVersion || "") || typeof hostContextProvider !== "function"
@@ -73,9 +84,12 @@ class RuntimeManager {
     this.hostContextProvider = hostContextProvider;
     this.scriptRoot = scriptRoot;
     this.bootstrapPath = bootstrapPath;
+    this.persistentBootstrapPath = persistentBootstrapPath;
+    this.scriptLauncher = scriptLauncher || null;
     this.desktopLauncher = desktopLauncher;
     this.modulePath = modulePath;
     this.libraryPath = libraryPath;
+    this.fileSystem = fileSystem;
   }
 
   async execute(request) {
@@ -97,15 +111,21 @@ class RuntimeManager {
       invalid("Runtime Manager config must contain only JSON values", "config");
     }
 
+    const isPersistentExport = this.platform === "win32" && this.scriptLauncher
+      && request.capabilityId === "ae.export" && request.entry === "scripts/resolve2ae_export.py"
+      && EXPORT_TO_AE_COMMANDS.has(request.commandId);
     const prepared = await this.resolveAndProbe({
       runtime: request.runtime,
       capabilityId: request.capabilityId
     });
-    const { resolution, stagedRoot, selectedBootstrap } = prepared;
-
-    const launched = await this.launcher.execute({
+    const { resolution, stagedRoot, selectedBootstrap, readiness } = prepared;
+    const launchRequest = {
       resolution,
-      bootstrapPath: selectedBootstrap,
+      bootstrapPath: isPersistentExport
+        ? (resolution.source === "manifest"
+          ? path.join(stagedRoot, "persistent_bootstrap.py")
+          : this.persistentBootstrapPath)
+        : selectedBootstrap,
       request: {
         operation: "script-execute",
         scriptRoot: stagedRoot,
@@ -113,7 +133,13 @@ class RuntimeManager {
         commandId: request.commandId,
         config: request.config
       }
-    });
+    };
+    if (isPersistentExport) {
+      const health = this.workerHealth(resolution, readiness);
+      launchRequest.healthKey = health.key;
+      launchRequest.identity = health.identity;
+    }
+    const launched = await (isPersistentExport ? this.scriptLauncher : this.launcher).execute(launchRequest);
     if (!validScriptEnvelope(launched?.response?.script)) {
       throw new RuntimeError("RUNTIME_PROTOCOL_INVALID", "Runtime returned an invalid script envelope", {
         details: { reason: "invalid-script-envelope", process: launched?.process }
@@ -169,6 +195,80 @@ class RuntimeManager {
       script.logs.push({ level: "info", message: `✅ ${script.result.message}` });
     }
     return script;
+  }
+
+  workerHealth(resolution, readiness) {
+    const canonical = (candidate) => {
+      const real = this.fileSystem.realpathSync(candidate);
+      const stats = this.fileSystem.statSync(real);
+      if (!path.isAbsolute(real) || !stats.isFile() || !Number.isFinite(stats.mtimeMs)) throw new Error("invalid health file");
+      return { path: real, mtimeMs: stats.mtimeMs };
+    };
+    try {
+      const executable = canonical(resolution.executable);
+      const module = canonical(readiness.bridge.modulePath);
+      const library = canonical(readiness.bridge.libraryPath);
+      const identity = `${executable.path}\u0000${executable.mtimeMs}`;
+      return {
+        identity,
+        key: JSON.stringify({
+          executable,
+          resolveVersion: readiness.resolve.version,
+          bridge: { module, library }
+        })
+      };
+    } catch (_error) {
+      throw new RuntimeError("RUNTIME_PROTOCOL_INVALID", "Runtime Probe returned unverifiable worker health", {
+        details: { reason: "persistent-worker-health" }
+      });
+    }
+  }
+
+  async prewarmExportPythonWorker() {
+    if (!this.scriptLauncher) return false;
+    let resolution;
+    try {
+      if (this.overrideExecutable !== undefined) {
+        resolution = this.resolver.resolve({ overrideExecutable: this.overrideExecutable });
+      } else if (this.resolver.registry && typeof this.resolver.registry.getAll === "function"
+        && typeof this.resolver.runtimeRoot === "string") {
+        const matches = this.resolver.registry.getAll().filter((profile) => (
+          profile.runtime === "python" && profile.platform === this.platform
+          && profile.architecture === this.architecture && profile.capabilities.includes("ae.export")
+        ));
+        if (matches.length !== 1) return false;
+        const profile = matches[0];
+        const executable = this.fileSystem.realpathSync(path.resolve(
+          this.resolver.runtimeRoot,
+          ...profile.executable.split("/")
+        ));
+        if (!this.fileSystem.statSync(executable).isFile()) return false;
+        resolution = { source: "manifest", supportStatus: "machine-verified", executable, profile: structuredClone(profile) };
+      } else {
+        return false;
+      }
+      const executable = this.fileSystem.realpathSync(resolution.executable);
+      const mtimeMs = this.fileSystem.statSync(executable).mtimeMs;
+      if (!Number.isFinite(mtimeMs)) return false;
+      const stagedRoot = resolution.source === "manifest"
+        ? path.join(path.dirname(executable), "clackly") : this.scriptRoot;
+      return await this.scriptLauncher.prewarm({
+        resolution,
+        bootstrapPath: resolution.source === "manifest"
+          ? path.join(stagedRoot, "persistent_bootstrap.py") : this.persistentBootstrapPath,
+        scriptRoot: stagedRoot,
+        entry: "scripts/resolve2ae_export.py",
+        identity: `${executable}\u0000${mtimeMs}`,
+        healthKey: `prewarm:${executable}\u0000${mtimeMs}`
+      });
+    } catch (_error) {
+      // Host startup deliberately ignores this best-effort background warm-up.
+      return false;
+    }
+  }
+
+  disposeExportPythonWorker() {
+    if (this.scriptLauncher) this.scriptLauncher.dispose();
   }
 
   // Shared preparation pipeline for execute and availability checks: Override,

@@ -104,7 +104,7 @@ test("a discovered manifest executes its Python feature through the command path
   }
 });
 
-test("bundled After Effects manifests expose one Feature, one visible Command, and five internal actions", () => {
+test("bundled After Effects manifests expose one Feature, one visible Command, and two internal actions", () => {
   const definitions = loadCapabilityDefinitions();
   const aeDefinitions = definitions.filter(({ id }) => id === "ae.export");
   assert.equal(aeDefinitions.length, 1);
@@ -112,8 +112,8 @@ test("bundled After Effects manifests expose one Feature, one visible Command, a
   assert.equal(aeDefinitions[0].executor.entry, "scripts/resolve2ae_export.py");
 
   const commands = loadCommands().filter(({ capability }) => capability === "ae.export");
-  assert.equal(commands.length, 6);
-  assert.equal(commands.filter((command) => command.presentation === "internal").length, 5);
+  assert.equal(commands.length, 3);
+  assert.equal(commands.filter((command) => command.presentation === "internal").length, 2);
   assert.equal(commands.filter((command) => command.presentation !== "internal").length, 1);
   assert.equal(commands.every((command) => !("mode" in command) && !("runtime" in command)), true);
 
@@ -190,7 +190,7 @@ test("the real Python path hands desktop launch to the host and preserves public
       { entry: "scripts/feature.py" },
       {
         capabilityId: "ae.export",
-        commandId: "timeline.exportCurrentToAfterEffects",
+        commandId: "timeline.exportToAfterEffects",
         config: { aePath },
         logger: { info: (message) => logs.push(message) }
       }

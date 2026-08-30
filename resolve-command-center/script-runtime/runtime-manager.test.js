@@ -87,6 +87,77 @@ test("Runtime Manager keeps Override authoritative and uses the application scri
   assert.equal(calls[2][1].request.scriptRoot, path.resolve("C:/app"));
 });
 
+test("Runtime Manager routes only the three Windows Export-to-AE actions through the persistent launcher", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "clackly-persistent-route-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const executable = path.join(root, "python.exe");
+  const modulePath = path.join(root, "DaVinciResolveScript.py");
+  const libraryPath = path.join(root, "fusionscript.dll");
+  for (const file of [executable, modulePath, libraryPath]) fs.writeFileSync(file, "fixture");
+  const resolution = { source: "manifest", supportStatus: "machine-verified", executable, profile: {} };
+  const calls = [];
+  const response = {
+    response: {
+      ok: true,
+      runtime: { version: "3.13.14", architecture: "64bit", executable },
+      script: { ok: true, result: { sent: true }, logs: [] }
+    },
+    process: { exitCode: 0, durationMs: 1 },
+    worker: { state: "warm", restarted: false }
+  };
+  const manager = new RuntimeManager({
+    resolver: { resolve: () => resolution },
+    probe: { probe: async () => ({
+      ok: true,
+      resolve: { version: "20.3.2" },
+      bridge: { modulePath, libraryPath }
+    }) },
+    launcher: { execute: async (input) => { calls.push(["one-shot", input]); return response; } },
+    scriptLauncher: { execute: async (input) => { calls.push(["persistent", input]); return response; }, prewarm: async () => true, dispose() {} },
+    clacklyVersion: "0.1.0",
+    platform: "win32",
+    architecture: "x64",
+    hostContextProvider: async () => ({ application: "davinci-resolve", version: "20.3.2.9" }),
+    scriptRoot: root,
+    fileSystem: fs
+  });
+
+  for (const commandId of [
+    "timeline.exportToAfterEffects",
+    "timeline.exportAudioToAfterEffects",
+    "timeline.exportVideoToAfterEffects"
+  ]) {
+    await manager.execute({ ...request, commandId });
+  }
+  assert.deepEqual(calls.slice(0, 3).map(([kind]) => kind), ["persistent", "persistent", "persistent"]);
+  assert.equal(calls.filter(([kind]) => kind === "persistent").length, 3);
+  const persistent = calls[0][1];
+  assert.match(persistent.bootstrapPath, /persistent_bootstrap\.py$/);
+  assert.equal(typeof persistent.healthKey, "string");
+  assert.equal(typeof persistent.identity, "string");
+
+  for (const commandId of [
+    "timeline.exportCurrentToAfterEffects",
+    "timeline.exportBlueRangeToAfterEffects",
+    "timeline.exportCyanRangeToAfterEffects"
+  ]) {
+    await manager.execute({ ...request, commandId });
+  }
+  assert.deepEqual(calls.slice(-3).map(([kind]) => kind), ["one-shot", "one-shot", "one-shot"]);
+  assert.equal(calls.filter(([kind]) => kind === "persistent").length, 3);
+  assert.equal(calls.filter(([kind]) => kind === "one-shot").length, 3);
+
+  await manager.execute({ ...request, commandId: "timeline.unsupportedExportToAfterEffects" });
+  await manager.execute({ ...request, entry: "scripts/other.py" });
+  assert.equal(calls.filter(([kind]) => kind === "one-shot").length, 5);
+
+  manager.platform = "darwin";
+  await manager.execute({ ...request, commandId: "timeline.exportToAfterEffects" });
+  assert.equal(calls.at(-1)[0], "one-shot");
+  assert.equal(calls.filter(([kind]) => kind === "persistent").length, 3);
+  assert.equal(calls.filter(([kind]) => kind === "one-shot").length, 6);
+});
+
 test("Runtime Manager rejects an invalid Override before reading host state", async () => {
   let hostRead = false;
   const invalid = Object.assign(new Error("invalid override"), { code: "RUNTIME_OVERRIDE_INVALID" });
