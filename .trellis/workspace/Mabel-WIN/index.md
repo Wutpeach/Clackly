@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 49
+- **Total Sessions**: 50
 - **Last Active**: 2026-08-30
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1087 | Active |
+| `journal-1.md` | ~1118 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 50 | 2026-08-30 | Adopt persistent Python Export-to-AE worker | `c55d743b3abae462e4b121ffa8c58e271cd3a3b7` | `main` |
 | 49 | 2026-08-30 | Persistent Python export worker A/B | `a3ff37a` | `main` |
 | 48 | 2026-08-29 | Profile Python and Resolve export latency | `26ed7e1` | `main` |
 | 47 | 2026-08-29 | Optimize After Effects running-state detection | `a23878b`, `425c3bb` | `main` |

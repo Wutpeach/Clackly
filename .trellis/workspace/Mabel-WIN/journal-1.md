@@ -1085,3 +1085,34 @@ Qualified a temporary prewarmed persistent Python B arm for Export-to-AE: steady
 ### Status
 
 [OK] **Completed**
+
+
+## Session 50: Adopt persistent Python Export-to-AE worker
+
+**Date**: 2026-08-30
+**Task**: Adopt persistent Python Export-to-AE worker
+**Branch**: `main`
+
+### Summary
+
+Adopted the qualified persistent managed-Python Export-to-AE boundary, contracted the product to three current commands with binding migration, retained independent PowerShell ownership, verified package/install identity, and recorded user-reported real-host acceptance.
+
+### Main Changes
+
+- Enabled the persistent Python worker only for the three Windows Export-to-AE commands; Runtime Probe and the PowerShell AE helper remain separate.
+- Migrated legacy bindings to the current mixed, audio, and video command ids without retaining retired references.
+- Recorded installed timeout and ResolveAdapterError recovery, package identity, and qualitative 2026-08-30 user acceptance evidence.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c55d743b3abae462e4b121ffa8c58e271cd3a3b7` | (see git log) |
+
+### Testing
+
+- [OK] 384 Node and 87 Python tests passed; build, managed-Runtime staging, package verification, syntax/compile, parity, privacy, and installed identity checks passed.
+
+### Status
+
+[OK] **Completed**
