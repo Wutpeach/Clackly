@@ -1,0 +1,2 @@
+{"file":".trellis/tasks/08-30-ae-export-runtime-naming-activation-repair/research/applicable-contracts.md","reason":"Audit runtime source/staging/package/install identity and the fixed export/runtime/host ownership boundaries."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify all active and migrated interaction paths share the same config, JSX, Viewer, and activation behavior without boundary-specific branches."}
