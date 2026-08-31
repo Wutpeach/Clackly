@@ -117,15 +117,26 @@ try {
 
   $ClacklyRoot = Join-Path $ProfileRoot "clackly"
   New-Item -ItemType Directory -Path $ClacklyRoot -Force | Out-Null
-  Copy-Item -LiteralPath (Join-Path $ProjectRoot "script-runtime\runtime\bootstrap.py") -Destination (Join-Path $ClacklyRoot "bootstrap.py")
-  Copy-Item -LiteralPath (Join-Path $ProjectRoot "script-runtime\runtime\persistent_bootstrap.py") -Destination (Join-Path $ClacklyRoot "persistent_bootstrap.py")
-  Copy-Item -LiteralPath (Join-Path $ProjectRoot "script-runtime\python_runner.py") -Destination $ClacklyRoot
+  $ApplicationSourceFiles = @(
+    [pscustomobject]@{ SourcePath = (Join-Path $ProjectRoot "script-runtime\runtime\bootstrap.py"); StagedPath = "clackly/bootstrap.py" },
+    [pscustomobject]@{ SourcePath = (Join-Path $ProjectRoot "script-runtime\runtime\persistent_bootstrap.py"); StagedPath = "clackly/persistent_bootstrap.py" },
+    [pscustomobject]@{ SourcePath = (Join-Path $ProjectRoot "script-runtime\python_runner.py"); StagedPath = "clackly/python_runner.py" }
+  )
   foreach ($Directory in @("resolve", "scripts", "resolve2ae_core")) {
-    $Target = Join-Path $ClacklyRoot $Directory
-    New-Item -ItemType Directory -Path $Target -Force | Out-Null
-    Get-ChildItem -LiteralPath (Join-Path $ProjectRoot $Directory) -File -Filter "*.py" |
+    $ApplicationSourceFiles += Get-ChildItem -LiteralPath (Join-Path $ProjectRoot $Directory) -File -Filter "*.py" |
       Where-Object { $_.Name -notlike "test_*" } |
-      Copy-Item -Destination $Target
+      Sort-Object Name |
+      ForEach-Object {
+        [pscustomobject]@{
+          SourcePath = $_.FullName
+          StagedPath = "clackly/$Directory/$($_.Name)"
+        }
+      }
+  }
+  foreach ($SourceFile in $ApplicationSourceFiles) {
+    $StagedPath = Join-Path $ProfileRoot ($SourceFile.StagedPath.Replace("/", [IO.Path]::DirectorySeparatorChar))
+    New-Item -ItemType Directory -Path (Split-Path $StagedPath -Parent) -Force | Out-Null
+    Copy-Item -LiteralPath $SourceFile.SourcePath -Destination $StagedPath
   }
 
   Copy-Item -LiteralPath $LicensePath -Destination (Join-Path $ProfileRoot "LICENSE.txt")
@@ -139,6 +150,17 @@ try {
   [IO.File]::WriteAllText($ApplicationSbom, ($Sbom -join [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
 
   $LockHash = Get-Sha256 $LockPath
+  $ApplicationSources = @(
+    foreach ($SourceFile in $ApplicationSourceFiles) {
+      $StagedPath = Join-Path $ProfileRoot ($SourceFile.StagedPath.Replace("/", [IO.Path]::DirectorySeparatorChar))
+      $SourceHash = Get-Sha256 $SourceFile.SourcePath
+      if ($SourceHash -ne (Get-Sha256 $StagedPath)) {
+        throw "Managed application source staging hash mismatch: $($SourceFile.StagedPath)."
+      }
+      [pscustomobject][ordered]@{ path = $SourceFile.StagedPath; sha256 = $SourceHash }
+    }
+  )
+  $ApplicationSources = @($ApplicationSources | Sort-Object path)
   $Metadata = [ordered]@{
     schemaVersion = 1
     profileId = $Lock.profileId
@@ -149,7 +171,11 @@ try {
     releaseStatus = $Lock.releaseStatus
     source = [ordered]@{ url = $Lock.asset.url; sha256 = $Lock.asset.sha256 }
     paths = [ordered]@{ executable = "python.exe"; bootstrap = "clackly/bootstrap.py"; scriptRoot = "clackly" }
-    build = [ordered]@{ lockSha256 = $LockHash; script = "scripts/stage-managed-python.ps1" }
+    build = [ordered]@{
+      lockSha256 = $LockHash
+      script = "scripts/stage-managed-python.ps1"
+      applicationSources = $ApplicationSources
+    }
   }
   [IO.File]::WriteAllText(
     (Join-Path $ProfileRoot "runtime.json"),

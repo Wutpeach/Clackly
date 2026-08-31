@@ -4,7 +4,7 @@
 [V1.0.1] Resolve2AE @Awei (LUT Support)
 ------------------------------------------------
 1. [NEW] 自动获取片段 Input LUT 并应用到 AE Lumetri Color。
-2. [V28.4] 设置界面：调试模式开关、自定义合成名称前缀。
+2. [V28.4] 设置界面：调试模式开关与预览合成选项。
 3. [V28.3] JSX 自动清理（AE执行完自删除）。
 4. [V28.2] 跳过被禁用的片段（D键禁用）。
 5. [V28.1] Cyan标记支持：同时导出视频+音频轨道2。
@@ -50,7 +50,6 @@ def load_config():
     default_conf = {
         "last_known_ae_path": "",
         "debug_mode": False,
-        "prefix": "Link"
     }
     if os.path.exists(CONFIG_FILE):
         try:
@@ -604,9 +603,6 @@ def process_and_send(
         else:
             status_callback("Generating JSX...")
 
-    # 从配置获取前缀
-    prefix = config.get('prefix', 'Link')
-
     jsx = []
     jsx.append(f"// Resolve2AE V1.0.1")
     jsx.append(f"app.beginUndoGroup('Import Resolve Clips');")
@@ -614,11 +610,32 @@ def process_and_send(
     min_start = min([c['item'].GetStart() for c in target_clips])
     max_end = max([c['item'].GetEnd() for c in target_clips])
     comp_duration_sec = (max_end - min_start) / fps
-    comp_name = f"{prefix}_{timeline_name}_{scope_mode}_{timestamp}"
-    jsx.append(f"var comp = app.project.items.addComp('{comp_name}', {int(tl_width)}, {int(tl_height)}, 1, {comp_duration_sec}, {fps});")
-
-    # 根据配置决定是否打开 Viewer
-    jsx.append(f"comp.openInViewer();")
+    timeline_name_literal = json.dumps(str(timeline_name))
+    jsx.append(f"var clacklyTimelineName = {timeline_name_literal};")
+    jsx.append("var clacklySourceFolder = null;")
+    jsx.append("var clacklyMaxSequence = 0;")
+    jsx.append("var clacklyTimelinePrefix = '-' + clacklyTimelineName + '-';")
+    jsx.append("for (var clacklyItemIndex = 1; clacklyItemIndex <= app.project.items.length; clacklyItemIndex++) {")
+    jsx.append("  var clacklyItem = app.project.items[clacklyItemIndex];")
+    jsx.append("  if (!clacklySourceFolder && clacklyItem instanceof FolderItem && clacklyItem.name === 'Clackly Source Comps') clacklySourceFolder = clacklyItem;")
+    jsx.append("  if (clacklyItem instanceof CompItem) {")
+    jsx.append("    var clacklyItemName = clacklyItem.name;")
+    jsx.append("    var clacklyResolutionEnd = clacklyItemName.indexOf(']');")
+    jsx.append("    if (clacklyResolutionEnd > 1 && clacklyItemName.substr(0, clacklyResolutionEnd + 1).match(/^\\[\\d+x\\d+\\]$/)) {")
+    jsx.append("      var clacklySequenceSuffix = clacklyItemName.substr(clacklyResolutionEnd + 1);")
+    jsx.append("      if (clacklySequenceSuffix.indexOf(clacklyTimelinePrefix) === 0) {")
+    jsx.append("        clacklySequenceSuffix = clacklySequenceSuffix.substr(clacklyTimelinePrefix.length);")
+    jsx.append("        if (clacklySequenceSuffix.match(/^[1-9]\\d*(?:-Preview)?$/)) {")
+    jsx.append("          var clacklySequence = parseInt(clacklySequenceSuffix.replace(/-Preview$/, ''), 10);")
+    jsx.append("          if (clacklySequence > clacklyMaxSequence) clacklyMaxSequence = clacklySequence;")
+    jsx.append("        }")
+    jsx.append("      }")
+    jsx.append("    }")
+    jsx.append("  }")
+    jsx.append("}")
+    jsx.append("var clacklySequence = clacklyMaxSequence + 1;")
+    jsx.append(f"var clacklySourceName = '[{int(tl_width)}x{int(tl_height)}]-' + clacklyTimelineName + '-' + clacklySequence;")
+    jsx.append(f"var comp = app.project.items.addComp(clacklySourceName, {int(tl_width)}, {int(tl_height)}, 1, {comp_duration_sec}, {fps});")
 
     global_start_frame = min_start
 
@@ -1017,12 +1034,20 @@ def process_and_send(
                     jsx.append(f"}} catch(e) {{}}")
 
     if config.get('create1080pPreviewComp') is True:
-        jsx.append("var previewComp = app.project.items.addComp(comp.name + '_Preview_1080p', 1920, 1080, 1, comp.duration, comp.frameRate);")
+        jsx.append("if (!clacklySourceFolder) clacklySourceFolder = app.project.items.addFolder('Clackly Source Comps');")
+        jsx.append("comp.parentFolder = clacklySourceFolder;")
+        jsx.append("var clacklyPreviewName = '[1920x1080]-' + clacklyTimelineName + '-' + clacklySequence + '-Preview';")
+        jsx.append("var previewComp = app.project.items.addComp(clacklyPreviewName, 1920, 1080, 1, comp.duration, comp.frameRate);")
+        jsx.append("previewComp.parentFolder = app.project.rootFolder;")
         jsx.append("var previewLayer = previewComp.layers.add(comp);")
         jsx.append("previewLayer.property('Position').setValue([previewComp.width / 2, previewComp.height / 2]);")
         jsx.append("var previewFitPercent = Math.min(previewComp.width / comp.width, previewComp.height / comp.height) * 100;")
         jsx.append("previewLayer.property('Scale').setValue([previewFitPercent, previewFitPercent]);")
+        jsx.append("previewComp.openInViewer();")
+    else:
+        jsx.append("comp.openInViewer();")
 
+    jsx.append("app.activate();")
     jsx.append(f"app.endUndoGroup();")
     # Host Electron writes this returned JSX into its desktop temp directory.
     if not config.get('debug_mode', False):

@@ -4,6 +4,10 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
+const {
+  assertApplicationSourceIdentity,
+  productionPythonSourceInventory
+} = require("./verify-package");
 
 const appRoot = path.resolve(__dirname, "..");
 const scriptPath = path.join(__dirname, "stage-managed-python.ps1");
@@ -76,6 +80,81 @@ test("Runtime staging and package verification retain the persistent Export-to-A
   const verifier = fs.readFileSync(path.join(__dirname, "verify-package.js"), "utf8");
   assert.match(source, /persistent_bootstrap\.py/);
   assert.match(verifier, /clackly\/persistent_bootstrap\.py/);
+});
+
+test("Windows packaging refreshes the managed runtime before Electron Builder", () => {
+  const packageScript = JSON.parse(fs.readFileSync(path.join(appRoot, "package.json"), "utf8"))
+    .scripts["package:win"];
+  assert.match(packageScript, /npm run runtime:stage/);
+  assert.ok(packageScript.indexOf("npm run runtime:stage") < packageScript.indexOf("electron-builder"));
+});
+
+test("package verification detects stale managed application sources before and after staging", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "clackly-runtime-source-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const sourceRoot = path.join(root, "source");
+  const stagedProfileRoot = path.join(root, "staged-profile");
+  const packagedProfileRoot = path.join(root, "packaged-profile");
+  const sources = [
+    ["script-runtime/runtime/bootstrap.py", "clackly/bootstrap.py", "bootstrap"],
+    ["script-runtime/runtime/persistent_bootstrap.py", "clackly/persistent_bootstrap.py", "persistent"],
+    ["script-runtime/python_runner.py", "clackly/python_runner.py", "runner"],
+    ["resolve/adapter.py", "clackly/resolve/adapter.py", "adapter"],
+    ["scripts/resolve2ae_export.py", "clackly/scripts/resolve2ae_export.py", "export"],
+    ["scripts/test_ignored.py", "clackly/scripts/test_ignored.py", "ignored"],
+    ["resolve2ae_core/export.py", "clackly/resolve2ae_core/export.py", "core"]
+  ];
+  for (const [sourceRelative, stagedRelative, content] of sources) {
+    const sourcePath = path.join(sourceRoot, ...sourceRelative.split("/"));
+    fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+    fs.writeFileSync(sourcePath, content);
+    if (!sourceRelative.includes("/test_")) {
+      for (const profileRoot of [stagedProfileRoot, packagedProfileRoot]) {
+        const target = path.join(profileRoot, ...stagedRelative.split("/"));
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.copyFileSync(sourcePath, target);
+      }
+    }
+  }
+
+  const applicationSources = productionPythonSourceInventory(sourceRoot);
+  assert.equal(applicationSources.some(({ path: itemPath }) => itemPath.endsWith("test_ignored.py")), false);
+  const metadata = { build: { applicationSources } };
+  assert.doesNotThrow(() => assertApplicationSourceIdentity({
+    appRoot: sourceRoot,
+    stagedProfileRoot,
+    packagedProfileRoot,
+    metadata
+  }));
+
+  const staleMetadata = structuredClone(metadata);
+  staleMetadata.build.applicationSources[0].sha256 = "0".repeat(64);
+  assert.throws(() => assertApplicationSourceIdentity({
+    appRoot: sourceRoot,
+    stagedProfileRoot,
+    packagedProfileRoot,
+    metadata: staleMetadata
+  }), /Staged runtime source inventory differs from the current repository source/);
+
+  fs.writeFileSync(path.join(stagedProfileRoot, "clackly", "scripts", "resolve2ae_export.py"), "stale staging");
+  assert.throws(() => assertApplicationSourceIdentity({
+    appRoot: sourceRoot,
+    stagedProfileRoot,
+    packagedProfileRoot,
+    metadata
+  }), /Staged application source file differs from current source/);
+
+  fs.copyFileSync(
+    path.join(sourceRoot, "scripts", "resolve2ae_export.py"),
+    path.join(stagedProfileRoot, "clackly", "scripts", "resolve2ae_export.py")
+  );
+  fs.writeFileSync(path.join(packagedProfileRoot, "clackly", "resolve2ae_core", "export.py"), "stale package");
+  assert.throws(() => assertApplicationSourceIdentity({
+    appRoot: sourceRoot,
+    stagedProfileRoot,
+    packagedProfileRoot,
+    metadata
+  }), /Packaged application source file differs from current source/);
 });
 
 test("production hosts inject live Resolve version and Core owns packaged Runtime wiring", () => {

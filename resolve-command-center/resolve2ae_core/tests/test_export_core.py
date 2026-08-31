@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import ExitStack
 import json
 import shutil
+import subprocess
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -419,9 +420,55 @@ class ExportCoreSnapshotTests(unittest.TestCase):
 
     def _assert_matches_snapshot(self, snapshot_name: str, actual: dict) -> None:
         expected = json.loads((SNAPSHOT_DIR / f"{snapshot_name}.json").read_text(encoding="utf-8"))
-        self.assertEqual(actual["jsx"], expected["jsx"])
+        self.assertEqual(
+            self._without_approved_presentation_jsx(actual["jsx"]),
+            self._without_approved_presentation_jsx(expected["jsx"]),
+        )
         self.assertEqual(actual["statuses"], expected["statuses"][:-2])
         self.assertEqual(actual["popen_calls"], [])
+
+    def _without_approved_presentation_jsx(self, jsx: str) -> str:
+        normalized: list[str] = []
+        skipping_project_scan = False
+        for line in jsx.splitlines():
+            if line.startswith("var clacklyTimelineName ="):
+                skipping_project_scan = True
+                continue
+            if skipping_project_scan:
+                if line.startswith("var comp = app.project.items.addComp("):
+                    skipping_project_scan = False
+                    normalized.append("var comp = app.project.items.addComp(<approved-source-name>);")
+                continue
+            if line.startswith("var comp = app.project.items.addComp("):
+                normalized.append("var comp = app.project.items.addComp(<approved-source-name>);")
+            elif line not in {"comp.openInViewer();", "app.activate();"}:
+                normalized.append(line)
+        return "\n".join(normalized)
+
+    def _evaluate_project_item_scan(self, jsx: str, items: list[dict]) -> dict:
+        scan_start = jsx.index("var clacklyTimelineName =")
+        scan_end = jsx.index("var comp = app.project.items.addComp(", scan_start)
+        scanner = jsx[scan_start:scan_end]
+        runner = """
+const fixtureItems = JSON.parse(process.argv[1]);
+class FolderItem { constructor(item) { this.name = item.name; this.id = item.id; } }
+class CompItem { constructor(item) { this.name = item.name; this.id = item.id; } }
+const app = { project: { items: [null].concat(fixtureItems.map((item) =>
+  item.type === "folder" ? new FolderItem(item) : new CompItem(item))) } };
+""" + scanner + """
+process.stdout.write(JSON.stringify({
+  sequence: clacklySequence,
+  sourceName: clacklySourceName,
+  folderId: clacklySourceFolder ? clacklySourceFolder.id : null
+}));
+"""
+        result = subprocess.run(
+            ["node", "-e", runner, json.dumps(items)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return json.loads(result.stdout)
 
     def test_single_video_otio_success_matches_snapshot(self) -> None:
         clip = FakeVideoItem(start=0, end=24, name="ClipA")
@@ -429,7 +476,7 @@ class ExportCoreSnapshotTests(unittest.TestCase):
         actual = self._run_export(
             "single_video_otio_success",
             timeline,
-            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+            {"debug_mode": False, "last_known_ae_path": ""},
         )
         self._assert_matches_snapshot("single_video_otio_success", actual)
         public_result = dict(actual["result"])
@@ -452,7 +499,7 @@ class ExportCoreSnapshotTests(unittest.TestCase):
         actual = self._run_export(
             "single_video_otio_fallback",
             timeline,
-            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+            {"debug_mode": False, "last_known_ae_path": ""},
         )
         self._assert_matches_snapshot("single_video_otio_fallback", actual)
 
@@ -468,7 +515,7 @@ class ExportCoreSnapshotTests(unittest.TestCase):
         actual = self._run_export(
             "mixed_video_audio",
             timeline,
-            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
+            {"debug_mode": False, "last_known_ae_path": ""},
         )
         self._assert_matches_snapshot("mixed_video_audio", actual)
 
@@ -476,6 +523,7 @@ class ExportCoreSnapshotTests(unittest.TestCase):
         for width, height, expected_fit_percent in (
             (3840, 2160, 50.0),
             (2048, 1536, 70.3125),
+            (1920, 1080, 100.0),
         ):
             with self.subTest(source_resolution=(width, height)):
                 clip = FakeVideoItem(start=0, end=24, name="PreviewSource")
@@ -488,7 +536,6 @@ class ExportCoreSnapshotTests(unittest.TestCase):
                     f"preview_{width}x{height}",
                     timeline,
                     {
-                        "prefix": "Link",
                         "debug_mode": False,
                         "create1080pPreviewComp": True,
                     },
@@ -496,12 +543,12 @@ class ExportCoreSnapshotTests(unittest.TestCase):
                 jsx = actual["jsx"]
                 source_comp = (
                     "var comp = app.project.items.addComp("
-                    "'Link_Timeline_single_1700000000', "
+                    "clacklySourceName, "
                     f"{width}, {height}, 1, 1.0, 24.0);"
                 )
                 preview_comp = (
                     "var previewComp = app.project.items.addComp("
-                    "comp.name + '_Preview_1080p', 1920, 1080, 1, "
+                    "clacklyPreviewName, 1920, 1080, 1, "
                     "comp.duration, comp.frameRate);"
                 )
                 preview_layer = "var previewLayer = previewComp.layers.add(comp);"
@@ -519,16 +566,19 @@ class ExportCoreSnapshotTests(unittest.TestCase):
                 )
 
                 self.assertIn(source_comp, jsx)
-                self.assertIn("comp.openInViewer();", jsx)
                 self.assertIn("// Clip: PreviewSource", jsx)
                 self.assertIn("var layer = comp.layers.add(fileItem);", jsx)
+                self.assertIn("comp.parentFolder = clacklySourceFolder;", jsx)
+                self.assertIn("previewComp.parentFolder = app.project.rootFolder;", jsx)
+                self.assertIn("var clacklyPreviewName = '[1920x1080]-' + clacklyTimelineName + '-' + clacklySequence + '-Preview';", jsx)
                 self.assertEqual(jsx.count(preview_comp), 1)
                 self.assertEqual(jsx.count(preview_layer), 1)
                 self.assertIn(preview_position, jsx)
                 self.assertIn(preview_fit, jsx)
                 self.assertIn(preview_scale, jsx)
-                self.assertLess(jsx.index(source_comp), jsx.index("comp.openInViewer();"))
                 self.assertLess(jsx.index("// Clip: PreviewSource"), jsx.index(preview_comp))
+                self.assertLess(jsx.index(preview_scale), jsx.index("previewComp.openInViewer();"))
+                self.assertLess(jsx.index("previewComp.openInViewer();"), jsx.index("app.activate();"))
                 self.assertLess(jsx.index(preview_scale), jsx.index("app.endUndoGroup();"))
                 self.assertNotIn("comp.width =", jsx)
                 self.assertNotIn("comp.height =", jsx)
@@ -543,14 +593,91 @@ class ExportCoreSnapshotTests(unittest.TestCase):
                 fit_percent = min(1920 / width, 1080 / height) * 100
                 self.assertEqual(fit_percent, expected_fit_percent)
 
-    def test_false_preview_option_appends_no_wrapper_jsx(self) -> None:
+    def test_project_item_scan_allocates_independent_max_plus_one_sequences_and_reuses_first_folder(self) -> None:
+        timeline = FakeTimeline(
+            video_tracks={1: [FakeVideoItem(start=0, end=24)]},
+            export_success=False,
+            resolution=("2048", "1536"),
+            name="Timeline A",
+        )
+        actual = self._run_export("project_item_scan", timeline, {"debug_mode": False})
+        jsx = actual["jsx"]
+        self.assertEqual(jsx.count("for (var clacklyItemIndex = 1; clacklyItemIndex <= app.project.items.length; clacklyItemIndex++)"), 1)
+        self.assertEqual(jsx.count("app.project.items[clacklyItemIndex]"), 1)
+        self.assertIn("clacklyItem instanceof FolderItem", jsx)
+        self.assertIn("clacklyItem instanceof CompItem", jsx)
+
+        existing_items = [
+            {"type": "folder", "id": "moved-folder", "name": "Clackly Source Comps"},
+            {"type": "folder", "id": "later-folder", "name": "Clackly Source Comps"},
+            {"type": "comp", "id": "a1", "name": "[3840x2160]-Timeline A-1"},
+            {"type": "comp", "id": "a3-preview", "name": "[1920x1080]-Timeline A-3-Preview"},
+            {"type": "comp", "id": "a5", "name": "[1280x720]-Timeline A-5"},
+            {"type": "comp", "id": "a0", "name": "[1920x1080]-Timeline A-0"},
+            {"type": "comp", "id": "renamed", "name": "User renamed Timeline A 99"},
+            {"type": "comp", "id": "b1", "name": "[3840x2160]-Timeline B-1"},
+        ]
+        scanned = self._evaluate_project_item_scan(jsx, existing_items)
+        self.assertEqual(scanned, {
+            "sequence": 6,
+            "sourceName": "[2048x1536]-Timeline A-6",
+            "folderId": "moved-folder",
+        })
+        renamed_folder = self._evaluate_project_item_scan(jsx, [
+            {"type": "folder", "id": "renamed-folder", "name": "User Source Comps"},
+        ])
+        self.assertIsNone(renamed_folder["folderId"])
+
+        other_timeline = FakeTimeline(
+            video_tracks={1: [FakeVideoItem(start=0, end=24)]},
+            export_success=False,
+            name="Timeline B",
+        )
+        other_jsx = self._run_export("project_item_other_timeline", other_timeline, {"debug_mode": False})["jsx"]
+        self.assertEqual(self._evaluate_project_item_scan(other_jsx, existing_items)["sequence"], 2)
+        new_timeline = FakeTimeline(
+            video_tracks={1: [FakeVideoItem(start=0, end=24)]},
+            export_success=False,
+            name="Timeline C",
+        )
+        new_timeline_jsx = self._run_export("project_item_new_timeline", new_timeline, {"debug_mode": False})["jsx"]
+        self.assertEqual(self._evaluate_project_item_scan(new_timeline_jsx, existing_items)["sequence"], 1)
+
+        hd_timeline = FakeTimeline(
+            video_tracks={1: [FakeVideoItem(start=0, end=24)]},
+            export_success=False,
+            name="Timeline A",
+        )
+        hd_jsx = self._run_export(
+            "project_item_hd_preview",
+            hd_timeline,
+            {"debug_mode": False, "create1080pPreviewComp": True},
+        )["jsx"]
+        hd_source = self._evaluate_project_item_scan(hd_jsx, existing_items)["sourceName"]
+        self.assertEqual(hd_source, "[1920x1080]-Timeline A-6")
+        self.assertIn("if (!clacklySourceFolder) clacklySourceFolder = app.project.items.addFolder('Clackly Source Comps');", hd_jsx)
+        self.assertIn("var clacklyPreviewName = '[1920x1080]-' + clacklyTimelineName + '-' + clacklySequence + '-Preview';", hd_jsx)
+        self.assertNotEqual(hd_source, "[1920x1080]-Timeline A-6-Preview")
+
+        safe_timeline = FakeTimeline(
+            video_tracks={1: [FakeVideoItem(start=0, end=24)]},
+            export_success=False,
+            name="O'Reilly\n[Scene]",
+        )
+        safe_jsx = self._run_export("project_item_safe_name", safe_timeline, {"debug_mode": False})["jsx"]
+        self.assertIn('var clacklyTimelineName = "O\'Reilly\\n[Scene]";', safe_jsx)
+        self.assertEqual(
+            self._evaluate_project_item_scan(safe_jsx, [])["sourceName"],
+            "[1920x1080]-O'Reilly\n[Scene]-1",
+        )
+
+    def test_false_preview_option_creates_only_root_source_and_activates_it(self) -> None:
         clip = FakeVideoItem(start=0, end=24, name="PreviewDisabled")
         timeline = FakeTimeline(video_tracks={1: [clip]}, export_success=False)
         actual = self._run_export(
             "preview_disabled",
             timeline,
             {
-                "prefix": "Link",
                 "debug_mode": False,
                 "create1080pPreviewComp": False,
             },
@@ -558,6 +685,11 @@ class ExportCoreSnapshotTests(unittest.TestCase):
 
         self.assertNotIn("previewComp", actual["jsx"])
         self.assertNotIn("previewLayer", actual["jsx"])
+        self.assertNotIn("app.project.items.addFolder", actual["jsx"])
+        self.assertNotIn("comp.parentFolder =", actual["jsx"])
+        self.assertEqual(actual["jsx"].count("comp.openInViewer();"), 1)
+        self.assertEqual(actual["jsx"].count("app.activate();"), 1)
+        self.assertLess(actual["jsx"].index("comp.openInViewer();"), actual["jsx"].index("app.activate();"))
 
     def test_mixed_single_and_mixed_blue_run_video_otio_enrichment(self) -> None:
         transform_params = [
@@ -640,7 +772,7 @@ class ExportCoreSnapshotTests(unittest.TestCase):
             ["Analyzing...", "Exporting OTIO...", "Parsing Data..."],
             actual["statuses"],
         )
-        self.assertIn("var comp = app.project.items.addComp('Link_Timeline_batch_1700000000'", actual["jsx"])
+        self.assertIn("var comp = app.project.items.addComp(clacklySourceName, 1920, 1080, 1, 1.0, 24.0);", actual["jsx"])
         self.assertIn("// Crop Mask", actual["jsx"])
         self.assertIn("// Lens Correction -> Optics Compensation", actual["jsx"])
         self.assertIn("layer.timeRemapEnabled = true;", actual["jsx"])
@@ -671,6 +803,47 @@ class ExportCoreSnapshotTests(unittest.TestCase):
         self.assertNotIn("// Clip: [Audio]", jsx)
         self.assertNotIn("layer.enabled = false;", jsx)
         self.assertGreaterEqual(jsx.count("layer.audioEnabled = false;"), 2)
+
+    def test_every_shared_and_retained_range_policy_opens_one_final_comp_then_activates_ae(self) -> None:
+        video = FakeVideoItem(start=0, end=24, name="ActivationVideo")
+        audio = FakeTimelineAudioItem(start=0, end=24, name="ActivationAudio")
+        timeline = FakeTimeline(
+            video_tracks={1: [video]},
+            audio_tracks={1: [audio]},
+            markers={0: {"color": "Blue", "duration": 24}},
+            export_success=False,
+        )
+        for triple in (
+            ("auto", "auto", "mixed"),
+            ("audio-only", "auto", "audio"),
+            ("video-only", "auto", "video"),
+            ("video-range", "blue-range", "video"),
+            ("mixed-range", "blue-range", "mixed"),
+        ):
+            with self.subTest(triple=triple):
+                result = export_core.process_and_send(
+                    FakeResolve(),
+                    FakeProject(timeline),
+                    AE_PATH,
+                    lambda _message: None,
+                    {"debug_mode": False},
+                    *triple,
+                )
+                jsx = result["__clacklyDesktopLaunch"]["jsx"]
+                self.assertEqual(jsx.count("openInViewer();"), 1)
+                self.assertEqual(jsx.count("app.activate();"), 1)
+                self.assertLess(jsx.index("openInViewer();"), jsx.index("app.activate();"))
+                self.assertLess(jsx.index("app.activate();"), jsx.index("app.endUndoGroup();"))
+
+    def test_legacy_prefix_values_do_not_change_generated_jsx(self) -> None:
+        timeline = FakeTimeline(video_tracks={1: [FakeVideoItem(start=0, end=24)]}, export_success=False)
+        legacy = self._run_export(
+            "legacy_prefix",
+            timeline,
+            {"prefix": "Legacy Prefix", "debug_mode": False},
+        )
+        current = self._run_export("no_prefix", timeline, {"debug_mode": False})
+        self.assertEqual(legacy["jsx"], current["jsx"])
 
     def test_video_with_lut_matches_snapshot(self) -> None:
         clip = FakeVideoItem(start=0, end=24, name="ClipLUT", input_lut="ShowLUT")

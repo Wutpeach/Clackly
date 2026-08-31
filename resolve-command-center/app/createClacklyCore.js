@@ -5,6 +5,7 @@ const { WindowsAfterEffectsProcessProbe } = require("../capability/afterEffectsP
 const { createCapabilityRegistry } = require("../capability/registry");
 const { createMarkerCapability } = require("../capability/marker");
 const { createImageClipboardCapability } = require("../capability/imageClipboard");
+const { migrateLegacyAfterEffectsExportPrefix } = require("../capability/afterEffectsConfigMigration");
 const { registerScriptCapabilities } = require("../capability/registerScripts");
 const { createCommandExecutor } = require("../command-engine/executor");
 const { getCommands } = require("../command-engine/registry");
@@ -121,9 +122,11 @@ function createClacklyCore({
   registerScriptCapabilities({ capabilityRegistry, appRoot, runtimeManager });
 
   const featureCatalog = new FeatureCatalog({ capabilityRegistry });
+  const configStorage = ConfigStorage.fromAppData(appDataPath);
+  migrateLegacyAfterEffectsExportPrefix(configStorage);
   const configManager = new ConfigManager({
     capabilityRegistry,
-    storage: ConfigStorage.fromAppData(appDataPath)
+    storage: configStorage
   });
   // Preferences deliberately own a separate full-replacement document. ConfigManager
   // remains the only capability-domain authority for config.json.

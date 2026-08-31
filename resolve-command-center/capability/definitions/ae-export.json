@@ -26,11 +26,6 @@
       "required": true,
       "localizations": { "zh-CN": { "label": "After Effects 路径" } }
     },
-    "prefix": {
-      "type": "string",
-      "label": "Composition Prefix",
-      "localizations": { "zh-CN": { "label": "合成前缀" } }
-    },
     "create1080pPreviewComp": {
       "type": "boolean",
       "label": "Create 1080p Preview Comp",

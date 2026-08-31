@@ -20,9 +20,7 @@ def execute(context):
     if not isinstance(ae_path, str) or not Path(ae_path).is_file():
         raise ValueError("After Effects path must point to an existing executable file")
 
-    prefix = context.config.get("prefix")
     config = {
-        "prefix": prefix.strip() if isinstance(prefix, str) and prefix.strip() else "Link",
         "debug_mode": False,
         "create1080pPreviewComp": context.config.get("create1080pPreviewComp") is True,
     }

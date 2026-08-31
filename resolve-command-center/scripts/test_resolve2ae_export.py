@@ -15,9 +15,9 @@ class Logger:
 
 
 class Context:
-    def __init__(self, command_id, ae_path, prefix="", config_overrides=None):
+    def __init__(self, command_id, ae_path, config_overrides=None):
         self.command_id = command_id
-        self.config = {"aePath": ae_path, "prefix": prefix}
+        self.config = {"aePath": ae_path}
         if config_overrides:
             self.config.update(config_overrides)
         self.logger = Logger()
@@ -46,7 +46,7 @@ class Resolve2AEExportTests(unittest.TestCase):
                     ("true", {"create1080pPreviewComp": True}, True),
                 ):
                     with self.subTest(command_id=command_id, config_case=config_case):
-                        context = Context(command_id, str(ae_path), "  Shot  ", overrides)
+                        context = Context(command_id, str(ae_path), {**overrides, "prefix": "legacy value"})
                         success = {
                             "ok": True,
                             "code": "exported",
@@ -64,17 +64,16 @@ class Resolve2AEExportTests(unittest.TestCase):
                             "resolve", "project", str(ae_path)
                         ))
                         self.assertEqual(process.call_args.args[4], {
-                            "prefix": "Shot",
                             "debug_mode": False,
                             "create1080pPreviewComp": expected_value,
                         })
                         self.assertEqual(process.call_args.args[5:], (mode, target_policy, media_policy))
 
-    def test_uses_default_prefix_and_propagates_controlled_failures(self):
+    def test_ignores_legacy_prefix_and_propagates_controlled_failures(self):
         with tempfile.TemporaryDirectory() as directory:
             ae_path = Path(directory, "AfterFX.exe")
             ae_path.touch()
-            context = Context("timeline.exportToAfterEffects", str(ae_path))
+            context = Context("timeline.exportToAfterEffects", str(ae_path), {"prefix": "Old Prefix"})
             failed = {
                 "ok": False,
                 "code": "no-clips",
@@ -89,7 +88,10 @@ class Resolve2AEExportTests(unittest.TestCase):
             ) as process:
                 with self.assertRaisesRegex(RuntimeError, "No Clips"):
                     resolve2ae_export.execute(context)
-            self.assertEqual(process.call_args.args[4]["prefix"], "Link")
+            self.assertEqual(process.call_args.args[4], {
+                "debug_mode": False,
+                "create1080pPreviewComp": False,
+            })
 
         with self.assertRaisesRegex(ValueError, "existing executable file"):
             resolve2ae_export.execute(Context("timeline.exportToAfterEffects", "missing.exe"))

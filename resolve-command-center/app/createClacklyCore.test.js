@@ -5,12 +5,16 @@ const path = require("node:path");
 const test = require("node:test");
 
 const { createClacklyCore } = require("./createClacklyCore");
+const { ConfigStorage } = require("../config/ConfigStorage");
 const { RuntimeManager } = require("../script-runtime/runtime/manager");
 const appRoot = path.resolve(__dirname, "..");
 
-function createCore(overrides = {}) {
+function createCore({ beforeCreate, ...overrides } = {}) {
   const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "clackly-core-"));
   const appDataPath = path.join(temporaryDirectory, "appdata");
+  if (typeof beforeCreate === "function") {
+    beforeCreate({ appDataPath, temporaryDirectory });
+  }
   const core = createClacklyCore({
     appRoot,
     appDataPath,
@@ -95,6 +99,63 @@ test("Core returns working application services with marker and script capabilit
     message: "Python runtime executable is missing",
     details: { missing: ["python-runtime"], action: null }
   });
+});
+
+test("Core silently removes only the retired AE Prefix from persisted capability configuration", (t) => {
+  const legacyAeExport = {
+    aePath: "C:\\Adobe\\AfterFX.exe",
+    create1080pPreviewComp: true,
+    prefix: "Legacy Prefix"
+  };
+  const unrelatedCapability = { keep: "unchanged" };
+  const { core, appDataPath, cleanup } = createCore({
+    beforeCreate: ({ appDataPath: persistedAppDataPath }) => {
+      ConfigStorage.fromAppData(persistedAppDataPath).save({
+        "ae.export": legacyAeExport,
+        "marker.add": {},
+        "unrelated.capability": unrelatedCapability
+      });
+    }
+  });
+  t.after(cleanup);
+
+  assert.doesNotThrow(() => core.configManager.assertConfigured("ae.export"));
+  assert.deepEqual(core.configManager.get("ae.export"), {
+    aePath: "C:\\Adobe\\AfterFX.exe",
+    create1080pPreviewComp: true
+  });
+  assert.deepEqual(ConfigStorage.fromAppData(appDataPath).load(), {
+    "ae.export": {
+      aePath: "C:\\Adobe\\AfterFX.exe",
+      create1080pPreviewComp: true
+    },
+    "marker.add": {},
+    "unrelated.capability": unrelatedCapability
+  });
+});
+
+test("Core keeps non-legacy unknown AE settings invalid", (t) => {
+  const { core, cleanup } = createCore({
+    beforeCreate: ({ appDataPath }) => {
+      ConfigStorage.fromAppData(appDataPath).save({
+        "ae.export": {
+          aePath: "C:\\Adobe\\AfterFX.exe",
+          create1080pPreviewComp: true,
+          unexpected: true
+        }
+      });
+    }
+  });
+  t.after(cleanup);
+
+  assert.throws(
+    () => core.configManager.get("ae.export"),
+    /Unknown configuration key: unexpected/
+  );
+  assert.throws(
+    () => core.configManager.assertConfigured("ae.export"),
+    /Unknown configuration key: unexpected/
+  );
 });
 
 test("Core constructs a single RuntimeManager and never resolves host context eagerly", (t) => {

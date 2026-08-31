@@ -472,6 +472,7 @@ const result = await runtimeProbe.probe({
 - Both Electron hosts use `ConfigStorage.fromAppData(app.getPath("appData"))`, resolving to shared `appData/Clackly/config.json`; Workflow Integration keeps its separate `userData` root.
 - The stored JSON root maps capability ids to flat configuration objects. ConfigStorage is the only configuration filesystem owner.
 - ConfigManager resolves schemas through Capability Registry metadata, preserves unknown capability sections, returns copies, and reloads before reads and writes so long-running hosts observe sequential changes.
+- After registering current script capabilities, the shared Core silently removes only legacy `ae.export.prefix` through ConfigStorage before constructing ConfigManager. It writes only when that key exists, preserves `aePath`, `create1080pPreviewComp`, and unrelated capability sections, and leaves every other unknown key for normal schema rejection.
 - A non-empty explicit Schema `field.label` wins; otherwise the shared label utility formats camelCase and `.`, `_`, `-` separators. ConfigManager uses it for missing-required projections, and FeatureCatalog returns cloned schemas with resolved labels.
 - String-like types are strings, numbers are finite, booleans are booleans, and select values must match declared options. This layer does not inspect paths/folders or parse colors.
 - Settings IPC calls `save(..., { requireComplete: true })` so missing required fields fail before persistence; non-UI callers may still save partial drafts before `assertConfigured()` gates execution.
@@ -506,7 +507,7 @@ const result = await runtimeProbe.probe({
 - Good: capability metadata declares `configSchema`, future UI reads that metadata, and capability execution calls `context.config.get("aePath")`.
 - Base: `marker.add` declares `configSchema: {}` and executes exactly as before.
 - Good: both hosts share the config file but reload before operations, preserving sequential changes made by the other host.
-- Good: a manually selected existing `AfterFX.exe` remains authoritative; a stale path is replaced while `prefix` is preserved.
+- Good: a manually selected existing `AfterFX.exe` remains authoritative; a stale path is replaced while `create1080pPreviewComp` is preserved.
 - Good: `output_folder` projects as `Output folder` in lifecycle messages and Settings without renderer formatting.
 - Base: no discoverable AE leaves `aePath` absent so the existing required-field Settings recovery stays accurate.
 - Bad: capability code reads Clackly configuration through `node:fs`, receives ConfigStorage, or reads another capability id.
@@ -521,6 +522,7 @@ const result = await runtimeProbe.probe({
 - Assert two long-running managers observe sequential shared-file changes and preserve unrelated capability sections.
 - Assert startup initialization short-circuits a valid saved path, awaits discovery in precedence order with the exact bounded `execFile` options, compares numeric versions, validates files, preserves sibling settings, removes only stale `aePath`, preserves non-ASCII paths with explicit UTF-8 output, and is a non-Windows no-op.
 - Assert deferred manual-save and reset races obey compare-before-write (initially absent, stale-present, and reset-removed stale cases) and that no test starts real PowerShell.
+- Assert legacy `ae.export.prefix` removal is a one-write migration that preserves current sibling/unrelated sections, while an absent Prefix and a second run do not write and arbitrary unknown keys still reject.
 - Assert both hosts start a named initialization Promise, observe rejection immediately, and never await it before palette/IPC/hotkey readiness through injectable composition tests; source-order string assertions alone are insufficient.
 - Assert executor blocks incomplete configuration before execution and otherwise passes the unchanged command plus scoped context.
 - Assert both host composition roots use the common appData path while Workflow Integration retains its userData override.
@@ -565,7 +567,8 @@ initializeAfterEffectsPath(configManager);
 - Raw facts: `read_timeline_start_frame(timeline)` and `read_timeline_markers(timeline)` call the matching Resolve API directly and preserve its raw result or error.
 - Execution: `process_and_send(..., mode, target_policy, media_policy)`, `_terminal_result(ok, code, mode, target_policy, media_policy, clip_count, message)`.
 - Preview config: optional Capability boolean `ae.export.create1080pPreviewComp`; absent or `false` is disabled, and `true` enables one presentation wrapper for every product Command through the shared execution path.
-- Preview JSX: `addComp(comp.name + "_Preview_1080p", 1920, 1080, 1, comp.duration, comp.frameRate)`; add `comp` once, center at `[previewComp.width / 2, previewComp.height / 2]`, then set equal Scale axes from `Math.min(previewComp.width / comp.width, previewComp.height / comp.height) * 100`.
+- Composition names: Source is `[sourceWidthxsourceHeight]-TimelineName-N`; enabled Preview is `[1920x1080]-TimelineName-N-Preview`, sharing the same project-derived `N`.
+- Preview JSX: create the named 1920 x 1080 Preview with `comp.duration`/`comp.frameRate`, add `comp` once, center at `[previewComp.width / 2, previewComp.height / 2]`, then set equal Scale axes from `Math.min(previewComp.width / comp.width, previewComp.height / comp.height) * 100`.
 - Product Command/wrapper triples: exactly `timeline.exportToAfterEffects -> ("auto", "auto", "mixed")`, `timeline.exportAudioToAfterEffects -> ("audio-only", "auto", "audio")`, and `timeline.exportVideoToAfterEffects -> ("video-only", "auto", "video")`.
 - Wrapper mapping: `scripts/resolve2ae_export.py` maps only those three current AE Command ids to the product triples and passes all three arguments. Retired current-only, explicit Blue-range, and Cyan-range ids have no Command registration or wrapper mapping and are rejected before Resolve access.
 - Core validation: `process_and_send()` retains its six exact `SUPPORTED_COMMAND_TRIPLES`: the three product triples plus `("single", "single", "mixed")`, `("video-range", "blue-range", "video")`, and `("mixed-range", "blue-range", "mixed")` for Core selection compatibility/regression coverage. The retained Core triples are not product Commands or wrapper routes.
@@ -583,9 +586,9 @@ initializeAfterEffectsPath(configManager);
 - OTIO enrichment runs whenever any target record has `track_type == "video"` (`has_video`); `content_type` remains a display projection and never suppresses video processing. Video-only export writes `layer.audioEnabled = false;` for every video layer including linked audio.
 - Result contracts are layer-specific: Core success carries the seven public keys plus the private `__clacklyDesktopLaunch` directive; Core controlled failure emits exactly the seven keys; the Wrapper converts `ok: false` into a script error; RuntimeManager strips the launch directive from successful public output.
 - The wrapper rejects every non-product Command id before Resolve access. `process_and_send()` separately validates its six Core triples before Resolve access; its retained internal triples do not create a Command or wrapper route.
-- The timeline-resolution source composition remains the canonical export: its name, dimensions, layers, timing, and `openInViewer()` behavior stay unchanged. When enabled, preview construction is appended only after all source layers and before `app.endUndoGroup()`; it references rather than replaces the source composition.
+- The timeline-resolution Source remains the canonical export: apart from its project-aware name, its dimensions, layers, timing, media, effects, and selection semantics stay unchanged. When Preview is enabled, Source is fully populated first, moved to `Clackly Source Comps`, and referenced rather than replaced by a root Preview; Source opens in the Viewer when disabled, Preview opens when enabled.
 - `ae.export` Capability metadata owns the optional boolean and localized field label. `scripts/resolve2ae_export.py` only adapts that scoped value into the shared Core config; Settings remains generic and schema-driven.
-- Disabled or absent preview config appends no JSX, preserving existing export snapshots byte-for-byte. Enabled preview naming extends the existing source prefix/timeline/scope/timestamp convention with only `_Preview_1080p`.
+- Disabled or absent preview config creates only the root Source and no Preview JSX. Enabled Preview uses the shared Source sequence, retains the original-resolution Source, and uses the fixed `-Preview` suffix so a 1920 x 1080 Source cannot collide with its wrapper.
 - Fit is uniform and unclipped: using the minimum width/height ratio keeps both scaled source axes within 1920 x 1080. Composition layout policy stays in `resolve2ae_core/export.py`; Command manifests, Resolve adapters, RuntimeManager, persistent bootstrap/launcher, and the host After Effects launcher do not gain preview knowledge.
 
 ### 4. Validation & Error Matrix
@@ -607,7 +610,7 @@ initializeAfterEffectsPath(configManager);
 - Good: mixed single with a disabled top video track falls back to the next enabled video while retaining linked-audio de-duplication.
 - Base: one visible Command with no Blue marker exports the topmost playhead video plus its linked audio.
 - Good: 3840 x 2160 fits at 50%; 2048 x 1536 fits at 70.3125%, proving height can be the limiting ratio.
-- Base: preview disabled or absent produces the existing source-only JSX without changing snapshot baselines.
+- Base: preview disabled or absent creates one root Source; enabling it creates one centered 1920 x 1080 Preview around that canonical Source.
 - Bad: resize or rename `comp`, open a replacement comp instead, hard-code 50%, use different X/Y scales, or implement preview policy in Settings, a Command, the persistent worker, or AfterEffectsLauncher.
 - Bad: catch every resolver exception and return `None`; this changes explicit errors and can hide range-construction failures.
 - Bad: make Export branch on `TimelineRange.source` or move playhead fallback into the resolver.
@@ -1094,7 +1097,7 @@ const help = getInteractionHelp(command, commands, bindings);
 - Manager: `RuntimeManager.execute({ runtime, capabilityId, entry, commandId, config }) -> ScriptEnvelope`.
 - Internal desktop plan: `{ type: "after-effects-jsx", executable, args: ["-r", "$CLACKLY_JSX"], jsx }`; `AfterEffectsLauncher.execute(plan, { configuredExecutable }) -> { mode: "running" | "cold" }`.
 - Lock: `{ runtimeVersion, platform, architecture, asset, license, sigstore, spdx, releaseStatus }`, with every remote input carrying an HTTPS URL and SHA-256.
-- Packaged metadata: `{ id, runtimeVersion, architecture, executable, assetSha256, releaseStatus, stagedPaths, provenance }` in `runtime.json`.
+- Packaged metadata: `{ id, runtimeVersion, architecture, executable, assetSha256, releaseStatus, stagedPaths, provenance, build: { lockSha256, script, applicationSources: Array<{ path, sha256 }> } }` in `runtime.json`.
 
 ### 3. Contracts
 
@@ -1105,7 +1108,8 @@ const help = getInteractionHelp(command, commands, bindings);
 - Bootstrap `script-execute` validates a relative entry under its canonical staged root and returns the existing nested script envelope. `ScriptContext`, log records, script errors, and JSON results stay compatible.
 - An isolated Python Feature may return the reserved internal After Effects JSX launch plan, but it must not inspect desktop process state or start After Effects. `RuntimeManager` delegates that plan once to the host-injected launcher and strips it before the Capability-facing result.
 - The host launcher revalidates `ae.export.aePath`, requires the exact fixed `-r` JSX argument contract, bounds JSX, creates the script inside the canonical host temp root, and starts After Effects with `shell: false` plus the normal host environment. It retains the running/cold bootstrap behavior and never retries.
-- Windows staging verifies the committed lock before extraction, disables ambient `site`, copies production Python sources, and emits Runtime/license/Sigstore/SPDX/application-SBOM inventory.
+- Windows staging verifies the committed lock before extraction, disables ambient `site`, copies production Python sources, records their sorted staged-relative SHA-256 inventory in `runtime.json.build.applicationSources`, and emits Runtime/license/Sigstore/SPDX/application-SBOM inventory.
+- `package:win` runs `runtime:stage` before the application build and Electron Builder. Package verification independently derives the current production-Python source inventory, requires it to equal the staged metadata, and compares every current source hash with both staging and package payloads. Comparing package only with staging is forbidden because one stale staging tree can otherwise validate itself.
 - Electron packages the Runtime outside asar at `process.resourcesPath/runtimes`.
 - Persistent Export-to-AE uses one hidden managed interpreter with strict READY/PREPARED/JSON-line frames, a 1 MiB response envelope, one active request plus bounded FIFO, and one worker-lifetime isolated temporary directory. Background preparation imports the fixed entry and platform identity without touching Resolve; each request creates a new ScriptContext and reacquires Resolve/project/timeline.
 - The parent starts the 10,000 ms request deadline on write. Timeout, malformed/oversized output, stdin/stdout failure, EOF, native crash, live health-key change, or ResolveAdapterError retirement kills once, waits for close and cleanup, rejects queued work, never retries the failed command, and allows only a later command to start a replacement. Both hosts prewarm and dispose the Python worker independently of the PowerShell AE process probe.
@@ -1117,22 +1121,24 @@ const help = getInteractionHelp(command, commands, bindings);
 - Probe failure/native crash -> typed Probe error; no business launch, reusable failure cache, or retry.
 - Invalid script request/envelope -> `RUNTIME_REQUEST_INVALID` / `RUNTIME_PROTOCOL_INVALID`.
 - Invalid desktop plan/path/arguments/JSX -> `AFTER_EFFECTS_LAUNCH_INVALID`; host preparation or spawn failure -> `AFTER_EFFECTS_LAUNCH_FAILED`. Neither retries or exposes internal JSX in diagnostics.
-- Malformed lock, missing asset, hash mismatch, unsafe staging target, incomplete payload, SBOM failure, or artifact mismatch -> build/package failure before release.
+- Malformed lock, missing asset, hash mismatch, unsafe staging target, incomplete payload, missing/stale application-source inventory, source/staging/package hash drift, SBOM failure, or artifact mismatch -> build/package failure before release.
 - `releaseStatus` remains `candidate` until packaged identity, live Probe miss/hit, Workflow Integration launch, and real Export-to-AE send all pass; patch-family inference is forbidden.
 
 ### 5. Good/Base/Bad Cases
 
 - Good: a hostile parent Python environment still executes the single locked packaged interpreter outside asar.
 - Good: Python returns a bounded JSX plan; the host validates it against `ae.export.aePath`, launches once with the desktop environment, and callers receive only the existing result.
+- Good: changing `resolve2ae_core/export.py` makes package verification fail until staging and packaging rerun from that source.
 - Base: automated package checks pass while live Resolve is absent; retain `candidate` and report the live gate as blocked.
-- Bad: start After Effects from the isolated Python worker, copy desktop variables into the Runtime environment, promote from patch-family assumptions, or retry after launch failure.
+- Bad: start After Effects from the isolated Python worker, copy desktop variables into the Runtime environment, compare only package with a pre-existing staging tree, promote from patch-family assumptions, or retry after launch failure.
 
 ### 6. Tests Required
 
 - Assert Manager order is Resolve -> Probe/cache -> one execution launch and preserves ScriptContext/log/error/result contracts; assert only the three Windows Export-to-AE actions select the persistent launcher while Probe, non-Windows, unsupported entries, and other scripts remain one-shot.
 - Assert Python never starts After Effects, the host launcher validates and spawns exactly once with the host environment, and internal launch metadata is stripped before Provider output.
 - Assert malformed Override, host context, lock, hashes, staging paths, payloads, and envelopes fail closed.
-- Stage/package the locked Runtime, inventory exactly one interpreter plus notices/SBOM, and execute it under hostile Python environment variables.
+- Assert `package:win` orders `runtime:stage` before Electron Builder; stale source metadata, a stale staged source, and a stale packaged source each fail independently.
+- Stage/package the locked Runtime, inventory exactly one interpreter plus notices/SBOM, compare current/staged/packaged application-source identities, and execute it under hostile Python environment variables.
 - Record separate live evidence for Probe miss/hit, Workflow Integration launch, and the real Export-to-AE send before promotion.
 
 ### 7. Wrong vs Correct
@@ -1142,6 +1148,8 @@ const help = getInteractionHelp(command, commands, bindings);
 ```javascript
 spawn("python", [entry]); // PATH-selected and unprobed
 spawn(aePath, ["-r", jsxPath]); // inherits the isolated Runtime environment
+// Comparing release/runtimes only to yesterday's build/runtime-staging lets
+// stale Python source validate itself.
 ```
 
 #### Correct
@@ -1149,6 +1157,7 @@ spawn(aePath, ["-r", jsxPath]); // inherits the isolated Runtime environment
 ```javascript
 await runtimeManager.execute({ runtime: "python", capabilityId, entry, commandId, config });
 await afterEffectsLauncher.execute(plan, { configuredExecutable: config.aePath });
+// package:win stages first; verification requires current source == staging == package.
 ```
 
 ---

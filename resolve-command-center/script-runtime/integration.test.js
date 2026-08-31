@@ -108,7 +108,7 @@ test("bundled After Effects manifests expose one Feature, one visible Command, a
   const definitions = loadCapabilityDefinitions();
   const aeDefinitions = definitions.filter(({ id }) => id === "ae.export");
   assert.equal(aeDefinitions.length, 1);
-  assert.deepEqual(Object.keys(aeDefinitions[0].configSchema), ["aePath", "prefix", "create1080pPreviewComp"]);
+  assert.deepEqual(Object.keys(aeDefinitions[0].configSchema), ["aePath", "create1080pPreviewComp"]);
   assert.deepEqual(aeDefinitions[0].configSchema.create1080pPreviewComp, {
     type: "boolean",
     label: "Create 1080p Preview Comp",
@@ -132,7 +132,7 @@ test("bundled After Effects manifests expose one Feature, one visible Command, a
     .getAllFeatures()
     .filter(({ id }) => id === "ae.export");
   assert.equal(features.length, 1);
-  assert.deepEqual(Object.keys(features[0].configSchema), ["aePath", "prefix", "create1080pPreviewComp"]);
+  assert.deepEqual(Object.keys(features[0].configSchema), ["aePath", "create1080pPreviewComp"]);
   assert.deepEqual(features[0].configSchema.create1080pPreviewComp, {
     type: "boolean",
     label: "Create 1080p Preview Comp",

@@ -10,7 +10,7 @@
     "start:electron": "electron .",
     "build": "vite build",
     "runtime:stage": "powershell -ExecutionPolicy Bypass -File scripts/stage-managed-python.ps1",
-    "package:win": "npm run build && electron-builder --win dir",
+    "package:win": "npm run runtime:stage && npm run build && electron-builder --win dir",
     "package:verify": "node scripts/verify-package.js",
     "palette:evidence": "node scripts/palette-evidence.mjs",
     "settings:evidence": "node scripts/palette-evidence.mjs --renderer built --scenario settings-application-empty,settings-typical-ready,settings-missing-config-long-path,settings-zh-cn-multi-help,settings-busy,settings-error,settings-search-match,settings-search-empty,settings-reduced-motion",
