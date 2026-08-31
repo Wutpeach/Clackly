@@ -1137,3 +1137,24 @@ Added the default-off ae.export preview-comp setting, shared Python config flow,
 ### Status
 
 [OK] **Completed**
+
+
+## Session 52: AE export runtime naming and activation repair
+
+**Date**: 2026-08-31
+**Task**: AE export runtime naming and activation repair
+**Branch**: `main`
+
+### Summary
+
+Fixed stale managed-Python packaging, removed and migrated Composition Prefix, added project-aware Source/Preview naming and organization, unified AE Viewer activation across export modes, verified and installed the Workflow package, and closed real Resolve/AE host acceptance.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `357b2e0` | (see git log) |
+
+### Status
+
+[OK] **Completed**
