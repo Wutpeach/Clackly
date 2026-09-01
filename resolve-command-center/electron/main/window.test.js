@@ -513,6 +513,10 @@ test("the Windows native policy creates an opaque detached Panel with no native 
         this.calls.push(["setIgnoreMouseEvents", value]);
       }
 
+      setSkipTaskbar(value) {
+        this.calls.push(["setSkipTaskbar", value]);
+      }
+
       show() {
         this.calls.push("show");
       }
@@ -552,6 +556,7 @@ test("the Windows native policy creates an opaque detached Panel with no native 
     assert.equal(main.options.thickFrame, true);
     assert.match(main.loadedUrl, /palette-surface=opaque-full-bleed/);
     assert.match(main.loadedUrl, /interaction-panel-mode=detached-native-panel/);
+    assert.deepEqual(main.calls, [["setSkipTaskbar", true]], "D6 reasserts its taskbar policy after native construction");
 
     assert.deepEqual(panel.options, {
       width: 260,
@@ -579,12 +584,18 @@ test("the Windows native policy creates an opaque detached Panel with no native 
     });
     assert.equal(panel.loadedUrl, "http://127.0.0.1:5173/?view=interaction-panel");
     assert.equal(Object.hasOwn(panel.options, "backgroundMaterial"), false);
-    assert.deepEqual(panel.calls, [["setIgnoreMouseEvents", true]], "the visible opacity-zero Panel ignores input immediately");
+    assert.deepEqual(panel.calls, [
+      ["setSkipTaskbar", true],
+      ["setIgnoreMouseEvents", true]
+    ], "D7 reasserts its taskbar policy and ignores input immediately");
     assert.equal(panel.listeners.has("ready-to-show"), false);
     const ready = panel.webContents.listeners.get("did-finish-load");
     assert.equal(typeof ready, "function");
     ready();
-    assert.deepEqual(panel.calls, [["setIgnoreMouseEvents", true]], "renderer readiness has no native visibility or focus transition");
+    assert.deepEqual(panel.calls, [
+      ["setSkipTaskbar", true],
+      ["setIgnoreMouseEvents", true]
+    ], "renderer readiness has no native visibility or focus transition");
   });
 });
 
@@ -877,6 +888,7 @@ test("D7 ignores only a stale focused blur and preserves the ordinary blur-to-hi
     setOpacity(value) { this.opacity = value; this.calls.push(["setOpacity", value]); }
     setIgnoreMouseEvents(value) { this.calls.push(["setIgnoreMouseEvents", value]); }
     setFocusable(value) { this.calls.push(["setFocusable", value]); }
+    blur() { this.calls.push("blur"); }
     emitBlur() { this.listeners.get("blur").forEach((listener) => listener()); }
   }
 
@@ -896,7 +908,7 @@ test("D7 ignores only a stale focused blur and preserves the ordinary blur-to-hi
   assert.deepEqual(d7.calls, [
     ["setOpacity", 0],
     ["setIgnoreMouseEvents", true],
-    ["setFocusable", false]
+    "blur"
   ]);
 
   const defaultPalette = createPaletteWindow({}, FakeBrowserWindow);
@@ -991,7 +1003,7 @@ test("palette anchors its visible main top-left at the cursor inside the padded 
   assert.deepEqual({ x: calls[0][1] + PALETTE_SHADOW_PADDING, y: calls[0][2] + PALETTE_SHADOW_PADDING }, { x: 100, y: 100 });
 });
 
-test("D6 anchors its full-bleed native Palette at the cursor and keeps opacity conceal/reveal persistent", () => {
+test("D6 keeps focusability stable so taskbar policy reassertion never produces an AddTab lifecycle", () => {
   const calls = [];
   let visible = false;
   let opacity = 0;
@@ -1001,6 +1013,7 @@ test("D6 anchors its full-bleed native Palette at the cursor and keeps opacity c
     getOpacity: () => opacity,
     setPosition: (x, y) => calls.push(["setPosition", x, y]),
     setFocusable: (value) => calls.push(["setFocusable", value]),
+    setSkipTaskbar: (value) => calls.push(["setSkipTaskbar", value]),
     setIgnoreMouseEvents: (value) => calls.push(["setIgnoreMouseEvents", value]),
     setOpacity: (value) => {
       opacity = value;
@@ -1011,6 +1024,7 @@ test("D6 anchors its full-bleed native Palette at the cursor and keeps opacity c
       calls.push("show");
     },
     focus: () => calls.push("focus"),
+    blur: () => calls.push("blur"),
     hide: () => calls.push("hide"),
     minimize: () => calls.push("minimize"),
     restore: () => calls.push("restore"),
@@ -1027,7 +1041,7 @@ test("D6 anchors its full-bleed native Palette at the cursor and keeps opacity c
   showPaletteWindow(window, options);
   assert.deepEqual(calls, [
     ["setPosition", 100, 100],
-    ["setFocusable", true],
+    ["setSkipTaskbar", true],
     ["setIgnoreMouseEvents", false],
     ["setOpacity", 1],
     "show"
@@ -1038,14 +1052,14 @@ test("D6 anchors its full-bleed native Palette at the cursor and keeps opacity c
   assert.deepEqual(calls, [
     ["setOpacity", 0],
     ["setIgnoreMouseEvents", true],
-    ["setFocusable", false]
+    "blur"
   ]);
 
   calls.length = 0;
   showPaletteWindow(window, options);
   assert.deepEqual(calls, [
     ["setPosition", 100, 100],
-    ["setFocusable", true],
+    ["setSkipTaskbar", true],
     ["setIgnoreMouseEvents", false],
     ["setOpacity", 1],
     "focus"
@@ -1054,6 +1068,44 @@ test("D6 anchors its full-bleed native Palette at the cursor and keeps opacity c
   assert.equal(calls.includes("hide"), false);
   assert.equal(calls.includes("minimize"), false);
   assert.equal(calls.includes("restore"), false);
+  assert.equal(calls.some(([name]) => name === "setFocusable"), false, "D6 never toggles focusability during reveal or conceal");
+});
+
+test("D6 conceal blur re-entry is absorbed after opacity and mouse input are disabled", () => {
+  withoutDevRenderer(() => {
+    const calls = [];
+    class FakeBrowserWindow {
+      constructor() {
+        this.listeners = new Map();
+        this.opacity = 1;
+      }
+
+      loadFile() {}
+      center() {}
+      on(event, listener) { this.listeners.set(event, listener); }
+      isDestroyed() { return false; }
+      isVisible() { return true; }
+      getOpacity() { return this.opacity; }
+      setSkipTaskbar(value) { calls.push(["setSkipTaskbar", value]); }
+      setOpacity(value) { this.opacity = value; calls.push(["setOpacity", value]); }
+      setIgnoreMouseEvents(value) { calls.push(["setIgnoreMouseEvents", value]); }
+      blur() {
+        calls.push("blur");
+        this.listeners.get("blur")();
+      }
+    }
+
+    const palette = createPaletteWindow({ surface: PALETTE_SURFACE.OPAQUE_FULL_BLEED }, FakeBrowserWindow);
+    calls.length = 0;
+
+    hidePaletteWindow(palette);
+
+    assert.deepEqual(calls, [
+      ["setOpacity", 0],
+      ["setIgnoreMouseEvents", true],
+      "blur"
+    ]);
+  });
 });
 
 test("D6 uses the 240×320 native footprint for work-area flipping", () => {

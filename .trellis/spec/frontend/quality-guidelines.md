@@ -48,7 +48,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Launcher and Search always occupy the fixed visible `240x320` Palette main rectangle. Interaction Panel open/closed remains Palette-local presentation state. The renderer sends only bounded integer `{ anchorY, contentHeight }` metrics plus a validated read-only presentation snapshot; it never supplies screen coordinates, bounds, width, height, shapes, padding, resize policy, commands, query, selection, or arbitrary HTML.
 - `electron/shared/palette-geometry.json` is the single cross-layer authority for the main `240x320`, `#151619` surface, `8px` main radius, Panel `260px` width, `16px` gap, `60–180px` height, `8px` inset, `4px` Panel radius, and visual elevation. Native helpers, browser-preview metrics, JSX style projection, and CSS must consume it rather than copy geometry.
 - `selectPaletteHostPolicy()` is the only Windows native-surface selector. It maps both `standalone` and `workflow` on `win32` to D6/D7 independent of renderer URL, `--dev-renderer`, or `app.isPackaged`; non-Windows maps to the compatible transparent attached fallback. Settings is outside this policy.
-- Windows D6 main construction is `240x320`, `frame:false`, `transparent:false`, `backgroundColor:"#151619"`, `roundedCorners:true`, `thickFrame:true`, `minimizable:false`, `skipTaskbar:true`, and `alwaysOnTop:true`, with no Mica and no base `setShape`. The renderer receives the neutral opaque full-bleed surface marker and paints at `0,0`; DWM owns the outer corners/shadow. First reveal may call `show()` only because the persistent window starts hidden. Repeated conceal/reveal uses immediate `setOpacity(0/1)`, mouse/focus gating, cursor-origin placement, and focus—never minimize, restore, hide/show, timer, or authored motion.
+- Windows D6 main construction is `240x320`, `frame:false`, `transparent:false`, `backgroundColor:"#151619"`, `roundedCorners:true`, `thickFrame:true`, `minimizable:false`, `skipTaskbar:true`, and `alwaysOnTop:true`, with no Mica and no base `setShape`. The renderer receives the neutral opaque full-bleed surface marker and paints at `0,0`; DWM owns the outer corners/shadow. D6 stays focusable for its entire lifetime. First reveal may call `show()` only because the persistent window starts hidden. Every reveal reasserts `setSkipTaskbar(true)`, then enables mouse input and restores opacity before native `show()` or `focus()`. Repeated conceal/reveal uses immediate `setOpacity(0/1)`, mouse gating, cursor-origin placement, focus, and conceal order `setOpacity(0) -> setIgnoreMouseEvents(true) -> blur()`—never minimize, restore, hide/show, timer, or authored motion. Toggling D6 focusability is forbidden: on Windows in Electron 36.3.2, `setFocusable(true)` internally calls `SetSkipTaskbar(false)` / `AddTab`, and the compensating taskbar reassertion yields an Explorer `AddTab`/`DeleteTab` flash. The logical-shown blur guard absorbs the blur event after conceal without recursion.
 - Windows D7 constructs one persistent detached opaque `260x60` Panel window with `show:true`, `opacity:0`, `frame:false`, `transparent:false`, `backgroundColor:"#151619"`, `roundedCorners:true`, `thickFrame:true`, `minimizable:false`, `skipTaskbar:true`, `alwaysOnTop:true`, and `focusable:false`. It ignores mouse immediately and remains constructor-only nonfocusable: readiness, open, update, and close never call `setFocusable`, `show`, `hide`, `minimize`, or `restore`. The host positions it at main right plus a real screen-space `16px` gap and bounds height to `60–180px`.
 - The D7 controller owns Panel creation/recreation, readiness, combined work-area clamp, main-bounds restoration, and lifecycle. A no-state close is a true native no-op. Open/update validate the bounded snapshot, retain the main as focus/selection authority, enable Panel mouse input, send presentation, and set opacity `1`. Actual close sets opacity `0`, ignores mouse, clears presentation, restores the main bounds, deletes state, and restores main focus only when explicitly requested and absent. Unready, destroyed, invalid, or failed delivery paths fail closed without hiding or unfocusing the usable main.
 - Windows native blur ignores only a queued event for which `mainWindow.isFocused()` is already true; a real unfocused blur still follows the logical-shown conceal path. This narrow guard prevents Electron focus feedback from a redundant detached operation and is not a debounce or general blur exemption.
@@ -89,8 +89,10 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Good: Opening Interaction Info on Windows D7 keeps the opaque `240x320` main at left, opens the separately native `260px` Panel at its clamped anchor with no HWND in the real `16px` gap, and restores exact original main bounds on close/hide/failure.
 - Base: Windows standalone dev, built, packaged, and Workflow select identical D6/D7 construction and opacity/mouse lifecycle; non-Windows selects the attached transparent compatibility fallback.
 - Good: registering a Command with declared description/category/icon makes it appear correctly without renderer edits.
+- Good: D6 retains its construction focusability, reasserts `setSkipTaskbar(true)`, enables mouse input, and only then restores opacity and calls native `show()` or `focus()`; conceal uses opacity `0`, mouse-ignore, and `blur()`.
 - Bad: UI code checks `if (query === "marker")` or invokes Resolve APIs directly.
 - Bad: searching category labels, adding production prototype fixtures, sending renderer-provided bounds/shape/position, using a general resize protocol, or dynamically routing whole-window mouse events.
+- Bad: toggling D6 focusability during reveal or conceal. Electron 36.3.2 maps `setFocusable(true)` to taskbar `AddTab` and a compensating `setSkipTaskbar(true)` to `DeleteTab`, which flashes the Windows taskbar icon.
 
 ### 6. Tests Required
 
@@ -100,7 +102,7 @@ Frontend code includes Electron main-process code, Workflow Integration Plugin m
 - Assert registered Command presentation is preserved, an empty registered catalog stays empty, and no shortcut/prototype entries are synthesized in production presentation.
 - Assert Launcher and Search exclude `presentation: "internal"` Commands while `listCommands()`/`getCommandById()` still return them, and that the shared presentability predicate has no Command-id branches.
 - Assert the pure policy matrix maps Windows standalone dev/built/packaged and Workflow to D6/D7 independently of URL/`app.isPackaged`, with non-Windows attached fallback and Settings outside the selector.
-- Assert Windows D6 exact `240x320` opaque options, no base shape, cursor/work-area placement, first native show only, and repeat immediate opacity `0/1` conceal/reveal; assert the fallback retains its documented transparent padded shape contract.
+- Assert Windows D6 exact `240x320` opaque options, no base shape, cursor/work-area placement, first native show only, and repeat immediate opacity `0/1` conceal/reveal. Both first and repeated reveal must assert no `setFocusable` call and `setSkipTaskbar(true) -> setIgnoreMouseEvents(false) -> setOpacity(1) -> show/focus`; conceal must assert `setOpacity(0) -> setIgnoreMouseEvents(true) -> blur()` plus idempotent blur-event re-entry. Assert the fallback retains its documented transparent padded shape contract.
 - Assert Windows D7 exact persistent opaque constructor, real `16px` screen-space gap, `60–180px` height clamp, prewarm `show:true`/opacity `0`, constructor-only `focusable:false`, mouse gating, no post-construction show/hide/minimize/restore/focusability calls, no-state close no-op, idempotent update, original-main restoration, fail-closed recreation/delivery, and stale-versus-real blur handling.
 - Assert the `.palette-shell` suppresses only its own focus outline while control `:focus-visible` rules remain.
 - Assert Settings remains its painted square (`0px`) transparent contract; Windows D6/D7 owns native corners/shadow while renderer main/Panel paint the shared `8px`/`4px` content radii, and the fallback retains its padded renderer-shadow contract.
@@ -140,6 +142,28 @@ const nativePolicy = !app.isPackaged && shouldLoadDevRenderer()
 ```javascript
 const policy = selectPaletteHostPolicy({ host, platform: process.platform });
 // Renderer URL and packaged state select loading/distribution, never Windows surface policy.
+```
+
+#### Wrong
+
+```javascript
+window.setFocusable(true); // Electron 36.3.2 also performs SetSkipTaskbar(false) / AddTab.
+window.setSkipTaskbar(true); // DeleteTab flashes Explorer on every reveal.
+window.setOpacity(1);
+window.show();
+```
+
+#### Correct
+
+```javascript
+window.setSkipTaskbar(true);
+window.setIgnoreMouseEvents(false);
+window.setOpacity(1);
+window.show();
+
+window.setOpacity(0);
+window.setIgnoreMouseEvents(true);
+window.blur();
 ```
 
 ---

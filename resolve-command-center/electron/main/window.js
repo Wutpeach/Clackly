@@ -40,6 +40,7 @@ const SETTINGS_SIZE = Object.freeze({
 const interactionPanelState = new WeakMap();
 const detachedInteractionPanelState = new WeakMap();
 const readyDetachedInteractionPanels = new WeakSet();
+const d6PaletteWindows = new WeakSet();
 
 function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -78,6 +79,11 @@ function setPaletteShape(window, rectangles) {
   } catch (_error) {
     return false;
   }
+}
+
+function keepPaletteWindowOffTaskbar(window) {
+  if (typeof window?.setSkipTaskbar !== "function") return;
+  window.setSkipTaskbar(true);
 }
 
 function normalizeInteractionPanelMetrics(metrics) {
@@ -271,6 +277,14 @@ function getPaletteInset(options) {
   return usesD6OpaqueFullBleed(options) ? 0 : PALETTE_SHADOW_PADDING;
 }
 
+function isD6PaletteWindow(window, options) {
+  if (usesD6OpaqueFullBleed(options)) {
+    d6PaletteWindows.add(window);
+    return true;
+  }
+  return d6PaletteWindows.has(window);
+}
+
 function positionPaletteNearCursor(window, screenApi, options = {}) {
   const cursorPoint = screenApi.getCursorScreenPoint();
   const workArea = screenApi.getDisplayNearestPoint(cursorPoint).workArea;
@@ -321,6 +335,7 @@ function createPaletteWindow(options = {}, BrowserWindowType = BrowserWindow) {
       sandbox: false
     }
   });
+  if (opaqueFullBleed) d6PaletteWindows.add(window);
 
   loadRenderer(window, undefined, opaqueFullBleed
     ? {
@@ -330,6 +345,7 @@ function createPaletteWindow(options = {}, BrowserWindowType = BrowserWindow) {
         : {})
     }
     : undefined);
+  keepPaletteWindowOffTaskbar(window);
   window.center();
   if (!opaqueFullBleed) setPaletteShape(window, paletteBaseShape());
 
@@ -443,6 +459,7 @@ function createDetachedInteractionPanelWindow(BrowserWindowType = BrowserWindow)
       sandbox: false
     }
   });
+  keepPaletteWindowOffTaskbar(window);
   window.setIgnoreMouseEvents(true);
   loadRenderer(window, "interaction-panel");
   window.webContents.once("did-finish-load", () => {
@@ -588,7 +605,11 @@ function showPaletteWindow(window, options = {}) {
     positionPaletteNearCursor(window, screenApi, options);
   }
 
-  window.setFocusable(true);
+  const d6Palette = isD6PaletteWindow(window, options);
+  // On Windows, Electron maps focusability changes to taskbar tab changes.
+  // D6 stays focusable for its lifetime, so reveals never produce AddTab/DeleteTab.
+  if (!d6Palette) window.setFocusable(true);
+  keepPaletteWindowOffTaskbar(window);
   window.setIgnoreMouseEvents(false);
   window.setOpacity(1);
   if (window.isVisible()) {
@@ -611,7 +632,11 @@ function hidePaletteWindow(window, options = {}) {
 
   window.setOpacity(0);
   window.setIgnoreMouseEvents(true);
-  window.setFocusable(false);
+  if (isD6PaletteWindow(window, options)) {
+    window.blur();
+  } else {
+    window.setFocusable(false);
+  }
 }
 
 module.exports = {
