@@ -1158,3 +1158,24 @@ Fixed stale managed-Python packaging, removed and migrated Composition Prefix, a
 ### Status
 
 [OK] **Completed**
+
+
+## Session 53: Fix Palette taskbar flash on reveal
+
+**Date**: 2026-09-01
+**Task**: Fix Palette taskbar flash on reveal
+**Branch**: `main`
+
+### Summary
+
+Removed the Electron 36 AddTab/DeleteTab cycle by keeping Windows D6 focusable for its lifetime, concealing with opacity, mouse-ignore, and blur; preserved D7, Settings, native geometry, and the paused blue-border behavior. Passed 49 focused and 391 Node tests, all Python suites, build, Windows package verification, installed hash parity, and user Resolve acceptance across repeated reveals and focus return. No Trellis task archive was created because the user had explicitly declined task creation for this lightweight repair.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2eb8d7a` | (see git log) |
+
+### Status
+
+[OK] **Completed**
