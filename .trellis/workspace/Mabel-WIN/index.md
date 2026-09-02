@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 53
-- **Last Active**: 2026-09-01
+- **Total Sessions**: 54
+- **Last Active**: 2026-09-02
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1181 | Active |
+| `journal-1.md` | ~1202 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 54 | 2026-09-02 | Internal Beta installer | `fab140e` | `main` |
 | 53 | 2026-09-01 | Fix Palette taskbar flash on reveal | `2eb8d7a` | `main` |
 | 52 | 2026-08-31 | AE export runtime naming and activation repair | `357b2e0` | `main` |
 | 51 | 2026-08-30 | Add optional 1080p AE preview comp | `7e3327c` | `main` |

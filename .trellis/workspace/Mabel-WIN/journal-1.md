@@ -1179,3 +1179,24 @@ Removed the Electron 36 AddTab/DeleteTab cycle by keeping Windows D6 focusable f
 ### Status
 
 [OK] **Completed**
+
+
+## Session 54: Internal Beta installer
+
+**Date**: 2026-09-02
+**Task**: Internal Beta installer
+**Branch**: `main`
+
+### Summary
+
+Built and qualified a self-contained Windows x64 internal Beta ZIP with verified package identity, safe one-click install and exact-target uninstall, transactional upgrade rollback, Unicode/UAC-safe entry handling, full automated coverage, independent review, real ProgramData install, Resolve acceptance, and uninstall/reinstall validation.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fab140e` | (see git log) |
+
+### Status
+
+[OK] **Completed**
