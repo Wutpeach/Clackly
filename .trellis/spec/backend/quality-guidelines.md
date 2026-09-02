@@ -1300,6 +1300,82 @@ const records = await processProbe.query();
 const running = validateCanonicalConfiguredPath(records);
 ```
 
+## Scenario: Internal Beta Workflow Distribution
+
+### 1. Scope / Trigger
+
+- Trigger: assembling or changing the self-contained Windows x64 internal Beta ZIP, its one-click installer/uninstaller, or the ProgramData Workflow Integration transaction.
+- This distribution layer composes the existing verified Electron/managed-Runtime package. It does not own renderer, D6/D7, Settings, Capability behavior, user-data schema, or public-release signing.
+
+### 2. Signatures
+
+- Build: `npm run beta:package` -> `release/internal-beta/Clackly-Beta-<version>-win-x64.zip`.
+- Entries: `安装 Clackly.bat -> tools/Install-Clackly.ps1`; `卸载 Clackly.bat -> tools/Uninstall-Clackly.ps1`.
+- Production target: `%PROGRAMDATA%\Blackmagic Design\DaVinci Resolve\Support\Workflow Integration Plugins\com.wutpeach.clackly`.
+- Transaction result: `{ Success: boolean, Code: number, Message: string, RetainedPath: string, RetainedPaths: string[] }`; `RetainedPath` is compatibility-only and aliases the first complete retained-path entry.
+
+### 3. Contracts
+
+- `beta:package` runs `package:win` then `package:verify` before distribution assembly. Package/Workflow manifest versions must agree, and `WorkflowIntegration.node` must match the qualified size and SHA-256.
+- The ZIP carries the complete `win-unpacked`, while installation maps `resources/app` to the plugin root and external `resources/runtimes` to `<plugin>/resources/runtimes`.
+- The builder validates every existing source ancestor and the complete source tree with lstat semantics before it removes a previous owned Beta directory or ZIP. Junction, symlink, dangling-link, special-entry, traversal, duplicate, or case-collision input fails without changing the prior artifact.
+- The package writes a sorted exact `SHA256SUMS.txt`, re-verifies it before compression, extracts the final ZIP to a disposable directory, and requires inventory/hash identity with the pre-ZIP tree.
+- Consumer scripts require only Windows PowerShell 5.1. UAC relaunch uses the fixed `$PSHOME\powershell.exe`; native `Start-Process -ArgumentList` double-quotes the canonical `-File` path. PowerShell single-quoted literals are not valid Win32 argv quoting.
+- Resolve running or indeterminate fails closed; the installer never terminates Resolve. Production entries expose no arbitrary plugin-root or failure-injection parameter.
+- Package and plugin roots validate every existing ancestor as a normal directory with no reparse/link component. Sources, stage, backup, active target, failed candidate, and uninstall tombstone are revalidated immediately before copy/move/remove transitions.
+- Install builds and verifies a same-parent stage, renames a recognized old target to backup, activates by rename, verifies the active inventory, and restores the backup on activation failure. Same-version reinstall and older-to-newer upgrade are supported; downgrade, foreign/corrupt target, file, or reparse target is refused.
+- Cleanup never risks a verified active target. Any rollback/cleanup failure returns every surviving task-owned stage/backup/failed/tombstone path in `RetainedPaths`, and production entries print each path.
+- Uninstall renames only the recognized exact target to a same-parent tombstone before deletion. It preserves sibling plugins and never reads, moves, or deletes `%APPDATA%\Clackly`.
+
+### 4. Validation & Error Matrix
+
+- Missing/malformed/hash-drifted package, version/id/native/Runtime mismatch, unsafe inventory/source/ancestor -> invalid-package failure before target or previous-artifact mutation.
+- Resolve running or process query indeterminate -> Resolve-closed failure before staging/tombstone creation.
+- Missing target during uninstall -> idempotent success. File, foreign/corrupt/newer/reparse target -> unsafe-target refusal without deletion.
+- Stage/copy/pre-activation verification failure -> remove only task-owned stage and leave the old active target unchanged.
+- Failure after backup/activation -> move failed candidate aside, restore and verify backup, report activation failure. Restoration failure -> distinct rollback failure plus all surviving transaction paths.
+- Verified active install plus backup/stage cleanup failure -> cleanup failure; keep the active target and report every retained path.
+- Uninstall tombstone deletion failure -> cleanup failure with the surviving tombstone; never broaden deletion to its parent.
+
+### 5. Good/Base/Bad Cases
+
+- Good: an extracted path containing spaces, Chinese characters, `&`, and an apostrophe reaches the elevated PowerShell entry with `-Elevated` and preserves its exit code.
+- Good: an unsafe source junction makes a rebuild fail while the previous verified Beta directory and ZIP remain byte-identical.
+- Base: fresh install, same-version reinstall, upgrade, idempotent uninstall, and reinstall all preserve `%APPDATA%\Clackly`.
+- Bad: delete the old plugin before the replacement tree is staged and verified.
+- Bad: use `GetFullPath` as physical containment, inspect only the final target, or follow an ancestor junction into a different backing tree.
+- Bad: return only a backup path when a failed candidate or tombstone also survives.
+
+### 6. Tests Required
+
+- Assert build composition, version/native authority, exact hash inventory, Unicode paths, ZIP extraction identity, and unsafe-source rejection before old-output cleanup.
+- Execute PowerShell transaction fixtures for fresh/reinstall/upgrade/downgrade, stage and active drift, failures before/after backup, rollback failure, cleanup-after-restore, and uninstall cleanup; compare surviving task-owned paths with `RetainedPaths` exactly.
+- Create nested and ancestor junction/dangling-link fixtures for package roots, plugin roots, active targets, and owned outputs; assert failure precedes any sentinel, sibling, old artifact, or user-data mutation.
+- Run a real non-UAC `Start-Process` probe through the production argument builder from a path containing spaces, Chinese, `&`, and an apostrophe; assert the switch and chosen child exit code survive native parsing.
+- Run full Node/Python tests, build, Windows package, package verification, Beta assembly, `git diff --check`, an independent destructive-scope review, and then a controlled real install while Resolve is closed.
+- For real install/uninstall, compare payload and ProgramData inventories/hashes, verify no transaction remnants, preserve sibling plugins and `%APPDATA%\Clackly`, reinstall the accepted artifact, then record separate Resolve host acceptance on a local project.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```powershell
+Remove-Item -LiteralPath $Target -Recurse -Force
+Copy-Item -LiteralPath $Package -Destination $Target -Recurse
+$arguments = "-File '$PSCommandPath' -Elevated" # single quotes do not delimit Win32 argv
+```
+
+#### Correct
+
+```powershell
+Assert-ClacklyNormalAncestorChain -Path $PluginRoot
+Assert-ClacklyInstalledTree -Target $Stage -Package $Package
+Move-Item -LiteralPath $Target -Destination $Backup
+Move-Item -LiteralPath $Stage -Destination $Target
+Assert-ClacklyInstalledTree -Target $Target -Package $Package
+$arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $canonicalScript + '" -Elevated'
+```
+
 ## Forbidden Patterns
 
 - Machine-specific absolute paths in startup scripts.
