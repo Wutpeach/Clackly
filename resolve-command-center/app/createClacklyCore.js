@@ -88,6 +88,7 @@ function createClacklyCore({
   });
   if (!afterEffectsProcessProbe || typeof afterEffectsProcessProbe.prewarm !== "function"
     || typeof afterEffectsProcessProbe.query !== "function"
+    || typeof afterEffectsProcessProbe.getForegroundProcessName !== "function"
     || typeof afterEffectsProcessProbe.dispose !== "function") {
     throw new TypeError("Clackly Core requires an After Effects process probe lifecycle");
   }
@@ -165,6 +166,7 @@ function createClacklyCore({
     prewarmExportPythonWorker: () => runtimeManager.prewarmExportPythonWorker(),
     disposeExportPythonWorker: () => runtimeManager.disposeExportPythonWorker(),
     prewarmAfterEffectsProcessProbe: () => afterEffectsProcessProbe.prewarm(),
+    getForegroundProcessName: () => afterEffectsProcessProbe.getForegroundProcessName(),
     disposeAfterEffectsProcessProbe: () => afterEffectsProcessProbe.dispose()
   };
 }

@@ -317,7 +317,11 @@ if (!hasSingleInstanceLock) {
       initializeAfterEffectsPath: () => initializeAfterEffectsPath(core.configManager),
       createPaletteWindow: createWorkflowPaletteWindow,
       registerIpcHandlers,
-      registerPaletteHotkey: () => registerPaletteHotkey(togglePalette),
+      registerPaletteHotkey: () => registerPaletteHotkey(
+        togglePalette,
+        () => Boolean(paletteWindow && isPaletteWindowShown(paletteWindow)),
+        core.getForegroundProcessName
+      ),
       reportInitializationError: (error) => {
         console.error(error);
         const locale = core.localizationService.getSnapshot().effectiveLocale;

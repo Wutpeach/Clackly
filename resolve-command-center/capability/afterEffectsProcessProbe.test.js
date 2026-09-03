@@ -130,6 +130,62 @@ test("a user query arriving during prewarm shares the helper but waits for its o
   assert.equal(spawns.length, 1);
 });
 
+test("serializes fresh foreground-process queries through the prewarmed helper", async (t) => {
+  const { children, probe, spawns } = fixture(t);
+  const warming = probe.prewarm();
+
+  assert.equal(spawns.length, 1);
+  await readyForQuery(children[0]);
+  assert.deepEqual(children[0].stdin.writes, [["QUERY 1\n", "utf8"]]);
+  response(children[0], result(1));
+  assert.equal(await warming, true);
+
+  const first = probe.getForegroundProcessName();
+  assert.equal(spawns.length, 1);
+  assert.deepEqual(children[0].stdin.writes, [
+    ["QUERY 1\n", "utf8"],
+    ["FOREGROUND 2\n", "utf8"]
+  ]);
+
+  const second = probe.getForegroundProcessName();
+  response(children[0], { requestId: 2, processName: "Resolve.exe" });
+  assert.equal(await first, "Resolve.exe");
+
+  assert.deepEqual(children[0].stdin.writes, [
+    ["QUERY 1\n", "utf8"],
+    ["FOREGROUND 2\n", "utf8"],
+    ["FOREGROUND 3\n", "utf8"]
+  ]);
+  response(children[0], { requestId: 3, processName: "Resolve.exe" });
+  assert.equal(await second, "Resolve.exe");
+});
+
+test("rejects malformed foreground output closed", async (t) => {
+  const { children, probe } = fixture(t);
+  const pending = probe.getForegroundProcessName();
+  await readyForQuery(children[0]);
+  response(children[0], { requestId: 1, processName: "C:\\Resolve.exe" });
+
+  await assert.rejects(pending, (error) => error.details.reason === "malformed-response");
+  assert.equal(children[0].killed, 1);
+});
+
+test("a failed foreground query retires the helper before the next fresh request", async (t) => {
+  const { children, probe, spawns } = fixture(t);
+  const failed = probe.getForegroundProcessName();
+  await readyForQuery(children[0]);
+  response(children[0], { requestId: 1, error: "foreground-query-failed" });
+
+  await assert.rejects(failed, (error) => error.details.reason === "foreground-query-failed");
+  assert.equal(children[0].killed, 1);
+
+  const recovered = probe.getForegroundProcessName();
+  assert.equal(spawns.length, 2);
+  await readyForQuery(children[1]);
+  response(children[1], { requestId: 2, processName: "Resolve.exe" });
+  assert.equal(await recovered, "Resolve.exe");
+});
+
 test("a failed background prewarm is silent to later query recovery and does not retry itself", async (t) => {
   const { children, probe, spawns } = fixture(t);
   const warming = probe.prewarm();
@@ -244,5 +300,6 @@ test("non-Windows paths never spawn and report a stopped live-process set", asyn
   });
   assert.equal(await probe.prewarm(), false);
   assert.deepEqual(await probe.query(), { processCount: 0, records: [] });
+  assert.equal(await probe.getForegroundProcessName(), null);
   assert.equal(spawned, false);
 });

@@ -1240,16 +1240,18 @@ const result = await mediaPoolAdapter.importMediaToBin({ diskPath, binName: "Cli
 ### 2. Signatures
 
 - Probe: `new WindowsAfterEffectsProcessProbe({ hostEnvironment?, platform?, spawnProcess?, setTimer?, clearTimer?, startupTimeoutMs?, queryTimeoutMs? })`.
-- Lifecycle: `prewarm() -> Promise<boolean>`, `query() -> Promise<{ processCount: number, records: ProcessRecord[] }>`, and `dispose() -> void`.
+- Lifecycle: `prewarm() -> Promise<boolean>`, `query() -> Promise<{ processCount: number, records: ProcessRecord[] }>`, `getForegroundProcessName() -> Promise<string | null>`, and `dispose() -> void`.
 - Record: `{ status: "ok", path: string } | { status: "unresolved" }`.
-- Core lifecycle: `prewarmAfterEffectsProcessProbe() -> Promise<boolean>` and `disposeAfterEffectsProcessProbe() -> void`; the raw probe is not exposed.
+- Core lifecycle: `prewarmAfterEffectsProcessProbe() -> Promise<boolean>`, `getForegroundProcessName() -> Promise<string | null>`, and `disposeAfterEffectsProcessProbe() -> void`; the raw probe is not exposed.
 
 ### 3. Contracts
 
 - One hidden `shell: false` Windows PowerShell child belongs to one Clackly Core and lives no longer than its Electron host.
-- The fixed helper protocol accepts only `QUERY <positive-safe-integer-id>`. It receives no AE configuration path, JSX, project data, or arbitrary command text.
+- The fixed helper protocol accepts only `QUERY <positive-safe-integer-id>` and `FOREGROUND <positive-safe-integer-id>`. It receives no AE configuration path, JSX, project data, renderer input, or arbitrary command text.
 - `prewarm()` performs one real enumeration and discards it. Every Export-to-AE invocation calls `query()` again and therefore observes fresh process state rather than a cached prewarm result.
-- Queries serialize through one helper. Prewarm plus a concurrent user query must not start a second PowerShell process or let the user consume the discarded result.
+- AE and foreground queries serialize through one helper. Prewarm plus a concurrent query must not start a second PowerShell process or let the caller consume the discarded prewarm result.
+- The helper compiles the fixed `GetForegroundWindow` binding before READY. Every hidden-Palette hotkey reveal asks for a fresh foreground process name without paying a new process or `Add-Type` startup cost.
+- When the helper session is already READY and idle, enqueuing the first foreground request writes it to helper stdin in the same call stack. Do not route this ready path through `Promise.resolve()` / `.then()`; Electron can defer that microtask long enough to create user-visible shortcut latency. Startup and queued requests keep their existing asynchronous/serialized paths.
 - Node owns canonical regular-file validation and case-insensitive Windows path identity. A matching configured executable means running; valid nonmatches mean stopped; any unresolved candidate without a validated match means unknown/fail-closed; a validated match wins over other unresolved candidates.
 - Startup, query, and output are bounded. Protocol/timeout/child failure rejects the current work, terminates the helper, and performs no retry for that export. A later command may start one replacement helper.
 - Both standalone and Workflow hosts start prewarm without delaying Palette/IPC/hotkey/Resolve readiness and call disposal during `will-quit`.
@@ -1259,6 +1261,8 @@ const result = await mediaPoolAdapter.importMediaToBin({ diskPath, binName: "Cli
 - Missing `SystemRoot`, spawn/stdio failure, invalid READY, timeout, child exit, malformed/non-UTF-8/oversized output, wrong request id, unknown fields, inconsistent count, or record overflow -> `AFTER_EFFECTS_PROCESS_PROBE_FAILED`; terminate the helper.
 - Probe failure during launcher detection -> existing `AFTER_EFFECTS_LAUNCH_FAILED`; create no AE process or startup bootstrap.
 - Zero records or all canonical valid nonmatches -> confirmed stopped and use the existing cold path exactly once.
+- Foreground query returns one bounded basename ending in `.exe`; malformed names, paths, protocol errors, and lookup failure reject and retire the helper so Palette reveal fails closed.
+- Non-Windows foreground query -> `null` without spawning.
 - Exact configured canonical path -> confirmed running and send `-r <temporary-jsx>` exactly once.
 - Unresolved record without a match -> unknown/fail-closed. Exact match plus unresolved record -> confirmed running.
 - Helper failure during background prewarm -> host remains ready; a later user command may start a new helper but the failed prewarm does not retry itself.
@@ -1266,15 +1270,20 @@ const result = await mediaPoolAdapter.importMediaToBin({ diskPath, binName: "Cli
 ### 5. Good/Base/Bad Cases
 
 - Good: background prewarm pays the helper's first-query cost, discards the result, and request id 2 performs a new enumeration for the first export.
+- Good: after the same prewarm, repeated foreground requests return fresh process names through that helper without another spawn.
+- Good: an idle READY helper receives the first `FOREGROUND` write synchronously; a second request remains queued until the first response clears `active`.
 - Base: one helper services repeated fresh queries at about a few milliseconds each and exits with the host.
 - Good: failure kills the helper and the next command creates one replacement without replaying the failed export.
 - Bad: cache `isAfterEffectsRunning` from startup or reuse the prewarm response for an export.
+- Bad: always call `ensureStarted().then(sendNext)` from `drain()`, including when the helper is already READY and idle.
 - Bad: check only the process name, accept another AE installation, expose raw paths/errors in logs, or leave PowerShell alive after host shutdown.
 
 ### 6. Tests Required
 
 - Assert fixed encoded script/arguments, hidden no-shell pipes, readiness, timeout/output/record bounds, strict schema/request ids, and no configuration/JSX on stdin.
 - Assert prewarm performs exactly one discarded enumeration; a concurrent user query receives a distinct later response through the same child.
+- Assert foreground requests reuse the prewarmed child, serialize with AE queries, validate exact response shape/name bounds, and retire/restart the helper on failure.
+- Assert the first idle READY foreground write is observable before any microtask yield, and prove the assertion fails when the ready-session fast path is removed; assert the second request still waits for the first response.
 - Assert zero/match/nonmatch/unresolved/match-plus-unresolved truth-table behavior and canonical-path validation.
 - Assert unknown state performs zero AE spawn and zero bootstrap write; warm and cold modes spawn once with unchanged arguments.
 - Assert active/queued work rejects on failure, no same-command retry occurs, later restart works, and disposal is idempotent and terminates the real child.
@@ -1298,6 +1307,17 @@ queueMicrotask(() => core.prewarmAfterEffectsProcessProbe().catch(() => {}));
 // Each export still asks for a fresh process-table enumeration.
 const records = await processProbe.query();
 const running = validateCanonicalConfiguredPath(records);
+```
+
+For latency-sensitive ready sessions, the queue drain must keep the synchronous fast path:
+
+```javascript
+// Wrong: defers every ready-helper write through a Promise callback.
+this.ensureStarted().then(() => this.sendNext(this.session));
+
+// Correct: write the first idle request immediately; only startup stays async.
+if (this.session?.ready) return this.sendNext(this.session);
+this.ensureStarted().then(() => this.sendNext(this.session));
 ```
 
 ## Scenario: Internal Beta Workflow Distribution

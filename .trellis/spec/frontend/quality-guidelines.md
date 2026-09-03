@@ -634,6 +634,69 @@ import SoftPresence from "./motion/softPresence.jsx";
 )}
 ```
 
+## Scenario: Resolve-Scoped Global Palette Hotkey
+
+### 1. Scope / Trigger
+
+- Trigger: changing the global Palette accelerator, its foreground-application gate, or either host's hotkey registration.
+
+### 2. Signatures
+
+- `registerPaletteHotkey(onToggle, isPaletteShown = () => false, getProcessName?) -> () => void`.
+- Core callback: `getForegroundProcessName() -> Promise<string | null>`.
+- `isResolveForeground(getProcessName?) -> Promise<boolean>`.
+
+### 3. Contracts
+
+- Standalone and Workflow hosts register the same shared hotkey implementation and inject their current logical Palette visibility.
+- A visible Palette closes immediately without an OS process lookup.
+- A hidden Palette reveals only when the foreground Windows process basename is case-insensitively `Resolve.exe`; lookup failure and non-Windows hosts fail closed.
+- Recheck visibility after the asynchronous lookup so a pending reveal never closes a Palette opened by another path.
+- Direct `showPalette` callers, including second-instance handling, do not inherit this shortcut-only gate.
+- Foreground lookup is a fresh serialized request through the Core-owned, startup-prewarmed, bounded hidden/no-shell PowerShell helper and accepts no user or renderer input.
+- The Ctrl+Space path must not spawn a new PowerShell process or compile `Add-Type`; helper startup pays that cost in the background before steady-state input.
+- When that helper is already READY and idle, the foreground request must reach helper stdin synchronously from the hotkey callback; a Promise microtask before the write is not an acceptable steady-state path.
+
+### 4. Validation & Error Matrix
+
+- Foreground `Resolve.exe` while hidden -> invoke the existing toggle once.
+- Foreground AE or any other process while hidden -> no-op.
+- Lookup spawn, timeout, output, or process-resolution failure -> no-op.
+- Palette becomes visible during lookup -> no-op when lookup settles.
+- Palette already visible -> invoke the existing toggle immediately and perform no lookup.
+
+### 5. Good/Base/Bad Cases
+
+- Good: Ctrl+Space in Resolve reveals the hidden Palette; the next Ctrl+Space closes it while Clackly owns focus.
+- Base: Ctrl+Space in After Effects leaves the hidden Palette unchanged.
+- Bad: gate `showPaletteWindow` itself, which would also block second-instance and other deliberate reveal paths.
+
+### 6. Tests Required
+
+- Assert case-insensitive `Resolve.exe` acceptance and rejection of AE, lookup errors, and nonmatching processes.
+- Assert visible Palette closure skips the process probe.
+- Assert a pending foreground lookup cannot toggle a Palette that became visible before it resolved.
+- Assert both host composition paths inject current Palette visibility into the shared registration.
+- Assert foreground lookup reuses the actually prewarmed helper instead of starting a per-key process.
+- Assert an idle READY helper receives the first foreground write before any microtask yield while later requests remain serialized.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```javascript
+globalShortcut.register(accelerator, onToggle);
+```
+
+#### Correct
+
+```javascript
+globalShortcut.register(accelerator, async () => {
+  if (isPaletteShown()) return onToggle();
+  if (await isResolveForeground() && !isPaletteShown()) onToggle();
+});
+```
+
 ## Forbidden Patterns
 
 - Command-specific UI branches for execution behavior.

@@ -180,6 +180,7 @@ test("Core owns one narrow After Effects process-probe lifecycle", async (t) => 
       return Promise.resolve(true);
     },
     query: async () => ({ processCount: 0, records: [] }),
+    getForegroundProcessName: async () => "Resolve.exe",
     dispose() {
       calls.push("dispose");
     }
@@ -193,6 +194,7 @@ test("Core owns one narrow After Effects process-probe lifecycle", async (t) => 
   t.after(cleanup);
 
   assert.equal(await core.prewarmAfterEffectsProcessProbe(), true);
+  assert.equal(await core.getForegroundProcessName(), "Resolve.exe");
   core.disposeAfterEffectsProcessProbe();
   assert.deepEqual(calls, ["create", "prewarm", "dispose"]);
   assert.equal(Object.hasOwn(core, "afterEffectsProcessProbe"), false);

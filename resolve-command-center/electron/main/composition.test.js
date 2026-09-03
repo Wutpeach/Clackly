@@ -98,6 +98,7 @@ test("both hosts prewarm and dispose the separate Core-owned process helpers wit
     assert.match(source, /queueMicrotask\(\(\) => core\.prewarmExportPythonWorker\(\)\.catch\(\(\) => \{\}\)\)/);
     assert.match(source, /core\.disposeAfterEffectsProcessProbe\(\)/);
     assert.match(source, /core\.disposeExportPythonWorker\(\)/);
+    assert.match(source, /registerPaletteHotkey\(\s*togglePalette,\s*\(\) => Boolean\(paletteWindow && isPaletteWindowShown\(paletteWindow\)\),\s*core\.getForegroundProcessName\s*\)/s);
   }
   assert.match(workflow, /app\.whenReady\(\)\.then\(async \(\) => \{\s*queueMicrotask\(/s);
   assert.match(standalone, /app\.whenReady\(\)\.then\(\(\) => \{\s*queueMicrotask\(/s);

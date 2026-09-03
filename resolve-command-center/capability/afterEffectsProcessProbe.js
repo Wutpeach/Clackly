@@ -6,8 +6,10 @@ const PROCESS_PROBE_STARTUP_TIMEOUT_MS = 5000;
 const PROCESS_PROBE_QUERY_TIMEOUT_MS = 5000;
 const PROCESS_PROBE_MAX_RESPONSE_BYTES = 1024 * 1024;
 const PROCESS_PROBE_MAX_RECORDS = 256;
+const PROCESS_PROBE_MAX_PROCESS_NAME_LENGTH = 260;
 const READY_LINE = "CLACKLY_AE_PROCESS_PROBE_READY/1";
 const ENUMERATION_FAILED = "enumeration-failed";
+const FOREGROUND_QUERY_FAILED = "foreground-query-failed";
 
 // This helper accepts only a generated numeric request id. The configured AE
 // executable, JSX, and host configuration never cross its stdin boundary.
@@ -16,24 +18,36 @@ const HELPER_SCRIPT = [
   "[Console]::InputEncoding = $utf8",
   "[Console]::OutputEncoding = $utf8",
   "$ErrorActionPreference = 'Stop'",
+  "$source = 'using System; using System.Runtime.InteropServices; public static class ForegroundWindow { [DllImport(\"user32.dll\")] public static extern IntPtr GetForegroundWindow(); [DllImport(\"user32.dll\")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId); }';",
+  "Add-Type -TypeDefinition $source",
   `[Console]::Out.WriteLine('${READY_LINE}')`,
   "[Console]::Out.Flush()",
   "while (($line = [Console]::In.ReadLine()) -ne $null) {",
-  "  if ($line -notmatch '^QUERY ([1-9][0-9]*)$') { break }",
-  "  $requestId = [Int64]$Matches[1]",
+  "  if ($line -notmatch '^(QUERY|FOREGROUND) ([1-9][0-9]*)$') { break }",
+  "  $operation = $Matches[1]",
+  "  $requestId = [Int64]$Matches[2]",
   "  try {",
-  "    $records = @(Get-Process -Name AfterFX -ErrorAction SilentlyContinue | ForEach-Object {",
-  "      $candidate = $null",
-  "      try { $candidate = $_.Path } catch {}",
-  "      if ([string]::IsNullOrWhiteSpace([string]$candidate)) {",
-  "        [PSCustomObject]@{ status = 'unresolved' }",
-  "      } else {",
-  "        [PSCustomObject]@{ path = [string]$candidate; status = 'ok' }",
-  "      }",
-  "    })",
-  "    $payload = [PSCustomObject]@{ requestId = $requestId; processCount = @($records).Count; records = @($records) }",
+  "    if ($operation -eq 'QUERY') {",
+  "      $records = @(Get-Process -Name AfterFX -ErrorAction SilentlyContinue | ForEach-Object {",
+  "        $candidate = $null",
+  "        try { $candidate = $_.Path } catch {}",
+  "        if ([string]::IsNullOrWhiteSpace([string]$candidate)) {",
+  "          [PSCustomObject]@{ status = 'unresolved' }",
+  "        } else {",
+  "          [PSCustomObject]@{ path = [string]$candidate; status = 'ok' }",
+  "        }",
+  "      })",
+  "      $payload = [PSCustomObject]@{ requestId = $requestId; processCount = @($records).Count; records = @($records) }",
+  "    } else {",
+  "      $window = [ForegroundWindow]::GetForegroundWindow()",
+  "      $processId = [uint32]0",
+  "      if ($window -eq [IntPtr]::Zero -or [ForegroundWindow]::GetWindowThreadProcessId($window, [ref]$processId) -eq 0 -or $processId -eq 0) { throw 'No foreground process' }",
+  "      $process = Get-Process -Id $processId -ErrorAction Stop",
+  "      $payload = [PSCustomObject]@{ requestId = $requestId; processName = ([string]$process.ProcessName + '.exe') }",
+  "    }",
   "  } catch {",
-  `    $payload = [PSCustomObject]@{ requestId = $requestId; error = '${ENUMERATION_FAILED}' }`,
+  `    $error = if ($operation -eq 'QUERY') { '${ENUMERATION_FAILED}' } else { '${FOREGROUND_QUERY_FAILED}' }`,
+  "    $payload = [PSCustomObject]@{ requestId = $requestId; error = $error }",
   "  }",
   "  [Console]::Out.WriteLine(($payload | ConvertTo-Json -Compress -Depth 3))",
   "  [Console]::Out.Flush()",
@@ -68,7 +82,7 @@ function powerShellPath(hostEnvironment) {
   return path.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
 }
 
-function validateResponse(payload) {
+function validateResponse(payload, operation) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)
     || !validRequestId(payload.requestId)) {
     throw probeError("malformed-response");
@@ -76,10 +90,21 @@ function validateResponse(payload) {
 
   if (Object.hasOwn(payload, "error")) {
     if (!exactKeys(payload, ["error", "requestId"])
-      || payload.error !== ENUMERATION_FAILED) {
+      || payload.error !== (operation === "QUERY" ? ENUMERATION_FAILED : FOREGROUND_QUERY_FAILED)) {
       throw probeError("malformed-response");
     }
     return { requestId: payload.requestId, error: payload.error };
+  }
+
+  if (operation === "FOREGROUND") {
+    if (!exactKeys(payload, ["processName", "requestId"])
+      || typeof payload.processName !== "string"
+      || payload.processName.length === 0 || payload.processName.length > PROCESS_PROBE_MAX_PROCESS_NAME_LENGTH
+      || payload.processName.includes("\0") || /[\\/:]/u.test(payload.processName)
+      || !payload.processName.toLowerCase().endsWith(".exe")) {
+      throw probeError("malformed-response");
+    }
+    return { requestId: payload.requestId, processName: payload.processName };
   }
 
   if (!exactKeys(payload, ["processCount", "records", "requestId"])
@@ -167,9 +192,21 @@ class WindowsAfterEffectsProcessProbe {
     if (this.platform !== "win32") {
       return Promise.resolve({ processCount: 0, records: [] });
     }
+    return this.request("QUERY");
+  }
+
+  getForegroundProcessName() {
+    if (this.platform !== "win32") return Promise.resolve(null);
+    return this.request("FOREGROUND");
+  }
+
+  request(operation) {
+    if (operation !== "QUERY" && operation !== "FOREGROUND") {
+      return Promise.reject(probeError("invalid-operation"));
+    }
     if (this.disposed) return Promise.reject(probeError("disposed"));
     return new Promise((resolve, reject) => {
-      this.queue.push({ resolve, reject });
+      this.queue.push({ operation, resolve, reject });
       this.drain();
     });
   }
@@ -318,7 +355,7 @@ class WindowsAfterEffectsProcessProbe {
 
     let response;
     try {
-      response = validateResponse(JSON.parse(line));
+      response = validateResponse(JSON.parse(line), this.active.operation);
     } catch (error) {
       this.failSession(session, error?.code === "AFTER_EFFECTS_PROCESS_PROBE_FAILED"
         ? error
@@ -337,12 +374,18 @@ class WindowsAfterEffectsProcessProbe {
     const active = this.active;
     this.active = null;
     this.clearTimer(active.timer);
-    active.resolve({ processCount: response.processCount, records: response.records });
+    active.resolve(active.operation === "FOREGROUND"
+      ? response.processName
+      : { processCount: response.processCount, records: response.records });
     this.drain();
   }
 
   drain() {
     if (this.draining || this.active || this.queue.length === 0 || this.disposed) return;
+    if (this.session?.ready) {
+      this.sendNext(this.session);
+      return;
+    }
     this.draining = true;
     this.ensureStarted().then(() => {
       this.draining = false;
@@ -371,7 +414,7 @@ class WindowsAfterEffectsProcessProbe {
     };
     this.active = active;
     try {
-      session.child.stdin.write(`QUERY ${requestId}\n`, "utf8", (error) => {
+      session.child.stdin.write(`${active.operation} ${requestId}\n`, "utf8", (error) => {
         if (error) this.failSession(session, probeError("stdin-write-error"));
       });
     } catch (_error) {
