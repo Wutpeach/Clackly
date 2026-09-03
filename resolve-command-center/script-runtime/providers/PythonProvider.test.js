@@ -145,21 +145,39 @@ test("python provider reports ready availability through the runtime manager", a
 test("python provider maps runtime evidence to stable Feature Status availability", async () => (
   withApp(async (appRoot) => {
     const mappings = [
-      ["RUNTIME_NOT_FOUND", "missing-dependency", ["python-runtime"]],
-      ["RESOLVE_MODULE_NOT_FOUND", "missing-dependency", ["resolve-scripting"]],
-      ["RESOLVE_LIBRARY_NOT_FOUND", "missing-dependency", ["resolve-scripting"]],
-      ["RUNTIME_UNSUPPORTED", "unavailable", []],
-      ["RUNTIME_ARCHITECTURE_UNSUPPORTED", "unavailable", []],
-      ["RUNTIME_VERSION_MISMATCH", "unavailable", []],
-      ["RESOLVE_NOT_RUNNING", "unavailable", []]
+      ["RUNTIME_NOT_FOUND", "missing-dependency", ["python-runtime"], "Python runtime executable is missing"],
+      ["RESOLVE_MODULE_NOT_FOUND", "missing-dependency", ["resolve-scripting"], "DaVinci Resolve scripting module or library is missing"],
+      ["RESOLVE_LIBRARY_NOT_FOUND", "missing-dependency", ["resolve-scripting"], "DaVinci Resolve scripting module or library is missing"],
+      ["RUNTIME_UNSUPPORTED", "unavailable", [], "No compatible managed Python runtime for this Resolve version"],
+      ["RUNTIME_ARCHITECTURE_UNSUPPORTED", "unavailable", [], "Python runtime architecture is not supported for this Resolve version"],
+      ["RUNTIME_VERSION_MISMATCH", "unavailable", [], "Python runtime version does not match the expected profile"],
+      ["RESOLVE_NOT_RUNNING", "unavailable", [], "DaVinci Resolve is not running or scripting is unavailable"],
+      ["RUNTIME_PROBE_REQUEST_INVALID", "unavailable", [], "Managed Python Runtime Probe setup is invalid (RUNTIME_PROBE_REQUEST_INVALID). Repair the Resolve bridge paths or reinstall Clackly."],
+      ["RUNTIME_OVERRIDE_INVALID", "unavailable", [], "Managed Python Runtime override is invalid (RUNTIME_OVERRIDE_INVALID). Remove or correct CLACKLY_PYTHON_EXECUTABLE."],
+      ["RUNTIME_LAUNCH_REQUEST_INVALID", "unavailable", [], "Managed Python Runtime launch setup is invalid (RUNTIME_LAUNCH_REQUEST_INVALID). Reinstall a matching Clackly package."],
+      ["RUNTIME_EXECUTABLE_INVALID", "unavailable", [], "Managed Python Runtime executable is invalid (RUNTIME_EXECUTABLE_INVALID). Reinstall the complete Clackly package."],
+      ["RUNTIME_SPAWN_FAILED", "unavailable", [], "Managed Python Runtime could not start (RUNTIME_SPAWN_FAILED). Reinstall the complete Clackly package."],
+      ["RUNTIME_STDIN_FAILED", "unavailable", [], "Managed Python Runtime could not receive its Probe request (RUNTIME_STDIN_FAILED). Reinstall the complete Clackly package."],
+      ["RUNTIME_PROCESS_EXITED", "unavailable", [], "Managed Python Runtime exited during its Probe (RUNTIME_PROCESS_EXITED). Reinstall the complete Clackly package."],
+      ["RUNTIME_TIMEOUT", "unavailable", [], "Managed Python Runtime Probe timed out (RUNTIME_TIMEOUT). Restart Resolve and verify the Runtime installation."],
+      ["RUNTIME_OUTPUT_LIMIT", "unavailable", [], "Managed Python Runtime Probe exceeded its output limit (RUNTIME_OUTPUT_LIMIT). Reinstall a matching Clackly package."],
+      ["RUNTIME_NATIVE_BRIDGE_CRASH", "unavailable", [], "Resolve bridge terminated the isolated Runtime (RUNTIME_NATIVE_BRIDGE_CRASH). Restart Resolve and run the check again."],
+      ["RUNTIME_PROTOCOL_EMPTY", "unavailable", [], "Managed Python Runtime Probe returned no response (RUNTIME_PROTOCOL_EMPTY). Verify package integrity and matching Clackly sources."],
+      ["RUNTIME_PROTOCOL_INVALID", "unavailable", [], "Managed Python Runtime Probe returned an invalid response (RUNTIME_PROTOCOL_INVALID). Verify package integrity and matching Clackly sources."],
+      ["BOOTSTRAP_REQUEST_INVALID", "unavailable", [], "Managed Python Runtime Bootstrap request is invalid (BOOTSTRAP_REQUEST_INVALID). Verify matching Clackly application and Runtime files."],
+      ["RUNTIME_TEMP_CLEANUP_FAILED", "unavailable", [], "Managed Python Runtime Probe cleanup failed (RUNTIME_TEMP_CLEANUP_FAILED). Stop Clackly and check temporary-directory permissions."],
+      ["RUNTIME_PROBE_FAILED", "unavailable", [], "Managed Python Runtime Probe failed (RUNTIME_PROBE_FAILED). Verify the Runtime and Resolve installation."],
+      ["RESOLVE_IMPORT_FAILED", "unavailable", [], "DaVinci Resolve bridge could not be imported (RESOLVE_IMPORT_FAILED). Check the Resolve installation and exact bridge paths."],
+      ["RESOLVE_CONNECTION_FAILED", "unavailable", [], "DaVinci Resolve bridge could not connect (RESOLVE_CONNECTION_FAILED). Check the Resolve installation and exact bridge paths."],
+      ["RESOLVE_VERSION_UNVERIFIED", "unavailable", [], "DaVinci Resolve version could not be verified (RESOLVE_VERSION_UNVERIFIED). Start Resolve and use Workflow Integration or a healthy bridge."]
     ];
-    for (const [code, status, missing] of mappings) {
+    for (const [code, status, missing, message] of mappings) {
       const provider = new PythonProvider({
         appRoot,
         runtimeManager: {
           execute: async () => ({}),
           checkAvailability: async () => {
-            throw Object.assign(new Error(code), { code });
+            throw Object.assign(new Error("untrusted Runtime detail"), { code });
           }
         }
       });
@@ -170,7 +188,7 @@ test("python provider maps runtime evidence to stable Feature Status availabilit
       assert.equal(result.status, status);
       assert.deepEqual(result.details.missing, missing);
       assert.equal(result.details.action, null);
-      assert.equal(typeof result.message, "string");
+      assert.equal(result.message, message);
     }
   })
 ));
@@ -195,18 +213,21 @@ test("python provider reports a missing script entry and rethrows unexpected run
     });
     assert.equal(probed, false);
 
+    const unexpected = Object.assign(new Error("unexpected Runtime detail"), {
+      code: "RUNTIME_FUTURE_FAILURE"
+    });
     const failing = new PythonProvider({
       appRoot,
       runtimeManager: {
         execute: async () => ({}),
         checkAvailability: async () => {
-          throw Object.assign(new Error("spawn failed"), { code: "RUNTIME_SPAWN_FAILED" });
+          throw unexpected;
         }
       }
     });
     await assert.rejects(
       failing.checkAvailability({ runtime: "python", entry: "scripts/run.py" }, { capabilityId: "ae.export" }),
-      (error) => error.code === "RUNTIME_SPAWN_FAILED"
+      (error) => error === unexpected
     );
 
     const invalid = new PythonProvider({

@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/index.md","reason":"Locate the active backend Runtime and Capability quality contract for review."}
+{"file":".trellis/tasks/09-02-fix-packaged-ae-export-status/research/applicable-contracts.md","reason":"Check the focused typed availability, fail-closed unknown-error, package, and renderer-boundary contracts."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify the existing status message field carries the classification end to end with no renderer-specific parsing or payload drift."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Verify the existing PythonProvider availability table remains the sole classification owner and no parallel mapping is introduced."}
