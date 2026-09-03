@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify Electron and Palette behavior remains within the accepted host contract"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify shared persistent process-probe protocol, bounds, recovery, and lifecycle"}
+{"file":".trellis/tasks/09-03-restrict-ctrl-space-to-davinci/research/hotkey-foreground-gate.md","reason":"Verify both hosts use the shared gate and non-hotkey reveal callers remain unchanged"}
