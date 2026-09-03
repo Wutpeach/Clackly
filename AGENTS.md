@@ -20,16 +20,47 @@ Managed by Trellis. Edits outside this block are preserved; edits inside may be 
 
 <!-- TRELLIS:END -->
 
-## Orca Worker Collaboration
+## Orca + Trellis Worker Collaboration
 
-Collaboration is primarily based on Orca Workers.
+The current session acts as the Lead Coordinator.
 
-On new session start, launch Orca collaboration and ensure a base Develop Worker exists: role=developer, label=develop, agent=Codex, model=gpt-5.6-terra, effort=xhigh, worker_permission_mode=bypassPermissions.
+Use Orca orchestration to dispatch Trellis sub-agents when needed.
 
-The Lead window is responsible for understanding requirements, planning, task decomposition, coordination, acceptance, and result summary.
+Available workers:
 
-- Dispatch coding implementation tasks to the `develop` Worker by default.
-- For independent research into code, conventions, or impact scope, create a `research` Worker (role=researcher, label=research, agent=Codex, model=gpt-5.6-luna, effort=hjgh, worker_permission_mode=bypassPermissions).
-- When multiple tasks can progress independently, additional Workers may be created: each Worker handles exactly one clearly bounded task with a unique label, and no more than 3 active simultaneously; cross-Worker shared conventions are specified by the Lead when dispatching.
-- Workers must not recursively dispatch other Workers; the Lead checks actual changes and verification results before summarizing to the user.
-- If Orca collaboration cannot start, report the situation honestly and ask the user how to proceed.
+- trellis-research
+  Use for:
+  - codebase investigation
+  - architecture analysis
+  - documentation research
+
+- trellis-implement
+  Use for:
+  - implementation
+  - code changes
+  - tests
+
+- trellis-check
+  Use for:
+  - reviewing changes
+  - lint/type checking
+  - fixing issues
+
+
+The Lead decides:
+- whether delegation is needed
+- task decomposition
+- acceptance of results
+
+Workers must not spawn additional workers.
+
+### File Search
+
+For any file search, filename or path lookup, or content grep in the current git-indexed directory, use the `fff` MCP tools instead of the default search tools.
+
+Prefer:
+- `fffind` for file and path search.
+- `ffgrep` for content search.
+- `fff-multi-grep` for broader multi-query grep tasks.
+
+Only fall back to default tools if `fff` is unavailable or the target is outside the indexed project.
