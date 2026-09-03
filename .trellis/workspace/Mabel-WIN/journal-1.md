@@ -1200,3 +1200,25 @@ Built and qualified a self-contained Windows x64 internal Beta ZIP with verified
 ### Status
 
 [OK] **Completed**
+
+
+## Session 55: Restrict and speed up Ctrl+Space
+<!-- trellis-session: v=2 fp=fc5f0a9d23831675 -->
+
+**Date**: 2026-09-03
+**Task**: Restrict and speed up Ctrl+Space
+**Branch**: `main`
+
+### Summary
+
+Restricted Palette Ctrl+Space reveal to foreground DaVinci Resolve, reused the prewarmed Windows foreground-process probe, removed steady-state microtask delay, validated with focused/full tests and live Resolve acceptance, and removed temporary product diagnostics.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c5b4909` | fix(palette): restrict and speed up Ctrl+Space |
+
+### Status
+
+[OK] **Completed**
