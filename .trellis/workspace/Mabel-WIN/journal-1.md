@@ -1222,3 +1222,25 @@ Restricted Palette Ctrl+Space reveal to foreground DaVinci Resolve, reused the p
 ### Status
 
 [OK] **Completed**
+
+
+## Session 56: Resolve 21.1 native AE export and Marker cleanup
+<!-- trellis-session: v=2 fp=35d1f07e8bc31643 -->
+
+**Date**: 2026-09-11
+**Task**: Resolve 21.1 native AE export and Marker cleanup
+**Branch**: `fix/resolve-21-1-ae-export`
+
+### Summary
+
+Qualified and packaged CPython 3.14.4 for Resolve 21.1 while retaining the 20.3.2 profile. Preserved normal/audio/video commands, native selected-set timing/gaps and empty-selection playhead fallback. User manual testing passed; removed Marker export branches, range module/helpers/tests, stale bytecode and outdated docs. Independent Orca implementation/check stages passed full tests (410 Node, 78 Python), build and both Runtime package checks. Task archived; unrelated changes preserved; no push.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9328471` | fix(ae-export): support Resolve 21.1 native selection |
+
+### Status
+
+[OK] **Completed**

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 55
-- **Last Active**: 2026-09-03
+- **Total Sessions**: 56
+- **Last Active**: 2026-09-11
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1224 | Active |
+| `journal-1.md` | ~1246 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 56 | 2026-09-11 | Resolve 21.1 native AE export and Marker cleanup | `9328471` | `fix/resolve-21-1-ae-export` |
 | 55 | 2026-09-03 | Restrict and speed up Ctrl+Space | `c5b4909` | `main` |
 | 54 | 2026-09-02 | Internal Beta installer | `fab140e` | `main` |
 | 53 | 2026-09-01 | Fix Palette taskbar flash on reveal | `2eb8d7a` | `main` |
