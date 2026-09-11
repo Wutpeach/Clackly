@@ -7,9 +7,8 @@
 2. [V28.4] 设置界面：调试模式开关与预览合成选项。
 3. [V28.3] JSX 自动清理（AE执行完自删除）。
 4. [V28.2] 跳过被禁用的片段（D键禁用）。
-5. [V28.1] Cyan标记支持：同时导出视频+音频轨道2。
-6. [FIX] 修复翻转时锚点偏移取反的问题。
-7. [FIX] 修复旋转方向在不同翻转状态下的转换规则。
+5. [FIX] 修复翻转时锚点偏移取反的问题。
+6. [FIX] 修复旋转方向在不同翻转状态下的转换规则。
 """
 
 import os
@@ -19,9 +18,6 @@ import time
 import shutil
 import tempfile
 import math
-
-from resolve.adapter import read_timeline_markers, read_timeline_start_frame
-from resolve.timeline_range import TimelineRangeScanError, resolve_timeline_range
 
 # ================= [1. 常量与配置] =================
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".resolve_to_ae_config.json")
@@ -144,13 +140,11 @@ def copy_lut_to_ae(src_path, ae_lut_dir):
 
 # ================= [2. 智能选区逻辑] =================
 
-class MissingMarkerError(ValueError):
+class NativeSelectionError(RuntimeError):
     pass
 
 
-def get_target_clips_logic(timeline, target_policy="auto", media_policy="mixed"):
-    if target_policy not in {"auto", "single", "blue-range"}:
-        raise ValueError(f"Unsupported target policy: {target_policy}")
+def get_target_clips_logic(timeline, media_policy="mixed"):
     if media_policy not in {"mixed", "audio", "video"}:
         raise ValueError(f"Unsupported media policy: {media_policy}")
     try:
@@ -161,31 +155,91 @@ def get_target_clips_logic(timeline, target_policy="auto", media_policy="mixed")
     start_frame = 0
     end_frame = 0
     mode = "single"
-
-    tl_start_frame = read_timeline_start_frame(timeline)
-
-    if target_policy in {"auto", "blue-range"}:
-        timeline_range = None
+    def build_item_key(item, fallback_track_type=None, fallback_track_index=None):
+        track_type = fallback_track_type
+        track_index = fallback_track_index
         try:
-            markers = read_timeline_markers(timeline)
-        except Exception:
-            if target_policy != "auto":
-                raise
-        else:
-            try:
-                timeline_range = resolve_timeline_range(tl_start_frame, markers)
-            except TimelineRangeScanError as error:
-                if target_policy != "auto":
-                    raise error.cause from None
-                timeline_range = error.resolve_partial(tl_start_frame)
-        if timeline_range is not None:
-            start_frame = timeline_range.start_frame
-            end_frame = timeline_range.end_frame_exclusive
-            mode = "batch"
-        elif target_policy == "blue-range":
-            raise MissingMarkerError("No Blue duration marker found")
+            track_info = item.GetTrackTypeAndIndex()
+            if track_info and len(track_info) >= 2:
+                track_type = track_info[0]
+                track_index = track_info[1]
+        except:
+            pass
 
-    if mode == "single":
+        try:
+            i_start = int(item.GetStart())
+        except:
+            i_start = -1
+        try:
+            i_end = int(item.GetEnd())
+        except:
+            i_end = -1
+        try:
+            i_name = item.GetName() or ""
+        except:
+            i_name = ""
+
+        return (track_type, track_index, i_start, i_end, i_name)
+
+    native_selection = None
+    native_selection_requested = False
+    get_selected_clips = getattr(timeline, "GetSelectedClips", None)
+    if get_selected_clips is not None:
+        if not callable(get_selected_clips):
+            raise NativeSelectionError("Resolve native selection API is not callable")
+        try:
+            selected_items = get_selected_clips()
+        except Exception as error:
+            raise NativeSelectionError("Resolve native selection API failed") from error
+        if not isinstance(selected_items, list):
+            raise NativeSelectionError("Resolve native selection API returned a malformed response")
+
+        native_selection_requested = bool(selected_items)
+        native_selection = []
+        seen_items = set()
+        for item in selected_items:
+            try:
+                item_type = item.GetType().lower()
+                track_info = item.GetTrackTypeAndIndex()
+                track_type = track_info[0].lower()
+                track_index = track_info[1]
+                start_frame = int(item.GetStart())
+                end_frame = int(item.GetEnd())
+                media = item.GetMediaPoolItem()
+            except Exception as error:
+                raise NativeSelectionError("Resolve native selection item is malformed") from error
+            if item_type not in {"video", "audio"}:
+                continue
+            if track_type != item_type:
+                raise NativeSelectionError("Resolve native selection track metadata is malformed")
+            if (not isinstance(track_index, int) or track_index < 1
+                    or end_frame <= start_frame or media is None):
+                continue
+            try:
+                item_key = ("id", item.GetUniqueId())
+                if not item_key[1]: raise ValueError
+            except Exception:
+                item_key = ("record",) + build_item_key(item, track_type, track_index)
+            if item_key in seen_items or not timeline.GetIsTrackEnabled(track_type, track_index) or not item.GetClipEnabled():
+                continue
+            seen_items.add(item_key)
+            native_selection.append({
+                "item": item,
+                "track_index": track_index,
+                "start_frame": start_frame,
+                "track_type": track_type
+            })
+        native_selection.sort(key=lambda clip: (
+            0 if clip["track_type"] == "video" else 1,
+            clip["track_index"],
+            clip["start_frame"],
+            clip["item"].GetEnd(),
+            clip["item"].GetName() or ""
+        ))
+
+    if native_selection_requested:
+        mode = "batch"
+    else:
         current_tc = timeline.GetCurrentTimecode()
         start_frame = timecode_to_frames(current_tc, fps)
         end_frame = start_frame + 1
@@ -220,40 +274,18 @@ def get_target_clips_logic(timeline, target_policy="auto", media_policy="mixed")
                     })
         return clips
 
-    def build_item_key(item, fallback_track_type=None, fallback_track_index=None):
-        track_type = fallback_track_type
-        track_index = fallback_track_index
-        try:
-            track_info = item.GetTrackTypeAndIndex()
-            if track_info and len(track_info) >= 2:
-                track_type = track_info[0]
-                track_index = track_info[1]
-        except:
-            pass
-
-        try:
-            i_start = int(item.GetStart())
-        except:
-            i_start = -1
-        try:
-            i_end = int(item.GetEnd())
-        except:
-            i_end = -1
-        try:
-            i_name = item.GetName() or ""
-        except:
-            i_name = ""
-
-        return (track_type, track_index, i_start, i_end, i_name)
-
     def topmost(clips):
         if not clips:
             return []
         max_track = max(c['track_index'] for c in clips)
         return [c for c in clips if c['track_index'] == max_track]
 
-    video_clips = collect_clips("video")
-    audio_clips = collect_clips("audio")
+    if native_selection_requested:
+        video_clips = [clip for clip in native_selection if clip["track_type"] == "video"]
+        audio_clips = [clip for clip in native_selection if clip["track_type"] == "audio"]
+    else:
+        video_clips = collect_clips("video")
+        audio_clips = collect_clips("audio")
 
     def is_linked_to_video(audio_clip, video_keys):
         try:
@@ -513,14 +545,12 @@ def find_props_dual_lock(t_idx, item_start, item_name, exact_map, fallback_list)
 
 # ================= [4. 核心执行 (V27.0 Anchor Position Fix)] =================
 
-SUPPORTED_COMMAND_TRIPLES = {
-    ("auto", "auto", "mixed"),
-    ("audio-only", "auto", "audio"),
-    ("video-only", "auto", "video"),
-    ("single", "single", "mixed"),
-    ("video-range", "blue-range", "video"),
-    ("mixed-range", "blue-range", "mixed"),
+SUPPORTED_COMMAND_MODES = {
+    ("auto", "mixed"),
+    ("audio-only", "audio"),
+    ("video-only", "video"),
 }
+RESULT_TARGET_POLICY = "auto"
 
 
 def _terminal_result(ok, code, mode, target_policy, media_policy, clip_count, message):
@@ -542,15 +572,14 @@ def process_and_send(
     status_callback,
     config=None,
     mode="auto",
-    target_policy="auto",
     media_policy="mixed",
 ):
     if config is None:
         config = load_config()
-    if (mode, target_policy, media_policy) not in SUPPORTED_COMMAND_TRIPLES:
+    if (mode, media_policy) not in SUPPORTED_COMMAND_MODES:
         raise ValueError(
-            "Unsupported export triple: "
-            f"mode={mode!r} target_policy={target_policy!r} media_policy={media_policy!r}"
+            "Unsupported export mode/media policy: "
+            f"mode={mode!r} media_policy={media_policy!r}"
         )
 
     ae_lut_dir = get_ae_lut_dir(ae_path)
@@ -559,20 +588,14 @@ def process_and_send(
     if not timeline:
         message = "No Timeline"
         status_callback(f"❌ {message}")
-        return _terminal_result(False, "no-timeline", mode, target_policy, media_policy, 0, message)
+        return _terminal_result(False, "no-timeline", mode, RESULT_TARGET_POLICY, media_policy, 0, message)
 
     status_callback("Analyzing...")
-    try:
-        scope_mode, target_clips, fps, content_type = get_target_clips_logic(
-            timeline, target_policy, media_policy
-        )
-    except MissingMarkerError as error:
-        status_callback(f"❌ {error}")
-        return _terminal_result(False, "missing-marker", mode, target_policy, media_policy, 0, str(error))
+    scope_mode, target_clips, fps, content_type = get_target_clips_logic(timeline, media_policy)
     if not target_clips:
         message = "No Clips"
         status_callback(f"⚠️ {message}")
-        return _terminal_result(False, "no-clips", mode, target_policy, media_policy, 0, message)
+        return _terminal_result(False, "no-clips", mode, RESULT_TARGET_POLICY, media_policy, 0, message)
 
     timeline_name = timeline.GetName()
     tl_width = float(timeline.GetSetting("timelineResolutionWidth"))
@@ -1056,7 +1079,7 @@ def process_and_send(
 
     message = f"Sent {len(target_clips)} Clips"
     result = _terminal_result(
-        True, "exported", mode, target_policy, media_policy, len(target_clips), message
+        True, "exported", mode, RESULT_TARGET_POLICY, media_policy, len(target_clips), message
     )
     result["__clacklyDesktopLaunch"] = {
         "type": "after-effects-jsx",

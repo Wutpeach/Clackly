@@ -380,19 +380,29 @@ test("Resolver accepts a contained payload when the runtime root is a symlink", 
   assert.equal(resolver.resolve(request()).executable, executable);
 });
 
-test("the committed current profile is selected but reports its deliberately absent source payload", () => {
+test("the committed Resolve profiles select exactly and retain explicit unsupported hosts", () => {
   const registry = loadRuntimeRegistry();
-  const profileId = "python-cpython-3.13.14-resolve-20.3.2-win32-x64";
-  assert.equal(registry.get(profileId).releaseStatus, "current");
+  const legacyProfileId = "python-cpython-3.13.14-resolve-20.3.2-win32-x64";
+  const currentProfileId = "python-cpython-3.14.4-resolve-21.1-win32-x64";
+  assert.equal(registry.get(legacyProfileId).releaseStatus, "legacy-pinned");
+  assert.equal(registry.get(currentProfileId).releaseStatus, "current");
   const resolver = new RuntimeResolver({ registry });
-  const error = expectRuntimeError(
+  const legacyError = expectRuntimeError(
     () => resolver.resolve(request()),
     "RUNTIME_NOT_FOUND",
     "missing-runtime"
   );
-  assert.equal(
-    error.details.profileId,
-    profileId
+  assert.equal(legacyError.details.profileId, legacyProfileId);
+  const currentError = expectRuntimeError(
+    () => resolver.resolve(request({ host: { version: "21.1.0.14" } })),
+    "RUNTIME_NOT_FOUND",
+    "missing-runtime"
+  );
+  assert.equal(currentError.details.profileId, currentProfileId);
+  expectRuntimeError(
+    () => resolver.resolve(request({ host: { version: "21.0.4" } })),
+    "RUNTIME_UNSUPPORTED",
+    "unsupported"
   );
 });
 

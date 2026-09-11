@@ -59,6 +59,12 @@ class FakeAudioItem:
     def GetTrackTypeAndIndex(self) -> tuple[str, int]:
         return ("audio", self._track_index)
 
+    def GetType(self) -> str:
+        return "audio"
+
+    def GetUniqueId(self) -> str:
+        return f"audio:{self._track_index}:{self._start}:{self._end}:{self._name}"
+
     def GetClipEnabled(self) -> bool:
         return self._enabled
 
@@ -107,6 +113,12 @@ class FakeVideoItem:
     def GetTrackTypeAndIndex(self) -> tuple[str, int]:
         return ("video", self._track_index)
 
+    def GetType(self) -> str:
+        return "video"
+
+    def GetUniqueId(self) -> str:
+        return f"video:{self._track_index}:{self._start}:{self._end}:{self._name}"
+
     def GetLinkedItems(self) -> list:
         return list(self._linked_items)
 
@@ -132,11 +144,13 @@ class FakeTimelineAudioItem(FakeAudioItem):
         enabled: bool = True,
         left_offset: int = 0,
         duration: int | None = None,
+        linked_items: list | None = None,
     ) -> None:
         super().__init__(start, end, name=name, track_index=track_index, enabled=enabled)
         self._media = FakeMediaPoolItem(file_path, "0x0", "")
         self._left_offset = left_offset
         self._duration = duration if duration is not None else (end - start)
+        self._linked_items = linked_items or []
 
     def GetMediaPoolItem(self) -> FakeMediaPoolItem:
         return self._media
@@ -148,7 +162,10 @@ class FakeTimelineAudioItem(FakeAudioItem):
         return self._duration
 
     def GetLinkedItems(self) -> list:
-        return []
+        return list(self._linked_items)
+
+
+_NO_NATIVE_SELECTION = object()
 
 
 class FakeTimeline:
@@ -158,7 +175,6 @@ class FakeTimeline:
         video_tracks: dict[int, list],
         audio_tracks: dict[int, list] | None = None,
         disabled_tracks: dict[str, set[int]] | None = None,
-        markers: dict | None = None,
         export_payload: dict | None = None,
         export_success: bool = True,
         name: str = "Timeline",
@@ -166,11 +182,12 @@ class FakeTimeline:
         start_frame: int = 0,
         resolution: tuple[str, str] = ("1920", "1080"),
         current_tc: str = "00:00:00:00",
+        selected_clips=_NO_NATIVE_SELECTION,
+        selection_error: Exception | None = None,
     ) -> None:
         self.video_tracks = video_tracks
         self.audio_tracks = audio_tracks or {}
         self.disabled_tracks = disabled_tracks or {}
-        self.markers = markers or {}
         self.export_payload = export_payload
         self.export_success = export_success
         self.name = name
@@ -178,6 +195,10 @@ class FakeTimeline:
         self.start_frame = start_frame
         self.resolution = resolution
         self.current_tc = current_tc
+        self.selected_clips = selected_clips
+        self.selection_error = selection_error
+        if selected_clips is _NO_NATIVE_SELECTION:
+            self.GetSelectedClips = None
 
     def GetSetting(self, key: str) -> str:
         return {
@@ -189,11 +210,13 @@ class FakeTimeline:
     def GetStartFrame(self) -> int:
         return self.start_frame
 
-    def GetMarkers(self) -> dict:
-        return self.markers
-
     def GetCurrentTimecode(self) -> str:
         return self.current_tc
+
+    def GetSelectedClips(self) -> list:
+        if self.selection_error:
+            raise self.selection_error
+        return list(self.selected_clips) if isinstance(self.selected_clips, list) else self.selected_clips
 
     def GetTrackCount(self, track_type: str) -> int:
         tracks = self.video_tracks if track_type == "video" else self.audio_tracks
@@ -233,6 +256,11 @@ class FakeResolve:
 class FakeMissingMediaVideoItem(FakeVideoItem):
     def GetMediaPoolItem(self):
         return None
+
+
+class FakeUnsupportedTimelineItem(FakeVideoItem):
+    def GetType(self) -> str:
+        return "title"
 
 
 class FakeAudioItemWithoutTrackIndex(FakeAudioItem):
@@ -510,7 +538,6 @@ process.stdout.write(JSON.stringify({
         timeline = FakeTimeline(
             video_tracks={1: [video_with_audio]},
             audio_tracks={1: [audio_clip]},
-            markers={0: {"color": "Blue", "duration": 24}},
         )
         actual = self._run_export(
             "mixed_video_audio",
@@ -691,7 +718,7 @@ process.stdout.write(JSON.stringify({
         self.assertEqual(actual["jsx"].count("app.activate();"), 1)
         self.assertLess(actual["jsx"].index("comp.openInViewer();"), actual["jsx"].index("app.activate();"))
 
-    def test_mixed_single_and_mixed_blue_run_video_otio_enrichment(self) -> None:
+    def test_mixed_playhead_runs_video_otio_enrichment(self) -> None:
         transform_params = [
             {"Parameter ID": "ZoomX", "Parameter Value": 1.2},
             {"Parameter ID": "ZoomY", "Parameter Value": 0.9},
@@ -753,30 +780,6 @@ process.stdout.write(JSON.stringify({
         self.assertIn("layer.property('Scale').setValue([", actual["jsx"])
         self.assertIn("// Clip: StandaloneA", actual["jsx"])
 
-        blue_timeline = FakeTimeline(
-            video_tracks={1: [clip]},
-            audio_tracks={1: [standalone_audio]},
-            markers={0: {"color": "Blue", "duration": 24}},
-            export_payload=wrap_tracks(build_otio_clip(
-                "ClipMixFX",
-                props=transform_params,
-                effects=[crop_effect, distortion_effect, speed_effect],
-            )),
-        )
-        actual = self._run_export(
-            "mixed_blue_otio_enrichment",
-            blue_timeline,
-            {"prefix": "Link", "debug_mode": False, "last_known_ae_path": ""},
-        )
-        self.assertEqual(
-            ["Analyzing...", "Exporting OTIO...", "Parsing Data..."],
-            actual["statuses"],
-        )
-        self.assertIn("var comp = app.project.items.addComp(clacklySourceName, 1920, 1080, 1, 1.0, 24.0);", actual["jsx"])
-        self.assertIn("// Crop Mask", actual["jsx"])
-        self.assertIn("// Lens Correction -> Optics Compensation", actual["jsx"])
-        self.assertIn("layer.timeRemapEnabled = true;", actual["jsx"])
-
     def test_video_only_export_mutes_every_video_layer_with_linked_audio(self) -> None:
         linked_audio = FakeAudioItem(0, 24, track_index=1, mapping={"track_mapping": {"1": {"mute": False}}})
         first = FakeVideoItem(start=0, end=24, name="ClipV1", track_index=1, linked_items=[linked_audio])
@@ -784,7 +787,7 @@ process.stdout.write(JSON.stringify({
         timeline = FakeTimeline(
             video_tracks={1: [first], 2: [second]},
             audio_tracks={1: [linked_audio]},
-            markers={0: {"color": "Blue", "duration": 24}},
+            selected_clips=[first, second],
         )
         statuses: list[str] = []
         result = export_core.process_and_send(
@@ -794,7 +797,6 @@ process.stdout.write(JSON.stringify({
             statuses.append,
             {"prefix": "Link", "debug_mode": False},
             "video-only",
-            "auto",
             "video",
         )
         jsx = result["__clacklyDesktopLaunch"]["jsx"]
@@ -804,30 +806,27 @@ process.stdout.write(JSON.stringify({
         self.assertNotIn("layer.enabled = false;", jsx)
         self.assertGreaterEqual(jsx.count("layer.audioEnabled = false;"), 2)
 
-    def test_every_shared_and_retained_range_policy_opens_one_final_comp_then_activates_ae(self) -> None:
+    def test_every_product_export_opens_one_final_comp_then_activates_ae(self) -> None:
         video = FakeVideoItem(start=0, end=24, name="ActivationVideo")
         audio = FakeTimelineAudioItem(start=0, end=24, name="ActivationAudio")
         timeline = FakeTimeline(
             video_tracks={1: [video]},
             audio_tracks={1: [audio]},
-            markers={0: {"color": "Blue", "duration": 24}},
             export_success=False,
         )
-        for triple in (
-            ("auto", "auto", "mixed"),
-            ("audio-only", "auto", "audio"),
-            ("video-only", "auto", "video"),
-            ("video-range", "blue-range", "video"),
-            ("mixed-range", "blue-range", "mixed"),
+        for command_mode in (
+            ("auto", "mixed"),
+            ("audio-only", "audio"),
+            ("video-only", "video"),
         ):
-            with self.subTest(triple=triple):
+            with self.subTest(command_mode=command_mode):
                 result = export_core.process_and_send(
                     FakeResolve(),
                     FakeProject(timeline),
                     AE_PATH,
                     lambda _message: None,
                     {"debug_mode": False},
-                    *triple,
+                    *command_mode,
                 )
                 jsx = result["__clacklyDesktopLaunch"]["jsx"]
                 self.assertEqual(jsx.count("openInViewer();"), 1)
@@ -1104,299 +1103,134 @@ process.stdout.write(JSON.stringify({
         self.assertEqual(["Analyzing...", "⚠️ No Clips"], statuses)
         self.assertEqual(result["code"], "no-clips")
 
-    def _clips(self, timeline, target_policy="auto", media_policy="mixed") -> list:
-        _mode, clips, _fps, _content_type = export_core.get_target_clips_logic(
-            timeline, target_policy, media_policy
-        )
+    def _clips(self, timeline, media_policy="mixed") -> list:
+        _mode, clips, _fps, _content_type = export_core.get_target_clips_logic(timeline, media_policy)
         return [clip["item"] for clip in clips]
 
-    def test_full_three_by_three_target_and_media_matrix(self) -> None:
-        current_video = FakeVideoItem(start=0, end=24, name="Current", track_index=1)
-        ranged_video = FakeVideoItem(start=48, end=72, name="Ranged", track_index=2)
-        current_audio = FakeTimelineAudioItem(start=0, end=24, name="Audio1", track_index=1)
-        ranged_audio = FakeTimelineAudioItem(start=48, end=72, name="Audio2", track_index=2)
+    def test_native_selection_is_authoritative_for_all_media_policies(self) -> None:
+        first = FakeVideoItem(start=0, end=24, name="First", track_index=1)
+        gap = FakeVideoItem(start=24, end=48, name="Gap", track_index=1)
+        second = FakeVideoItem(start=48, end=72, name="Second", track_index=2)
+        audio = FakeTimelineAudioItem(start=48, end=72, name="Audio", track_index=2)
         timeline = FakeTimeline(
-            video_tracks={1: [current_video], 2: [ranged_video]},
-            audio_tracks={1: [current_audio], 2: [ranged_audio]},
-            markers={48: {"color": "Blue", "duration": 24}},
+            video_tracks={1: [first, gap], 2: [second]},
+            audio_tracks={2: [audio]},
+            selected_clips=[audio, second, first],
         )
+        calls = 0
 
-        self.assertEqual(self._clips(timeline, "auto", "mixed"), [ranged_video, ranged_audio])
-        self.assertEqual(self._clips(timeline, "auto", "video"), [ranged_video])
-        self.assertEqual(self._clips(timeline, "auto", "audio"), [ranged_audio])
-        self.assertEqual(self._clips(timeline, "single", "mixed"), [current_video, current_audio])
-        self.assertEqual(self._clips(timeline, "single", "video"), [current_video])
-        self.assertEqual(self._clips(timeline, "single", "audio"), [current_audio])
-        self.assertEqual(self._clips(timeline, "blue-range", "mixed"), [ranged_video, ranged_audio])
-        self.assertEqual(self._clips(timeline, "blue-range", "video"), [ranged_video])
-        self.assertEqual(self._clips(timeline, "blue-range", "audio"), [ranged_audio])
+        def selected_once():
+            nonlocal calls
+            calls += 1
+            return [audio, second, first]
 
-        mode, clips, _fps, content_type = export_core.get_target_clips_logic(
-            timeline, "auto", "mixed"
+        timeline.GetSelectedClips = selected_once
+        timeline.GetCurrentTimecode = lambda: (_ for _ in ()).throw(
+            AssertionError("explicit selection must not read the playhead")
         )
-        self.assertEqual((mode, [clip["item"] for clip in clips], content_type), (
-            "batch", [ranged_video, ranged_audio], "mixed"
-        ))
-        mode, clips, _fps, content_type = export_core.get_target_clips_logic(
-            timeline, "single", "mixed"
-        )
-        self.assertEqual((mode, [clip["item"] for clip in clips], content_type), (
-            "single", [current_video, current_audio], "mixed"
-        ))
+        expected = {
+            "mixed": [first, second, audio],
+            "video": [first, second],
+            "audio": [audio],
+        }
+        for policy, clips in expected.items():
+            with self.subTest(policy=policy):
+                mode, records, _fps, _content_type = export_core.get_target_clips_logic(timeline, policy)
+                self.assertEqual("batch", mode)
+                self.assertEqual(clips, [record["item"] for record in records])
+                self.assertNotIn(gap, [record["item"] for record in records])
+        self.assertEqual(3, calls)
 
-    def test_multiple_blue_markers_choose_lowest_numeric_frame_and_ignore_point_and_cyan(self) -> None:
-        at_20 = FakeVideoItem(start=20, end=44, name="At20", track_index=1)
-        at_100 = FakeVideoItem(start=100, end=124, name="At100", track_index=2)
-        timeline = FakeTimeline(
-            video_tracks={1: [at_20], 2: [at_100]},
-            markers={
-                "100": {"color": "Blue", "duration": 24},
-                "5": {"color": "Blue", "duration": 1},
-                "20": {"color": "Blue", "duration": 24},
-                "10": {"color": "Cyan", "duration": 24},
-            },
-        )
-        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(
-            timeline, "auto", "video"
-        )
-        self.assertEqual(mode, "batch")
-        self.assertEqual([clip["item"] for clip in clips], [at_20])
-
-        # Enumeration order must not matter: reversed insertion still picks frame 20.
-        timeline.markers = dict(reversed(list(timeline.markers.items())))
-        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(
-            timeline, "auto", "video"
-        )
-        self.assertEqual([clip["item"] for clip in clips], [at_20])
-
-    def test_malformed_marker_info_and_duration_are_skipped(self) -> None:
+    def test_empty_native_selection_uses_playhead(self) -> None:
         current = FakeVideoItem(start=0, end=24, name="Current")
         timeline = FakeTimeline(
             video_tracks={1: [current]},
-            markers={
-                "bad-info": None,
-                "bad-duration": {"color": "Blue", "duration": "not-a-number"},
-                "point": {"color": "Blue", "duration": 1},
-                "cyan": {"color": "Cyan", "duration": 24},
-                "red": {"color": "Red", "duration": 24},
-            },
+            selected_clips=[],
         )
 
-        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(
-            timeline, "auto", "video"
-        )
-        self.assertEqual(mode, "single")
-        self.assertEqual([clip["item"] for clip in clips], [current])
-        with self.assertRaisesRegex(export_core.MissingMarkerError, "No Blue duration marker found"):
-            export_core.get_target_clips_logic(timeline, "blue-range", "video")
+        mode, clips, _fps, content_type = export_core.get_target_clips_logic(timeline, "video")
 
-    def test_malformed_qualifying_frame_keeps_current_partial_scan_behavior(self) -> None:
-        current = FakeVideoItem(start=0, end=10, name="Current")
-        ranged = FakeVideoItem(start=20, end=44, name="Ranged")
-        timeline = FakeTimeline(
-            video_tracks={1: [current, ranged]},
-            markers={
-                "20": {"color": "Blue", "duration": 24},
-                "bad-frame": {"color": "Blue", "duration": 24},
-            },
-        )
+        self.assertEqual(("single", [current], "video"), (
+            mode, [record["item"] for record in clips], content_type
+        ))
 
-        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(
-            timeline, "auto", "video"
-        )
-        self.assertEqual(mode, "batch")
-        self.assertEqual([clip["item"] for clip in clips], [ranged])
-        with self.assertRaisesRegex(ValueError, "invalid literal"):
-            export_core.get_target_clips_logic(timeline, "blue-range", "video")
-
-        timeline.markers = dict(reversed(list(timeline.markers.items())))
-        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(
-            timeline, "auto", "video"
-        )
-        self.assertEqual(mode, "single")
-        self.assertEqual([clip["item"] for clip in clips], [current])
-
-    def test_marker_range_uses_absolute_half_open_coordinates_without_trimming(self) -> None:
-        ends_at_start = FakeVideoItem(start=1000, end=1010, name="EndsAtStart")
-        overlaps_first_frame = FakeVideoItem(start=1009, end=1011, name="FirstFrame")
-        inside = FakeVideoItem(start=1010, end=1015, name="Inside")
-        overlaps_last_frame = FakeVideoItem(start=1014, end=1016, name="LastFrame")
-        starts_at_end = FakeVideoItem(start=1015, end=1020, name="StartsAtEnd")
-        timeline = FakeTimeline(
-            video_tracks={1: [
-                ends_at_start,
-                overlaps_first_frame,
-                inside,
-                overlaps_last_frame,
-                starts_at_end,
-            ]},
-            markers={"10": {"color": "Blue", "duration": 5}},
-            start_frame=1000,
-        )
-
-        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(
-            timeline, "auto", "video"
-        )
-        selected = [clip["item"] for clip in clips]
-        self.assertEqual(mode, "batch")
-        self.assertEqual(selected, [overlaps_first_frame, inside, overlaps_last_frame])
-        self.assertEqual(
-            [(item.GetStart(), item.GetEnd()) for item in selected],
-            [(1009, 1011), (1010, 1015), (1014, 1016)],
-        )
-
-    def test_missing_timeline_start_uses_legacy_86400_marker_offset(self) -> None:
-        ranged = FakeVideoItem(start=86410, end=86412, name="Ranged")
-        timeline = FakeTimeline(
-            video_tracks={1: [ranged]},
-            markers={"10": {"color": "Blue", "duration": 2}},
-            start_frame=None,
-        )
-
-        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(
-            timeline, "auto", "video"
-        )
-        self.assertEqual(mode, "batch")
-        self.assertEqual([clip["item"] for clip in clips], [ranged])
-
-    def test_single_policy_does_not_read_markers(self) -> None:
+    def test_missing_native_selection_api_uses_playhead(self) -> None:
         current = FakeVideoItem(start=0, end=24, name="Current")
         timeline = FakeTimeline(video_tracks={1: [current]})
 
-        def fail_marker_read():
-            raise AssertionError("single policy must not read markers")
+        mode, clips, _fps, content_type = export_core.get_target_clips_logic(timeline, "video")
 
-        timeline.GetMarkers = fail_marker_read
-        self.assertEqual(self._clips(timeline, "single", "video"), [current])
+        self.assertEqual(("single", [current], "video"), (
+            mode, [record["item"] for record in clips], content_type
+        ))
 
-    def test_timeline_start_errors_propagate_before_every_policy(self) -> None:
-        timeline = FakeTimeline(video_tracks={})
-        start_error = RuntimeError("start frame API failed")
-
-        def fail_start_read():
-            raise start_error
-
-        timeline.GetStartFrame = fail_start_read
-        for target_policy in ("single", "auto", "blue-range"):
-            with self.subTest(target_policy=target_policy):
-                with self.assertRaises(RuntimeError) as raised:
-                    export_core.get_target_clips_logic(timeline, target_policy, "video")
-                self.assertIs(raised.exception, start_error)
-
-    def test_single_scope_selects_topmost_video_and_audio_independently(self) -> None:
-        lower_video = FakeVideoItem(start=0, end=24, name="V1", track_index=1)
-        upper_video = FakeVideoItem(start=0, end=24, name="V2", track_index=2)
-        lower_audio = FakeTimelineAudioItem(start=0, end=24, name="A1", track_index=1)
-        upper_audio = FakeTimelineAudioItem(start=0, end=24, name="A2", track_index=2)
+    def test_native_selection_never_falls_back_after_media_or_item_filtering(self) -> None:
+        playhead_video = FakeVideoItem(start=0, end=24, name="Playhead")
+        selected_audio = FakeTimelineAudioItem(start=0, end=24, name="SelectedAudio")
+        unsupported = FakeUnsupportedTimelineItem(start=0, end=24, name="Title")
+        no_media = FakeMissingMediaVideoItem(start=0, end=24, name="NoMedia")
         timeline = FakeTimeline(
-            video_tracks={1: [lower_video], 2: [upper_video]},
-            audio_tracks={1: [lower_audio], 2: [upper_audio]},
-            markers={48: {"color": "Blue", "duration": 24}},
+            video_tracks={1: [playhead_video]},
+            audio_tracks={1: [selected_audio]},
+            selected_clips=[selected_audio, unsupported, no_media],
         )
-        self.assertEqual(self._clips(timeline, "single", "video"), [upper_video])
-        self.assertEqual(self._clips(timeline, "single", "audio"), [upper_audio])
-        self.assertEqual(self._clips(timeline, "single", "mixed"), [upper_video, upper_audio])
 
-        disabled = FakeTimeline(
-            video_tracks={1: [lower_video], 2: [upper_video]},
-            audio_tracks={1: [lower_audio], 2: [upper_audio]},
-            disabled_tracks={"video": {2}, "audio": {2}},
+        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(timeline, "video")
+
+        self.assertEqual("batch", mode)
+        self.assertEqual([], clips)
+
+        no_media_timeline = FakeTimeline(
+            video_tracks={1: [playhead_video]},
+            selected_clips=[unsupported, no_media],
         )
-        self.assertEqual(self._clips(disabled, "single", "video"), [lower_video])
-        self.assertEqual(self._clips(disabled, "single", "audio"), [lower_audio])
+        mode, clips, _fps, _content_type = export_core.get_target_clips_logic(no_media_timeline, "video")
+        self.assertEqual(("batch", []), (mode, clips))
 
-    def test_single_mixed_deduplicates_linked_audio_and_falls_back_to_available_class(self) -> None:
-        linked_audio = FakeTimelineAudioItem(start=0, end=24, name="Linked", track_index=1)
-        video = FakeVideoItem(start=0, end=24, name="Video", track_index=1, linked_items=[linked_audio])
-        linked_audio.GetLinkedItems = lambda: [video]
-        timeline = FakeTimeline(video_tracks={1: [video]}, audio_tracks={1: [linked_audio]})
-        self.assertEqual(self._clips(timeline, "single", "mixed"), [video])
-
-        unlinked_audio = FakeTimelineAudioItem(start=0, end=24, name="Standalone", track_index=1)
-        standalone = FakeTimeline(video_tracks={1: [video]}, audio_tracks={1: [unlinked_audio]})
-        self.assertEqual(self._clips(standalone, "single", "mixed"), [video, unlinked_audio])
-
-        only_video = FakeTimeline(video_tracks={1: [video]}, audio_tracks={})
-        self.assertEqual(self._clips(only_video, "single", "mixed"), [video])
-        only_audio = FakeTimeline(video_tracks={}, audio_tracks={1: [unlinked_audio]})
-        self.assertEqual(self._clips(only_audio, "single", "mixed"), [unlinked_audio])
-
-    def test_batch_mixed_deduplicates_linked_audio_across_all_overlapping_tracks(self) -> None:
-        linked_audio = FakeTimelineAudioItem(start=48, end=72, name="Linked", track_index=1)
-        standalone_audio = FakeTimelineAudioItem(start=48, end=72, name="Standalone", track_index=2)
-        mixed_video = FakeVideoItem(start=48, end=72, name="Mixed", linked_items=[linked_audio])
-        linked_audio.GetLinkedItems = lambda: [mixed_video]
+    def test_native_selection_deduplicates_linked_audio_and_skips_disabled_items(self) -> None:
+        video = FakeVideoItem(start=0, end=24, name="Video", track_index=1)
+        audio = FakeTimelineAudioItem(start=0, end=24, name="Audio", track_index=1, linked_items=[video])
+        video._linked_items = [audio]
+        disabled = FakeVideoItem(start=48, end=72, name="Disabled", track_index=2, enabled=False)
         timeline = FakeTimeline(
-            video_tracks={1: [mixed_video]},
-            audio_tracks={1: [linked_audio], 2: [standalone_audio]},
-            markers={48: {"color": "Blue", "duration": 24}},
-        )
-        mode, clips, _fps, content_type = export_core.get_target_clips_logic(
-            timeline, "auto", "mixed"
-        )
-        self.assertEqual(mode, "batch")
-        self.assertEqual([clip["item"] for clip in clips], [mixed_video, standalone_audio])
-        self.assertEqual(content_type, "mixed")
-
-    def test_explicit_range_requires_the_requested_marker(self) -> None:
-        timeline = FakeTimeline(
-            video_tracks={1: [FakeVideoItem(start=0, end=24)]},
-            markers={0: {"color": "Cyan", "duration": 24}},
-        )
-        statuses: list[str] = []
-        result = export_core.process_and_send(
-            FakeResolve(),
-            FakeProject(timeline),
-            AE_PATH,
-            statuses.append,
-            {"prefix": "Link", "debug_mode": False},
-            "video-range",
-            "blue-range",
-            "video",
-        )
-        self.assertEqual(statuses, ["Analyzing...", "❌ No Blue duration marker found"])
-        self.assertEqual(result, {
-            "ok": False,
-            "code": "missing-marker",
-            "mode": "video-range",
-            "target_policy": "blue-range",
-            "media_policy": "video",
-            "clip_count": 0,
-            "message": "No Blue duration marker found",
-        })
-
-    def test_explicit_range_propagates_marker_api_errors(self) -> None:
-        timeline = FakeTimeline(video_tracks={1: [FakeVideoItem(start=0, end=24)]})
-
-        def fail_marker_read():
-            raise RuntimeError("marker API failed")
-
-        timeline.GetMarkers = fail_marker_read
-
-        with self.assertRaisesRegex(RuntimeError, "marker API failed"):
-            export_core.get_target_clips_logic(timeline, "blue-range", "video")
-        self.assertEqual(
-            export_core.get_target_clips_logic(timeline, "auto", "mixed")[0],
-            "single",
+            video_tracks={1: [video], 2: [disabled]},
+            audio_tracks={1: [audio]},
+            selected_clips=[audio, disabled, video, video],
         )
 
-    def test_process_and_send_rejects_unsupported_triples_before_resolve_access(self) -> None:
-        for triple in [
-            ("single", "single", "audio"),
-            ("single", "single", "video"),
-            ("mixed-range", "blue-range", "audio"),
-            ("audio-only", "auto", "video"),
-            ("unknown", "auto", "mixed"),
+        self.assertEqual([video], self._clips(timeline, "mixed"))
+
+    def test_native_selection_errors_are_not_interpreted_as_empty_selection(self) -> None:
+        current = FakeVideoItem(start=0, end=24, name="Current")
+        for selected_clips, selection_error in (({}, None), ([], RuntimeError("bridge failure"))):
+            with self.subTest(selected_clips=selected_clips, selection_error=selection_error):
+                timeline = FakeTimeline(
+                    video_tracks={1: [current]},
+                    selected_clips=selected_clips,
+                    selection_error=selection_error,
+                )
+                with self.assertRaises(export_core.NativeSelectionError):
+                    self._clips(timeline, "video")
+
+        current.GetTrackTypeAndIndex = lambda: ("audio", 1)
+        timeline = FakeTimeline(video_tracks={1: [current]}, selected_clips=[current])
+        with self.assertRaisesRegex(export_core.NativeSelectionError, "track metadata"):
+            self._clips(timeline, "video")
+
+    def test_process_and_send_rejects_unsupported_modes_before_resolve_access(self) -> None:
+        for command_mode in [
+            ("audio-only", "video"),
+            ("unknown", "mixed"),
         ]:
-            with self.subTest(triple=triple):
-                with self.assertRaisesRegex(ValueError, "Unsupported export triple"):
+            with self.subTest(command_mode=command_mode):
+                with self.assertRaisesRegex(ValueError, "Unsupported export mode/media policy"):
                     export_core.process_and_send(
                         FakeResolve(),
                         FakeProject(None),
                         AE_PATH,
                         lambda _message: None,
                         {"prefix": "Link", "debug_mode": False},
-                        *triple,
+                        *command_mode,
                     )
 
     def test_returns_desktop_launch_plan_without_starting_after_effects(self) -> None:

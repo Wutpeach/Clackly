@@ -179,7 +179,7 @@ Exactly one **Export to After Effects** card is visible and searchable; binding-
 | Ctrl+Click | Audio only |
 | Ctrl+Shift+Click | Video only |
 
-Selection scope comes from Resolve state: the lowest numeric Blue duration marker produces a batch range (all video, plus linked audio for mixed), and with no Blue marker the card falls back to the independent topmost video and audio clips under the playhead. Cyan markers are ignored. Legacy binding names remain executable as internal actions: Export Current Clip maps to playhead mixed, Export Blue Marker Range maps to Blue-range video, and Export Cyan Marker Range maps to Blue-range mixed without any Cyan-marker behavior. The release target is Windows with Resolve Studio Workflow Integration and After Effects. The retained macOS core path is not release-qualified. Progress streaming, cancellation, timeouts, and multiple-marker queues are intentionally not included.
+Selection scope comes from Resolve state: a non-empty native selection exports only eligible selected items and preserves their relative timing and gaps, while an empty selection or a host without the native API falls back to the independent topmost video and audio clips under the playhead. Timeline Markers never affect AE export. Saved legacy binding names are migrated to the three current mixed/audio/video actions; retired command ids are not executable. The release target is Windows with Resolve Studio Workflow Integration and After Effects. The retained macOS core path is not release-qualified. Progress streaming, cancellation, timeouts, and selection queues are intentionally not included.
 
 ## Feature UI Framework
 

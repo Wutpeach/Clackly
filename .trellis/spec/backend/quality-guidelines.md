@@ -556,36 +556,28 @@ initializeAfterEffectsPath(configManager);
 
 ### 1. Scope / Trigger
 
-- Trigger: resolving the currently supported Resolve timeline range, mapping it to target clips for After Effects export, converting an export Command id into a selection/media policy before Resolve access, or changing optional After Effects composition presentation around the canonical export.
-- Raw timeline facts stay in `resolve/adapter.py`; Blue duration-marker qualification and range construction stay in `resolve/timeline_range.py`; Export policy stays in `resolve2ae_core/export.py`; Command policy mapping stays in `scripts/resolve2ae_export.py`.
+- Trigger: mapping Resolve native selection or the playhead to target clips for After Effects export, converting an export Command id into a media policy before Resolve access, or changing optional After Effects composition presentation around the canonical export.
+- Export targeting stays in `resolve2ae_core/export.py`; Command policy mapping stays in `scripts/resolve2ae_export.py`. Marker creation is separate from AE export.
 
 ### 2. Signatures
 
-- Selection: `get_target_clips_logic(timeline, target_policy = "auto", media_policy = "mixed") -> list[record]`, where `target_policy` is `auto | single | blue-range` and `media_policy` is `mixed | audio | video`.
-- Range value: `TimelineRange(start_frame: int, end_frame_exclusive: int, source: Literal["resolve-duration-marker"])` in absolute Resolve timeline-item frame coordinates.
-- Range resolution: `resolve_timeline_range(timeline_start_frame, markers) -> TimelineRange | None` from already acquired raw Resolve facts.
-- Raw facts: `read_timeline_start_frame(timeline)` and `read_timeline_markers(timeline)` call the matching Resolve API directly and preserve its raw result or error.
-- Execution: `process_and_send(..., mode, target_policy, media_policy)`, `_terminal_result(ok, code, mode, target_policy, media_policy, clip_count, message)`.
+- Selection: `get_target_clips_logic(timeline, media_policy = "mixed") -> (mode, list[record], fps, content_type)`, where `media_policy` is `mixed | audio | video`.
+- Execution: `process_and_send(..., mode, media_policy)`, `_terminal_result(ok, code, mode, target_policy, media_policy, clip_count, message)`. The retained result `target_policy` value is always `"auto"` for protocol compatibility; it does not select a targeting branch.
 - Preview config: optional Capability boolean `ae.export.create1080pPreviewComp`; absent or `false` is disabled, and `true` enables one presentation wrapper for every product Command through the shared execution path.
 - Composition names: Source is `[sourceWidthxsourceHeight]-TimelineName-N`; enabled Preview is `[1920x1080]-TimelineName-N-Preview`, sharing the same project-derived `N`.
 - Preview JSX: create the named 1920 x 1080 Preview with `comp.duration`/`comp.frameRate`, add `comp` once, center at `[previewComp.width / 2, previewComp.height / 2]`, then set equal Scale axes from `Math.min(previewComp.width / comp.width, previewComp.height / comp.height) * 100`.
-- Product Command/wrapper triples: exactly `timeline.exportToAfterEffects -> ("auto", "auto", "mixed")`, `timeline.exportAudioToAfterEffects -> ("audio-only", "auto", "audio")`, and `timeline.exportVideoToAfterEffects -> ("video-only", "auto", "video")`.
-- Wrapper mapping: `scripts/resolve2ae_export.py` maps only those three current AE Command ids to the product triples and passes all three arguments. Retired current-only, explicit Blue-range, and Cyan-range ids have no Command registration or wrapper mapping and are rejected before Resolve access.
-- Core validation: `process_and_send()` retains its six exact `SUPPORTED_COMMAND_TRIPLES`: the three product triples plus `("single", "single", "mixed")`, `("video-range", "blue-range", "video")`, and `("mixed-range", "blue-range", "mixed")` for Core selection compatibility/regression coverage. The retained Core triples are not product Commands or wrapper routes.
+- Product Command/wrapper pairs: exactly `timeline.exportToAfterEffects -> ("auto", "mixed")`, `timeline.exportAudioToAfterEffects -> ("audio-only", "audio")`, and `timeline.exportVideoToAfterEffects -> ("video-only", "video")`.
+- Wrapper mapping: `scripts/resolve2ae_export.py` maps only those three AE Command ids to the product pairs and passes both arguments. Other Command ids are rejected before Resolve access.
+- Core validation: `process_and_send()` accepts only those three `SUPPORTED_COMMAND_MODES` pairs before Resolve access.
 
 ### 3. Contracts
 
-- The resolver accepts only exact-color Blue markers with `int(duration) > 1`, chooses the lowest numeric marker frame independently of enumeration order, adds the timeline start offset once, and returns a half-open absolute range. A missing start fact uses the legacy `86400`; Cyan, point, malformed-info, and malformed-duration markers are ignored.
-- `TimelineRange` owns exact integer start/end frames, `end_frame_exclusive > start_frame`, and the only current source token. It does not reject negative frames, clamp to timeline bounds, or validate FPS.
-- `auto` consumes the resolved range when present and otherwise falls back to the playhead single. The retained Core-internal `single` policy does not read markers, and the retained Core-internal `blue-range` policy requires a resolved range. These policies, `MissingMarkerError`, FPS/timecode behavior, and clip overlap remain Export concerns; consumers do not branch on `range.source`.
-- Marker API/scan errors retain their compatibility boundary: `auto` falls back, including retaining a valid candidate accumulated before a malformed qualifying frame; `blue-range` propagates the original error. Start-frame API errors propagate for every policy.
-- `TimelineRangeScanError` is an internal extraction-compatibility detail, not a Range result or consumer contract. Only the resolver, Export's legacy catch boundary, and focused tests may reference it; upstream runtime, Command, Capability, and future generic consumers must not depend on it.
-- Batch membership is the half-open overlap `clip_start < range.end_frame_exclusive and clip_end > range.start_frame`. The range controls membership only and never trims selected clips.
-- `single` selects the independent topmost enabled video and audio records; mixed de-duplicates linked audio against the video record, and each requested class falls back to the available counterpart when absent.
-- The retained Core-internal `blue-range` branch targets video intersecting the Blue range plus de-duplicated linked audio for mixed; its direct compatibility/regression triples keep the existing missing-marker terminal when no Blue marker exists.
+- On a host exposing `Timeline.GetSelectedClips`, Export calls it once. A non-empty list is authoritative: normalize only enabled, media-backed video/audio items with their real track identities, retain each selected item, sort deterministically, apply the existing media/linked-media policy, and never infer clips inside a selected span. A non-empty list filtered to nothing returns `no-clips`.
+- An empty native list and a host without `Timeline.GetSelectedClips` both use the existing playhead single. Neither path reads or otherwise consults timeline Markers. API exceptions or malformed responses are explicit diagnostic failures, not empty selection.
+- The playhead selects the independent topmost enabled video and audio records; mixed de-duplicates linked audio against the video record, and each requested class falls back to the available counterpart when absent.
 - OTIO enrichment runs whenever any target record has `track_type == "video"` (`has_video`); `content_type` remains a display projection and never suppresses video processing. Video-only export writes `layer.audioEnabled = false;` for every video layer including linked audio.
 - Result contracts are layer-specific: Core success carries the seven public keys plus the private `__clacklyDesktopLaunch` directive; Core controlled failure emits exactly the seven keys; the Wrapper converts `ok: false` into a script error; RuntimeManager strips the launch directive from successful public output.
-- The wrapper rejects every non-product Command id before Resolve access. `process_and_send()` separately validates its six Core triples before Resolve access; its retained internal triples do not create a Command or wrapper route.
+- The wrapper rejects every non-product Command id before Resolve access. `process_and_send()` separately validates its three Core mode/media pairs before Resolve access.
 - The timeline-resolution Source remains the canonical export: apart from its project-aware name, its dimensions, layers, timing, media, effects, and selection semantics stay unchanged. When Preview is enabled, Source is fully populated first, moved to `Clackly Source Comps`, and referenced rather than replaced by a root Preview; Source opens in the Viewer when disabled, Preview opens when enabled.
 - `ae.export` Capability metadata owns the optional boolean and localized field label. `scripts/resolve2ae_export.py` only adapts that scoped value into the shared Core config; Settings remains generic and schema-driven.
 - Disabled or absent preview config creates only the root Source and no Preview JSX. Enabled Preview uses the shared Source sequence, retains the original-resolution Source, and uses the fixed `-Preview` suffix so a 1920 x 1080 Source cannot collide with its wrapper.
@@ -594,35 +586,29 @@ initializeAfterEffectsPath(configManager);
 ### 4. Validation & Error Matrix
 
 - Unsupported wrapper Command id, including every retired id -> rejected before Resolve access with no Core call.
-- Unsupported Core `(mode, target_policy, media_policy)` triple -> rejected before Resolve access.
-- Missing Blue for a retained direct Core `blue-range` triple -> existing `missing-marker` terminal result; product `auto` without Blue -> playhead, not an error.
-- Malformed marker info/duration -> skip the entry; malformed qualifying frame -> preserve the existing policy-specific scan failure and any earlier candidate.
-- `GetMarkers()` failure -> auto playhead fallback, explicit propagation; `GetStartFrame()` failure -> propagation for every policy.
-- Non-integer or empty `TimelineRange` -> constructor `TypeError`/`ValueError`; negative but increasing ranges remain valid.
+- Unsupported Core `(mode, media_policy)` pair -> rejected before Resolve access.
+- Missing or empty native selection -> playhead fallback; a host without the native API also uses the playhead.
+- Native API/item failure or malformed response -> explicit `NativeSelectionError`, never an inferred empty selection.
 - No target clips for the requested media -> existing controlled no-clips failure with a media-appropriate message.
 - Missing preview key or explicit `false` -> no wrapper JSX; invalid non-boolean stored/submitted value -> existing ConfigManager type rejection before execution.
 - Enabled preview -> exactly one 1920 x 1080 wrapper with source-derived duration/frame rate, one centered nested source layer, and identical X/Y Fit scale.
 
 ### 5. Good/Base/Bad Cases
 
-- Good: two Blue markers at frames `100` and `20` select the `20` marker (numeric ordering) regardless of API enumeration order.
-- Good: marker frame `10`, timeline start `1000`, and duration `5` resolves to `[1010, 1015)`; clips touching only `1010` or `1015` are excluded.
-- Good: mixed single with a disabled top video track falls back to the next enabled video while retaining linked-audio de-duplication.
-- Base: one visible Command with no Blue marker exports the topmost playhead video plus its linked audio.
+- Good: a disjoint, multitrack native selection preserves selected ordering and gaps while excluding unselected intervening clips.
+- Good: a native host with an empty selection and a qualified host without the native API both export the topmost playhead video plus its linked audio.
 - Good: 3840 x 2160 fits at 50%; 2048 x 1536 fits at 70.3125%, proving height can be the limiting ratio.
 - Base: preview disabled or absent creates one root Source; enabling it creates one centered 1920 x 1080 Preview around that canonical Source.
 - Bad: resize or rename `comp`, open a replacement comp instead, hard-code 50%, use different X/Y scales, or implement preview policy in Settings, a Command, the persistent worker, or AfterEffectsLauncher.
-- Bad: catch every resolver exception and return `None`; this changes explicit errors and can hide range-construction failures.
-- Bad: make Export branch on `TimelineRange.source` or move playhead fallback into the resolver.
+- Bad: infer empty selection from a native API exception or fall back from filtered explicit selection to unrelated playhead content.
 - Bad: gating OTIO/video-property enrichment on `content_type == "video"` so a mixed selection skips video processing.
 - Bad: exporting video-only with embedded/linked audio still enabled on a video layer.
 
 ### 6. Tests Required
 
-- Assert TimelineRange invariants, exact Blue/duration qualification, numeric-vs-lexical keys (`"100"`/`"20"`), enumeration independence, malformed facts, absolute offset, `86400`, and end-exclusive construction.
-- Assert the full 3x3 selection matrix, Cyan ignore, Blue absence, explicit missing Blue, policy-specific API/scan errors, half-open overlap with no trimming, independent topmost fallback, and mixed de-duplication.
-- Assert the three product Command/wrapper triples and rejected retired ids, the retained Core-internal selection triples, exact Core failure/success transport, Wrapper script error, RuntimeManager stripped success/typed failure, and multiple video layers all muted in video-only coverage.
-- Assert mixed-single and mixed-Blue transformed/speed/crop/lens/blend/LUT regressions that prove OTIO enrichment still runs, plus linked-A/V video-only silence assertions.
+- Assert native selected-only multi-track/disjoint ordering, linked/disabled/media filtering, non-empty no-fallback behavior, API errors, native-empty playhead targeting, and API-absent playhead targeting.
+- Assert the three product Command/wrapper pairs and rejected modes, exact Core failure/success transport, Wrapper script error, RuntimeManager stripped success/typed failure, and multiple video layers all muted in video-only coverage.
+- Assert selected and playhead transformed/speed/crop/lens/blend/LUT regressions that prove OTIO enrichment still runs, plus linked-A/V video-only silence assertions.
 - Assert the localized optional schema field reaches all three product Commands through the shared entry; missing/null-like test fixtures/false adapt to disabled while literal true enables it.
 - Assert disabled snapshots remain unchanged and enabled JSX preserves source construction order/content, creates one deterministic 1920 x 1080 wrapper after source layers, reuses source timing, nests and centers the source once, and uses the runtime minimum-ratio formula with equal axes for both 16:9 and non-16:9 sources.
 
@@ -641,11 +627,6 @@ if content_type == "video":
 has_video = any(record["track_type"] == "video" for record in target_clips)
 if has_video:
     enrich_otio(target_clips)
-
-timeline_start = read_timeline_start_frame(timeline)
-markers = read_timeline_markers(timeline)
-timeline_range = resolve_timeline_range(timeline_start, markers)
-# Export decides whether None means playhead fallback or MissingMarkerError.
 
 if config.get("create1080pPreviewComp") is True:
     # Append declarative JSX after source-layer generation; comp stays canonical.

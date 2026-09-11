@@ -68,45 +68,32 @@ function findPython(directory, found = []) {
   return found;
 }
 
+function loadLockedProfiles(runtimeRoot) {
+  const manifest = JSON.parse(fs.readFileSync(path.join(runtimeRoot, "manifest.json"), "utf8"));
+  const locks = fs.readdirSync(runtimeRoot)
+    .filter((name) => name.endsWith(".lock.json"))
+    .map((name) => ({ name, ...JSON.parse(fs.readFileSync(path.join(runtimeRoot, name), "utf8")) }));
+  assert.equal(manifest.profiles.length, locks.length,
+    "Every packaged Runtime profile must have one lock file");
+  return manifest.profiles.map((profile) => {
+    const lock = locks.find(({ profileId }) => profileId === profile.id);
+    assert(lock, `Packaged Runtime Manifest has no lock for ${profile.id}`);
+    assert.equal(profile.runtimeVersion, lock.version);
+    assert.equal(profile.releaseStatus, lock.releaseStatus);
+    return { profile, lock };
+  }).sort((left, right) => left.profile.id.localeCompare(right.profile.id));
+}
+
+function pythonStem(version) {
+  return `python${version.split(".").slice(0, 2).join("")}`;
+}
+
 async function verifyPackage({
   appRoot = path.resolve(__dirname, ".."),
   packageRoot = path.resolve(process.argv[2] || path.join(path.resolve(__dirname, ".."), "release", "win-unpacked"))
 } = {}) {
   const runtimeRoot = path.join(packageRoot, "resources", "runtimes");
-  const lock = JSON.parse(fs.readFileSync(path.join(runtimeRoot, "python-win32-x64.lock.json"), "utf8"));
-  const manifest = JSON.parse(fs.readFileSync(path.join(runtimeRoot, "manifest.json"), "utf8"));
-  const profile = manifest.profiles.find(({ id }) => id === lock.profileId);
-  assert(profile, `Packaged Manifest does not contain ${lock.profileId}`);
-  assert.equal(manifest.profiles.length, 1, "Package must contain exactly one Runtime profile");
-  assert.equal(profile.runtimeVersion, lock.version);
-  assert.equal(profile.releaseStatus, lock.releaseStatus);
-
-  const executable = path.join(runtimeRoot, ...profile.executable.split("/"));
-  const profileRoot = path.dirname(executable);
-  const metadata = JSON.parse(fs.readFileSync(path.join(profileRoot, "runtime.json"), "utf8"));
-  assert.equal(metadata.profileId, profile.id);
-  assert.equal(metadata.runtimeVersion, lock.version);
-  assert.equal(metadata.releaseStatus, lock.releaseStatus);
-  assert.equal(metadata.source.sha256, lock.asset.sha256);
-  const sourceLock = fs.readFileSync(path.join(appRoot, "resources", "runtimes", "python-win32-x64.lock.json"));
-  assert.equal(metadata.build.lockSha256, crypto.createHash("sha256").update(sourceLock).digest("hex"));
-
-  for (const file of [
-    "python.exe", "python313.dll", "python313.zip", "python313._pth", "runtime.json",
-    "LICENSE.txt", "THIRD_PARTY_NOTICES.md", "python-embed.sigstore",
-    "python-embed.spdx.json", "application.spdx.json", "clackly/bootstrap.py",
-    "clackly/persistent_bootstrap.py",
-    "clackly/python_runner.py", "clackly/scripts/resolve2ae_export.py"
-  ]) {
-    assert(fs.statSync(path.join(profileRoot, ...file.split("/"))).isFile(), `Missing packaged file: ${file}`);
-  }
-  assert.deepEqual(
-    fs.readFileSync(path.join(profileRoot, "python313._pth"), "utf8").trim().split(/\r?\n/),
-    ["python313.zip", ".", "clackly"]
-  );
-  JSON.parse(fs.readFileSync(path.join(profileRoot, "python-embed.spdx.json"), "utf8"));
-  JSON.parse(fs.readFileSync(path.join(profileRoot, "application.spdx.json"), "utf8"));
-
+  const profiles = loadLockedProfiles(runtimeRoot);
   const stagedRoot = path.join(appRoot, "build", "runtime-staging", "runtimes");
   const stagedFiles = inventory(stagedRoot);
   assert.deepEqual(inventory(runtimeRoot), stagedFiles, "Packaged Runtime inventory differs from staging");
@@ -115,44 +102,72 @@ async function verifyPackage({
     assert.equal(sha256(path.join(runtimeRoot, ...filePath)), sha256(path.join(stagedRoot, ...filePath)),
       `Packaged Runtime file changed: ${relative}`);
   }
-  const stagedProfileRoot = path.dirname(path.join(stagedRoot, ...profile.executable.split("/")));
-  assertApplicationSourceIdentity({
-    appRoot,
-    stagedProfileRoot,
-    packagedProfileRoot: profileRoot,
-    metadata
-  });
-  assert.deepEqual(findPython(packageRoot).map((item) => fs.realpathSync(item)), [fs.realpathSync(executable)]);
+
+  for (const { profile, lock } of profiles) {
+    const executable = path.join(runtimeRoot, ...profile.executable.split("/"));
+    const profileRoot = path.dirname(executable);
+    const stagedProfileRoot = path.dirname(path.join(stagedRoot, ...profile.executable.split("/")));
+    const metadata = JSON.parse(fs.readFileSync(path.join(profileRoot, "runtime.json"), "utf8"));
+    assert.equal(metadata.profileId, profile.id);
+    assert.equal(metadata.runtimeVersion, lock.version);
+    assert.equal(metadata.releaseStatus, lock.releaseStatus);
+    assert.equal(metadata.source.sha256, lock.asset.sha256);
+    const sourceLock = fs.readFileSync(path.join(appRoot, "resources", "runtimes", lock.name));
+    assert.equal(metadata.build.lockSha256, crypto.createHash("sha256").update(sourceLock).digest("hex"));
+
+    const stem = pythonStem(lock.version);
+    for (const file of [
+      "python.exe", `${stem}.dll`, `${stem}.zip`, `${stem}._pth`, "runtime.json",
+      "LICENSE.txt", "THIRD_PARTY_NOTICES.md", "python-embed.sigstore",
+      "python-embed.spdx.json", "application.spdx.json", "clackly/bootstrap.py",
+      "clackly/persistent_bootstrap.py", "clackly/python_runner.py",
+      "clackly/scripts/resolve2ae_export.py"
+    ]) {
+      assert(fs.statSync(path.join(profileRoot, ...file.split("/"))).isFile(), `Missing packaged file: ${file}`);
+    }
+    assert.deepEqual(
+      fs.readFileSync(path.join(profileRoot, `${stem}._pth`), "utf8").trim().split(/\r?\n/),
+      [`${stem}.zip`, ".", "clackly"]
+    );
+    JSON.parse(fs.readFileSync(path.join(profileRoot, "python-embed.spdx.json"), "utf8"));
+    JSON.parse(fs.readFileSync(path.join(profileRoot, "application.spdx.json"), "utf8"));
+    assertApplicationSourceIdentity({ appRoot, stagedProfileRoot, packagedProfileRoot: profileRoot, metadata });
+
+    const launcher = new RuntimeLauncher({
+      bootstrapPath: path.join(profileRoot, "clackly", "bootstrap.py"),
+      parentEnvironment: {
+        ...process.env,
+        PATH: "C:\\hostile-python-3.11",
+        CONDA_PREFIX: "C:\\hostile-conda",
+        VIRTUAL_ENV: "C:\\hostile-venv",
+        PYTHONHOME: "C:\\hostile-python-home"
+      }
+    });
+    const { response } = await launcher.execute({
+      resolution: {
+        source: "manifest",
+        supportStatus: "machine-verified",
+        executable,
+        profile
+      },
+      request: { operation: "runtime-info" }
+    });
+    assert.equal(response.runtime.version, lock.version);
+    assert.equal(response.runtime.architecture, "64bit");
+    assert.equal(fs.realpathSync(response.runtime.executable), fs.realpathSync(executable));
+    console.log(`Verified packaged CPython ${lock.version} x64 at ${executable}`);
+  }
+
+  assert.deepEqual(
+    findPython(packageRoot).map((item) => fs.realpathSync(item)).sort(),
+    profiles.map(({ profile }) => fs.realpathSync(path.join(runtimeRoot, ...profile.executable.split("/")))).sort()
+  );
   assert.equal(fs.existsSync(path.join(packageRoot, "resources", "app.asar")), false);
   assert(fs.statSync(path.join(packageRoot, "resources", "app", "manifest.xml")).isFile());
   assert(fs.statSync(path.join(packageRoot, "resources", "app", "workflow-plugin", "WorkflowIntegration.node")).isFile());
   assert.equal(resolveRuntimeRoot({
     appRoot: path.join(packageRoot, "resources", "app")
   }), runtimeRoot, "Resolve-owned Electron must find the packaged sibling Runtime");
-
-  const launcher = new RuntimeLauncher({
-    bootstrapPath: path.join(profileRoot, "clackly", "bootstrap.py"),
-    parentEnvironment: {
-      ...process.env,
-      PATH: "C:\\hostile-python-3.11",
-      CONDA_PREFIX: "C:\\hostile-conda",
-      VIRTUAL_ENV: "C:\\hostile-venv",
-      PYTHONHOME: "C:\\hostile-python-home"
-    }
-  });
-  const { response } = await launcher.execute({
-    resolution: {
-      source: "manifest",
-      supportStatus: "machine-verified",
-      executable,
-      profile
-    },
-    request: { operation: "runtime-info" }
-  });
-  assert.equal(response.runtime.version, lock.version);
-  assert.equal(response.runtime.architecture, "64bit");
-  assert.equal(fs.realpathSync(response.runtime.executable), fs.realpathSync(executable));
-  console.log(`Verified packaged CPython ${lock.version} x64 at ${executable}`);
 }
 
 if (require.main === module) {

@@ -38,7 +38,7 @@ class Resolve2AEExportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             ae_path = Path(directory, "AfterFX.exe")
             ae_path.touch()
-            for command_id, (mode, target_policy, media_policy) in resolve2ae_export.COMMAND_POLICIES.items():
+            for command_id, (mode, media_policy) in resolve2ae_export.COMMAND_POLICIES.items():
                 for config_case, overrides, expected_value in (
                     ("missing", {}, False),
                     ("null", {"create1080pPreviewComp": None}, False),
@@ -51,7 +51,7 @@ class Resolve2AEExportTests(unittest.TestCase):
                             "ok": True,
                             "code": "exported",
                             "mode": mode,
-                            "target_policy": target_policy,
+                            "target_policy": "auto",
                             "media_policy": media_policy,
                             "clip_count": 2,
                             "message": "Sent 2 Clips",
@@ -67,7 +67,7 @@ class Resolve2AEExportTests(unittest.TestCase):
                             "debug_mode": False,
                             "create1080pPreviewComp": expected_value,
                         })
-                        self.assertEqual(process.call_args.args[5:], (mode, target_policy, media_policy))
+                        self.assertEqual(process.call_args.args[5:], (mode, media_policy))
 
     def test_ignores_legacy_prefix_and_propagates_controlled_failures(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -97,14 +97,6 @@ class Resolve2AEExportTests(unittest.TestCase):
             resolve2ae_export.execute(Context("timeline.exportToAfterEffects", "missing.exe"))
         with self.assertRaisesRegex(ValueError, "Unsupported After Effects export Command"):
             resolve2ae_export.execute(Context("unknown.command", "missing.exe"))
-        for retired in (
-            "timeline.exportCurrentToAfterEffects",
-            "timeline.exportBlueRangeToAfterEffects",
-            "timeline.exportCyanRangeToAfterEffects",
-        ):
-            with self.assertRaisesRegex(ValueError, "Unsupported After Effects export Command"):
-                resolve2ae_export.execute(Context(retired, str(ae_path)))
-
 
 if __name__ == "__main__":
     unittest.main()
