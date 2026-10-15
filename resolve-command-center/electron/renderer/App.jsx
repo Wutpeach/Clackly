@@ -50,7 +50,9 @@ import {
   getFeatureWarning,
   getInteractionHelp,
   getRecoveryAction,
-  projectLauncherSections
+  isOrdinaryScript,
+  projectLauncherSections,
+  shouldExecuteDirectly
 } from "./model.mjs";
 
 const hasElectronHost = Boolean(window.resolveCommandCenter);
@@ -163,7 +165,7 @@ function CommandMeta({ command, pinned, labelRef, t }) {
       </span>
       <span ref={labelRef} className="command-name" title={command.name}>{command.name}</span>
       <span className="command-detail">
-        <span className="command-category">{command.category}</span>
+        <span className="command-category">{command.subtitle || command.category}</span>
         {!canExecuteCommand(command) && (
           <span className="status-label">{t(`status.label.${getFeatureWarning(command.featureStatus, t)?.kind}`)}</span>
         )}
@@ -230,6 +232,114 @@ function CommandRow({
   );
 }
 
+function getShortcutActionContextError(action, evidence, t) {
+  if (!evidence) return t("experiment.shortcut.readRequired");
+  const context = evidence.context;
+  if (!context || context.page !== "edit") {
+    return action === "deselect-all"
+      ? t("experiment.shortcut.deselectContext")
+      : t("experiment.shortcut.enableContext");
+  }
+  if (action === "deselect-all" && context.selectedClipCount > 0) return "";
+  if (action === "enable-clip" && context.selectedClipCount === 1) return "";
+  return action === "deselect-all"
+    ? t("experiment.shortcut.deselectContext")
+    : t("experiment.shortcut.enableContext");
+}
+
+function formatShortcutLastResult(lastResult, t) {
+  if (!lastResult) return "";
+  const stage = ["preflight", "palette-hidden", "posthide-guard", "native-restore", "sendinput", "complete"].includes(lastResult.stage)
+    ? lastResult.stage
+    : "unknown";
+  const error = ["request-rejected", "context-changed", "keyboard-config-changed", "keyboard-layout-changed", "foreground-restore-failed", "foreground-check-failed", "held-modifier", "sendinput-partial", "native-output-unparseable", "native-helper-unknown", "unknown"].includes(lastResult.error)
+    ? lastResult.error
+    : null;
+  const expected = Number.isSafeInteger(lastResult.expectedInputs) ? lastResult.expectedInputs : null;
+  const sent = Number.isSafeInteger(lastResult.sentInputs) ? lastResult.sentInputs : null;
+  const cleanupExpected = Number.isSafeInteger(lastResult.cleanupExpected) ? lastResult.cleanupExpected : null;
+  const cleanupSent = Number.isSafeInteger(lastResult.cleanupSent) ? lastResult.cleanupSent : null;
+  return t("experiment.shortcut.lastResult", {
+    stage: t(`experiment.shortcut.stage.${stage}`),
+    helper: t(`experiment.shortcut.helper.${lastResult.helperEntered ? "entered" : "notEntered"}`),
+    send: t(`experiment.shortcut.send.${lastResult.sendInvoked === true ? "yes" : lastResult.sendInvoked === false ? "no" : "unknown"}`),
+    counts: sent !== null && expected !== null ? t("experiment.shortcut.counts", { sent, expected })
+      : expected !== null ? t("experiment.shortcut.expected", { expected }) : "",
+    cleanup: cleanupSent !== null && cleanupExpected !== null ? t("experiment.shortcut.cleanup", { sent: cleanupSent, expected: cleanupExpected }) : "",
+    error: error ? t("experiment.shortcut.error", { error: t(`experiment.shortcut.error.${error}`) }) : ""
+  });
+}
+
+function ResolveShortcutTestPanel({
+  action,
+  chord,
+  confirmed,
+  evidence,
+  reading,
+  running,
+  status,
+  lastResult,
+  onAction,
+  onChord,
+  onConfirmed,
+  onRefresh,
+  onRun,
+  onClose,
+  t
+}) {
+  const actionLabel = action === "deselect-all"
+    ? t("experiment.shortcut.deselectAll")
+    : t("experiment.shortcut.enableClip");
+  const contextError = getShortcutActionContextError(action, evidence, t);
+  const visibleStatus = reading ? t("experiment.shortcut.reading") : contextError || status;
+  const lastResultText = formatShortcutLastResult(lastResult, t);
+  return (
+    <section className="resolve-shortcut-test-panel" aria-label={t("experiment.shortcut.title")}>
+      <header className="resolve-shortcut-test-header">
+        <div>
+          <h2>{t("experiment.shortcut.title")}</h2>
+          <p>{t("experiment.shortcut.description")}</p>
+        </div>
+        <button className="footer-control footer-icon" type="button" onClick={onClose} aria-label={t("experiment.shortcut.back")} title={t("experiment.shortcut.back")}>
+          <Icon name="close" size={16} />
+        </button>
+      </header>
+      <form className="resolve-shortcut-test-form" onSubmit={(event) => {
+        event.preventDefault();
+        onRun(contextError);
+      }}>
+        <label>
+          <span>{t("experiment.shortcut.action")}</span>
+          <select value={action} onChange={(event) => onAction(event.target.value)} disabled={reading || running}>
+            <option value="deselect-all">{t("experiment.shortcut.deselectAll")}</option>
+            <option value="enable-clip">{t("experiment.shortcut.enableClip")}</option>
+          </select>
+        </label>
+        <label>
+          <span>{t("experiment.shortcut.chord")}</span>
+          <input value={chord} onChange={(event) => onChord(event.target.value)} placeholder={t("experiment.shortcut.chordPlaceholder")} autoComplete="off" spellCheck="false" disabled={reading || running} />
+        </label>
+        <label className="resolve-shortcut-confirmation">
+          <input type="checkbox" checked={confirmed} onChange={(event) => onConfirmed(event.target.checked)} disabled={reading || running} />
+          <span>{t("experiment.shortcut.confirm")}</span>
+        </label>
+        <div className="resolve-shortcut-test-actions">
+          <button type="button" className="footer-control resolve-shortcut-refresh" onClick={onRefresh} disabled={reading || running}>
+            {reading ? t("experiment.shortcut.reading") : t("experiment.shortcut.refresh")}
+          </button>
+          <button type="submit" className="resolve-shortcut-run" disabled={reading || running || Boolean(contextError) || !chord.trim() || !confirmed}>
+            {running ? t("experiment.shortcut.testing") : t("experiment.shortcut.test", { action: actionLabel })}
+          </button>
+        </div>
+        <p className="resolve-shortcut-status" role="status" aria-live="polite">
+          {visibleStatus}
+        </p>
+        {lastResultText && <p className="resolve-shortcut-status" role="status">{lastResultText}</p>}
+      </form>
+    </section>
+  );
+}
+
 function PaletteApp() {
   const { effectiveLocale, t } = useLocalization();
   const shellRef = useRef(null);
@@ -253,6 +363,18 @@ function PaletteApp() {
   const [pinnedIds, setPinnedIds] = useState(() => new Set());
   const [interactionPanelOpen, setInteractionPanelOpen] = useState(false);
   const [interactionPanelGeometry, setInteractionPanelGeometry] = useState(null);
+  const [shortcutTestOpen, setShortcutTestOpen] = useState(false);
+  const [shortcutAction, setShortcutAction] = useState("deselect-all");
+  const [shortcutChord, setShortcutChord] = useState("");
+  const [shortcutConfirmed, setShortcutConfirmed] = useState(false);
+  const [shortcutEvidence, setShortcutEvidence] = useState(null);
+  const [shortcutReading, setShortcutReading] = useState(false);
+  const [shortcutRunning, setShortcutRunning] = useState(false);
+  const [shortcutStatus, setShortcutStatus] = useState("");
+  const [shortcutLastResult, setShortcutLastResult] = useState(null);
+  const resolveShortcutTestAvailable = typeof api.collectResolveBoundShortcutEvidence === "function"
+    && typeof api.runResolveBoundShortcutSpike === "function"
+    && typeof api.getResolveBoundShortcutLastResult === "function";
   const localizedCommands = useMemo(() => localizeCommands(commands, effectiveLocale), [commands, effectiveLocale]);
   const searchCatalog = useMemo(
     () => createPresentationCatalog(searchResponse.commands, featureStatuses),
@@ -303,6 +425,13 @@ function PaletteApp() {
 
   useEffect(() => {
     let mounted = true;
+    const refreshScriptSearch = () => {
+      Promise.resolve(api.searchCommands("", [], { refresh: true }))
+        .then(() => {
+          if (mounted) setSearchRefreshRevision((current) => current + 1);
+        })
+        .catch(() => {});
+    };
     const refreshCatalog = async () => {
       try {
         const [nextCommands, nextBindings, cachedStatuses] = await Promise.all([
@@ -322,6 +451,7 @@ function PaletteApp() {
       }
     };
     refreshCatalog();
+    refreshScriptSearch();
 
     const unsubscribe = api.onPaletteShown(() => {
       pendingPinSelectionRef.current = null;
@@ -333,8 +463,14 @@ function PaletteApp() {
       setIsExecuting(false);
       setInteractionPanelOpen(false);
       setInteractionPanelGeometry(null);
+      setShortcutTestOpen(false);
+      setShortcutEvidence(null);
+      setShortcutStatus("");
+      setShortcutChord("");
+      setShortcutConfirmed(false);
       api.closeInteractionPanel();
       refreshCatalog();
+      refreshScriptSearch();
       setSearchRefreshRevision((current) => current + 1);
       requestAnimationFrame(() => shellRef.current?.focus());
     });
@@ -457,6 +593,35 @@ function PaletteApp() {
     };
   }, [interactionPanelOpen, interactionPresentation, interactionRows.length, mode, selectedIndex]);
 
+  useEffect(() => {
+    if (!shortcutTestOpen) return undefined;
+    let active = true;
+    setShortcutReading(true);
+    setShortcutEvidence(null);
+    setShortcutChord("");
+    setShortcutConfirmed(false);
+    Promise.allSettled([
+      Promise.resolve(api.collectResolveBoundShortcutEvidence()),
+      Promise.resolve(api.getResolveBoundShortcutLastResult())
+    ])
+      .then(([evidenceResult, lastResultResult]) => {
+        if (!active) return;
+        if (evidenceResult.status === "fulfilled") setShortcutEvidence(evidenceResult.value);
+        if (lastResultResult.status === "fulfilled" && lastResultResult.value) {
+          setShortcutLastResult(lastResultResult.value);
+        }
+        setShortcutStatus((current) => current || t(evidenceResult.status === "fulfilled"
+          ? "experiment.shortcut.ready"
+          : "experiment.shortcut.readRequired"));
+      })
+      .finally(() => {
+        if (active) setShortcutReading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [shortcutTestOpen]);
+
   function enterSearch(text = "") {
     setQuery(text);
     setMode("search");
@@ -468,7 +633,7 @@ function PaletteApp() {
   }
 
   function toggleSelectedPin() {
-    if (!selectedCommand) return;
+    if (!selectedCommand || isOrdinaryScript(selectedCommand)) return;
     const commandId = selectedCommand.id;
     pendingPinSelectionRef.current = commandId;
     // Immediately invalidate an in-flight request for the previous Pin set.
@@ -514,11 +679,14 @@ function PaletteApp() {
     if (event.type === "contextmenu") {
       event.preventDefault();
     }
-    if (event.type === "click" && event.detail === 0) {
+    if (shouldExecuteDirectly(command, event)) {
       executeCommand(command);
       return;
     }
     if (!command || isExecuting || !command.available) return;
+    if (isOrdinaryScript(command)) {
+      return;
+    }
     if (browserPreview) {
       openInteractionPanel();
       return;
@@ -589,7 +757,79 @@ function PaletteApp() {
     else openInteractionPanel();
   }
 
+  function openShortcutTest() {
+    if (!resolveShortcutTestAvailable) return;
+    closeInteractionPanel(false);
+    setShortcutTestOpen(true);
+  }
+
+  function closeShortcutTest() {
+    setShortcutTestOpen(false);
+    setShortcutStatus("");
+    setShortcutChord("");
+    setShortcutConfirmed(false);
+    requestAnimationFrame(() => shellRef.current?.focus());
+  }
+
+  function refreshShortcutEvidence() {
+    if (shortcutReading || shortcutRunning) return;
+    setShortcutReading(true);
+    setShortcutEvidence(null);
+    setShortcutChord("");
+    setShortcutConfirmed(false);
+    setShortcutStatus("");
+    Promise.resolve(api.collectResolveBoundShortcutEvidence())
+      .then((evidence) => {
+        setShortcutEvidence(evidence);
+        setShortcutStatus(t("experiment.shortcut.ready"));
+      })
+      .catch(() => setShortcutStatus(t("experiment.shortcut.readRequired")))
+      .finally(() => setShortcutReading(false));
+  }
+
+  async function runShortcutTest(contextError) {
+    if (contextError) {
+      setShortcutStatus(contextError);
+      return;
+    }
+    if (!shortcutConfirmed) {
+      setShortcutStatus(t("experiment.shortcut.confirmRequired"));
+      return;
+    }
+    if (!shortcutEvidence || shortcutRunning) return;
+    setShortcutRunning(true);
+    setShortcutStatus("");
+    try {
+      const response = await api.runResolveBoundShortcutSpike({
+        action: shortcutAction,
+        chord: shortcutChord,
+        evidence: {
+          source: "resolve-keyboard-customization",
+          confirmedAt: new Date().toISOString(),
+          ...shortcutEvidence
+        }
+      });
+      if (response?.lastResult) setShortcutLastResult(response.lastResult);
+      setShortcutStatus(response?.ok
+        ? t("experiment.shortcut.effectRequired")
+        : response?.transportAttempted
+          ? t("experiment.shortcut.transportUncertain")
+          : t("experiment.shortcut.noSend"));
+    } catch (_error) {
+      setShortcutStatus(t("experiment.shortcut.transportUncertain"));
+    } finally {
+      setShortcutRunning(false);
+    }
+  }
+
   function handleKeyDown(event) {
+    if (shortcutTestOpen) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeShortcutTest();
+      }
+      return;
+    }
     if (interactionPanelOpen) {
       if (event.key === "Tab" || event.key === "Escape") {
         event.preventDefault();
@@ -634,7 +874,7 @@ function PaletteApp() {
     }
   }
 
-  const selectedPinned = Boolean(selectedCommand && pinnedIds.has(selectedCommand.id));
+  const selectedPinned = Boolean(selectedCommand && !isOrdinaryScript(selectedCommand) && pinnedIds.has(selectedCommand.id));
   const handleCommandHover = (command) => {
     setHoveredCommandId(command.id);
   };
@@ -656,7 +896,34 @@ function PaletteApp() {
       onKeyDown={handleKeyDown}
     >
       <div ref={mainSurfaceRef} className="palette-main">
-        {mode === "launcher" && (
+        {shortcutTestOpen ? (
+          <ResolveShortcutTestPanel
+            action={shortcutAction}
+            chord={shortcutChord}
+            confirmed={shortcutConfirmed}
+            evidence={shortcutEvidence}
+            reading={shortcutReading}
+            running={shortcutRunning}
+            status={shortcutStatus}
+            lastResult={shortcutLastResult}
+            onAction={(action) => {
+              setShortcutAction(action);
+              setShortcutChord("");
+              setShortcutConfirmed(false);
+              setShortcutStatus("");
+            }}
+            onChord={(chord) => {
+              setShortcutChord(chord);
+              setShortcutConfirmed(false);
+              setShortcutStatus("");
+            }}
+            onConfirmed={setShortcutConfirmed}
+            onRefresh={refreshShortcutEvidence}
+            onRun={runShortcutTest}
+            onClose={closeShortcutTest}
+            t={t}
+          />
+        ) : mode === "launcher" && (
           <section className="launcher-view" aria-label={t("palette.launcher")}>
             <button type="button" className="launcher-search" onClick={() => enterSearch("")} aria-label={t("palette.search")}>
               <Icon name="search" size={17} />
@@ -700,7 +967,7 @@ function PaletteApp() {
           </section>
         )}
 
-        {mode === "search" && (
+        {!shortcutTestOpen && mode === "search" && (
           <SoftPresence className="search-view" ariaLabel={t("palette.search")}>
             <div className="search-control">
               <Icon name="search" size={18} />
@@ -722,7 +989,7 @@ function PaletteApp() {
                   key={command.id}
                   command={command}
                   index={index}
-                  pinned={pinnedIds.has(command.id)}
+                  pinned={!isOrdinaryScript(command) && pinnedIds.has(command.id)}
                   selected={index === selectedIndex}
                   hovered={hoveredCommandId === command.id}
                   accessibleDescription={getCommandAccessibleDescription(command, localizedCommands, bindings, t)}
@@ -745,22 +1012,29 @@ function PaletteApp() {
           </SoftPresence>
         )}
 
-        <div className="palette-footer-area">
+        {!shortcutTestOpen && <div className="palette-footer-area">
           <footer className="palette-footer">
             <button className="footer-control footer-icon" type="button" onClick={() => api.openSettings()} aria-label={t("palette.settings")} title={t("palette.settings")}>
               <Icon name="settings" size={16} />
             </button>
-            <button
-              className={selectedPinned ? "footer-control footer-icon active" : "footer-control footer-icon"}
-              type="button"
-              onClick={toggleSelectedPin}
-              aria-label={selectedCommand ? t(selectedPinned ? "palette.unpin" : "palette.pin", { name: selectedCommand.name }) : t("palette.pinSelected")}
-              aria-pressed={selectedPinned}
-              disabled={!selectedCommand}
-              title={selectedCommand ? t(selectedPinned ? "palette.unpin" : "palette.pin", { name: selectedCommand.name }) : t("palette.pinSelected")}
-            >
-              <Icon name="pin" size={15} />
-            </button>
+            {resolveShortcutTestAvailable && (
+              <button className="footer-control footer-developer" type="button" onClick={openShortcutTest} aria-label={t("experiment.shortcut.open")} title={t("experiment.shortcut.open")}>
+                {t("experiment.shortcut.open")}
+              </button>
+            )}
+            {!isOrdinaryScript(selectedCommand) && (
+              <button
+                className={selectedPinned ? "footer-control footer-icon active" : "footer-control footer-icon"}
+                type="button"
+                onClick={toggleSelectedPin}
+                aria-label={selectedCommand ? t(selectedPinned ? "palette.unpin" : "palette.pin", { name: selectedCommand.name }) : t("palette.pinSelected")}
+                aria-pressed={selectedPinned}
+                disabled={!selectedCommand}
+                title={selectedCommand ? t(selectedPinned ? "palette.unpin" : "palette.pin", { name: selectedCommand.name }) : t("palette.pinSelected")}
+              >
+                <Icon name="pin" size={15} />
+              </button>
+            )}
             <span className="footer-spacer" aria-hidden="true" />
             {hasSelectedCommand && (
               <button
@@ -777,7 +1051,7 @@ function PaletteApp() {
               </button>
             )}
           </footer>
-        </div>
+        </div>}
       </div>
 
       {interactionPanelOpen && hasSelectedCommand && !detachedNativeInteractionPanel && (

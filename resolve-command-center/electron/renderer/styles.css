@@ -120,7 +120,8 @@ select:focus-visible {
 }
 
 .settings-shell {
-  border-radius: 0;
+  --settings-shell-radius: 8px;
+  border-radius: var(--settings-shell-radius);
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.045);
 }
 
@@ -279,6 +280,142 @@ kbd {
   border-top: 1px solid var(--color-palette-separator);
   color: var(--color-palette-muted);
   font-size: 10px;
+}
+
+.footer-developer {
+  padding: 0 5px;
+  font-size: 10px;
+}
+
+.resolve-shortcut-test-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  padding: 10px 12px;
+  overflow-y: auto;
+  color: var(--color-text-primary);
+  background: var(--color-palette-surface);
+  scrollbar-color: var(--color-text-muted) transparent;
+  scrollbar-width: thin;
+}
+
+.resolve-shortcut-test-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-palette-separator);
+}
+
+.resolve-shortcut-test-header h2,
+.resolve-shortcut-test-header p,
+.resolve-shortcut-test-form p {
+  margin: 0;
+}
+
+.resolve-shortcut-test-header h2 {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.resolve-shortcut-test-header p,
+.resolve-shortcut-status {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.resolve-shortcut-test-header p {
+  margin-top: 3px;
+}
+
+.resolve-shortcut-test-form {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding-top: 9px;
+}
+
+.resolve-shortcut-test-form > label:not(.resolve-shortcut-confirmation) {
+  display: grid;
+  gap: 4px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.resolve-shortcut-test-form select,
+.resolve-shortcut-test-form input:not([type="checkbox"]) {
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--color-palette-control-border);
+  border-radius: 4px;
+  color: var(--color-text-primary);
+  background: var(--color-palette-control-fill);
+}
+
+.resolve-shortcut-test-form select:focus-visible,
+.resolve-shortcut-test-form input:not([type="checkbox"]):focus-visible {
+  border-color: var(--color-accent);
+}
+
+.resolve-shortcut-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.resolve-shortcut-confirmation input {
+  margin: 2px 0 0;
+  accent-color: var(--color-accent);
+}
+
+.resolve-shortcut-test-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+}
+
+.resolve-shortcut-refresh,
+.resolve-shortcut-run {
+  min-height: 30px;
+  padding: 0 7px;
+  border: 1px solid var(--color-palette-control-border);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.resolve-shortcut-refresh {
+  justify-content: center;
+  color: var(--color-text-secondary);
+  background: var(--color-palette-control-fill);
+}
+
+.resolve-shortcut-run {
+  color: var(--color-accent-foreground);
+  background: var(--color-accent);
+}
+
+.resolve-shortcut-run:hover:not(:disabled),
+.resolve-shortcut-run:focus-visible {
+  background: var(--color-accent-hover);
+}
+
+.resolve-shortcut-refresh:disabled,
+.resolve-shortcut-run:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.resolve-shortcut-status {
+  min-height: 30px;
 }
 
 .footer-control {
@@ -715,20 +852,20 @@ kbd {
 
 .settings-shell {
   --settings-nav-width: 190px;
-  --settings-inspector-width: 220px;
   --settings-nav-row-height: 30px;
   --settings-detail-inline: 18px;
   --settings-detail-top: 14px;
   --settings-detail-bottom: 16px;
-  --settings-footer-height: 34px;
+  --settings-footer-height: 40px;
   --settings-titlebar-height: 36px;
   --settings-control-height: 30px;
+  --settings-field-gap: 20px;
   --settings-title-size: 16px;
   --settings-section-size: 14px;
   --settings-label-size: 13px;
   --settings-body-size: 13px;
   --settings-status-size: 12px;
-  --settings-meta-size: 11px;
+  --settings-meta-size: 12px;
   --settings-keycap-size: 10px;
   --settings-sidebar-surface: var(--color-palette-surface);
   --settings-control-surface: var(--color-palette-control-fill);
@@ -747,6 +884,17 @@ kbd {
   grid-template-rows: var(--settings-titlebar-height) minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
+  color-scheme: dark;
+}
+
+.settings-shell,
+.language-options {
+  user-select: none;
+}
+
+.settings-shell input:not([type="checkbox"]),
+.settings-shell textarea {
+  user-select: text;
 }
 
 .settings-titlebar {
@@ -755,18 +903,20 @@ kbd {
   min-width: 0;
   border-bottom: 1px solid var(--settings-hairline);
   background: var(--color-palette-surface);
+  border-radius: calc(var(--settings-shell-radius) - 1px) calc(var(--settings-shell-radius) - 1px) 0 0;
+  overflow: hidden;
 }
 
 .settings-titlebar-drag {
   position: absolute;
   top: env(titlebar-area-y, 0);
-  left: env(titlebar-area-x, 0);
+  left: calc(env(titlebar-area-x, 0px) + var(--settings-shell-radius));
   display: flex;
   align-items: center;
-  width: env(titlebar-area-width, 100%);
+  width: calc(env(titlebar-area-width, 100%) - var(--settings-shell-radius) * 2);
   height: env(titlebar-area-height, var(--settings-titlebar-height));
   min-width: 0;
-  padding: 0 12px;
+  padding: 0 calc(12px - var(--settings-shell-radius));
   -webkit-app-region: drag;
 }
 
@@ -805,7 +955,7 @@ kbd {
 
 .settings-workspace {
   display: grid;
-  grid-template-columns: var(--settings-nav-width) minmax(0, 1fr) var(--settings-inspector-width);
+  grid-template-columns: var(--settings-nav-width) minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -879,7 +1029,10 @@ kbd {
 }
 
 .feature-navigation-footer {
-  padding: 7px 8px 8px;
+  display: flex;
+  align-items: center;
+  height: var(--settings-footer-height);
+  padding: 4px 8px;
   border-top: 1px solid var(--settings-hairline);
 }
 
@@ -911,7 +1064,7 @@ kbd {
 .feature-button {
   position: relative;
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) 14px;
+  grid-template-columns: 16px minmax(0, 1fr);
   align-items: center;
   gap: 7px;
   width: 100%;
@@ -957,6 +1110,10 @@ kbd {
   display: grid;
   place-items: center;
   color: var(--settings-status-warning);
+}
+
+.feature-button:has(.feature-status-indicator) {
+  grid-template-columns: 16px minmax(0, 1fr) 14px;
 }
 
 .feature-status-indicator.loading svg {
@@ -1011,9 +1168,14 @@ kbd {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-bottom: 11px;
-  border-bottom: 1px solid var(--settings-hairline);
+  min-width: 0;
 }
+
+.settings-configuration-header > div { min-width: 0; }
+.settings-configuration h1 { overflow-wrap: anywhere; }
+.settings-introduction { margin-top: 8px; }
+.settings-section { margin-top: 16px; }
+.feature-status-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 
 .settings-configuration-icon {
   display: inline-flex;
@@ -1056,32 +1218,6 @@ kbd {
   line-height: 1.2;
 }
 
-.settings-inspector {
-  min-width: 0;
-  min-height: 0;
-  padding: 0 var(--settings-detail-inline);
-  overflow-y: auto;
-  border-left: 1px solid var(--settings-border);
-  scrollbar-color: var(--color-text-muted) transparent;
-  scrollbar-width: thin;
-}
-
-.settings-inspector-section {
-  padding: var(--settings-detail-top) 0;
-}
-
-.settings-inspector-section + .settings-inspector-section {
-  border-top: 1px solid var(--settings-hairline);
-}
-
-.settings-inspector-section > h2 {
-  margin: 0 0 8px;
-  color: var(--color-text-primary);
-  font-size: var(--settings-section-size);
-  font-weight: 600;
-  line-height: 1.2;
-}
-
 .inspector-description,
 .feature-status-reason {
   margin: 0;
@@ -1094,7 +1230,7 @@ kbd {
 .inspector-metadata {
   display: grid;
   gap: 4px;
-  margin: 10px 0 0;
+  margin: 16px 0 0;
   padding-top: 8px;
   border-top: 1px solid var(--settings-hairline);
 }
@@ -1140,7 +1276,7 @@ kbd {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 10px;
+  margin: 0;
 }
 
 .inspector-actions .secondary-button {
@@ -1171,10 +1307,10 @@ kbd {
 
 .inspector-interaction-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 4px;
+  grid-template-columns: 130px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
   padding: 6px 0;
-  border-top: 1px solid var(--settings-hairline);
 }
 
 .inspector-interaction-input {
@@ -1202,11 +1338,56 @@ kbd {
   line-height: 18px;
 }
 
-.inspector-interaction-plus {
-  color: var(--color-text-muted);
-  font-size: 9px;
-  line-height: 1;
+.interaction-mouse svg { display: block; flex-shrink: 0; }
+.interaction-input .interaction-mouse,
+.inspector-interaction-input .interaction-mouse { padding: 0 4px; }
+
+.language-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: var(--settings-control-height);
+  padding: 0 8px;
+  border: 1px solid var(--settings-border);
+  border-radius: var(--radius-toolbar);
+  color: var(--color-text-primary);
+  background: var(--settings-control-surface);
+  font-size: var(--settings-label-size);
+  text-align: left;
 }
+.language-select:hover:not([aria-disabled="true"]) { border-color: var(--color-palette-control-border-strong); }
+.language-select:focus-visible { outline: 1px solid var(--settings-focus); outline-offset: -1px; }
+.language-select[aria-disabled="true"] { opacity: 0.42; }
+.language-select span { min-width: 0; overflow-wrap: anywhere; }
+.language-select svg { flex-shrink: 0; }
+.language-options {
+  position: fixed;
+  z-index: 30;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-toolbar);
+  color: var(--color-text-primary);
+  background: var(--color-palette-surface);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+  color-scheme: dark;
+}
+.language-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: var(--radius-rail);
+  cursor: default;
+}
+.language-option.active { color: var(--color-accent-foreground); background: var(--color-accent); }
+.language-option svg { flex-shrink: 0; }
 
 .inspector-interaction-action-name {
   min-width: 0;
@@ -1220,7 +1401,8 @@ kbd {
 
 .settings-fields {
   display: grid;
-  gap: 10px;
+  width: min(100%, 280px);
+  gap: var(--settings-field-gap);
 }
 
 .settings-field {
@@ -1228,8 +1410,7 @@ kbd {
   gap: 5px;
 }
 
-.settings-field > label,
-.checkbox-field label {
+.settings-field > label {
   color: var(--color-text-secondary);
   font-size: var(--settings-label-size);
   font-weight: 500;
@@ -1256,23 +1437,63 @@ kbd {
   padding: 4px;
 }
 
-.settings-field input:focus,
+.settings-field input:not([type="checkbox"]):focus,
 .settings-field select:focus {
   border-color: var(--settings-focus);
   box-shadow: 0 0 0 1px var(--settings-focus);
 }
 
-.checkbox-field {
-  grid-template-columns: 18px minmax(0, 1fr);
+.switch-field {
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 9px;
+  gap: 12px;
+  min-height: var(--settings-control-height);
 }
 
-.checkbox-field input {
-  width: 16px;
-  height: 16px;
+.switch-field input {
+  appearance: none;
+  position: relative;
+  width: 34px;
+  height: 20px;
   margin: 0;
-  accent-color: var(--color-accent);
+  border: 1px solid var(--settings-border);
+  border-radius: 10px;
+  background: var(--settings-control-fill);
+  cursor: default;
+}
+
+.switch-field input::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-text-secondary);
+}
+
+.switch-field input:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.switch-field input:checked::before {
+  left: 16px;
+  background: var(--color-accent-foreground);
+}
+
+.switch-field input:hover:not(:disabled):not(:checked) {
+  border-color: var(--color-palette-control-border-strong);
+}
+
+.switch-field input:focus-visible {
+  outline: 1px solid var(--settings-focus);
+  outline-offset: 3px;
+}
+
+.switch-field:has(input:disabled) {
+  opacity: 0.42;
 }
 
 .settings-picker-control {
@@ -1369,6 +1590,37 @@ kbd {
 .application-settings-actions {
   grid-template-columns: minmax(0, 1fr);
 }
+
+.settings-update .update-versions {
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+}
+
+.update-versions > div { grid-template-columns: 106px minmax(0, 1fr); }
+.update-versions dt { color: var(--color-text-secondary); }
+.update-versions dd { font-variant-numeric: tabular-nums; }
+.update-fixture-label { margin-bottom: 9px; }
+.update-status { margin: 0; font-size: var(--settings-status-size); line-height: 1.45; color: var(--color-text-secondary); }
+.update-retry, .update-checked { margin-top: 6px; }
+.update-actions { margin-top: 10px; }
+.settings-update .update-actions { flex-wrap: wrap; }
+.update-installation { margin-top: 12px; }
+.update-install-reason, .update-candidate-help { margin-top: 5px; overflow-wrap: anywhere; }
+.update-confirmation { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--settings-border); }
+.update-confirmation h3 { margin: 0 0 6px; font-size: var(--settings-label-size); font-weight: 500; color: var(--color-text-primary); }
+.update-confirmation .settings-empty-copy { margin-bottom: 0; }
+.update-actions .secondary-button[aria-disabled="true"] { opacity: 0.42; }
+.update-actions .secondary-button[aria-disabled="true"]:hover { background: var(--settings-control-surface); }
+.update-progress { display: grid; gap: 5px; margin-top: 10px; font-size: var(--settings-meta-size); color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
+.update-progress progress { width: 100%; height: 4px; appearance: none; border: 0; border-radius: 2px; background: var(--settings-border); accent-color: var(--color-text-secondary); }
+.update-progress progress::-webkit-progress-bar { background: var(--settings-border); border-radius: 2px; }
+.update-progress progress::-webkit-progress-value { background: var(--color-text-secondary); border-radius: 2px; }
+.update-progress progress::-moz-progress-bar { background: var(--color-text-secondary); border-radius: 2px; }
+.update-release { margin-top: 14px; }
+.update-release h3 { margin: 0 0 6px; color: var(--color-text-secondary); font-size: var(--settings-label-size); font-weight: 500; }
+.update-release-notes { max-height: 104px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: var(--settings-status-size); line-height: 1.45; color: var(--color-text-secondary); user-select: text; scrollbar-width: thin; scrollbar-color: var(--color-text-muted) transparent; }
+.update-release-notes:focus-visible { outline: 1px solid var(--settings-focus); outline-offset: 3px; }
 
 .settings-actions .secondary-button {
   min-height: 26px;

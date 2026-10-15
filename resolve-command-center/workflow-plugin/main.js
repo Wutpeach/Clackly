@@ -19,23 +19,28 @@ const {
 const { createNativeDualWindowHost } = require("../electron/main/nativeDualWindowHost");
 const { getPaletteAccelerator, registerPaletteHotkey } = require("../electron/main/hotkey");
 const { composeStartup } = require("../electron/main/composeStartup");
-const { getCommandById, getCommands } = require("../command-engine/registry");
+const { getCommands } = require("../command-engine/registry");
 const { initializeAfterEffectsPath } = require("../capability/afterEffectsPath");
 const { BindingStorage } = require("../interaction/BindingStorage");
 const { InteractionManager } = require("../interaction/InteractionManager");
 const { createResolveAdapter } = require("../resolve/adapter");
+const { registerExperimentalResolveShortcut } = require("../electron/main/experimentalResolveShortcut");
 const { registerFeatureUiIpc } = require("../feature-ui/registerIpc");
 const { createClacklyCore } = require("../app/createClacklyCore");
 const { getElectronSystemLanguages } = require("../localization/LocalizationService");
 const { registerLocalizationIpc } = require("../localization/registerIpc");
 const { translate } = require("../localization/resources");
 const { createClipboardImageReader } = require("../electron/main/clipboard");
+const { createHostUpdateService } = require("../electron/main/update/UpdateService");
+const { registerUpdateIpc } = require("../electron/main/update/registerIpc");
+const { registerUpdateLifecycle } = require("../electron/main/update/lifecycle");
 
 const PLUGIN_ID = "com.wutpeach.clackly";
 
 let WorkflowIntegration = null;
 let paletteWindow = null;
 let settingsWindow = null;
+let updateService = null;
 let initPromise = null;
 let resolvePromise = null;
 let cleanupDone = false;
@@ -124,6 +129,7 @@ const resolveAdapter = createResolveAdapter({ getResolve });
 const appRoot = path.resolve(__dirname, "..");
 const core = createClacklyCore({
   appRoot,
+  resolveInstallationHost: { kind: "workflow", execPath: process.execPath },
   appDataPath: app.getPath("appData"),
   temporaryRoot: app.getPath("temp"),
   systemLanguagesProvider: () => getElectronSystemLanguages(app),
@@ -154,15 +160,11 @@ const core = createClacklyCore({
 });
 
 async function executeWorkflowCommand(commandId) {
-  const command = getCommandById(commandId);
-  if (!command) {
-    throw new Error(`Unknown command: ${commandId}`);
-  }
-
-  const result = await core.executeCommand(command.id);
+  const result = await core.executeSearchResult(commandId);
+  if (result?.status === "api_returned") return result;
   return {
     ok: true,
-    command: command.id,
+    command: commandId,
     ...result
   };
 }
@@ -221,8 +223,12 @@ function togglePalette() {
 }
 
 function registerIpcHandlers() {
+  updateService = createHostUpdateService({ app, appRoot, host: { kind: 'workflow', execPath: process.execPath } });
+  registerUpdateLifecycle({ app, updateService });
+  registerUpdateIpc({ ipcMain, updateService, getSettingsWindow: () => settingsWindow });
+  updateService.start();
   ipcMain.handle("commands:list", () => getCommands());
-  ipcMain.handle("commands:search", (_event, query, pinnedIds) => core.searchCommands(query, pinnedIds));
+  ipcMain.handle("commands:search", (_event, query, pinnedIds, options) => core.searchCommands(query, pinnedIds, options));
   ipcMain.handle("commands:execute", async (_event, commandId) => {
     const result = await executeWorkflowCommand(commandId);
     hidePalette();
@@ -236,6 +242,18 @@ function registerIpcHandlers() {
     return result;
   });
   ipcMain.on("palette:hide", hidePalette);
+  registerExperimentalResolveShortcut({
+    ipcMain,
+    getResolve,
+    hidePalette,
+    appRoot,
+    appDataPath: app.getPath("appData"),
+    isTrustedSender: (event) => Boolean(
+      paletteWindow && !paletteWindow.isDestroyed()
+      && event?.sender === paletteWindow.webContents
+      && event.senderFrame === paletteWindow.webContents.mainFrame
+    )
+  });
   registerLocalizationIpc({
     ipcMain,
     localizationService: core.localizationService,
@@ -332,6 +350,7 @@ if (!hasSingleInstanceLock) {
   });
 
   app.on("will-quit", () => {
+    void updateService?.dispose();
     const { globalShortcut } = require("electron");
     globalShortcut.unregisterAll();
     core.disposeExportPythonWorker();

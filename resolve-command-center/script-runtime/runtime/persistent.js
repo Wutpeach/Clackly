@@ -175,6 +175,15 @@ class PersistentScriptLauncher {
     }
     const required = prepare ? ["operation", "scriptRoot", "entry"]
       : ["operation", "scriptRoot", "entry", "commandId", "config"];
+    if (!prepare && Object.hasOwn(request, "bridge")) {
+      required.push("bridge");
+      if (!exactKeys(request.bridge, ["modulePath", "libraryPath"])) {
+        throw persistentError("RUNTIME_LAUNCH_REQUEST_INVALID", "Persistent Runtime bridge tuple is invalid", { field: "bridge" });
+      }
+      for (const field of ["modulePath", "libraryPath"]) {
+        this.validateFile(request.bridge[field], "RUNTIME_LAUNCH_REQUEST_INVALID", field);
+      }
+    }
     if (request.operation !== (prepare ? "prepare" : "script-execute")
       || !exactKeys(request, required)) {
       throw persistentError("RUNTIME_LAUNCH_REQUEST_INVALID", "Persistent Runtime request has an invalid operation", { field: "request.operation" });

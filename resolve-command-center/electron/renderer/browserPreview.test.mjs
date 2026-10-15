@@ -59,6 +59,30 @@ test("browser preview calculates only local bounded panel presentation geometry"
   });
 });
 
+test("the explicit shortcut-test preview fixture collects evidence without native input", async () => {
+  const api = createBrowserPreviewApi({ search: "?resolve-shortcut-spike-preview=1" });
+  assert.equal(typeof api.collectResolveBoundShortcutEvidence, "function");
+  assert.equal(typeof api.runResolveBoundShortcutSpike, "function");
+  assert.equal(typeof api.getResolveBoundShortcutLastResult, "function");
+  assert.deepEqual((await api.collectResolveBoundShortcutEvidence()).context.selectedClipIds, ["preview-clip"]);
+  assert.deepEqual(await api.runResolveBoundShortcutSpike({ action: "deselect-all" }), {
+    ok: true,
+    result: { postconditionRequired: true }
+  });
+  assert.deepEqual(await api.getResolveBoundShortcutLastResult(), {
+    version: 1,
+    outcome: "failed",
+    stage: "sendinput",
+    error: "sendinput-partial",
+    helperEntered: true,
+    sendInvoked: true,
+    expectedInputs: 6,
+    sentInputs: 2,
+    cleanupExpected: 3,
+    cleanupSent: 3
+  });
+});
+
 test("browser preview reads the canonical visual contract while remaining a hostless DOM composition", () => {
   const previewSource = fs.readFileSync(new URL("./browserPreview.mjs", import.meta.url), "utf8");
   const appSource = fs.readFileSync(new URL("./App.jsx", import.meta.url), "utf8");
@@ -128,6 +152,7 @@ test("Settings fixtures are explicit, hostless preview data with defensive copie
   assert.deepEqual(SETTINGS_PREVIEW_SCENARIOS, [
     "application-empty",
     "typical-ready",
+    "actual-ae",
     "missing-config-long-path",
     "zh-cn-multi-help",
     "busy",

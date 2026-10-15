@@ -231,6 +231,10 @@ def script_execute(request):
     if not contained or not os.path.isfile(candidate):
         return failure("FileNotFoundError", "entry must be a file contained by scriptRoot")
 
+    bridge_error = configure_bridge(request)
+    if bridge_error:
+        return bridge_error
+
     bootstrap_root = Path(__file__).resolve().parent
     runner_path = next(
         (path for path in (bootstrap_root / "python_runner.py", bootstrap_root.parent / "python_runner.py") if path.is_file()),
@@ -248,6 +252,34 @@ def script_execute(request):
         "runtime": runtime,
         "script": runner.run_script(candidate, command_id, config),
     }
+
+
+def configure_bridge(request):
+    """Validate private transport paths without loading native code or Resolve."""
+    if "bridge" not in request:
+        return None  # Config-only fixtures and generic scripts retain their API.
+    bridge = request["bridge"]
+    if not isinstance(bridge, dict) or set(bridge) != {"modulePath", "libraryPath"}:
+        return failure("ValueError", "bridge must contain modulePath and libraryPath")
+    canonical = {}
+    for field, code in (("modulePath", "RESOLVE_MODULE_NOT_FOUND"), ("libraryPath", "RESOLVE_LIBRARY_NOT_FOUND")):
+        value = bridge[field]
+        if not isinstance(value, str) or not os.path.isabs(value) or not os.path.isfile(value):
+            return failure("FileNotFoundError", "Selected Resolve bridge file is unavailable", code, "bridge-path")
+        canonical[field] = os.path.realpath(value)
+    previous = getattr(configure_bridge, "identity", None)
+    identity = tuple((canonical[field], os.stat(canonical[field]).st_size, os.stat(canonical[field]).st_mtime_ns)
+                     for field in ("modulePath", "libraryPath"))
+    if previous is not None and previous != identity:
+        return failure("RuntimeError", "Resolve bridge changed inside a worker", "RESOLVE_BRIDGE_CHANGED", "bridge-path")
+    configure_bridge.identity = identity
+    os.environ["RESOLVE_SCRIPT_LIB"] = canonical["libraryPath"]
+    os.environ["RESOLVE_SCRIPT_API"] = os.path.dirname(os.path.dirname(canonical["modulePath"]))
+    os.environ["CLACKLY_RESOLVE_SCRIPT_MODULE"] = canonical["modulePath"]
+    module_directory = os.path.dirname(canonical["modulePath"])
+    if module_directory not in sys.path:
+        sys.path.insert(0, module_directory)
+    return None
 
 
 def handle(raw_request):

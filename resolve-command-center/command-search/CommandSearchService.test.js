@@ -54,6 +54,112 @@ function ids(response) {
   return response.commands.map(({ id }) => id);
 }
 
+test("ordinary scripts refresh once, match without paths, and keep built-ins first on equal text", async () => {
+  let discovers = 0;
+  const ordinaryScript = {
+    id: "resolve-workspace-script:c:/scripts/utility/example.py",
+    name: "Example",
+    absolutePath: "C:\\Scripts\\Utility\\Example.py",
+    language: "python",
+    source: "system",
+    category: "Utility",
+    nesting: ["Nested"]
+  };
+  const duplicateName = {
+    ...ordinaryScript,
+    id: "resolve-workspace-script:c:/scripts/edit/example.lua",
+    absolutePath: "C:\\Scripts\\Edit\\Example.lua",
+    language: "lua",
+    source: "user",
+    category: "Edit",
+    nesting: []
+  };
+  const service = new CommandSearchService({
+    getCommands: () => [command({ id: "built-in-example", name: "Example", keywords: [] })],
+    localizationService: { getSnapshot: () => ({ effectiveLocale: "en" }) },
+    usageHistory: { getSnapshot: () => ({ [ordinaryScript.id]: { usageCount: 99, lastUsedAt: 1_800_000_000_000 } }) },
+    ordinaryScripts: {
+      discover: async () => {
+        discovers += 1;
+        return { scripts: [ordinaryScript, duplicateName], diagnostics: [] };
+      }
+    }
+  });
+
+  assert.deepEqual(ids(service.search("", [])), ["built-in-example"], "empty Search remains built-in-only");
+  await Promise.all([service.refresh(), service.refresh()]);
+  assert.equal(discovers, 1, "concurrent palette refreshes share one discovery");
+
+  const results = service.search("example", [ordinaryScript.id]);
+  assert.deepEqual(ids(results), ["built-in-example", ordinaryScript.id, duplicateName.id]);
+  assert.deepEqual(results.usedCommandIds, [], "scripts cannot enter Recent from stray usage facts");
+  const script = results.commands.find(({ id }) => id === ordinaryScript.id);
+  assert.deepEqual(
+    { name: script.name, subtitle: script.subtitle, category: script.category, description: script.description, kind: script.kind },
+    {
+      name: "Example",
+      subtitle: "Resolve Script · Utility · Nested · System · Python",
+      category: "Utility",
+      description: "Utility · Nested · System · Python",
+      kind: "ordinary-script"
+    }
+  );
+  assert.equal(
+    results.commands.find(({ id }) => id === duplicateName.id).subtitle,
+    "Resolve Script · Edit · User · Lua",
+    "same-name scripts have useful visible disambiguation"
+  );
+  assert.equal(JSON.stringify(script).includes(ordinaryScript.absolutePath), false, "absolute paths never cross the UI boundary");
+  assert.deepEqual(ids(service.search("utility nested", [])), [ordinaryScript.id]);
+  assert.deepEqual(ids(service.search("scripts", [])), [], "path-bearing IDs are never searchable");
+  assert.equal(service.isOrdinaryScriptId(ordinaryScript.id), true);
+});
+
+test("ordinary discovery failure never removes built-in Search", async () => {
+  const service = new CommandSearchService({
+    getCommands: () => [command({ id: "built-in-example", name: "Example", keywords: [] })],
+    localizationService: { getSnapshot: () => ({ effectiveLocale: "en" }) },
+    usageHistory: { getSnapshot: () => ({}) },
+    ordinaryScripts: { discover: async () => { throw new Error("ResolvePython unavailable"); } }
+  });
+
+  await service.refresh();
+  assert.deepEqual(ids(service.search("example", [])), ["built-in-example"]);
+  assert.deepEqual(ids(service.search("", [])), ["built-in-example"]);
+});
+
+test("ordinary refresh keeps built-ins immediate and replaces partial or empty snapshots", async () => {
+  const script = {
+    id: "resolve-workspace-script:c:/scripts/utility/example.py",
+    name: "Example Script",
+    absolutePath: "C:\\Scripts\\Utility\\Example.py",
+    language: "python",
+    source: "system",
+    category: "Utility",
+    nesting: []
+  };
+  let finishDiscovery;
+  let snapshot = new Promise((resolve) => { finishDiscovery = resolve; });
+  const service = new CommandSearchService({
+    getCommands: () => [command({ id: "built-in-example", name: "Example", keywords: [] })],
+    localizationService: { getSnapshot: () => ({ effectiveLocale: "en" }) },
+    usageHistory: { getSnapshot: () => ({}) },
+    ordinaryScripts: { discover: () => snapshot }
+  });
+
+  const refresh = service.refresh();
+  assert.deepEqual(ids(service.search("example", [])), ["built-in-example"], "in-flight discovery never blocks built-ins");
+  finishDiscovery({ scripts: [script], diagnostics: [{ code: "entry_unreadable" }] });
+  await refresh;
+  assert.deepEqual(ids(service.search("script", [])), [script.id], "partial discovery keeps valid script rows");
+
+  snapshot = Promise.resolve({ scripts: [], diagnostics: [] });
+  await service.refresh();
+  assert.deepEqual(ids(service.search("script", [])), [], "an empty refresh removes stale rows");
+  assert.deepEqual(ids(service.search("example", [])), ["built-in-example"]);
+  assert.equal(service.isOrdinaryScriptId(script.id), true, "a disappeared selection still reaches controlled adapter rejection");
+});
+
 test("Search projects distinct navigation and discovery fields without exposing generated data", () => {
   const hidden = command({ id: "timeline.hidden", presentation: "internal" });
   const { service } = createService({ commands: [command(), hidden] });

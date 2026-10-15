@@ -143,7 +143,7 @@ $ApplicationSourceFiles = @(
 )
 foreach ($Directory in @("resolve", "scripts", "resolve2ae_core")) {
   $ApplicationSourceFiles += Get-ChildItem -LiteralPath (Join-Path $ProjectRoot $Directory) -File -Filter "*.py" |
-    Where-Object { $_.Name -notlike "test_*" } |
+    Where-Object { $_.Name -notlike "test_*" -and $_.Name -ne "ordinary_scripts.py" } |
     Sort-Object Name |
     ForEach-Object {
       [pscustomobject]@{

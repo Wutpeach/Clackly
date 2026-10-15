@@ -43,6 +43,7 @@ function createProjectionEntry(command, sourceIndex, effectiveLocale) {
 
   return {
     sourceIndex,
+    builtIn: true,
     command: localized,
     fields: {
       localizedName,
@@ -62,6 +63,60 @@ export function createSearchProjection(commands, effectiveLocale) {
   return commands
     .filter(isCommandPresentable)
     .map((command, sourceIndex) => createProjectionEntry(command, sourceIndex, effectiveLocale));
+}
+
+function scriptLabel(value) {
+  return {
+    system: "System",
+    user: "User",
+    python: "Python",
+    lua: "Lua"
+  }[value] || value;
+}
+
+function scriptSearchTerms(script) {
+  return [script.category, ...script.nesting].filter((term) => typeof term === "string" && term.trim());
+}
+
+function createOrdinaryScriptProjection(scripts, sourceIndex) {
+  if (!Array.isArray(scripts)) return [];
+  return scripts.flatMap((script, index) => {
+    if (!script || typeof script.id !== "string" || typeof script.name !== "string"
+      || !Array.isArray(script.nesting)) return [];
+    const terms = scriptSearchTerms(script);
+    const detail = [...terms, script.source, script.language]
+      .filter((term) => typeof term === "string" && term.trim())
+      .map(scriptLabel)
+      .join(" · ");
+    const subtitle = ["Resolve Script", detail].filter(Boolean).join(" · ");
+    const namePinyin = transliterateName(script.name);
+    const termPinyin = terms.map(transliterate);
+    return [{
+      sourceIndex: sourceIndex + index,
+      builtIn: false,
+      command: {
+        id: script.id,
+        name: script.name,
+        description: detail || "Resolve Script",
+        category: scriptLabel(script.category) || "Resolve Scripts",
+        subtitle,
+        icon: "command",
+        keywords: [],
+        presentation: "visible",
+        kind: "ordinary-script"
+      },
+      fields: {
+        localizedName: [createSearchField(script.name)].filter(Boolean),
+        englishName: [],
+        nameFullPinyin: namePinyin.full.map(createSearchField).filter(Boolean),
+        namePinyinInitials: namePinyin.initials.map(createSearchField).filter(Boolean),
+        commandId: [],
+        localizedKeywords: terms.map(createSearchField).filter(Boolean),
+        englishKeywords: [],
+        keywordFullPinyin: termPinyin.map(({ full }) => createSearchField(full)).filter(Boolean)
+      }
+    }];
+  });
 }
 
 function fieldMatches(field, query) {
@@ -193,7 +248,7 @@ function cloneCommand(command) {
 }
 
 export class CommandSearchService {
-  constructor({ getCommands, localizationService, usageHistory, now = () => Date.now() } = {}) {
+  constructor({ getCommands, localizationService, usageHistory, ordinaryScripts = null, now = () => Date.now() } = {}) {
     if (typeof getCommands !== "function") {
       throw new TypeError("CommandSearchService requires a Command catalog function");
     }
@@ -206,11 +261,18 @@ export class CommandSearchService {
     if (typeof now !== "function") {
       throw new TypeError("CommandSearchService requires a clock function");
     }
+    if (ordinaryScripts !== null && (!ordinaryScripts || typeof ordinaryScripts.discover !== "function")) {
+      throw new TypeError("Command Search ordinary scripts require discovery");
+    }
     this.getCommands = getCommands;
     this.localizationService = localizationService;
     this.usageHistory = usageHistory;
+    this.ordinaryScripts = ordinaryScripts;
     this.now = now;
     this.projection = null;
+    this.scriptEntries = [];
+    this.scriptIds = new Set();
+    this.refreshPromise = null;
   }
 
   getProjection() {
@@ -225,23 +287,48 @@ export class CommandSearchService {
     return this.projection;
   }
 
+  refresh() {
+    if (!this.ordinaryScripts) return Promise.resolve();
+    if (this.refreshPromise) return this.refreshPromise;
+    this.refreshPromise = Promise.resolve()
+      .then(() => this.ordinaryScripts.discover())
+      .then((snapshot) => {
+        const scripts = Array.isArray(snapshot?.scripts) ? snapshot.scripts : [];
+        const builtInEntries = this.getProjection().entries;
+        this.scriptEntries = createOrdinaryScriptProjection(scripts, builtInEntries.length);
+        for (const entry of this.scriptEntries) this.scriptIds.add(entry.command.id);
+      })
+      .catch(() => {
+        this.scriptEntries = [];
+      })
+      .finally(() => {
+        this.refreshPromise = null;
+      });
+    return this.refreshPromise;
+  }
+
+  isOrdinaryScriptId(commandId) {
+    return typeof commandId === "string" && this.scriptIds.has(commandId);
+  }
+
   search(query, pinnedIds = []) {
     const normalizedQuery = normalizeText(query);
     const pins = normalizePinnedIds(pinnedIds);
     const now = this.now();
     const safeNow = Number.isSafeInteger(now) && now >= 0 ? now : Date.now();
     const usage = this.usageHistory.getSnapshot();
-    const { entries } = this.getProjection();
+    const { entries: builtInEntries } = this.getProjection();
+    const entries = normalizedQuery ? [...builtInEntries, ...this.scriptEntries] : builtInEntries;
 
     const results = entries
       .map((entry) => {
         const text = normalizedQuery ? textRelevance(entry, normalizedQuery) : null;
         if (normalizedQuery && !text) return null;
-        const fact = usageFact(usage, entry.command.id);
+        const fact = entry.builtIn ? usageFact(usage, entry.command.id) : { usageCount: 0, lastUsedAt: 0 };
         return {
           entry,
           text,
-          pinned: pins.has(entry.command.id),
+          pinned: entry.builtIn && pins.has(entry.command.id),
           fact,
           score: decayedUsageScore(fact, safeNow)
         };
@@ -251,6 +338,8 @@ export class CommandSearchService {
         if (normalizedQuery) {
           const textOrder = compareTextRelevance(left.text, right.text);
           if (textOrder) return textOrder;
+          const builtInOrder = Number(right.entry.builtIn) - Number(left.entry.builtIn);
+          if (builtInOrder) return builtInOrder;
         }
         return Number(right.pinned) - Number(left.pinned)
           || right.score - left.score
@@ -262,7 +351,7 @@ export class CommandSearchService {
     return {
       commands: results.map(({ entry }) => cloneCommand(entry.command)),
       usedCommandIds: results
-        .filter(({ fact }) => fact.usageCount > 0)
+        .filter(({ entry, fact }) => entry.builtIn && fact.usageCount > 0)
         .map(({ entry }) => entry.command.id)
     };
   }

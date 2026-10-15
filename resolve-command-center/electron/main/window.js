@@ -2,6 +2,7 @@ const path = require("node:path");
 const { BrowserWindow, screen } = require("electron");
 const paletteGeometry = require("../shared/palette-geometry.json");
 const { translate } = require("../../localization/resources");
+const { normalizeTrigger } = require("../../interaction/trigger");
 const {
   PALETTE_SURFACE,
   PALETTE_INTERACTION_MODE
@@ -375,9 +376,14 @@ function normalizeDetachedInteractionPanelPresentation(presentation) {
     if (presentation.rows.length < 2 || presentation.rows.length > 16) return null;
     const rows = [];
     for (const row of presentation.rows) {
-      if (!row || typeof row !== "object" || Array.isArray(row) || !hasExactKeys(row, ["label", "actionName", "ariaLabel"])) return null;
+      if (!row || typeof row !== "object" || Array.isArray(row)
+        || !hasExactKeys(row, Object.hasOwn(row, "trigger") ? ["label", "actionName", "ariaLabel", "trigger"] : ["label", "actionName", "ariaLabel"])) return null;
       if (!isBoundedPresentationText(row.label, 80) || !isBoundedPresentationText(row.actionName, 240) || !isBoundedPresentationText(row.ariaLabel, 320)) return null;
-      rows.push({ label: row.label, actionName: row.actionName, ariaLabel: row.ariaLabel });
+      let trigger;
+      if (Object.hasOwn(row, "trigger")) {
+        try { trigger = normalizeTrigger(row.trigger); } catch (_error) { return null; }
+      }
+      rows.push({ label: row.label, actionName: row.actionName, ariaLabel: row.ariaLabel, ...(trigger ? { trigger } : {}) });
     }
     return { kind: "mappings", effectiveLocale: presentation.effectiveLocale, ariaLabel: presentation.ariaLabel, rows };
   }
@@ -551,21 +557,25 @@ function createSettingsWindow(
   BrowserWindowType = BrowserWindow,
   { title = translate("en", "settings.title") } = {}
 ) {
+  // Windows owns the outer silhouette: transparent frameless surfaces repaint
+  // white upper corners when the application deactivates on build 26200.
+  // Settings keeps its own taskbar, focus and close/show lifecycle.
+  const nativeSettingsSurface = process.platform === "win32";
   const window = new BrowserWindowType({
     width: SETTINGS_SIZE.width,
     height: SETTINGS_SIZE.height,
     show: false,
     frame: false,
-    roundedCorners: false,
-    transparent: true,
-    thickFrame: false,
+    roundedCorners: nativeSettingsSurface,
+    transparent: !nativeSettingsSurface,
+    thickFrame: nativeSettingsSurface,
     resizable: false,
     maximizable: false,
     minimizable: false,
     fullscreenable: false,
     alwaysOnTop: false,
     autoHideMenuBar: true,
-    backgroundColor: "#00000000",
+    backgroundColor: nativeSettingsSurface ? "#151619" : "#00000000",
     title,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -633,7 +643,9 @@ function hidePaletteWindow(window, options = {}) {
   window.setOpacity(0);
   window.setIgnoreMouseEvents(true);
   if (isD6PaletteWindow(window, options)) {
-    window.blur();
+    // Blur-driven conceal already handed focus to Settings or another window.
+    // Blurring again makes Windows activate the previous external application.
+    if (isWindowFocused(window)) window.blur();
   } else {
     window.setFocusable(false);
   }

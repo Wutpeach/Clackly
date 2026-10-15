@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import packageMetadata from "../../package.json";
+import SettingsUpdateSection from "./SettingsUpdateSection.jsx";
 import SettingsRenderer from "./SettingsRenderer.jsx";
+import LanguageSelect from "./LanguageSelect.jsx";
+import InteractionInput from "./InteractionInput.jsx";
 import { useLocalization } from "./LocalizationContext.jsx";
 import { localizeCommands, localizeFeatureMetadata, presentError } from "../../localization/presentation.mjs";
 import {
@@ -50,20 +52,6 @@ function formatProviderName(provider) {
 function presentSettingsOperationError(error, t, operation) {
   const knownMessage = presentError(error, t);
   return knownMessage === t("error.generic") ? t(`settings.error.${operation}`) : knownMessage;
-}
-
-function InteractionInput({ label }) {
-  const tokens = label.split(" + ").filter(Boolean);
-  return (
-    <span className="inspector-interaction-input" aria-label={label}>
-      {tokens.map((token, index) => (
-        <React.Fragment key={`${token}-${index}`}>
-          {index > 0 && <span className="inspector-interaction-plus" aria-hidden="true">+</span>}
-          <kbd aria-hidden="true">{token}</kbd>
-        </React.Fragment>
-      ))}
-    </span>
-  );
 }
 
 function Feedback({ status }) {
@@ -308,12 +296,12 @@ function SettingsApp({ api, Icon }) {
     }
   }
 
-  async function changeLocale(event) {
+  async function changeLocale(value) {
     if (busy) return;
     const operation = beginBusyOperation();
     setStatus(null);
     try {
-      await setLocalePreference(event.target.value);
+      await setLocalePreference(value);
     } catch (error) {
       if (isCurrentBusyOperation(operation)) setStatus({ kind: "error", message: presentSettingsOperationError(error, t, "locale") });
     } finally {
@@ -363,7 +351,7 @@ function SettingsApp({ api, Icon }) {
                       className={feature.id === selectedFeatureId ? "feature-button selected" : "feature-button"}
                       aria-current={feature.id === selectedFeatureId ? "page" : undefined}
                       aria-describedby={warning ? descriptionId : undefined}
-                      title={warning?.message}
+                      title={[feature.name, warning?.message].filter(Boolean).join(" — ")}
                       onClick={() => setSelectedFeatureId(feature.id)}
                     >
                       <Icon name={feature.icon} size={16} />
@@ -403,27 +391,29 @@ function SettingsApp({ api, Icon }) {
         </aside>
 
         <section className="settings-configuration" aria-labelledby={applicationSelected ? "application-title" : "feature-title"}>
-          <div className="settings-configuration-scroll">
+          <div className="settings-configuration-scroll" key={selectedFeatureId ?? "application"}>
             {applicationSelected ? (
               <>
                 <header className="settings-configuration-header">
                   <span className="settings-configuration-icon" aria-hidden="true"><Icon name="settings" size={16} /></span>
                   <h1 id="application-title">{t("settings.application")}</h1>
                 </header>
+                <p className="inspector-description settings-introduction">{t("settings.applicationDescription")}</p>
                 <section className="settings-section general-settings" aria-labelledby="language-heading">
-                  <h2 id="language-heading">{t("settings.language")}</h2>
                   <div className="settings-fields">
                     <div className="settings-field">
-                      <label htmlFor="locale-preference">{t("settings.language")}</label>
-                      <select id="locale-preference" value={preference} disabled={busy} onChange={changeLocale}>
-                        <option value="system">{t("settings.language.system")}</option>
-                        <option value="en">{t("settings.language.en")}</option>
-                        <option value="zh-CN">{t("settings.language.zh-CN")}</option>
-                      </select>
+                      <label id="language-heading" htmlFor="locale-preference">{t("settings.language")}</label>
+                      <LanguageSelect id="locale-preference" labelId="language-heading" value={preference}
+                        disabled={busy} onChange={changeLocale} options={[
+                          { value: "system", label: t("settings.language.system") },
+                          { value: "en", label: t("settings.language.en") },
+                          { value: "zh-CN", label: t("settings.language.zh-CN") }
+                        ]} />
                       <p className="settings-empty-copy">{t("settings.language.help")}</p>
                     </div>
                   </div>
                 </section>
+                <SettingsUpdateSection api={api} />
               </>
             ) : selectedFeature && (
               <>
@@ -434,98 +424,70 @@ function SettingsApp({ api, Icon }) {
                     <h1 id="feature-title">{selectedFeature.name}</h1>
                   </div>
                 </header>
-                <section className="settings-section" aria-labelledby="settings-heading">
-                  <h2 id="settings-heading">{t("settings.configuration")}</h2>
-                  <SettingsRenderer
-                    schema={selectedFeature.configSchema}
-                    values={draftValues}
-                    onChange={updateDraft}
-                    onPick={pickPath}
-                    t={t}
-                    disabled={busy}
-                  />
+                <p className="inspector-description settings-introduction">{selectedFeature.description}</p>
+                <section className="settings-section feature-status-section" aria-label={t("settings.status")}>
+                  <div className="feature-status-line">
+                    <p className={'feature-effective-status ' + selectedEffectiveStatus.kind}>
+                      {selectedEffectiveStatus.kind === "ready" && <span className="feature-ready-dot" aria-hidden="true" />}
+                      {selectedEffectiveStatus.label}
+                    </p>
+                    <div className="inspector-actions">
+                      <button type="button" className="secondary-button" disabled={busy} onClick={refreshStatus}>
+                        <Icon name="refresh" size={14} /><span>{t("settings.refresh")}</span>
+                      </button>
+                      <button type="button" className="secondary-button" disabled={busy}
+                        onClick={() => setEnabled(!selectedFeatureStatus?.enabled)}>
+                        <Icon name="power" size={14} />
+                        <span>{selectedFeatureStatus?.enabled ? t("settings.disable") : t("settings.enable")}</span>
+                      </button>
+                    </div>
+                  </div>
+                  {selectedEffectiveStatus.reason && <p className="feature-status-reason">{selectedEffectiveStatus.reason}</p>}
                 </section>
-              </>
-            )}
-          </div>
-          <footer className={applicationSelected ? "settings-actions application-settings-actions" : "settings-actions"}>
-            <Feedback status={status} />
-            {!applicationSelected && (
-              <>
-                <button type="button" className="secondary-button" disabled={busy || !hasSavedValues} onClick={reset}>
-                  {t("settings.resetButton")}
-                </button>
-                <button type="button" className="primary-button" disabled={busy || !hasSchema} onClick={save}>
-                  {busy ? t("settings.working") : t("settings.save")}
-                </button>
-              </>
-            )}
-          </footer>
-        </section>
-
-        <aside className="settings-inspector" aria-label={t("settings.contextInspector")}>
-          {applicationSelected ? (
-            <section className="settings-inspector-section" aria-labelledby="about-clackly-heading">
-              <h2 id="about-clackly-heading">{t("settings.about")}</h2>
-              <p className="inspector-description">{t("settings.applicationDescription")}</p>
-              <dl className="inspector-metadata">
-                <div><dt>{t("settings.version")}</dt><dd>{packageMetadata.version}</dd></div>
-              </dl>
-            </section>
-          ) : selectedFeature && (
-            <>
-              <section className="settings-inspector-section" aria-labelledby="feature-about-heading">
-                <h2 id="feature-about-heading">{t("settings.about")}</h2>
-                <p className="inspector-description">{selectedFeature.description}</p>
+                <section className="settings-section" aria-labelledby={hasSchema ? "settings-heading" : undefined}>
+                  {hasSchema && <h2 id="settings-heading">{t("settings.configuration")}</h2>}
+                  <SettingsRenderer schema={selectedFeature.configSchema} values={draftValues}
+                    onChange={updateDraft} onPick={pickPath} t={t} disabled={busy} />
+                </section>
+                <section className="settings-section" aria-labelledby="feature-interaction-heading">
+                  <h2 id="feature-interaction-heading">{t("settings.interaction")}</h2>
+                  {helpCommands.length === 0 ? (
+                    <p className="settings-empty-copy">{t("settings.noInteractionHelp")}</p>
+                  ) : helpCommands.map((command) => (
+                    <div className="inspector-interaction-command" key={command.id}>
+                      {helpCommands.length > 1 && <h3>{command.name}</h3>}
+                      {command.help.map((entry, index) => (
+                        <div className="inspector-interaction-row" key={entry.label + '-' + index} aria-label={t("interaction.rowAria", entry)}>
+                          <InteractionInput label={entry.label} trigger={entry.trigger} className="inspector-interaction-input" />
+                          <span className="inspector-interaction-action-name">{entry.actionName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </section>
                 {(selectedFeature.version || selectedFeature.providers?.length > 0) && (
                   <dl className="inspector-metadata">
                     {selectedFeature.version && <div><dt>{t("settings.version")}</dt><dd>{selectedFeature.version}</dd></div>}
                     {selectedFeature.providers?.length > 0 && <div><dt>{t("settings.providers")}</dt><dd>{selectedFeature.providers.map(formatProviderName).filter(Boolean).join(", ")}</dd></div>}
                   </dl>
                 )}
-              </section>
-              <section className="settings-inspector-section" aria-labelledby="feature-status-heading">
-                <h2 id="feature-status-heading">{t("settings.status")}</h2>
-                <p className={`feature-effective-status ${selectedEffectiveStatus.kind}`}>
-                  {selectedEffectiveStatus.kind === "ready" && <span className="feature-ready-dot" aria-hidden="true" />}
-                  {selectedEffectiveStatus.label}
-                </p>
-                {selectedEffectiveStatus.reason && <p className="feature-status-reason">{selectedEffectiveStatus.reason}</p>}
-                <div className="inspector-actions">
-                  <button type="button" className="secondary-button" disabled={busy} onClick={refreshStatus}>
-                    <Icon name="refresh" size={14} />
-                    <span>{t("settings.refresh")}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    disabled={busy}
-                    onClick={() => setEnabled(!selectedFeatureStatus?.enabled)}
-                  >
-                    <Icon name="power" size={14} />
-                    <span>{selectedFeatureStatus?.enabled ? t("settings.disable") : t("settings.enable")}</span>
-                  </button>
-                </div>
-              </section>
-              <section className="settings-inspector-section" aria-labelledby="feature-interaction-heading">
-                <h2 id="feature-interaction-heading">{t("settings.interaction")}</h2>
-                {helpCommands.length === 0 ? (
-                  <p className="settings-empty-copy">{t("settings.noInteractionHelp")}</p>
-                ) : helpCommands.map((command) => (
-                  <div className="inspector-interaction-command" key={command.id}>
-                    <h3>{command.name}</h3>
-                    {command.help.map((entry, index) => (
-                      <div className="inspector-interaction-row" key={`${entry.label}-${index}`} aria-label={t("interaction.rowAria", entry)}>
-                        <InteractionInput label={entry.label} />
-                        <span className="inspector-interaction-action-name">{entry.actionName}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </section>
-            </>
-          )}
-        </aside>
+              </>
+            )}
+          </div>
+          <footer className={hasSchema ? "settings-actions" : "settings-actions application-settings-actions"}>
+            <Feedback status={status} />
+            {hasSchema && (
+              <>
+                <button type="button" className="secondary-button" disabled={busy || !hasSavedValues} onClick={reset}>
+                  {t("settings.resetButton")}
+                </button>
+                <button type="button" className="primary-button" disabled={busy} onClick={save}>
+                  {busy ? t("settings.working") : t("settings.save")}
+                </button>
+              </>
+            )}
+          </footer>
+        </section>
       </div>
     </main>
   );

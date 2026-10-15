@@ -56,6 +56,8 @@ class RuntimeManager {
     desktopLauncher,
     modulePath,
     libraryPath,
+    installationPathsProvider,
+    diagnosticRecord,
     fileSystem = fs
   } = {}) {
     if (!resolver) {
@@ -90,6 +92,9 @@ class RuntimeManager {
     this.modulePath = modulePath;
     this.libraryPath = libraryPath;
     this.fileSystem = fileSystem;
+    this.installationPathsProvider = installationPathsProvider;
+    this.installationHostVersion = null;
+    this.diagnosticRecord = diagnosticRecord;
   }
 
   async execute(request) {
@@ -131,11 +136,12 @@ class RuntimeManager {
         scriptRoot: stagedRoot,
         entry: request.entry,
         commandId: request.commandId,
-        config: request.config
+        config: request.config,
+        ...(readiness.bridge ? { bridge: readiness.bridge } : {})
       }
     };
     if (isPersistentExport) {
-      const health = this.workerHealth(resolution, readiness);
+      const health = this.workerHealth(resolution, readiness, prepared.installation);
       launchRequest.healthKey = health.key;
       launchRequest.identity = health.identity;
     }
@@ -197,7 +203,7 @@ class RuntimeManager {
     return script;
   }
 
-  workerHealth(resolution, readiness) {
+  workerHealth(resolution, readiness, installation) {
     const canonical = (candidate) => {
       const real = this.fileSystem.realpathSync(candidate);
       const stats = this.fileSystem.statSync(real);
@@ -214,6 +220,7 @@ class RuntimeManager {
         key: JSON.stringify({
           executable,
           resolveVersion: readiness.resolve.version,
+          resolveRoot: installation?.resolveRoot || path.dirname(library.path),
           bridge: { module, library }
         })
       };
@@ -284,15 +291,24 @@ class RuntimeManager {
     try {
       host = await this.hostContextProvider();
     } catch (error) {
+      this.installationPathsProvider?.invalidate?.();
+      this.installationHostVersion = null;
       throw new RuntimeError("RESOLVE_VERSION_UNVERIFIED", "DaVinci Resolve version could not be read", {
         details: { cause: typeof error?.message === "string" ? error.message : String(error) }
       });
     }
     if (!isPlainObject(host) || host.application !== "davinci-resolve" || !VERSION.test(host.version || "")) {
+      this.installationPathsProvider?.invalidate?.();
+      this.installationHostVersion = null;
       throw new RuntimeError("RESOLVE_VERSION_UNVERIFIED", "DaVinci Resolve version could not be verified", {
         details: { reason: "invalid-host-context" }
       });
     }
+
+    if (this.installationHostVersion !== null && this.installationHostVersion !== host.version) {
+      this.installationPathsProvider?.invalidate?.();
+    }
+    this.installationHostVersion = host.version;
 
     if (!resolution) {
       resolution = this.resolver.resolve({
@@ -306,13 +322,23 @@ class RuntimeManager {
     const managed = resolution.source === "manifest";
     const stagedRoot = managed ? path.join(path.dirname(resolution.executable), "clackly") : this.scriptRoot;
     const selectedBootstrap = managed ? path.join(stagedRoot, "bootstrap.py") : this.bootstrapPath;
+    const installation = this.installationPathsProvider
+      ? await this.installationPathsProvider.getSnapshot() : null;
     const readiness = await this.probe.probe({
       resolution,
       clacklyVersion: this.clacklyVersion,
       resolveVersion: host.version,
       bootstrapPath: selectedBootstrap,
-      ...(this.modulePath ? { modulePath: this.modulePath } : {}),
-      ...(this.libraryPath ? { libraryPath: this.libraryPath } : {})
+      ...(installation ? { modulePath: installation.modulePath, libraryPath: installation.libraryPath } : {
+        ...(this.modulePath ? { modulePath: this.modulePath } : {}),
+        ...(this.libraryPath ? { libraryPath: this.libraryPath } : {})
+      })
+    });
+    this.diagnosticRecord?.record({
+      ...installation, ...readiness?.bridge,
+      status: readiness?.ok ? "passed" : "failed",
+      code: readiness?.error?.code || (readiness?.ok ? "RUNTIME_PROBE_PASSED" : "RUNTIME_PROBE_FAILED"),
+      stage: readiness?.error?.stage || "runtime-probe"
     });
     if (!readiness?.ok) {
       throw new RuntimeError(
@@ -322,7 +348,7 @@ class RuntimeManager {
       );
     }
 
-    return { resolution, stagedRoot, selectedBootstrap, readiness };
+    return { resolution, stagedRoot, selectedBootstrap, readiness, installation };
   }
 
   async checkAvailability(request) {

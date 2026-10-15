@@ -120,8 +120,10 @@ test("both hosts keep the IPC surface and host bootstrap", () => {
 
 test("both hosts expose one Core-owned Search contract through preload", () => {
   for (const source of [standalone, workflow]) {
-    assert.match(source, /ipcMain\.handle\("commands:search", \(_event, query, pinnedIds\) => core\.searchCommands\(query, pinnedIds\)\)/);
+    assert.match(source, /ipcMain\.handle\("commands:search", \(_event, query, pinnedIds, options\) => core\.searchCommands\(query, pinnedIds, options\)\)/);
+    assert.match(source, /core\.executeSearchResult\(commandId\)/);
     assert.doesNotMatch(source, /commandMatches/);
   }
-  assert.match(preload, /searchCommands: \(query, pinnedIds\) => ipcRenderer\.invoke\("commands:search", query, pinnedIds\)/);
+  assert.match(preload, /searchCommands: \(query, pinnedIds, options\) => ipcRenderer\.invoke\("commands:search", query, pinnedIds, options\)/);
+  assert.match(workflow, /if \(result\?\.status === "api_returned"\) return result;/);
 });

@@ -1,0 +1,95 @@
+name: Windows Workflow draft release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: workflow-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read
+    defaults:
+      run:
+        working-directory: resolve-command-center
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: resolve-command-center/package-lock.json
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - run: npm ci
+      - name: Check exact tag, clean source and once-reviewed vendor terms
+        run: |
+          node -e "const p=require('./package.json');require('./scripts/workflow-release/package').sourceIdentity(p.version,{tag:process.env.GITHUB_REF_NAME});require('./scripts/workflow-release/qualification').readQualification(undefined,{publishable:true})"
+      - name: Require owner-provisioned source artifact
+        env:
+          VENDOR_RUN: ${{ vars.CLACKLY_VENDOR_RUN_ID }}
+          VENDOR_ARTIFACT: ${{ vars.CLACKLY_VENDOR_ARTIFACT_NAME }}
+        run: |
+          if (!$env:VENDOR_RUN -or !$env:VENDOR_ARTIFACT) { throw 'Official SDK cannot be assumed on a hosted runner. Owner-provision an approved official-workflow-sdk.zip artifact and qualify it in vendor-qualification.json; no download URL fallback is configured.' }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ vars.CLACKLY_VENDOR_ARTIFACT_NAME }}
+          run-id: ${{ vars.CLACKLY_VENDOR_RUN_ID }}
+          github-token: ${{ github.token }}
+          path: resolve-command-center/build/vendor-input
+      - name: Provision verified vendor bytes
+        run: |
+          node scripts/workflow-release/provision.js --archive build/vendor-input/official-workflow-sdk.zip --output build/vendor-sdk --publishable
+          if ($LASTEXITCODE -ne 0) { throw 'Official SDK provisioning failed' }
+          Copy-Item -LiteralPath build/vendor-sdk/Examples/SamplePlugin/WorkflowIntegration.node -Destination workflow-plugin/WorkflowIntegration.node
+      - run: npm test
+      - run: npm run workflow:release:test
+      - run: npm run package:win
+      - run: npm run package:verify
+      - name: Build complete Workflow ZIP
+        run: npm run workflow:release -- --tag $env:GITHUB_REF_NAME --source-root build/vendor-sdk
+      - name: Verify exact artifact bytes and record SHA-256
+        run: |
+          $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
+          node scripts/workflow-release/package.js --verify "release/workflow/Clackly-Workflow-$version-win-x64.zip"
+          if ($LASTEXITCODE -ne 0) { throw 'Workflow ZIP verification failed' }
+          Get-FileHash -Algorithm SHA256 -LiteralPath "release/workflow/Clackly-Workflow-$version-win-x64.zip"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verified-workflow-release
+          path: resolve-command-center/release/workflow/Clackly-Workflow-*-win-x64.zip
+          if-no-files-found: error
+          retention-days: 14
+  draft:
+    needs: build
+    # Remains disabled until separately authorized repository activation. Never publish automatically.
+    if: vars.CLACKLY_ENABLE_DRAFT_RELEASE == 'true'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: verified-workflow-release
+          path: artifact
+      - name: Retain verified build identity and create an unpublished draft
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ($env:GH_REPO -cne 'Wutpeach/Clackly') { throw 'Unexpected publisher repository' }
+          $files = @(Get-ChildItem -LiteralPath artifact -File)
+          if ($files.Count -ne 1) { throw 'Expected exactly one complete Workflow ZIP' }
+          if ($files[0].Name -cne "Clackly-Workflow-$($env:GITHUB_REF_NAME.Substring(1))-win-x64.zip") { throw 'Artifact name differs from exact release tag' }
+          $digest = (Get-FileHash -Algorithm SHA256 -LiteralPath $files[0].FullName).Hash.ToLowerInvariant()
+          gh release create $env:GITHUB_REF_NAME $files[0].FullName --repo Wutpeach/Clackly --verify-tag --target $env:GITHUB_SHA --draft --title "Clackly $env:GITHUB_REF_NAME" --notes "Draft only. ZIP SHA-256: $digest. Source commit: $env:GITHUB_SHA. Review complete inventory, vendor terms and real-host evidence before manual publication. V1 relies on the fixed official repository and HTTPS; detached provenance is optional."
+          if ($LASTEXITCODE -ne 0) { throw 'Draft creation failed' }

@@ -1,0 +1,132 @@
+name: Main Windows verification
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: resolve-command-center
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: resolve-command-center/package-lock.json
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Verify release tooling without publication
+        run: npm run workflow:release:test
+  sdk-readiness:
+    name: Workflow SDK readiness
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    outputs:
+      ready: ${{ steps.sdk.outputs.ready }}
+    defaults:
+      run:
+        working-directory: resolve-command-center
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Check owner-provisioned SDK configuration
+        id: sdk
+        env:
+          VENDOR_RUN: ${{ vars.CLACKLY_VENDOR_RUN_ID }}
+          VENDOR_ARTIFACT: ${{ vars.CLACKLY_VENDOR_ARTIFACT_NAME }}
+        run: |
+          @'
+          const fs = require('node:fs');
+          const { readQualification } = require('./scripts/workflow-release/qualification');
+          const q = readQualification();
+          const run = process.env.VENDOR_RUN || '';
+          const artifact = process.env.VENDOR_ARTIFACT || '';
+          if (run && !/^[1-9][0-9]*$/.test(run)) throw new Error('CLACKLY_VENDOR_RUN_ID must be a positive Actions run ID');
+          if (artifact && (!artifact.trim() || artifact.trim() !== artifact)) throw new Error('CLACKLY_VENDOR_ARTIFACT_NAME must be a nonblank exact artifact name');
+          // Null/absent means not provisioned; a configured but invalid pin must fail.
+          if (q.sourceArchiveSha256 != null) {
+            if (typeof q.sourceArchiveSha256 !== 'string') throw new Error('Official SDK archive pin must be a SHA-256 string');
+            readQualification(undefined, { archive: true });
+          }
+          const missing = [];
+          if (!run) missing.push('CLACKLY_VENDOR_RUN_ID');
+          if (!artifact) missing.push('CLACKLY_VENDOR_ARTIFACT_NAME');
+          if (q.sourceArchiveSha256 == null) missing.push('vendor-qualification.json sourceArchiveSha256');
+          const ready = missing.length === 0;
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `ready=${ready}\n`);
+          const summary = ready
+            ? 'SDK configuration is ready. The complete Workflow ZIP job must still download, provision, build and verify the exact pinned bytes.'
+            : `Complete Workflow ZIP job skipped: SDK input pending (${missing.join(', ')}). Source tests/build remain independent; no complete ZIP was built or verified.`;
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Workflow package readiness\n\n${summary}\n`);
+          if (!ready) console.log(`::notice title=Complete Workflow ZIP skipped - SDK input pending::${summary}`);
+          '@ | node
+          if ($LASTEXITCODE -ne 0) { throw 'Workflow SDK configuration is invalid' }
+  workflow-package:
+    name: Complete Workflow ZIP (SDK required)
+    needs: [verify, sdk-readiness]
+    # PRs run all source/fixture checks above; proprietary SDK artifact access is main-only.
+    if: github.event_name == 'push' && needs.sdk-readiness.outputs.ready == 'true'
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read
+    defaults:
+      run:
+        working-directory: resolve-command-center
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: resolve-command-center/package-lock.json
+      - run: npm ci
+      - name: Require explicitly pinned official SDK input
+        env:
+          VENDOR_RUN: ${{ vars.CLACKLY_VENDOR_RUN_ID }}
+          VENDOR_ARTIFACT: ${{ vars.CLACKLY_VENDOR_ARTIFACT_NAME }}
+        run: |
+          if (!$env:VENDOR_RUN -or !$env:VENDOR_ARTIFACT) { throw 'Complete Workflow ZIP requires owner-provisioned official-workflow-sdk.zip: set CLACKLY_VENDOR_RUN_ID / CLACKLY_VENDOR_ARTIFACT_NAME and pin its SHA-256 in scripts/workflow-release/vendor-qualification.json. No public SDK URL fallback.' }
+          node -e "require('./scripts/workflow-release/qualification').readQualification(undefined,{archive:true})"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ vars.CLACKLY_VENDOR_ARTIFACT_NAME }}
+          run-id: ${{ vars.CLACKLY_VENDOR_RUN_ID }}
+          github-token: ${{ github.token }}
+          path: resolve-command-center/build/vendor-input
+      - name: Provision pinned official native for packaging
+        run: |
+          node scripts/workflow-release/provision.js --archive build/vendor-input/official-workflow-sdk.zip --output build/vendor-sdk
+          if ($LASTEXITCODE -ne 0) { throw 'Official SDK provisioning failed' }
+          Copy-Item -LiteralPath build/vendor-sdk/Examples/SamplePlugin/WorkflowIntegration.node -Destination workflow-plugin/WorkflowIntegration.node
+      - run: npm run package:win
+      - run: npm run package:verify
+      - name: Build and verify the one complete development Workflow ZIP
+        run: |
+          npm run workflow:release -- --nonpublishable --source-root build/vendor-sdk
+          if ($LASTEXITCODE -ne 0) { throw 'Workflow package build failed' }
+          $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
+          node scripts/workflow-release/package.js --verify "release/workflow/Clackly-Workflow-$version-win-x64.zip"
+          if ($LASTEXITCODE -ne 0) { throw 'Workflow ZIP verification failed' }
+          Get-FileHash -Algorithm SHA256 -LiteralPath "release/workflow/Clackly-Workflow-$version-win-x64.zip"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: complete-workflow-development-zip
+          path: resolve-command-center/release/workflow/Clackly-Workflow-*-win-x64.zip
+          if-no-files-found: error
+          retention-days: 14

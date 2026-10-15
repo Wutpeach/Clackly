@@ -71,7 +71,16 @@ export function getRecoveryAction(status) {
   return status?.details?.action === "open-settings" ? "open-settings" : null;
 }
 
+export function isOrdinaryScript(command) {
+  return command?.kind === "ordinary-script";
+}
+
+export function shouldExecuteDirectly(command, event) {
+  return event?.type === "click" && (event.detail === 0 || isOrdinaryScript(command));
+}
+
 export function canExecuteCommand(command) {
+  if (isOrdinaryScript(command)) return Boolean(command?.available);
   if (!command?.available) return false;
   return canExecuteFeature(command.featureStatus);
 }
@@ -81,9 +90,10 @@ export { isCommandPresentable };
 export function createPresentationCatalog(realCommands, statuses = []) {
   return joinFeatureStatuses(realCommands, statuses)
     .filter((command) => isCommandPresentable(command))
-    .filter((command) => isFeatureVisible(command.featureStatus))
+    .filter((command) => isOrdinaryScript(command) || isFeatureVisible(command.featureStatus))
     .map((command) => ({
     ...command,
+    featureStatus: isOrdinaryScript(command) ? null : command.featureStatus,
     available: true
   }));
 }
@@ -121,6 +131,7 @@ export function getInteractionHelp(targetCommand, commands, bindings, t = defaul
     })[modifier] || modifier);
     return [{
       label: [...modifiers, button].join(" + "),
+      trigger: { type: "mouse", button: binding.trigger.button, modifiers: [...binding.trigger.modifiers] },
       actionName: actionCommand.name,
       description: actionCommand.description
     }];
@@ -135,6 +146,7 @@ export function projectLauncherSections(commands, pinnedIds = new Set(), usedCom
   };
 
   for (const command of commands) {
+    if (isOrdinaryScript(command)) continue;
     if (pinnedIds.has(command.id)) {
       sections.pinned.push(command);
     } else if (usedCommandIds.has(command.id)) {

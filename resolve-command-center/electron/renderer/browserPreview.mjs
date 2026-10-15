@@ -1,5 +1,6 @@
 import paletteGeometry from "../shared/palette-geometry.json" with { type: "json" };
 import { CommandSearchService } from "../../command-search/CommandSearchService.mjs";
+import { createSettingsUpdateFixture } from "./settingsUpdateFixture.mjs";
 
 const BROWSER_PREVIEW_COMMANDS = [
   {
@@ -80,9 +81,12 @@ const BROWSER_PREVIEW_STATUSES = [
   }
 ];
 
+import afterEffectsMetadata from "../../capability/definitions/ae-export.json" with { type: "json" };
+
 export const SETTINGS_PREVIEW_SCENARIOS = Object.freeze([
   "application-empty",
   "typical-ready",
+  "actual-ae",
   "missing-config-long-path",
   "zh-cn-multi-help",
   "busy",
@@ -185,6 +189,13 @@ const SETTINGS_PREVIEW_FEATURES = [
 
 const SETTINGS_PREVIEW_COMMANDS = [
   {
+    id: "settings-preview.clipboard",
+    name: "Paste Clipboard Image",
+    description: "Save a clipboard image and import it into the Resolve Media Pool.",
+    category: "Media", icon: "image", keywords: ["clipboard"], capability: "settings-preview.clipboard",
+    localizations: { "zh-CN": { name: "粘贴剪贴板图像", description: "保存剪贴板图像并导入 Resolve 媒体池。", category: "媒体" } }
+  },
+  {
     id: "settings-preview.export",
     name: "Export to After Effects",
     description: "Send the selected Resolve timeline range to After Effects.",
@@ -221,6 +232,10 @@ const SETTINGS_PREVIEW_COMMANDS = [
 
 const SETTINGS_PREVIEW_BINDINGS = [
   {
+    id: "settings-preview.clipboard.click", target: "settings-preview.clipboard",
+    trigger: { type: "mouse", button: "left", modifiers: [] }, action: { command: "settings-preview.clipboard" }
+  },
+  {
     id: "settings-preview.export.click",
     target: "settings-preview.export",
     trigger: { type: "mouse", button: "left", modifiers: [] },
@@ -255,6 +270,14 @@ function settingsPreviewStatus(id, overrides = {}) {
 const LONG_WINDOWS_AFTER_EFFECTS_PATH = "C:\\Program Files\\Blackmagic Design\\DaVinci Resolve\\Support\\Developer\\Workflow Integrations\\Clackly\\After Effects 2025\\AfterFX.exe";
 
 const SETTINGS_PREVIEW_FIXTURES = Object.freeze({
+  "actual-ae": {
+    selectedFeatureId: "settings-preview.export",
+    features: [{ ...afterEffectsMetadata, id: "settings-preview.export", capability: "settings-preview.export" }],
+    statuses: [settingsPreviewStatus("settings-preview.export")],
+    commands: SETTINGS_PREVIEW_COMMANDS,
+    bindings: SETTINGS_PREVIEW_BINDINGS,
+    configs: { "settings-preview.export": { aePath: LONG_WINDOWS_AFTER_EFFECTS_PATH, create1080pPreviewComp: false } }
+  },
   "application-empty": {
     selectedFeatureId: null,
     features: [],
@@ -385,7 +408,21 @@ function getPreviewPanelGeometry({ anchorY, contentHeight }) {
 export function createBrowserPreviewApi({ search } = {}) {
   const browserSearch = readBrowserSearch(search);
   const fixture = getBrowserSettingsFixture(browserSearch);
-  const requestedLocale = new URLSearchParams(browserSearch).get("locale");
+  const parameters = new URLSearchParams(browserSearch);
+  const requestedLocale = parameters.get("locale");
+  const shortcutSpikePreview = parameters.get("resolve-shortcut-spike-preview") === "1";
+  const shortcutLastResult = Object.freeze({
+    version: 1,
+    outcome: "failed",
+    stage: "sendinput",
+    error: "sendinput-partial",
+    helperEntered: true,
+    sendInvoked: true,
+    expectedInputs: 6,
+    sentInputs: 2,
+    cleanupExpected: 3,
+    cleanupSent: 3
+  });
   let preference = ["system", "en", "zh-CN"].includes(requestedLocale)
     ? requestedLocale
     : fixture?.locale || "en";
@@ -406,6 +443,7 @@ export function createBrowserPreviewApi({ search } = {}) {
     usageHistory: { getSnapshot: () => ({}) }
   });
   return {
+    ...createSettingsUpdateFixture({ search: browserSearch }),
     getLocalizationSnapshot: async () => getSnapshot(),
     setLocalePreference: async (locale) => {
       if (!["system", "en", "zh-CN"].includes(locale)) throw new TypeError("Invalid locale preference");
@@ -443,6 +481,25 @@ export function createBrowserPreviewApi({ search } = {}) {
     hidePalette: () => {},
     openInteractionPanel: async (metrics) => getPreviewPanelGeometry(metrics),
     closeInteractionPanel: () => {},
+    ...(shortcutSpikePreview ? {
+      collectResolveBoundShortcutEvidence: async () => ({
+        resolveVersion: "preview",
+        preset: "Preview",
+        keyboardLayout: "0000000004090409",
+        keyboardConfig: { sha256: "0".repeat(64), mtimeMs: 1 },
+        context: {
+          projectId: "preview-project",
+          projectName: "Preview Project",
+          timelineId: "preview-timeline",
+          timelineName: "Preview Timeline",
+          page: "edit",
+          selectedClipCount: 1,
+          selectedClipIds: ["preview-clip"]
+        }
+      }),
+      runResolveBoundShortcutSpike: async () => ({ ok: true, result: { postconditionRequired: true } }),
+      getResolveBoundShortcutLastResult: async () => clone(shortcutLastResult)
+    } : {}),
     onPaletteShown: (callback) => {
       const frame = requestAnimationFrame(callback);
       return () => cancelAnimationFrame(frame);

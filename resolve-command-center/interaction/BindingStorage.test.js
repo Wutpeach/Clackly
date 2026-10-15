@@ -130,16 +130,19 @@ test("default After Effects bindings generate interaction help from Command desc
   assert.deepEqual(getInteractionHelp(target, commands, bindings), [
     {
       label: "Click",
+      trigger: { type: "mouse", button: "left", modifiers: [] },
       actionName: "Export to After Effects",
       description: "Automatically send the current Resolve selection to After Effects"
     },
     {
       label: "Ctrl + Click",
+      trigger: { type: "mouse", button: "left", modifiers: ["CTRL"] },
       actionName: "Export Audio to After Effects",
       description: "Send the current Resolve audio selection to After Effects"
     },
     {
       label: "Ctrl + Shift + Click",
+      trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT"] },
       actionName: "Export Video to After Effects",
       description: "Send the current Resolve video selection to After Effects"
     }

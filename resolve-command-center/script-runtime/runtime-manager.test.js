@@ -60,6 +60,29 @@ const request = {
   config: { aePath: "C:/AfterFX.exe" }
 };
 
+test("host version changes and observed disconnection invalidate cached installation selection", async () => {
+  let version = "20.3.2.9";
+  let currentRoot = "first";
+  let savedRoot;
+  const { manager } = fixture({
+    hostContextProvider: async () => {
+      if (version === null) throw new Error("host disconnected");
+      return { application: "davinci-resolve", version };
+    },
+    installationPathsProvider: {
+      getSnapshot: async () => ({ resolveRoot: savedRoot ||= currentRoot }),
+      invalidate: () => { savedRoot = null; }
+    }
+  });
+  assert.equal((await manager.resolveAndProbe(request)).installation.resolveRoot, "first");
+  version = "21.1.0"; currentRoot = "upgraded";
+  assert.equal((await manager.resolveAndProbe(request)).installation.resolveRoot, "upgraded");
+  version = null;
+  await assert.rejects(manager.resolveAndProbe(request), { code: "RESOLVE_VERSION_UNVERIFIED" });
+  version = "21.1.0"; currentRoot = "reconnected";
+  assert.equal((await manager.resolveAndProbe(request)).installation.resolveRoot, "reconnected");
+});
+
 test("Runtime Manager owns resolve, Probe, then one isolated script launch", async () => {
   const { calls, manager, resolution } = fixture();
   assert.deepEqual(await manager.execute(request), { ok: true, result: { sent: true }, logs: [] });

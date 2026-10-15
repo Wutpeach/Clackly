@@ -663,6 +663,19 @@ test("D7 accepts only a bounded read-only presentation snapshot and clamps its t
     ]
   };
   assert.deepEqual(normalizeDetachedInteractionPanelPresentation(mappings), mappings);
+  const semantic = { ...mappings, rows: mappings.rows.map((row, index) => ({
+    ...row, trigger: { type: "mouse", button: index ? "right" : "left", modifiers: index ? ["ALT"] : ["CTRL", "SHIFT"] }
+  })) };
+  const normalized = normalizeDetachedInteractionPanelPresentation(semantic);
+  assert.deepEqual(normalized, semantic, "D7 preserves binding-derived mouse semantics");
+  normalized.rows[0].trigger.modifiers.push("ALT");
+  assert.deepEqual(semantic.rows[0].trigger.modifiers, ["CTRL", "SHIFT"], "transport does not alias binding arrays");
+  for (const trigger of [null, { type: "key", button: "left", modifiers: [] },
+    { type: "mouse", button: "middle", modifiers: [] }, { type: "mouse", button: "left", modifiers: ["META"] },
+    { type: "mouse", button: "left", modifiers: ["CTRL", "CTRL"] },
+    { type: "mouse", button: "left", modifiers: [], command: "execute" }]) {
+    assert.equal(normalizeDetachedInteractionPanelPresentation({ ...semantic, rows: [{ ...semantic.rows[0], trigger }, semantic.rows[1]] }), null);
+  }
   assert.deepEqual(normalizeDetachedInteractionPanelPresentation({
     kind: "description",
     effectiveLocale: "en",
@@ -907,8 +920,7 @@ test("D7 ignores only a stale focused blur and preserves the ordinary blur-to-hi
   d7.emitBlur();
   assert.deepEqual(d7.calls, [
     ["setOpacity", 0],
-    ["setIgnoreMouseEvents", true],
-    "blur"
+    ["setIgnoreMouseEvents", true]
   ]);
 
   const defaultPalette = createPaletteWindow({}, FakeBrowserWindow);
@@ -1010,6 +1022,7 @@ test("D6 keeps focusability stable so taskbar policy reassertion never produces 
   const window = {
     isDestroyed: () => false,
     isVisible: () => visible,
+    isFocused: () => true,
     getOpacity: () => opacity,
     setPosition: (x, y) => calls.push(["setPosition", x, y]),
     setFocusable: (value) => calls.push(["setFocusable", value]),
@@ -1078,6 +1091,7 @@ test("D6 conceal blur re-entry is absorbed after opacity and mouse input are dis
       constructor() {
         this.listeners = new Map();
         this.opacity = 1;
+        this.focused = true;
       }
 
       loadFile() {}
@@ -1085,12 +1099,14 @@ test("D6 conceal blur re-entry is absorbed after opacity and mouse input are dis
       on(event, listener) { this.listeners.set(event, listener); }
       isDestroyed() { return false; }
       isVisible() { return true; }
+      isFocused() { return this.focused; }
       getOpacity() { return this.opacity; }
       setSkipTaskbar(value) { calls.push(["setSkipTaskbar", value]); }
       setOpacity(value) { this.opacity = value; calls.push(["setOpacity", value]); }
       setIgnoreMouseEvents(value) { calls.push(["setIgnoreMouseEvents", value]); }
       blur() {
         calls.push("blur");
+        this.focused = false;
         this.listeners.get("blur")();
       }
     }
@@ -1421,23 +1437,67 @@ test("preload exposes bounded Interaction Panel intent without a renderer bounds
   const preload = fs.readFileSync(path.join(__dirname, "preload.js"), "utf8");
   const app = fs.readFileSync(path.join(__dirname, "../renderer/App.jsx"), "utf8");
   const styles = fs.readFileSync(path.join(__dirname, "../renderer/styles.css"), "utf8");
-  const [detachedPreload, palettePreload] = preload.split("} else {");
+  const loadPreload = (search) => {
+    const exposed = {};
+    const calls = [];
+    const listeners = new Map();
+    const ipcRenderer = {
+      invoke: (...args) => { calls.push(["invoke", ...args]); return Promise.resolve(); },
+      send: (...args) => calls.push(["send", ...args]),
+      on: (channel, callback) => listeners.set(channel, callback),
+      removeListener: (channel, callback) => {
+        assert.equal(listeners.get(channel), callback);
+        listeners.delete(channel);
+      }
+    };
+    require("node:vm").runInNewContext(preload, {
+      require: (name) => {
+        if (name === "electron") return { contextBridge: {
+          exposeInMainWorld: (name, api) => { exposed[name] = api; }
+        }, ipcRenderer };
+        if (name === "node:path") return path;
+        if (name === "./experimentalResolveShortcut") return { isEnabled: () => false };
+        throw new Error(`Unexpected preload import: ${name}`);
+      },
+      __dirname, URLSearchParams, window: { location: { search } }
+    });
+    return { exposed, calls, listeners };
+  };
 
   assert.doesNotMatch(preload, /setPaletteMode/);
   assert.doesNotMatch(preload, /palette:set-mode/);
   assert.match(preload, /openInteractionPanel: \(metrics\) => ipcRenderer\.invoke\("palette:interaction-panel:open", metrics\)/);
   assert.match(preload, /closeInteractionPanel: \(\) => ipcRenderer\.send\("palette:interaction-panel:close"\)/);
   assert.doesNotMatch(preload, /setBounds|setSize|palette:bounds/);
-  assert.match(preload, /view"\) === "interaction-panel"/);
-  assert.match(preload, /resolveCommandCenterPanel/);
-  assert.match(preload, /onPresentation: \(callback\)/);
-  assert.match(preload, /interaction-panel:presentation/);
-  assert.match(palettePreload, /getLocalizationSnapshot/);
-  assert.match(palettePreload, /setLocalePreference/);
-  assert.match(palettePreload, /onLocalizationChanged/);
-  assert.doesNotMatch(detachedPreload, /getLocalizationSnapshot|setLocalePreference|onLocalizationChanged/);
-  assert.doesNotMatch(detachedPreload, /executeCommand|executeInteraction|listCommands|openSettings/);
-  assert.match(palettePreload, /executeCommand/);
+  const detached = loadPreload("?view=interaction-panel");
+  assert.deepEqual(Object.keys(detached.exposed), ["resolveCommandCenterPanel"]);
+  const panel = detached.exposed.resolveCommandCenterPanel;
+  assert.deepEqual(Object.keys(panel), ["onPresentation"]);
+  const presentations = [];
+  const unsubscribePanel = panel.onPresentation((value) => presentations.push(value));
+  const nextPresentation = { kind: "description", description: "Example" };
+  detached.listeners.get("interaction-panel:presentation")({}, nextPresentation);
+  unsubscribePanel();
+  detached.listeners.get("interaction-panel:presentation")({}, { kind: "description", description: "Later" });
+  assert.deepEqual(presentations, [null, nextPresentation]);
+  assert.deepEqual(detached.calls, []);
+  for (const search of ["", "?view=settings"]) {
+    const { exposed, calls, listeners } = loadPreload(search);
+    assert.deepEqual(Object.keys(exposed), ["resolveCommandCenter"]);
+    const api = exposed.resolveCommandCenter;
+    for (const name of ["getLocalizationSnapshot", "setLocalePreference", "onLocalizationChanged",
+      "executeCommand", "executeInteraction", "listCommands", "openSettings"]) assert.equal(typeof api[name], "function");
+    const intent = { metrics: { anchorY: 20, contentHeight: 60 }, presentation: nextPresentation };
+    api.openInteractionPanel(intent); api.closeInteractionPanel();
+    assert.deepEqual(calls, [["invoke", "palette:interaction-panel:open", intent],
+      ["send", "palette:interaction-panel:close"]]);
+    const localized = [];
+    const unsubscribe = api.onLocalizationChanged((value) => localized.push(value));
+    const snapshot = { locale: "zh-CN" };
+    listeners.get("localization:changed")({}, snapshot); unsubscribe();
+    assert.deepEqual(localized, [snapshot]);
+    assert.equal(listeners.has("localization:changed"), false);
+  }
   assert.doesNotMatch(app, /setPaletteMode/);
   assert.match(app, /usesDetachedNativePanel/);
   assert.match(app, /interaction-panel-measure/);
@@ -1458,7 +1518,8 @@ test("Palette and Settings retain their qualified painted radii while native win
   assert.match(app, /getPaletteVisualStyle\(paletteShadowPadding\)/);
   assert.match(styles, /--palette-elevation:\s*var\(--palette-external-shadow\)/);
   assert.match(styles, /\.settings-shell,\s*\.palette-main\s*\{[^}]*border:\s*1px solid var\(--color-border-strong\)/s);
-  assert.match(styles, /\.settings-shell\s*\{[^}]*border-radius:\s*0[^}]*box-shadow:\s*inset 0 1px/s);
+  // Settings' computed radius and transparent painted corners are asserted by
+  // the running renderer evidence; a CSS source regex breaks on token reuse.
   assert.match(styles, /\.palette-main\s*\{[^}]*top:\s*var\(--palette-shadow-padding\)[^}]*left:\s*var\(--palette-shadow-padding\)[^}]*width:\s*var\(--palette-main-width\)[^}]*height:\s*var\(--palette-main-height\)[^}]*border-radius:\s*var\(--palette-main-radius\)[^}]*box-shadow:\s*var\(--palette-elevation\)/s);
   assert.match(styles, /\.palette-shell\s*\{[^}]*background:\s*transparent/s);
   assert.match(styles, /\.interaction-panel\s*\{[^}]*top:\s*calc\(var\(--palette-shadow-padding\) \+ var\(--interaction-panel-top\)\)[^}]*left:\s*calc\(var\(--palette-main-width\) \+ var\(--interaction-panel-gap\) \+ var\(--palette-shadow-padding\)\)[^}]*width:\s*var\(--interaction-panel-width\)[^}]*max-height:\s*var\(--interaction-panel-max-height\)[^}]*border-radius:\s*var\(--interaction-panel-radius\)[^}]*box-shadow:\s*var\(--palette-elevation\)/s);
@@ -1472,6 +1533,31 @@ test("Palette and Settings retain their qualified painted radii while native win
   assert.doesNotMatch(settingsApp, /clackly-logo|logoUrl|settings-titlebar-brand/);
   assert.doesNotMatch(styles, /settings-titlebar-brand/);
   assert.doesNotMatch(styles, /palette-enter/);
+});
+
+test("D6 conceal preserves transferred Settings focus and releases focus only when it still owns it", () => {
+  for (const initialForeground of ["Settings", "Palette"]) {
+    let foreground = initialForeground;
+    let opacity = 1;
+    let ignoresMouse = false;
+    let focusable = true;
+    const palette = {
+      isDestroyed: () => false,
+      isVisible: () => true,
+      getOpacity: () => opacity,
+      isFocused: () => foreground === "Palette",
+      setOpacity: value => { opacity = value; },
+      setIgnoreMouseEvents: value => { ignoresMouse = value; },
+      setFocusable: value => { focusable = value; },
+      blur: () => { foreground = "Resolve"; }
+    };
+    hidePaletteWindow(palette, WINDOWS_NATIVE_DUAL_WINDOW_POLICY);
+    assert.equal(opacity, 0);
+    assert.equal(ignoresMouse, true);
+    assert.equal(focusable, true);
+    assert.equal(foreground, initialForeground === "Settings" ? "Settings" : "Resolve",
+      "Settings keeps transferred focus; explicit Palette dismissal returns it to the prior app");
+  }
 });
 
 test("opening settings reuses, restores, shows, and focuses an existing window", () => {
@@ -1523,16 +1609,16 @@ test("settings window uses the complete Electron 36 fixed frameless contract", (
       height: 560,
       show: false,
       frame: false,
-      roundedCorners: false,
-      transparent: true,
-      thickFrame: false,
+      roundedCorners: process.platform === "win32",
+      transparent: process.platform !== "win32",
+      thickFrame: process.platform === "win32",
       resizable: false,
       maximizable: false,
       minimizable: false,
       fullscreenable: false,
       alwaysOnTop: false,
       autoHideMenuBar: true,
-      backgroundColor: "#00000000",
+      backgroundColor: process.platform === "win32" ? "#151619" : "#00000000",
       title: translate("en", "settings.title"),
       webPreferences: {
         preload: path.join(__dirname, "preload.js"),

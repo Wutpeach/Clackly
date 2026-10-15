@@ -1,4 +1,5 @@
 import math
+import importlib.util
 import os
 import re
 import sys
@@ -49,6 +50,32 @@ def _call_optional(target: Any, method_name: str, *args: Any) -> Any:
 
 
 def get_resolve() -> Any:
+    selected_module = os.environ.get("CLACKLY_RESOLVE_SCRIPT_MODULE")
+    if selected_module:
+        # Managed requests carry the Probe's exact file pair. Resolve remains
+        # lazy, and ambient bmd/modules cannot satisfy this selected bridge.
+        try:
+            library = os.environ["RESOLVE_SCRIPT_LIB"]
+            dvr_script = sys.modules.get("DaVinciResolveScript")
+            if dvr_script is None:
+                spec = importlib.util.spec_from_file_location("DaVinciResolveScript", selected_module)
+                dvr_script = importlib.util.module_from_spec(spec)
+                sys.modules["DaVinciResolveScript"] = dvr_script
+                try:
+                    spec.loader.exec_module(dvr_script)
+                except BaseException:
+                    sys.modules.pop("DaVinciResolveScript", None)
+                    raise
+                dvr_script = sys.modules.get("DaVinciResolveScript", dvr_script)
+            if not os.path.samefile(dvr_script.__file__, library):
+                raise ImportError("Selected Resolve library was not loaded")
+            resolve = dvr_script.scriptapp("Resolve")
+            if resolve is None:
+                raise ResolveAdapterError("Could not connect to Resolve")
+            return resolve
+        except Exception as exc:
+            raise ResolveAdapterError("Selected Resolve scripting bridge is unavailable", code="RESOLVE_IMPORT_FAILED") from exc
+
     builtin_resolve = globals().get("resolve")
     if builtin_resolve is not None:
         return builtin_resolve

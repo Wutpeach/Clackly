@@ -165,6 +165,16 @@ class RuntimeLauncher {
         );
       }
       serializedRequest = serializeRequest(request);
+      if (request.operation === "script-execute" && Object.hasOwn(request, "bridge")) {
+        if (!isPlainObject(request.bridge)
+          || Object.keys(request.bridge).length !== 2
+          || !["modulePath", "libraryPath"].every((field) => Object.hasOwn(request.bridge, field))) {
+          throw executionError("RUNTIME_LAUNCH_REQUEST_INVALID", "Runtime bridge tuple is invalid", { field: "bridge" });
+        }
+        for (const field of ["modulePath", "libraryPath"]) {
+          this.validateFile(request.bridge[field], "RUNTIME_LAUNCH_REQUEST_INVALID", field);
+        }
+      }
       bootstrapPath = this.validateFile(
         Object.hasOwn(input, "bootstrapPath") ? input.bootstrapPath : this.bootstrapPath,
         "RUNTIME_LAUNCH_REQUEST_INVALID",

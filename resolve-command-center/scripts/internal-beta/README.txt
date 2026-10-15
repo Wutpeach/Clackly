@@ -2,7 +2,7 @@ Clackly Internal Beta for Windows x64
 ======================================
 
 Version: supplied by the package filename and manifest
-Supported host: DaVinci Resolve Studio 20.3.2.9 on Windows x64
+Supported hosts: DaVinci Resolve Studio 20.3.2.9 and 21.1 on Windows x64
 
 This is an unsigned internal Beta. Windows may show a security or reputation
 prompt because the package is not code signed. Follow your organisation's
@@ -17,6 +17,11 @@ Install
 3. Double-click "安装 Clackly.bat" and approve the single UAC prompt.
 4. Start DaVinci Resolve, then choose:
    Workspace > Workflow Integrations > Clackly
+5. Clackly locates the current Resolve installation and saves its scripting
+   dependency paths on first launch, including custom installation folders.
+   The first Resolve-dependent command still checks runtime compatibility.
+   After Effects can also be installed on another drive. If its executable
+   cannot be found automatically, select AfterFX.exe in Clackly Settings.
 
 Upgrade or reinstall
 --------------------
@@ -24,6 +29,12 @@ Run "安装 Clackly.bat" from the newer or same-version extracted Beta. The
 installer stages and verifies the new plugin before replacing the recognized
 Clackly target. If activation or verification fails, it restores the prior
 plugin automatically. Installing an older Beta over a newer one is refused.
+Staging, backups and uninstall remnants are kept outside Resolve's plugin
+scan, in the sibling "Workflow Integration Plugins.Clackly Transactions"
+folder. A failed cleanup therefore cannot register a duplicate Clackly plugin.
+Recognized GUID-named remnants from older installers are safely moved there
+and preserved. Any retained archive paths are printed, including on success;
+keep them for the internal Beta owner.
 
 Uninstall
 ---------
@@ -44,7 +55,9 @@ Troubleshooting
 - Exit code 12: close DaVinci Resolve and retry.
 - Exit code 10: extract the full ZIP again; a required file or hash failed.
 - Exit code 14: an unexpected, linked, corrupt, or newer target is present;
-  do not delete broad Resolve folders. Contact the internal Beta owner.
+  an unsafe or unidentified legacy transaction also stops installation.
+  Keep any displayed retained paths and contact the internal Beta owner;
+  do not delete broad Resolve folders.
 - Exit codes 16-18: retain the displayed task-owned transaction path and
   contact the internal Beta owner with the displayed code.
 

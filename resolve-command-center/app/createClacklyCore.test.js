@@ -9,6 +9,26 @@ const { ConfigStorage } = require("../config/ConfigStorage");
 const { RuntimeManager } = require("../script-runtime/runtime/manager");
 const appRoot = path.resolve(__dirname, "..");
 
+test("Core starts metadata-only discovery and shares that provider with both script consumers", async (t) => {
+  let complete;
+  const discovery = new Promise((resolve) => { complete = resolve; });
+  const installationPaths = { getSnapshot: () => discovery };
+  let ordinaryOptions;
+  let hostReads = 0;
+  const { core, cleanup } = createCore({ installationPathsProvider: installationPaths,
+    hostContextProvider: async () => { hostReads += 1; throw new Error("startup must not query Resolve API"); },
+    ordinaryScriptsFactory(options) { ordinaryOptions = options; return { discover: async () => ({ scripts: [], diagnostics: [] }), invoke: async () => ({ status: "not_submitted" }) }; }
+  });
+  t.after(cleanup);
+  assert.equal(core.runtimeManager.installationPathsProvider, installationPaths);
+  assert.equal(ordinaryOptions.installationPathsProvider, installationPaths);
+  assert.equal(core.installationPaths, installationPaths);
+  assert.equal(hostReads, 0);
+  complete({ modulePath: "D:/unused/module.py", libraryPath: "D:/unused/library.dll" });
+  await discovery;
+  assert.equal(hostReads, 0);
+});
+
 function createCore({ beforeCreate, ...overrides } = {}) {
   const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "clackly-core-"));
   const appDataPath = path.join(temporaryDirectory, "appdata");
@@ -59,6 +79,8 @@ test("Core returns working application services with marker and script capabilit
     "media.clipboard-image.import"
   );
   assert.equal(core.capabilityRegistry.get("ae.export").metadata.executor.entry, "scripts/resolve2ae_export.py");
+  assert.equal(typeof core.ordinaryScripts.discover, "function");
+  assert.equal(typeof core.ordinaryScripts.invoke, "function");
 
   assert.deepEqual(await core.executeCommand("timeline.addMarker"), {
     ok: true,
@@ -99,6 +121,54 @@ test("Core returns working application services with marker and script capabilit
     message: "Python runtime executable is missing",
     details: { missing: ["python-runtime"], action: null }
   });
+});
+
+test("Core refreshes ordinary-script Search separately and invokes a selected script once", async (t) => {
+  const scriptId = "resolve-workspace-script:c:/scripts/utility/example.py";
+  const calls = [];
+  let receipt = { status: "api_returned", apiReturn: null };
+  const { core, cleanup } = createCore({
+    ordinaryScriptsFactory: () => ({
+      discover: async () => ({
+        scripts: [{
+          id: scriptId,
+          name: "Example",
+          absolutePath: "C:\\Scripts\\Utility\\Example.py",
+          language: "python",
+          source: "system",
+          category: "Utility",
+          nesting: []
+        }],
+        diagnostics: []
+      }),
+      invoke: async (id) => {
+        calls.push(id);
+        return receipt;
+      }
+    })
+  });
+  t.after(cleanup);
+
+  await core.searchCommands("", [], { refresh: true });
+  assert.equal(core.searchCommands("", []).commands.some(({ id }) => id === scriptId), false);
+  assert.equal(
+    core.searchCommands("example", []).commands.find(({ id }) => id === scriptId).subtitle,
+    "Resolve Script · Utility · System · Python"
+  );
+  assert.deepEqual(await core.executeSearchResult(scriptId), receipt);
+  assert.deepEqual(calls, [scriptId]);
+
+  receipt = { status: "not_submitted", reason: "selection_unknown" };
+  await assert.rejects(
+    () => core.executeSearchResult(scriptId),
+    (error) => error.code === "resolve-script-not-submitted"
+  );
+  receipt = { status: "submission_unknown", reason: "transport_lost" };
+  await assert.rejects(
+    () => core.executeSearchResult(scriptId),
+    (error) => error.code === "resolve-script-submission-unknown"
+  );
+  assert.deepEqual(calls, [scriptId, scriptId, scriptId], "each selection has exactly one adapter invocation");
 });
 
 test("Core silently removes only the retired AE Prefix from persisted capability configuration", (t) => {

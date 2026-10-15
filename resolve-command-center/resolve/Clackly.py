@@ -30,9 +30,6 @@ LOG_PREFIX = "[resolve-command-center]"
 WINDOWS_DEFAULT_RESOLVE_SCRIPT_API = Path(
     r"C:\ProgramData\Blackmagic Design\DaVinci Resolve\Support\Developer\Scripting"
 )
-WINDOWS_DEFAULT_RESOLVE_SCRIPT_LIB = Path(
-    r"C:\Program Files\Blackmagic Design\DaVinci Resolve\fusionscript.dll"
-)
 
 
 def _port() -> int:
@@ -259,8 +256,18 @@ def _windows_default_resolve_script_lib() -> Optional[Path]:
     if os.name != "nt":
         return None
 
-    if WINDOWS_DEFAULT_RESOLVE_SCRIPT_LIB.exists():
-        return WINDOWS_DEFAULT_RESOLVE_SCRIPT_LIB
+    # Utility execution exposes the actual Resolve/ResolvePython executable.
+    # Do not pair a custom host with another installation's Program Files DLL.
+    executable = Path(sys.executable).resolve()
+    if executable.name.lower() == "resolve.exe":
+        root = executable.parent
+    elif executable.name.lower() == "resolvepython.exe" and executable.parent.name.lower() == "resolvepython":
+        root = executable.parent.parent
+    else:
+        return None
+    library = root / "fusionscript.dll"
+    if library.is_file():
+        return library
 
     return None
 
@@ -334,8 +341,8 @@ def _log_resolve_scripting_environment(
             "Resolve scripting environment variables are missing. The bridge "
             "cannot report healthy or run commands unless the selected Python "
             "can import DaVinciResolveScript or bmd. On "
-            "standard Windows installs, Clackly checks ProgramData scripting "
-            "modules and Program Files fusionscript.dll automatically."
+            "Windows hosts, Clackly checks ProgramData scripting modules and "
+            "the current Resolve executable's sibling fusionscript.dll."
         )
 
 

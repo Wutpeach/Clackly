@@ -14,3 +14,26 @@ WorkflowIntegration.node
 
 .DS_Store
 Thumbs.db
+
+# Agent design context and local development history stay on this computer.
+AGENTS.md
+/DESIGN.md
+/PRODUCT.md
+/.gitattributes
+.agents/
+.claude/
+.codex/
+.impeccable/
+.trellis/
+
+# Rebuild these locally; do not publish binaries, full packages or raw evidence.
+build/
+release/
+*.zip
+*.node
+*.exe
+*.dll
+*.pdb
+
+# Historical Resolve experiments contain local task paths; keep originals local.
+/resolve-command-center/resolve/feasibility/

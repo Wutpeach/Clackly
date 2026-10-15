@@ -43,8 +43,25 @@ test("feature/config display overlays stay presentation-only", () => {
 test("structured runtime errors map through stable codes while unknown errors stay generic", () => {
   const t = (key) => ({
     "error.clipboard-image-not-found": "已本地化的剪贴板错误",
+    "error.resolve-script-not-submitted": "已本地化的脚本拒绝错误",
+    "error.resolve-script-submission-unknown": "已本地化的脚本不确定警告",
     "error.generic": "已本地化的通用错误"
   })[key];
   assert.equal(presentError({ code: "clipboard-image-not-found", message: "technical detail" }, t), "已本地化的剪贴板错误");
+  assert.equal(presentError({ code: "resolve-script-not-submitted" }, t), "已本地化的脚本拒绝错误");
+  assert.equal(presentError({ code: "resolve-script-submission-unknown" }, t), "已本地化的脚本不确定警告");
+  assert.equal(
+    presentError({ message: "Error invoking remote method 'commands:execute': Error: resolve-script-not-submitted" }, t),
+    "已本地化的脚本拒绝错误"
+  );
+  assert.equal(
+    presentError({ message: "Error invoking remote method 'commands:execute': Error: resolve-script-submission-unknown" }, t),
+    "已本地化的脚本不确定警告"
+  );
   assert.equal(presentError(new Error("technical detail"), t), "已本地化的通用错误");
+  assert.equal(
+    presentError({ message: "Error invoking remote method 'commands:execute': Error: C:\\private\\script.py" }, t),
+    "已本地化的通用错误",
+    "unknown serialized IPC details never reach the UI"
+  );
 });

@@ -1,17 +1,10 @@
 import React from "react";
+import InteractionInput from "./InteractionInput.jsx";
 
 function InteractionRow({ interaction }) {
-  const inputTokens = interaction.label.split(" + ").filter(Boolean);
   return (
     <div className="interaction-row" role="listitem" aria-label={interaction.ariaLabel}>
-      <span className="interaction-input" aria-hidden="true">
-        {inputTokens.map((token, index) => (
-          <React.Fragment key={`${token}-${index}`}>
-            {index > 0 && <span className="interaction-plus">+</span>}
-            <kbd>{token}</kbd>
-          </React.Fragment>
-        ))}
-      </span>
+      <InteractionInput label={interaction.label} trigger={interaction.trigger} />
       <span className="interaction-action-name">{interaction.actionName}</span>
     </div>
   );

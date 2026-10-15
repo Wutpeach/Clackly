@@ -408,7 +408,13 @@ class RuntimeProbe {
           executable: response.runtime.executable
         },
         resolve: response.resolve,
-        bridge: response.bridge,
+        // Python and Node may canonicalize Windows short names differently.
+        // Persist one Node-canonical identity so successful cache reuse and
+        // worker health compare the same files across process boundaries.
+        bridge: {
+          modulePath: input.modulePath,
+          libraryPath: input.libraryPath
+        },
         cache: this.cacheDisposition(lookup)
       };
       const fingerprint = this.fingerprint.create(input, {

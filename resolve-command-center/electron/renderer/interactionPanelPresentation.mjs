@@ -9,9 +9,10 @@ export function createInteractionPanelPresentation(selectedCommand, interactionR
       kind: "mappings",
       effectiveLocale,
       ariaLabel: t("interaction.ariaLabel"),
-      rows: interactionRows.map(({ label, actionName }) => ({
+      rows: interactionRows.map(({ label, actionName, trigger }) => ({
         label,
         actionName,
+        ...(trigger ? { trigger: { ...trigger, modifiers: [...trigger.modifiers] } } : {}),
         ariaLabel: t("interaction.rowAria", { label, actionName })
       }))
     };

@@ -86,8 +86,8 @@ test("Palette owner re-projects localized Command description and mapping copy w
     effectiveLocale: "en",
     ariaLabel: "Command information",
     rows: [
-      { label: "Click", actionName: "Add Marker", ariaLabel: "Click: Add Marker" },
-      { label: "Right Click", actionName: "Edit Marker", ariaLabel: "Right Click: Edit Marker" }
+      { label: "Click", trigger: { type: "mouse", button: "left", modifiers: [] }, actionName: "Add Marker", ariaLabel: "Click: Add Marker" },
+      { label: "Right Click", trigger: { type: "mouse", button: "right", modifiers: [] }, actionName: "Edit Marker", ariaLabel: "Right Click: Edit Marker" }
     ]
   });
   assert.deepEqual(chinesePresentation, {
@@ -95,8 +95,8 @@ test("Palette owner re-projects localized Command description and mapping copy w
     effectiveLocale: "zh-CN",
     ariaLabel: "命令信息",
     rows: [
-      { label: "单击", actionName: "添加标记", ariaLabel: "单击：添加标记" },
-      { label: "右键单击", actionName: "编辑标记", ariaLabel: "右键单击：编辑标记" }
+      { label: "单击", trigger: { type: "mouse", button: "left", modifiers: [] }, actionName: "添加标记", ariaLabel: "单击：添加标记" },
+      { label: "右键单击", trigger: { type: "mouse", button: "right", modifiers: [] }, actionName: "编辑标记", ariaLabel: "右键单击：编辑标记" }
     ]
   });
 });

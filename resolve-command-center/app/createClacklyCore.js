@@ -23,6 +23,8 @@ const { ShortcutManager } = require("../shortcut/ShortcutManager");
 const { RuntimeManager } = require("../script-runtime/runtime/manager");
 const { PersistentScriptLauncher } = require("../script-runtime/runtime/persistent");
 const { resolveRuntimeRoot } = require("../script-runtime/runtime/paths");
+const { createOrdinaryScripts } = require("../resolve/ordinaryScripts");
+const { ResolveInstallationPaths, RuntimeDiagnosticRecord } = require("../resolve/installationPaths");
 const packageMetadata = require("../package.json");
 
 /**
@@ -36,11 +38,14 @@ function createClacklyCore({
   appDataPath,
   temporaryRoot,
   hostContextProvider,
+  resolveInstallationHost,
+  installationPathsProvider,
   systemLanguagesProvider = () => [],
   markerBackends,
   imageClipboard,
   afterEffectsProcessProbeFactory = (options) => new WindowsAfterEffectsProcessProbe(options),
-  persistentScriptLauncherFactory = (options) => new PersistentScriptLauncher(options)
+  persistentScriptLauncherFactory = (options) => new PersistentScriptLauncher(options),
+  ordinaryScriptsFactory = (options) => createOrdinaryScripts(options)
 } = {}) {
   if (typeof appRoot !== "string" || appRoot.trim().length === 0) {
     throw new TypeError("Clackly Core requires an application root");
@@ -68,6 +73,9 @@ function createClacklyCore({
   }
   if (typeof persistentScriptLauncherFactory !== "function") {
     throw new TypeError("Clackly Core requires a persistent Export Runtime factory");
+  }
+  if (typeof ordinaryScriptsFactory !== "function") {
+    throw new TypeError("Clackly Core requires an ordinary Resolve Scripts factory");
   }
 
   const shortcutManager = new ShortcutManager();
@@ -106,6 +114,14 @@ function createClacklyCore({
     || typeof persistentScriptLauncher.dispose !== "function") {
     throw new TypeError("Clackly Core requires a persistent Export Runtime lifecycle");
   }
+  const runtimeDiagnosticRecord = new RuntimeDiagnosticRecord({
+    filePath: path.join(appDataPath, "Clackly", "runtime-diagnostic.json")
+  });
+  const installationPaths = installationPathsProvider || new ResolveInstallationPaths({
+    host: resolveInstallationHost, appDataPath, diagnosticRecord: runtimeDiagnosticRecord
+  });
+  // Metadata-only discovery does not block palette construction or run Probe.
+  installationPaths.getSnapshot().catch(() => {});
   const runtimeManager = new RuntimeManager({
     runtimeRoot: resolveRuntimeRoot({
       appRoot
@@ -115,11 +131,20 @@ function createClacklyCore({
     desktopLauncher,
     scriptLauncher: persistentScriptLauncher,
     hostContextProvider,
+    installationPathsProvider: installationPaths,
+    diagnosticRecord: runtimeDiagnosticRecord,
     scriptRoot: appRoot,
     ...(process.env.CLACKLY_PYTHON_EXECUTABLE
       ? { overrideExecutable: process.env.CLACKLY_PYTHON_EXECUTABLE }
       : {})
   });
+  const ordinaryScripts = ordinaryScriptsFactory({
+    helperPath: path.join(appRoot, "resolve", "ordinary_scripts.py"),
+    installationPathsProvider: installationPaths
+  });
+  if (!ordinaryScripts || typeof ordinaryScripts.discover !== "function" || typeof ordinaryScripts.invoke !== "function") {
+    throw new TypeError("Clackly Core requires ordinary Resolve Scripts");
+  }
   registerScriptCapabilities({ capabilityRegistry, appRoot, runtimeManager });
 
   const featureCatalog = new FeatureCatalog({ capabilityRegistry });
@@ -139,7 +164,8 @@ function createClacklyCore({
   const commandSearch = new CommandSearchService({
     getCommands,
     localizationService,
-    usageHistory
+    usageHistory,
+    ordinaryScripts
   });
   const featureStatusManager = new FeatureStatusManager({
     capabilityRegistry,
@@ -152,6 +178,24 @@ function createClacklyCore({
     featureStatusManager,
     usageHistory
   });
+  const searchCommands = (query, pinnedIds, options = {}) => {
+    if (options?.refresh) {
+      return commandSearch.refresh().then(() => commandSearch.search(query, pinnedIds));
+    }
+    return commandSearch.search(query, pinnedIds);
+  };
+  const executeSearchResult = async (commandId) => {
+    if (!commandSearch.isOrdinaryScriptId(commandId)) return executeCommand(commandId);
+
+    const receipt = await ordinaryScripts.invoke(commandId);
+    if (receipt?.status === "api_returned") return receipt;
+    const code = receipt?.status === "submission_unknown"
+      ? "resolve-script-submission-unknown"
+      : "resolve-script-not-submitted";
+    const error = new Error(code);
+    error.code = code;
+    throw error;
+  };
 
   return {
     capabilityRegistry,
@@ -160,9 +204,12 @@ function createClacklyCore({
     localizationService,
     featureStatusManager,
     featureCatalog,
-    searchCommands: (query, pinnedIds) => commandSearch.search(query, pinnedIds),
+    searchCommands,
     executeCommand,
+    executeSearchResult,
+    ordinaryScripts,
     runtimeManager,
+    installationPaths,
     prewarmExportPythonWorker: () => runtimeManager.prewarmExportPythonWorker(),
     disposeExportPythonWorker: () => runtimeManager.disposeExportPythonWorker(),
     prewarmAfterEffectsProcessProbe: () => afterEffectsProcessProbe.prewarm(),

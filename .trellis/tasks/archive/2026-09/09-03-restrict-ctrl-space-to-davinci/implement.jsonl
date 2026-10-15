@@ -1,4 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Electron main-process and Palette host behavior contracts"}
-{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Core-owned persistent Windows process-probe protocol and lifecycle contracts"}
-{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Keep the foreground gate at one shared boundary and avoid duplicate host logic"}
-{"file":".trellis/tasks/09-03-restrict-ctrl-space-to-davinci/research/hotkey-foreground-gate.md","reason":"Confirmed shortcut call flow, Resolve process identity, and minimal implementation boundary"}

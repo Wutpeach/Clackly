@@ -21,16 +21,17 @@ function SettingsRenderer({ schema, values, onChange, onPick, t, disabled = fals
 
         if (control.kind === "checkbox") {
           return (
-            <div className="settings-field checkbox-field" key={key}>
+            <div className="settings-field switch-field" key={key}>
+              <label htmlFor={inputId}>{field.label}{field.required ? " *" : ""}</label>
               <input
                 id={inputId}
                 type="checkbox"
+                role="switch"
                 checked={Boolean(value)}
                 required={field.required}
                 disabled={disabled}
                 onChange={(event) => onChange(key, event.target.checked)}
               />
-                  <label htmlFor={inputId}>{field.label}{field.required ? " *" : ""}</label>
             </div>
           );
         }
@@ -57,6 +58,7 @@ function SettingsRenderer({ schema, values, onChange, onPick, t, disabled = fals
                   id={inputId}
                   type="text"
                   value={value ?? ""}
+                  title={value || undefined}
                   required={field.required}
                   disabled={disabled}
                   onChange={(event) => onChange(key, event.target.value)}

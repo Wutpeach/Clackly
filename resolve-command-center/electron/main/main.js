@@ -30,9 +30,13 @@ const { getElectronSystemLanguages } = require("../../localization/LocalizationS
 const { registerLocalizationIpc } = require("../../localization/registerIpc");
 const { translate } = require("../../localization/resources");
 const { createClipboardImageReader } = require("./clipboard");
+const { createHostUpdateService } = require("./update/UpdateService");
+const { registerUpdateIpc } = require("./update/registerIpc");
+const { registerUpdateLifecycle } = require("./update/lifecycle");
 
 let paletteWindow = null;
 let settingsWindow = null;
+let updateService = null;
 const paletteHostPolicy = selectPaletteHostPolicy({
   host: PALETTE_HOST.STANDALONE,
   platform: process.platform
@@ -53,6 +57,7 @@ const bridgeExecutionAdapter = createBridgeExecutionAdapter();
 const appRoot = path.resolve(__dirname, "../..");
 const core = createClacklyCore({
   appRoot,
+  resolveInstallationHost: { kind: "standalone", execPath: process.execPath },
   appDataPath: app.getPath("appData"),
   temporaryRoot: app.getPath("temp"),
   systemLanguagesProvider: () => getElectronSystemLanguages(app),
@@ -76,7 +81,7 @@ const interactionManager = new InteractionManager({
 
 async function executeStandaloneCommand(commandId) {
   try {
-    return await core.executeCommand(commandId);
+    return await core.executeSearchResult(commandId);
   } catch (error) {
     if (String(error && error.message).includes("Resolve scripting API is unavailable")) {
       throw new Error(
@@ -137,8 +142,12 @@ function togglePalette() {
 }
 
 function registerIpcHandlers() {
+  updateService = createHostUpdateService({ app, appRoot, host: { kind: 'standalone', execPath: process.execPath } });
+  registerUpdateLifecycle({ app, updateService });
+  registerUpdateIpc({ ipcMain, updateService, getSettingsWindow: () => settingsWindow });
+  updateService.start();
   ipcMain.handle("commands:list", () => getCommands());
-  ipcMain.handle("commands:search", (_event, query, pinnedIds) => core.searchCommands(query, pinnedIds));
+  ipcMain.handle("commands:search", (_event, query, pinnedIds, options) => core.searchCommands(query, pinnedIds, options));
   ipcMain.handle("commands:execute", async (_event, commandId) => {
     const result = await executeStandaloneCommand(commandId);
     hidePalette();
@@ -210,6 +219,7 @@ if (!hasSingleInstanceLock) {
   });
 
   app.on("will-quit", () => {
+    void updateService?.dispose();
     const { globalShortcut } = require("electron");
     globalShortcut.unregisterAll();
     core.disposeExportPythonWorker();

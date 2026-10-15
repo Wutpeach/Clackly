@@ -5,6 +5,8 @@ const path = require("node:path");
 const test = require("node:test");
 
 const { initializeAfterEffectsPath } = require("./afterEffectsPath");
+const { ConfigManager } = require("../config/ConfigManager");
+const { ConfigStorage } = require("../config/ConfigStorage");
 
 async function withTempDir(callback) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "clackly-ae-path-"));
@@ -64,6 +66,57 @@ function deferredProbe(result) {
     release: () => release()
   };
 }
+
+test("a custom D-drive AE path survives restart and recovers after relocation", () => (
+  withTempDir(async (directory) => {
+    const original = "D:/创作工具/Adobe After Effects 2026/Support Files/AfterFX.exe";
+    const relocated = "D:/应用程序/After Effects 2026.1/Support Files/AfterFX.exe";
+    const installed = new Set([original]);
+    const fileSystem = {
+      statSync: (filePath) => {
+        if (!installed.has(filePath)) throw Object.assign(new Error("missing"), { code: "ENOENT" });
+        return { isFile: () => true };
+      },
+      readdirSync: () => []
+    };
+    const storage = new ConfigStorage(path.join(directory, "Clackly", "config.json"));
+    storage.save({ "ae.export": { create1080pPreviewComp: true }, other: { keep: true } });
+    const capabilityRegistry = {
+      getMetadata: (id) => id === "ae.export" ? { configSchema: {
+        aePath: { type: "path" },
+        create1080pPreviewComp: { type: "boolean" }
+      } } : null
+    };
+    const createManager = () => new ConfigManager({ capabilityRegistry, storage });
+    const options = { platform: "win32", fileSystem, environment: {} };
+
+    assert.equal(await initializeAfterEffectsPath(createManager(), {
+      ...options,
+      execFile: (_executable, args, _options, callback) => {
+        if (args.at(-1).includes("Get-Process")) return callback(null, "");
+        assert.match(args.at(-1), /HKEY_CURRENT_USER/);
+        callback(null, `"${original}"`);
+      }
+    }), original);
+    assert.equal(await initializeAfterEffectsPath(createManager(), {
+      ...options, execFile: () => assert.fail("a valid persisted executable must be reused")
+    }), original);
+
+    installed.delete(original);
+    installed.add(relocated);
+    assert.equal(await initializeAfterEffectsPath(createManager(), {
+      ...options,
+      execFile: (_executable, args, _options, callback) => {
+        assert.match(args.at(-1), /Get-Process/);
+        callback(null, relocated);
+      }
+    }), relocated);
+    assert.deepEqual(storage.load(), {
+      "ae.export": { aePath: relocated, create1080pPreviewComp: true },
+      other: { keep: true }
+    });
+  })
+));
 
 test("a valid saved path short-circuits discovery and configuration writes", () => (
   withTempDir((directory) => {

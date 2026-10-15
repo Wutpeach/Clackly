@@ -345,6 +345,10 @@ The dev-MVP bridge subprocess does not inherit Resolve's in-process Python globa
 
 Resolve Utility menu scripts are run when selected from the menu; they are not a true Resolve application startup hook. The MVP entrypoint can start the bridge and Electron after the Utility script is triggered. A final installer, launch wrapper, or separate startup mechanism still needs to install and trigger that entrypoint automatically for true Resolve auto-start.
 
+## Workflow update package and native component
+
+Windows Workflow updates use one complete `Clackly-Workflow-<version>-win-x64.zip`, containing the application, built renderer, managed Python Runtime, and `workflow-plugin/WorkflowIntegration.node`. The native component comes from Blackmagic Design's official Workflow Integrations `Examples/SamplePlugin/`; it is supplied and hash-checked at build time, so users do not obtain a separate native module during installation. Blackmagic Design retains rights to its component; this attribution does not grant redistribution permission. The adjacent SDK terms review on 2026-10-15 did not establish an explicit public redistribution grant, so public release remains blocked pending clear evidence. See [release build inputs](scripts/workflow-release/README.md).
+
 ## Troubleshooting
 
 - `RuntimeError: Could not locate resolve-command-center app root` from Resolve usually means the Utility runner did not provide `__file__` and `RESOLVE_COMMAND_CENTER_ROOT` is missing or points to the wrong directory. Set `RESOLVE_COMMAND_CENTER_ROOT` to the directory containing `package.json` and `bridge/server.py`, then relaunch Resolve.

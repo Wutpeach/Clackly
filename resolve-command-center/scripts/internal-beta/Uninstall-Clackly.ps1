@@ -29,10 +29,8 @@ try {
   }
   $result = Invoke-ClacklyUninstallTransaction -PluginRoot (Get-ClacklyProductionPluginRoot)
   Write-Host $result.Message
-  if (!$result.Success) {
-    foreach ($retainedPath in @($result.RetainedPaths)) {
-      Write-Host ("Retained transaction path: " + $retainedPath)
-    }
+  foreach ($retainedPath in @($result.RetainedPaths)) {
+    Write-Host ("Retained transaction path: " + $retainedPath)
   }
   exit $result.Code
 } catch {

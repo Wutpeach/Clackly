@@ -122,7 +122,10 @@ def _prepare(request):
 
 
 def _script_execute(request):
-    if set(request) != {"requestId", "operation", "scriptRoot", "entry", "commandId", "config"}:
+    expected = {"requestId", "operation", "scriptRoot", "entry", "commandId", "config"}
+    if "bridge" in request:
+        expected.add("bridge")
+    if set(request) != expected:
         return _failure(request.get("requestId"))
     request_id = request.get("requestId")
     entry = _contained_entry(request.get("scriptRoot"), request.get("entry"))
@@ -132,6 +135,15 @@ def _script_execute(request):
             or not isinstance(command_id, str) or not command_id.strip() or not isinstance(config, dict)):
         return _failure(request_id)
     try:
+        bridge_bootstrap = sys.modules.get("clackly_bridge_bootstrap")
+        if bridge_bootstrap is None:
+            spec = importlib.util.spec_from_file_location("clackly_bridge_bootstrap", Path(__file__).with_name("bootstrap.py"))
+            bridge_bootstrap = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(bridge_bootstrap)
+            sys.modules["clackly_bridge_bootstrap"] = bridge_bootstrap
+        error = bridge_bootstrap.configure_bridge(request)
+        if error:
+            return _failure(request_id, error["error"]["code"])
         runner = _load_runner()
         script = runner.run_script(entry, command_id, dict(config))
         return {"requestId": request_id, "ok": True, "runtime": _runtime(), "script": script}

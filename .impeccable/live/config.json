@@ -1,6 +1,0 @@
-{
-  "files": ["resolve-command-center/index.html"],
-  "insertBefore": "</body>",
-  "commentSyntax": "html",
-  "cspChecked": true
-}

@@ -27,7 +27,8 @@ function productionPythonSourceInventory(appRoot) {
   for (const directory of ["resolve", "scripts", "resolve2ae_core"]) {
     const sourceDirectory = path.join(appRoot, directory);
     for (const entry of fs.readdirSync(sourceDirectory, { withFileTypes: true })
-      .filter((item) => item.isFile() && item.name.endsWith(".py") && !item.name.startsWith("test_"))
+      .filter((item) => item.isFile() && item.name.endsWith(".py")
+        && !item.name.startsWith("test_") && item.name !== "ordinary_scripts.py")
       .sort((left, right) => left.name.localeCompare(right.name))) {
       sourceFiles.push([
         path.join(directory, entry.name),

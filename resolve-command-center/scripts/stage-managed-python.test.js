@@ -100,6 +100,7 @@ test("package verification detects stale managed application sources before and 
     ["script-runtime/runtime/persistent_bootstrap.py", "clackly/persistent_bootstrap.py", "persistent"],
     ["script-runtime/python_runner.py", "clackly/python_runner.py", "runner"],
     ["resolve/adapter.py", "clackly/resolve/adapter.py", "adapter"],
+    ["resolve/ordinary_scripts.py", "clackly/resolve/ordinary_scripts.py", "ordinary helper"],
     ["scripts/resolve2ae_export.py", "clackly/scripts/resolve2ae_export.py", "export"],
     ["scripts/test_ignored.py", "clackly/scripts/test_ignored.py", "ignored"],
     ["resolve2ae_core/export.py", "clackly/resolve2ae_core/export.py", "core"]
@@ -108,7 +109,7 @@ test("package verification detects stale managed application sources before and 
     const sourcePath = path.join(sourceRoot, ...sourceRelative.split("/"));
     fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
     fs.writeFileSync(sourcePath, content);
-    if (!sourceRelative.includes("/test_")) {
+    if (!sourceRelative.includes("/test_") && !sourceRelative.endsWith("ordinary_scripts.py")) {
       for (const profileRoot of [stagedProfileRoot, packagedProfileRoot]) {
         const target = path.join(profileRoot, ...stagedRelative.split("/"));
         fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -119,6 +120,7 @@ test("package verification detects stale managed application sources before and 
 
   const applicationSources = productionPythonSourceInventory(sourceRoot);
   assert.equal(applicationSources.some(({ path: itemPath }) => itemPath.endsWith("test_ignored.py")), false);
+  assert.equal(applicationSources.some(({ path: itemPath }) => itemPath.endsWith("ordinary_scripts.py")), false);
   const metadata = { build: { applicationSources } };
   assert.doesNotThrow(() => assertApplicationSourceIdentity({
     appRoot: sourceRoot,

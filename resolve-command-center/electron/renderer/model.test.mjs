@@ -10,6 +10,8 @@ import {
   getInteractionHelp,
   getInteractionHelpCommands,
   getRecoveryAction,
+  isOrdinaryScript,
+  shouldExecuteDirectly,
   getSettingsControl,
   groupFeaturesByCategory,
   filterFeaturesByQuery,
@@ -81,6 +83,29 @@ test("presentation catalog preserves registered command metadata only", () => {
   assert.equal(Object.hasOwn(catalog[0], "shortcut"), false);
 });
 
+test("ordinary scripts stay executable Search rows without Feature, Pin, or Recent ownership", () => {
+  const script = {
+    id: "resolve-workspace-script:c:/scripts/utility/example.py",
+    name: "Example",
+    description: "Utility · System · Python",
+    category: "Resolve Script",
+    subtitle: "Resolve Script",
+    icon: "command",
+    kind: "ordinary-script",
+    presentation: "visible"
+  };
+  const [projected] = createPresentationCatalog([script]);
+
+  assert.equal(isOrdinaryScript(projected), true);
+  assert.equal(projected.featureStatus, null);
+  assert.equal(canExecuteCommand(projected), true);
+  assert.deepEqual(projectLauncherSections([projected], new Set([script.id]), new Set([script.id])), []);
+  assert.equal(shouldExecuteDirectly(projected, { type: "click", detail: 1 }), true);
+  assert.equal(shouldExecuteDirectly(projected, { type: "contextmenu", detail: 0 }), false);
+  assert.equal(shouldExecuteDirectly({ kind: "command" }, { type: "click", detail: 0 }), true);
+  assert.equal(shouldExecuteDirectly({ kind: "command" }, { type: "click", detail: 1 }), false);
+});
+
 test("presentation catalog hides internal Commands from every palette surface", () => {
   const visible = {
     id: "timeline.exportToAfterEffects",
@@ -144,6 +169,7 @@ test("internal action descriptions resolve under visible targets but never creat
   assert.deepEqual(getInteractionHelp(target, commands, bindings), [
     {
       label: "Ctrl + Click",
+      trigger: { type: "mouse", button: "left", modifiers: ["CTRL"] },
       actionName: "Export Audio to After Effects",
       description: "Send the current Resolve audio selection to After Effects"
     }
@@ -256,11 +282,13 @@ test("interaction help joins normalized bindings to registered action labels and
   const projected = getInteractionHelp(target, commands, bindings);
 
   assert.deepEqual(projected, [
-    { label: "Click", actionName: "Add Marker", description: "Add marker at current frame" },
-    { label: "Shift + Right Click", actionName: "Open Marker Options", description: "Open marker options" },
-    { label: "Ctrl + Shift + Alt + Click", actionName: "Add Marker Note", description: "Add a marker note" }
+    { label: "Click", trigger: { type: "mouse", button: "left", modifiers: [] }, actionName: "Add Marker", description: "Add marker at current frame" },
+    { label: "Shift + Right Click", trigger: { type: "mouse", button: "right", modifiers: ["SHIFT"] }, actionName: "Open Marker Options", description: "Open marker options" },
+    { label: "Ctrl + Shift + Alt + Click", trigger: { type: "mouse", button: "left", modifiers: ["CTRL", "SHIFT", "ALT"] }, actionName: "Add Marker Note", description: "Add a marker note" }
   ]);
   projected[0].label = "Changed";
+  projected[0].trigger.modifiers.push("ALT");
+  assert.deepEqual(bindings[0].trigger.modifiers, [], "help projection cannot mutate binding semantics");
   assert.equal(bindings[0].trigger.button, "left");
   assert.deepEqual(getInteractionHelp(target, commands, []), []);
   assert.deepEqual(getInteractionHelp(target, commands, [{ ...bindings[0], target: "other" }]), []);

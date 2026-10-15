@@ -411,11 +411,95 @@ function Assert-ClacklyResolveClosed {
   }
 }
 
-function New-ClacklySiblingPath {
+function Test-ClacklyOwnedTransactionPath {
+  param([string]$Parent, [string]$Path)
+  if ([string]::IsNullOrWhiteSpace($Parent) -or [string]::IsNullOrWhiteSpace($Path)) { return $false }
+  return [string]::Equals((Split-Path -Parent (Get-ClacklyCanonicalPath $Path)), (Get-ClacklyCanonicalPath $Parent).TrimEnd('\', '/'), [System.StringComparison]::OrdinalIgnoreCase) -and
+    (Split-Path -Leaf $Path) -match '^\.com\.wutpeach\.clackly\.(stage|backup|failed|uninstall)\.[0-9a-f]{32}$'
+}
+
+function Get-ClacklyTransactionRoot {
+  param([Parameter(Mandatory = $true)][string]$PluginRoot)
+  $scanRoot = (Get-ClacklyCanonicalPath $PluginRoot).TrimEnd('\', '/')
+  $container = Split-Path -Parent $scanRoot
+  if ([string]::IsNullOrWhiteSpace($container)) {
+    Throw-ClacklyError $script:ClacklyExit.UnsafeTarget "Workflow plugin root must have a normal parent directory."
+  }
+  # Resolve scans plugin manifests even in dot-prefixed directories. All transaction
+  # trees must stay in this dedicated sibling, on the same volume for rename.
+  $transactionRoot = Join-Path $container ((Split-Path -Leaf $scanRoot) + ".Clackly Transactions")
+  if ((Test-ClacklyContainedPath -Root $scanRoot -Candidate $transactionRoot -AllowRoot) -or
+      !(Test-ClacklyContainedPath -Root $container -Candidate $transactionRoot) -or
+      ![string]::Equals([IO.Path]::GetPathRoot($scanRoot), [IO.Path]::GetPathRoot($transactionRoot), [System.StringComparison]::OrdinalIgnoreCase)) {
+    Throw-ClacklyError $script:ClacklyExit.UnsafeTarget "Transaction root must be outside the Workflow plugin scan and on the same volume."
+  }
+  Assert-ClacklyNormalAncestorChain -Path $transactionRoot -ErrorCode $script:ClacklyExit.UnsafeTarget
+  return $transactionRoot
+}
+
+function Initialize-ClacklyTransactionRoot {
+  param([Parameter(Mandatory = $true)][string]$Root)
+  Assert-ClacklyNormalAncestorChain -Path $Root -ErrorCode $script:ClacklyExit.UnsafeTarget
+  if ($null -eq (Get-ClacklyExistingItemOrNull -Path $Root)) {
+    New-Item -ItemType Directory -Path $Root -ErrorAction Stop | Out-Null
+  }
+  Assert-ClacklyNormalAncestorChain -Path $Root -ErrorCode $script:ClacklyExit.UnsafeTarget
+  Get-ClacklySafeItem -Path $Root -Directory -ErrorCode $script:ClacklyExit.UnsafeTarget | Out-Null
+}
+
+function Assert-ClacklyLegacyTransaction {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  Assert-ClacklyNormalAncestorChain -Path $Path -ErrorCode $script:ClacklyExit.UnsafeTarget
+  Assert-ClacklyNormalTree -Root $Path -ErrorCode $script:ClacklyExit.UnsafeTarget
+  $manifest = Get-ClacklySafeItem -Path (Join-Path $Path "manifest.xml") -File -ErrorCode $script:ClacklyExit.UnsafeTarget
+  if ($manifest.Length -gt 65536) { Throw-ClacklyError $script:ClacklyExit.UnsafeTarget "Legacy transaction manifest is too large: $Path" }
+  $settings = New-Object System.Xml.XmlReaderSettings
+  $settings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
+  $settings.XmlResolver = $null
+  $reader = $null
+  try {
+    $reader = [System.Xml.XmlReader]::Create($manifest.FullName, $settings)
+    $xml = New-Object System.Xml.XmlDocument
+    $xml.XmlResolver = $null
+    $xml.Load($reader)
+    $plugins = $xml.SelectNodes('/BlackmagicDesign/Plugin')
+    $ids = $xml.SelectNodes('/BlackmagicDesign/Plugin/Id')
+    $versions = $xml.SelectNodes('/BlackmagicDesign/Plugin/Version')
+    if ($plugins.Count -ne 1 -or $ids.Count -ne 1 -or $versions.Count -ne 1 -or
+        $ids[0].InnerText -cne $script:ClacklyPluginId -or $versions[0].InnerText -notmatch '^\d+\.\d+\.\d+$') {
+      Throw-ClacklyError $script:ClacklyExit.UnsafeTarget "Legacy transaction manifest does not identify Clackly: $Path"
+    }
+  } catch {
+    Throw-ClacklyError $script:ClacklyExit.UnsafeTarget ("Legacy transaction cannot be relocated safely; retain this path for the Beta owner: " + $Path + ". " + $_.Exception.Message)
+  } finally {
+    if ($null -ne $reader) { $reader.Dispose() }
+  }
+}
+
+function Move-ClacklyLegacyTransactions {
+  param([string]$PluginRoot, [string]$TransactionRoot, $RetainedCandidates, $FailureInjector)
+  $legacy = @(Get-ChildItem -LiteralPath $PluginRoot -Force -ErrorAction Stop | Where-Object { Test-ClacklyOwnedTransactionPath -Parent $PluginRoot -Path $_.FullName })
+  foreach ($item in $legacy) { $RetainedCandidates.Add($item.FullName) }
+  # Validate every candidate before moving any: no foreign/partial-unidentified or
+  # linked tree can be silently hidden while claiming a repaired install.
+  foreach ($item in $legacy) { Assert-ClacklyLegacyTransaction -Path $item.FullName }
+  foreach ($item in $legacy) {
+    $kind = $item.Name.Split('.')[4]
+    $destination = New-ClacklyTransactionPath -Parent $TransactionRoot -Kind $kind
+    Invoke-ClacklyFailurePoint $FailureInjector "before-legacy-relocation"
+    Assert-ClacklyLegacyTransaction -Path $item.FullName
+    Assert-ClacklyNormalAncestorChain -Path $destination -ErrorCode $script:ClacklyExit.UnsafeTarget
+    Move-Item -LiteralPath $item.FullName -Destination $destination -ErrorAction Stop
+    $RetainedCandidates.Add($destination)
+    Invoke-ClacklyFailurePoint $FailureInjector "after-legacy-relocation"
+  }
+}
+
+function New-ClacklyTransactionPath {
   param([Parameter(Mandatory = $true)][string]$Parent, [Parameter(Mandatory = $true)][string]$Kind)
   Assert-ClacklyNormalAncestorChain -Path $Parent -ErrorCode $script:ClacklyExit.UnsafeTarget
   $candidate = Join-Path $Parent ("." + $script:ClacklyPluginId + "." + $Kind + "." + [guid]::NewGuid().ToString("N"))
-  if (!(Test-ClacklyContainedPath -Root $Parent -Candidate $candidate) -or (Test-Path -LiteralPath $candidate)) {
+  if (!(Test-ClacklyOwnedTransactionPath -Parent $Parent -Path $candidate) -or $null -ne (Get-ClacklyExistingItemOrNull -Path $candidate)) {
     Throw-ClacklyError $script:ClacklyExit.Staging "Could not allocate a contained transaction directory."
   }
   return $candidate
@@ -436,7 +520,7 @@ function Copy-ClacklyDirectoryContents {
 function Remove-ClacklyOwnedTree {
   param([string]$Path, [string]$Parent)
   if ([string]::IsNullOrWhiteSpace($Path)) { return }
-  if (!(Test-ClacklyContainedPath -Root $Parent -Candidate $Path) -or !(Split-Path -Leaf $Path).StartsWith("." + $script:ClacklyPluginId + ".", [System.StringComparison]::OrdinalIgnoreCase)) {
+  if (!(Test-ClacklyOwnedTransactionPath -Parent $Parent -Path $Path)) {
     Throw-ClacklyError $script:ClacklyExit.Cleanup "Refusing to remove a path outside Clackly transaction ownership."
   }
   Assert-ClacklyNormalAncestorChain -Path $Parent -ErrorCode $script:ClacklyExit.Cleanup
@@ -453,10 +537,10 @@ function Invoke-ClacklyFailurePoint {
 }
 
 function Get-ClacklySurvivingOwnedPaths {
-  param([Parameter(Mandatory = $true)][string]$Parent, [string[]]$Candidates = @())
+  param([Parameter(Mandatory = $true)][string]$Parent, [string[]]$Candidates = @(), [string]$AdditionalParent = "")
   $survivors = New-Object System.Collections.Generic.List[string]
   foreach ($candidate in @($Candidates | Where-Object { ![string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)) {
-    if (!(Test-ClacklyContainedPath -Root $Parent -Candidate $candidate) -or !(Split-Path -Leaf $candidate).StartsWith("." + $script:ClacklyPluginId + ".", [System.StringComparison]::OrdinalIgnoreCase)) {
+    if (!(Test-ClacklyOwnedTransactionPath -Parent $Parent -Path $candidate) -and !(Test-ClacklyOwnedTransactionPath -Parent $AdditionalParent -Path $candidate)) {
       continue
     }
     try {
@@ -474,9 +558,10 @@ function Invoke-ClacklyInstallTransaction {
   param(
     [Parameter(Mandatory = $true)]$Package,
     [Parameter(Mandatory = $true)][string]$PluginRoot,
-    [string]$ProcessState = "closed",
+    [string]$ProcessState = "",
     [scriptblock]$FailureInjector = $null
   )
+  $legacyCandidates = New-Object System.Collections.Generic.List[string]
   try {
     Assert-ClacklyResolveClosed -ProcessState $ProcessState
     $parent = Get-ClacklyCanonicalPath $PluginRoot
@@ -493,17 +578,23 @@ function Invoke-ClacklyInstallTransaction {
     if ($null -ne $existing -and $existing.VersionObject -gt $Package.VersionObject) {
       Throw-ClacklyError $script:ClacklyExit.UnsafeTarget "Refusing to downgrade a newer installed Clackly Beta."
     }
+    $transactionRoot = Get-ClacklyTransactionRoot -PluginRoot $parent
+    Initialize-ClacklyTransactionRoot -Root $transactionRoot
+    Move-ClacklyLegacyTransactions -PluginRoot $parent -TransactionRoot $transactionRoot -RetainedCandidates $legacyCandidates -FailureInjector $FailureInjector
   } catch {
-    return New-ClacklyResult (Get-ClacklyErrorCode $_ $script:ClacklyExit.Staging) $_.Exception.Message
+    $survivors = @()
+    if ($legacyCandidates.Count -gt 0) { $survivors = Get-ClacklySurvivingOwnedPaths -Parent $parent -AdditionalParent $transactionRoot -Candidates @($legacyCandidates) }
+    return New-ClacklyResult (Get-ClacklyErrorCode $_ $script:ClacklyExit.Staging) $_.Exception.Message -RetainedPaths $survivors
   }
 
   $stage = $null
   $backup = $null
   $failed = $null
+  $activated = $false
   $committed = $false
   $hadExisting = ($null -ne $existing)
   try {
-    $stage = New-ClacklySiblingPath -Parent $parent -Kind "stage"
+    $stage = New-ClacklyTransactionPath -Parent $transactionRoot -Kind "stage"
     Invoke-ClacklyFailurePoint $FailureInjector "before-stage-copy"
     Copy-ClacklyDirectoryContents -Source $Package.AppRoot -Destination $stage
     $stageResources = Join-Path $stage "resources"
@@ -514,15 +605,18 @@ function Invoke-ClacklyInstallTransaction {
     Assert-ClacklyInstalledTree -Target $stage -Package $Package
     Invoke-ClacklyFailurePoint $FailureInjector "before-backup"
     if ($null -ne $existing) {
-      $backup = New-ClacklySiblingPath -Parent $parent -Kind "backup"
+      $backup = New-ClacklyTransactionPath -Parent $transactionRoot -Kind "backup"
       Assert-ClacklyNormalAncestorChain -Path $target -ErrorCode $script:ClacklyExit.UnsafeTarget
       Assert-ClacklyNormalAncestorChain -Path $backup -ErrorCode $script:ClacklyExit.UnsafeTarget
+      Assert-ClacklyNormalTree -Root $target -ErrorCode $script:ClacklyExit.UnsafeTarget
       Move-Item -LiteralPath $target -Destination $backup -ErrorAction Stop
     }
     Invoke-ClacklyFailurePoint $FailureInjector "after-backup"
     Assert-ClacklyNormalAncestorChain -Path $stage -ErrorCode $script:ClacklyExit.Staging
     Assert-ClacklyNormalAncestorChain -Path $target -ErrorCode $script:ClacklyExit.UnsafeTarget
+    Assert-ClacklyNormalTree -Root $stage -ErrorCode $script:ClacklyExit.Staging
     Move-Item -LiteralPath $stage -Destination $target -ErrorAction Stop
+    $activated = $true
     $stage = $null
     Invoke-ClacklyFailurePoint $FailureInjector "after-activation"
     Assert-ClacklyInstalledTree -Target $target -Package $Package
@@ -532,11 +626,12 @@ function Invoke-ClacklyInstallTransaction {
     $failure = $_
     try {
       $targetItem = Get-ClacklyExistingItemOrNull -Path $target -ErrorCode $script:ClacklyExit.Rollback
-      if ($null -eq $stage -and $null -ne $targetItem) {
+      if ($activated -and $null -ne $targetItem) {
         Get-ClacklySafeItem -Path $target -Directory -ErrorCode $script:ClacklyExit.Rollback | Out-Null
-        $failed = New-ClacklySiblingPath -Parent $parent -Kind "failed"
+        $failed = New-ClacklyTransactionPath -Parent $transactionRoot -Kind "failed"
         Assert-ClacklyNormalAncestorChain -Path $target -ErrorCode $script:ClacklyExit.Rollback
         Assert-ClacklyNormalAncestorChain -Path $failed -ErrorCode $script:ClacklyExit.Rollback
+        Assert-ClacklyNormalTree -Root $target -ErrorCode $script:ClacklyExit.Rollback
         Move-Item -LiteralPath $target -Destination $failed -ErrorAction Stop
       }
       if ($null -ne $backup) {
@@ -548,29 +643,32 @@ function Invoke-ClacklyInstallTransaction {
         Invoke-ClacklyFailurePoint $FailureInjector "before-restore"
         Assert-ClacklyNormalAncestorChain -Path $backup -ErrorCode $script:ClacklyExit.Rollback
         Assert-ClacklyNormalAncestorChain -Path $target -ErrorCode $script:ClacklyExit.Rollback
+        Assert-ClacklyNormalTree -Root $backup -ErrorCode $script:ClacklyExit.Rollback
         Move-Item -LiteralPath $backup -Destination $target -ErrorAction Stop
         Get-ClacklyRecognizedTarget -Target $target | Out-Null
         $backup = $null
       }
-      if ($null -ne $failed) { Invoke-ClacklyFailurePoint $FailureInjector "before-failed-cleanup"; Remove-ClacklyOwnedTree -Path $failed -Parent $parent; $failed = $null }
-      if ($null -ne $stage) { Remove-ClacklyOwnedTree -Path $stage -Parent $parent; $stage = $null }
+      if ($null -ne $failed) { Invoke-ClacklyFailurePoint $FailureInjector "before-failed-cleanup"; Remove-ClacklyOwnedTree -Path $failed -Parent $transactionRoot; $failed = $null }
+      if ($null -ne $stage) { Invoke-ClacklyFailurePoint $FailureInjector "before-stage-cleanup"; Remove-ClacklyOwnedTree -Path $stage -Parent $transactionRoot; $stage = $null }
+      $survivors = Get-ClacklySurvivingOwnedPaths -Parent $transactionRoot -Candidates @($legacyCandidates)
       if ($hadExisting) {
-        return New-ClacklyResult $script:ClacklyExit.Activation ("Installation failed and the previous installation was restored: " + $failure.Exception.Message)
+        return New-ClacklyResult $script:ClacklyExit.Activation ("Installation failed and the previous installation was restored: " + $failure.Exception.Message) -RetainedPaths $survivors
       }
-      return New-ClacklyResult $script:ClacklyExit.Activation ("Installation failed; no previous Clackly installation was present: " + $failure.Exception.Message)
+      return New-ClacklyResult $script:ClacklyExit.Activation ("Installation failed; no previous Clackly installation was present: " + $failure.Exception.Message) -RetainedPaths $survivors
     } catch {
-      $survivors = Get-ClacklySurvivingOwnedPaths -Parent $parent -Candidates @($stage, $backup, $failed)
+      $survivors = Get-ClacklySurvivingOwnedPaths -Parent $transactionRoot -Candidates (@($stage, $backup, $failed) + @($legacyCandidates))
       return New-ClacklyResult $script:ClacklyExit.Rollback ("Installation failed and rollback could not be completed: " + $_.Exception.Message) -RetainedPaths $survivors
     }
   }
 
   try {
     Invoke-ClacklyFailurePoint $FailureInjector "cleanup"
-    if ($null -ne $backup) { Remove-ClacklyOwnedTree -Path $backup -Parent $parent; $backup = $null }
-    if ($null -ne $stage) { Remove-ClacklyOwnedTree -Path $stage -Parent $parent; $stage = $null }
-    return New-ClacklyResult $script:ClacklyExit.Success "Clackly was installed successfully. Start Resolve, then choose Workspace > Workflow Integrations > Clackly."
+    if ($null -ne $backup) { Remove-ClacklyOwnedTree -Path $backup -Parent $transactionRoot; $backup = $null }
+    if ($null -ne $stage) { Remove-ClacklyOwnedTree -Path $stage -Parent $transactionRoot; $stage = $null }
+    $survivors = Get-ClacklySurvivingOwnedPaths -Parent $transactionRoot -Candidates @($legacyCandidates)
+    return New-ClacklyResult $script:ClacklyExit.Success "Clackly was installed successfully. Start Resolve, then choose Workspace > Workflow Integrations > Clackly." -RetainedPaths $survivors
   } catch {
-    $survivors = Get-ClacklySurvivingOwnedPaths -Parent $parent -Candidates @($stage, $backup, $failed)
+    $survivors = Get-ClacklySurvivingOwnedPaths -Parent $transactionRoot -Candidates (@($stage, $backup, $failed) + @($legacyCandidates))
     return New-ClacklyResult $script:ClacklyExit.Cleanup ("Clackly was installed and verified, but transaction cleanup needs attention: " + $_.Exception.Message) -RetainedPaths $survivors
   }
 }
@@ -578,9 +676,10 @@ function Invoke-ClacklyInstallTransaction {
 function Invoke-ClacklyUninstallTransaction {
   param(
     [Parameter(Mandatory = $true)][string]$PluginRoot,
-    [string]$ProcessState = "closed",
+    [string]$ProcessState = "",
     [scriptblock]$FailureInjector = $null
   )
+  $legacyCandidates = New-Object System.Collections.Generic.List[string]
   try {
     Assert-ClacklyResolveClosed -ProcessState $ProcessState
     $parent = Get-ClacklyCanonicalPath $PluginRoot
@@ -595,24 +694,32 @@ function Invoke-ClacklyUninstallTransaction {
       Throw-ClacklyError $script:ClacklyExit.UnsafeTarget "The production plugin target is not contained by its fixed parent."
     }
     $existing = Get-ClacklyRecognizedTarget -Target $target
+    $transactionRoot = Get-ClacklyTransactionRoot -PluginRoot $parent
+    Initialize-ClacklyTransactionRoot -Root $transactionRoot
+    Move-ClacklyLegacyTransactions -PluginRoot $parent -TransactionRoot $transactionRoot -RetainedCandidates $legacyCandidates -FailureInjector $FailureInjector
     if ($null -eq $existing) {
-      return New-ClacklyResult $script:ClacklyExit.Success "Clackly is not installed. Settings were preserved."
+      $survivors = Get-ClacklySurvivingOwnedPaths -Parent $transactionRoot -Candidates @($legacyCandidates)
+      return New-ClacklyResult $script:ClacklyExit.Success "Clackly is not installed. Settings were preserved." -RetainedPaths $survivors
     }
   } catch {
-    return New-ClacklyResult (Get-ClacklyErrorCode $_ $script:ClacklyExit.UnsafeTarget) $_.Exception.Message
+    $survivors = @()
+    if ($legacyCandidates.Count -gt 0) { $survivors = Get-ClacklySurvivingOwnedPaths -Parent $parent -AdditionalParent $transactionRoot -Candidates @($legacyCandidates) }
+    return New-ClacklyResult (Get-ClacklyErrorCode $_ $script:ClacklyExit.UnsafeTarget) $_.Exception.Message -RetainedPaths $survivors
   }
 
   $tombstone = $null
   try {
-    $tombstone = New-ClacklySiblingPath -Parent $parent -Kind "uninstall"
+    $tombstone = New-ClacklyTransactionPath -Parent $transactionRoot -Kind "uninstall"
     Assert-ClacklyNormalAncestorChain -Path $target -ErrorCode $script:ClacklyExit.UnsafeTarget
     Assert-ClacklyNormalAncestorChain -Path $tombstone -ErrorCode $script:ClacklyExit.UnsafeTarget
+    Assert-ClacklyNormalTree -Root $target -ErrorCode $script:ClacklyExit.UnsafeTarget
     Move-Item -LiteralPath $target -Destination $tombstone -ErrorAction Stop
     Invoke-ClacklyFailurePoint $FailureInjector "after-uninstall-rename"
-    Remove-ClacklyOwnedTree -Path $tombstone -Parent $parent
-    return New-ClacklyResult $script:ClacklyExit.Success "Clackly was uninstalled. Your settings were preserved."
+    Remove-ClacklyOwnedTree -Path $tombstone -Parent $transactionRoot
+    $survivors = Get-ClacklySurvivingOwnedPaths -Parent $transactionRoot -Candidates @($legacyCandidates)
+    return New-ClacklyResult $script:ClacklyExit.Success "Clackly was uninstalled. Your settings were preserved." -RetainedPaths $survivors
   } catch {
-    $survivors = Get-ClacklySurvivingOwnedPaths -Parent $parent -Candidates @($tombstone)
+    $survivors = Get-ClacklySurvivingOwnedPaths -Parent $transactionRoot -Candidates (@($tombstone) + @($legacyCandidates))
     return New-ClacklyResult $script:ClacklyExit.Cleanup ("Uninstall could not finish; retained task-owned paths are listed in RetainedPaths.") -RetainedPaths $survivors
   }
 }
@@ -621,5 +728,5 @@ Export-ModuleMember -Function @(
   "Get-ClacklyProductionPluginRoot", "Get-ClacklyWindowsPowerShellExecutable", "New-ClacklyElevationArgumentList", "Test-ClacklyContainedPath", "Assert-ClacklySafeRelativePath", "Assert-ClacklyNormalAncestorChain",
   "Get-ClacklyTreeInventory", "Read-ClacklyHashManifest", "Test-ClacklyHashInventory", "Test-ClacklyPackage",
   "Get-ClacklyExpectedInstalledInventory", "Assert-ClacklyInstalledTree", "Get-ClacklyRecognizedTarget",
-  "Get-ClacklyResolveState", "Get-ClacklySurvivingOwnedPaths", "Invoke-ClacklyInstallTransaction", "Invoke-ClacklyUninstallTransaction"
+  "Get-ClacklyResolveState", "Get-ClacklyTransactionRoot", "Get-ClacklySurvivingOwnedPaths", "Invoke-ClacklyInstallTransaction", "Invoke-ClacklyUninstallTransaction"
 )

@@ -10,7 +10,7 @@
  *
  * Examples:
  *   npm run palette:evidence
- *   node scripts/palette-evidence.mjs --renderer packaged --output ..\\.trellis\\tasks\\08-27-command-palette-interaction-hint\\evidence\\playwright
+ *   node scripts/palette-evidence.mjs --renderer packaged --output build/evidence/playwright
  *   node scripts/palette-evidence.mjs --renderer built --scenario interaction-panel,interaction-lifecycle
  */
 import assert from "node:assert/strict";
@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import { inflateSync } from "node:zlib";
 import { chromium } from "playwright";
 import { CommandSearchService } from "../command-search/CommandSearchService.mjs";
+import { SETTINGS_UPDATE_EVIDENCE_SCENARIOS, runSettingsUpdateEvidence } from "./settings-update-evidence.mjs";
 
 const require = createRequire(import.meta.url);
 const { version: playwrightVersion } = require("playwright/package.json");
@@ -50,6 +51,7 @@ const INTERACTION_SURFACE = PALETTE_SURFACE;
 const EVIDENCE_SEARCH_PATH = "/__clackly-evidence-search";
 const EVIDENCE_SEARCH_NOW = 1_800_000_000_000;
 const SCENARIOS = new Set([
+  ...SETTINGS_UPDATE_EVIDENCE_SCENARIOS,
   "default",
   "pinned-recent",
   "search-results",
@@ -64,6 +66,9 @@ const SCENARIOS = new Set([
   "error-feedback",
   "browser-preview",
   "settings-application-empty",
+  "settings-language-menu",
+  "settings-no-config",
+  "settings-actual-ae",
   "settings-typical-ready",
   "settings-missing-config-long-path",
   "settings-zh-cn-multi-help",
@@ -74,6 +79,10 @@ const SCENARIOS = new Set([
   "settings-reduced-motion"
 ]);
 const SETTINGS_EVIDENCE_SCENARIOS = new Set([
+  ...SETTINGS_UPDATE_EVIDENCE_SCENARIOS,
+  "settings-language-menu",
+  "settings-no-config",
+  "settings-actual-ae",
   "settings-application-empty",
   "settings-typical-ready",
   "settings-missing-config-long-path",
@@ -85,6 +94,9 @@ const SETTINGS_EVIDENCE_SCENARIOS = new Set([
   "settings-reduced-motion"
 ]);
 const SETTINGS_FIXTURE_BY_SCENARIO = Object.freeze({
+  "settings-language-menu": "typical-ready",
+  "settings-no-config": "typical-ready",
+  "settings-actual-ae": "actual-ae",
   "settings-application-empty": "application-empty",
   "settings-typical-ready": "typical-ready",
   "settings-missing-config-long-path": "missing-config-long-path",
@@ -442,6 +454,7 @@ async function inspectSettingsLayout(page, label) {
     const sidebar = document.querySelector(".feature-sidebar");
     const configuration = document.querySelector(".settings-configuration");
     const inspector = document.querySelector(".settings-inspector");
+    const navigationFooter = document.querySelector(".feature-navigation-footer");
     const footer = document.querySelector(".settings-actions");
     const titlebar = document.querySelector(".settings-titlebar");
     const detailIcon = document.querySelector(".settings-configuration-icon");
@@ -468,6 +481,8 @@ async function inspectSettingsLayout(page, label) {
       sidebar: rect(sidebar),
       configuration: rect(configuration),
       inspector: rect(inspector),
+      navigationFooter: rect(navigationFooter),
+      shellRadius: getComputedStyle(shell).borderRadius,
       footer: rect(footer),
       titlebar: titlebar ? { rect: rect(titlebar), background: getComputedStyle(titlebar).backgroundColor, borderBottom: getComputedStyle(titlebar).borderBottomWidth } : null,
       detailIcon: detailIcon ? { rect: rect(detailIcon), background: getComputedStyle(detailIcon).backgroundColor, border: getComputedStyle(detailIcon).borderWidth } : null,
@@ -479,7 +494,7 @@ async function inspectSettingsLayout(page, label) {
       control: control ? { height: getComputedStyle(control).height, background: getComputedStyle(control).backgroundColor, borderRadius: getComputedStyle(control).borderRadius } : null,
       footerShadow: footer ? getComputedStyle(footer).boxShadow : null,
       title: getComputedStyle(document.querySelector(".settings-configuration h1")).fontSize,
-      section: getComputedStyle(document.querySelector(".settings-section > h2")).fontSize,
+      section: document.querySelector(".settings-section > h2") ? getComputedStyle(document.querySelector(".settings-section > h2")).fontSize : null,
       navLabel: getComputedStyle(document.querySelector(".feature-button")).fontSize,
       candidates
     };
@@ -492,16 +507,19 @@ async function inspectSettingsLayout(page, label) {
   assert.equal(Math.round(layout.shell.width), SETTINGS_VIEWPORT.width, `${label}: Settings shell keeps native-sized width`);
   assert.equal(Math.round(layout.shell.height), SETTINGS_VIEWPORT.height, `${label}: Settings shell keeps native-sized height`);
   assert.equal(Math.round(layout.sidebar.width), 190, `${label}: Settings uses the approved compact Feature navigation column`);
-  assert.equal(Math.round(layout.inspector.width), 220, `${label}: Settings uses the approved Context Inspector column`);
+  assert.equal(layout.inspector, null, `${label}: Settings has one continuous detail column`);
   assert.ok(layout.configuration.left >= layout.sidebar.right - 0.5, `${label}: Configuration starts after Feature navigation`);
-  assert.ok(layout.configuration.right <= layout.inspector.left + 0.5, `${label}: Configuration stops before Context Inspector`);
+  assert.ok(Math.abs(layout.configuration.right - layout.shell.right) <= 1.5, `${label}: detail uses all remaining width`);
   assert.ok(layout.footer.top >= layout.configuration.top && layout.footer.bottom <= layout.configuration.bottom + 0.5, `${label}: fixed Settings footer remains inside Configuration`);
-  assert.equal(Math.round(layout.footer.height), 34, `${label}: Settings action strip follows the compact 34px rhythm`);
+  assert.equal(Math.round(layout.footer.height), 40, `${label}: Settings action strip follows the compact 40px rhythm`);
+  assert.equal(layout.navigationFooter.top, layout.footer.top, "navigation/detail footer hairlines align");
+  assert.equal(layout.navigationFooter.height, layout.footer.height, "both fixed footers share height");
+  assert.equal(layout.shellRadius, "8px", "Settings painted corners (not DWM proof)");
   assert.equal(layout.footerShadow, "none", `${label}: Settings footer uses a quiet hairline instead of an upward shadow`);
   assert.equal(layout.titlebar?.background, PALETTE_SURFACE, `${label}: titlebar shares the continuous Palette ink surface`);
   assert.equal(layout.titlebar?.borderBottom, "1px", `${label}: titlebar uses a weak structural hairline`);
   assert.equal(layout.title, "16px", `${label}: compact detail title follows the shared instrument hierarchy`);
-  assert.equal(layout.section, "14px", `${label}: section heading follows the 14px role`);
+  if (layout.section) assert.equal(layout.section, "14px", `${label}: section heading follows the 14px role`);
   assert.equal(layout.navLabel, "13px", `${label}: navigation label follows the 13px role`);
   assert.ok(layout.detailIcon, `${label}: Configuration has a compact current-generation icon`);
   assert.ok(layout.detailIcon && Math.round(layout.detailIcon.rect.width) === 16 && Math.round(layout.detailIcon.rect.height) === 16, `${label}: detail icon stays in the shared 14–16px slot`);
@@ -895,6 +913,12 @@ async function screenshot(page, output, name) {
   const buffer = await page.screenshot({ path: target, scale: "css", animations: "disabled", omitBackground: true });
   assert.equal(buffer.readUInt32BE(16), viewport.width, `${name}: PNG width`);
   assert.equal(buffer.readUInt32BE(20), viewport.height, `${name}: PNG height`);
+  if (await page.locator(".settings-shell").count()) {
+    const image = decodeRgbaPng(buffer);
+    for (const [x, y] of [[0, 0], [viewport.width - 1, 0], [0, viewport.height - 1], [viewport.width - 1, viewport.height - 1]]) {
+      assert.equal(image.alphaAt(x, y), 0, "Settings corner remains transparent, including titlebar and close hover paint");
+    }
+  }
   return target;
 }
 
@@ -994,7 +1018,109 @@ async function closeScenario(scenario, label) {
   await scenario.context.close();
 }
 
+async function verifyLanguageMenu(page, output, evidence) {
+  await page.getByRole("button", { name: "Clackly Settings", exact: true }).click();
+  const control = page.locator("#locale-preference");
+  await control.focus();
+  await page.keyboard.press("Enter");
+  assert.equal(await control.getAttribute("aria-expanded"), "true");
+  assert.equal(await page.getByRole("option").count(), 3);
+  assert.equal(await page.getByRole("listbox").evaluate((el) => getComputedStyle(el).backgroundColor), PALETTE_SURFACE);
+  assert.equal(await page.locator(".language-option.active").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(231, 232, 234)");
+  await page.keyboard.press("ArrowDown");
+  assert.equal(await page.locator(".language-option.active").innerText(), "Simplified Chinese");
+  evidence.push(await screenshot(page, output, "settings-language-keyboard-en.png"));
+  await page.keyboard.press("Escape");
+  assert.equal(await control.getAttribute("aria-expanded"), "false");
+  assert.equal(await control.evaluate((el) => el === document.activeElement), true);
+  assert.match(await control.innerText(), /English/, "Escape does not save a pending option");
+  await control.click();
+  await page.getByRole("option", { name: "Simplified Chinese" }).hover();
+  await page.getByRole("option", { name: "Simplified Chinese" }).click();
+  await page.waitForFunction(() => document.documentElement.lang === "zh-CN");
+  assert.equal(await control.evaluate((el) => el === document.activeElement), true, "selection returns focus without losing it to busy state");
+  assert.equal(await control.getAttribute("aria-expanded"), "false");
+  await control.click();
+  evidence.push(await screenshot(page, output, "settings-language-open-zh.png"));
+  await page.keyboard.press("Tab");
+  assert.equal(await control.getAttribute("aria-expanded"), "false");
+  assert.equal(await control.evaluate((el) => el === document.activeElement), false, "Tab leaves the control normally");
+  await control.focus();
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Home");
+  assert.match(await page.locator(".language-option.active").innerText(), /跟随系统/);
+  await page.keyboard.press("End");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.documentElement.lang === "en");
+  await control.click();
+  await page.getByRole("searchbox", { name: "Search Features" }).click();
+  assert.equal(await control.getAttribute("aria-expanded"), "false", "outside pointer closes without restoring focus");
+  await control.evaluate((el) => { el.style.position = "fixed"; el.style.left = "12px"; el.style.bottom = "42px"; el.style.width = "200px"; });
+  await control.click();
+  const rect = await page.getByRole("listbox").boundingBox();
+  const button = await control.boundingBox();
+  assert.ok(rect.y + rect.height <= button.y, "popup flips above the control near the bottom edge");
+  assert.ok(rect.x >= 8 && rect.x + rect.width <= 752 && rect.y >= 8 && rect.y + rect.height <= 552);
+  await page.keyboard.press("Escape");
+  await control.evaluate((el) => el.removeAttribute("style"));
+  await control.click();
+  await page.getByRole("option", { name: "System Default" }).click();
+  assert.match(await control.innerText(), /System Default|跟随系统/);
+  await page.locator(".feature-navigation .feature-button").first().click();
+  await page.locator(".feature-navigation-footer button").click();
+  assert.match(await control.innerText(), /System Default|跟随系统/, "preference remains selected across navigation");
+}
+
+async function verifyFeatureActions(page) {
+  const previewSwitch = page.getByRole("switch", { name: "Create 1080p Preview Comp", exact: true });
+  assert.equal(await previewSwitch.isChecked(), false);
+  await previewSwitch.focus();
+  await page.keyboard.press("Space");
+  assert.equal(await previewSwitch.isChecked(), true, "Space enables the accessible preview switch");
+  await previewSwitch.click();
+  assert.equal(await previewSwitch.isChecked(), false, "pointer disables the preview switch");
+  await page.locator('label[for="setting-create1080pPreviewComp"]').click();
+  assert.equal(await previewSwitch.isChecked(), true, "the full preview label toggles its associated switch");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "Settings saved" }).waitFor();
+  await page.getByRole("button", { name: "Clackly Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Export to After Effects", exact: true }).click();
+  assert.equal(await previewSwitch.isChecked(), true, "saved draft survives Feature navigation");
+  await previewSwitch.uncheck();
+  await page.getByRole("button", { name: "Reset", exact: true }).click();
+  assert.equal(await previewSwitch.isChecked(), true, "Reset consumes ConfigManager results rather than retaining the dirty draft");
+  await page.getByRole("button", { name: "Disable", exact: true }).click();
+  await page.locator(".feature-effective-status.disabled").waitFor();
+  assert.equal(await page.locator(".feature-ready-dot").count(), 0);
+  await page.getByRole("button", { name: "Enable", exact: true }).click();
+  await page.locator(".feature-effective-status.ready").waitFor();
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "Feature status refreshed" }).waitFor();
+}
+
+async function verifySettingsTextSelection(page) {
+  const search = page.getByRole("searchbox");
+  await search.fill("Feature query");
+  await page.keyboard.press("Control+a");
+  assert.equal(await search.evaluate(el => el.value.slice(el.selectionStart, el.selectionEnd)), "Feature query", "search Ctrl+A remains editable");
+  await search.fill("");
+  await page.locator(".settings-configuration h1").click();
+  await page.keyboard.press("Control+a");
+  assert.equal(await page.evaluate(() => window.getSelection().toString()), "", "Ctrl+A cannot select Settings chrome");
+  const heading = await page.locator(".settings-configuration h1").boundingBox();
+  await page.mouse.move(heading.x + 2, heading.y + heading.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(heading.x + heading.width - 2, heading.y + heading.height / 2, { steps: 5 });
+  await page.mouse.up();
+  assert.equal(await page.evaluate(() => window.getSelection().toString()), "", "pointer drag cannot select Settings labels");
+}
+
 async function runScenario(name, context) {
+  if (SETTINGS_UPDATE_EVIDENCE_SCENARIOS.includes(name)) {
+    await runSettingsUpdateEvidence(name, context);
+    return;
+  }
   const { browser, serverUrl, host, output, evidence, checks } = context;
   const scenario = SETTINGS_EVIDENCE_SCENARIOS.has(name)
     ? await createSettingsPreviewScenario(browser, serverUrl, SETTINGS_FIXTURE_BY_SCENARIO[name], {
@@ -1009,14 +1135,60 @@ async function runScenario(name, context) {
       assert.equal(await page.evaluate(() => Boolean(window.resolveCommandCenter)), false, `${name}: Settings fixture has no injected Electron host authority`);
       assert.equal(await page.locator(".clackly-browser-preview-agentation").count(), 0, `${name}: Settings fixture does not mount the Palette preview tool`);
       await page.locator(".settings-configuration h1").waitFor();
-      if (name === "settings-typical-ready") {
+      if (name === "settings-language-menu") {
+        await verifyLanguageMenu(page, output, evidence);
+      } else if (name === "settings-no-config") {
+        await page.getByRole("button", { name: "Paste Clipboard Image", exact: true }).click();
+        await page.getByRole("heading", { name: "Paste Clipboard Image", exact: true }).waitFor();
+        assert.equal(await page.locator(".settings-actions button").count(), 0, "empty schemas have no ineffective Save/Reset controls");
+        assert.match(await page.locator(".settings-configuration-scroll").innerText(), /No settings required/);
+        assert.match(await page.locator(".settings-configuration-scroll").innerText(), /Version\s*1\.0\.0/);
+        await verifySettingsTextSelection(page);
+        evidence.push(await screenshot(page, output, "settings-no-config-en.png"));
+        await page.getByRole("button", { name: "Clackly Settings", exact: true }).click();
+        await page.getByRole("combobox", { name: "Language" }).click();
+        await page.getByRole("option", { name: "Simplified Chinese" }).click();
+        await page.getByRole("button", { name: "粘贴剪贴板图像", exact: true }).click();
+        await page.getByRole("heading", { name: "粘贴剪贴板图像", exact: true }).waitFor();
+        evidence.push(await screenshot(page, output, "settings-no-config-zh.png"));
+        await page.getByRole("button", { name: "停用", exact: true }).click();
+        await page.locator(".feature-effective-status.disabled").waitFor();
+      } else if (name === "settings-actual-ae") {
+        const input = page.locator("#setting-aePath");
+        const original = await input.inputValue();
+        assert.equal(await input.getAttribute("title"), original, "full path is available in the native title tooltip");
+        await input.focus();
+        await page.keyboard.press("Control+a");
+        assert.equal(await input.evaluate((el) => el.value.slice(el.selectionStart, el.selectionEnd)), original, "complete long path remains selectable for copying/editing");
+        await verifyFeatureActions(page);
+        await verifySettingsTextSelection(page);
+        const pathField = await page.locator(".settings-field").filter({ has: input }).boundingBox();
+        const switchRow = await page.locator(".switch-field").boundingBox();
+        const form = await page.locator(".settings-fields").boundingBox();
+        const header = await page.locator(".settings-configuration-header").boundingBox();
+        assert.equal(Math.round(form.width), 280, "small configuration stays in a compact left form");
+        assert.ok(Math.abs(form.x - header.x) <= 1, "form aligns with the detail heading");
+        assert.ok(Math.abs(pathField.x - form.x) <= 1 && Math.abs(switchRow.x - form.x) <= 1, "path and switch start at the same left edge");
+        assert.ok(Math.abs(switchRow.x + switchRow.width - form.x - form.width) <= 1, "switch stays within the compact form width");
+        assert.ok(switchRow.y - pathField.y - pathField.height >= 19, "path and preview controls have distinct field spacing");
+        evidence.push(await screenshot(page, output, "settings-actual-ae-en.png"));
+        await page.getByRole("button", { name: "Clackly Settings", exact: true }).click();
+        await page.getByRole("combobox", { name: "Language" }).click();
+        await page.getByRole("option", { name: "Simplified Chinese" }).click();
+        await page.getByRole("button", { name: "导出到 After Effects", exact: true }).click();
+        await page.getByRole("heading", { name: "导出到 After Effects", exact: true }).waitFor();
+        assert.equal(await page.locator(".inspector-interaction-command h3").count(), 0, "a single Command does not duplicate its action title");
+        assert.deepEqual(await page.locator(".inspector-interaction-input [data-mouse-button]").evaluateAll((els) => els.map((el) => el.dataset.mouseButton)), ["left", "left", "right"]);
+        assert.equal(await page.locator(".inspector-interaction-input").last().getAttribute("title"), "Ctrl + Shift + 右键单击");
+        assert.equal(await page.locator("#setting-create1080pPreviewComp").isChecked(), true);
+      } else if (name === "settings-typical-ready") {
         assert.equal(await page.locator(".settings-titlebar img").count(), 0, "Settings titlebar renders no Clackly wordmark image");
         assert.equal(await page.locator(".settings-titlebar").innerText(), "Settings", "Settings titlebar keeps only the localized compact title");
-        const inspector = page.getByLabel("Context Inspector");
+        const inspector = page.locator(".settings-configuration-scroll");
         await inspector.waitFor();
         assert.match(await inspector.innerText(), /Version\s*1\.0\.0/, "Ready Settings About renders version metadata");
         assert.match(await inspector.innerText(), /Providers\s*Script, Electron Host/, "Ready Settings About formats existing provider ids for readable presentation");
-        const interaction = page.locator(".settings-inspector .inspector-interaction-command");
+        const interaction = page.locator(".inspector-interaction-command");
         assert.deepEqual(await interaction.locator(".inspector-interaction-action-name").allInnerTexts(), [
           "Export to After Effects",
           "Export Audio to After Effects",
@@ -1032,7 +1204,7 @@ async function runScenario(name, context) {
       } else if (name === "settings-zh-cn-multi-help") {
         await page.getByRole("heading", { name: "交互" }).scrollIntoViewIfNeeded();
         assert.ok(await page.locator(".inspector-interaction-input kbd").count() >= 5, "Simplified Chinese fixture preserves multi-row keycap help");
-        const interaction = page.locator(".settings-inspector .inspector-interaction-command");
+        const interaction = page.locator(".inspector-interaction-command");
         assert.deepEqual(await interaction.locator(".inspector-interaction-action-name").allInnerTexts(), [
           "导出到 After Effects",
           "导出音频到 After Effects",
@@ -1068,6 +1240,7 @@ async function runScenario(name, context) {
         assert.equal(motion, "0s", "reduced motion removes Settings navigation transitions");
         assert.equal(saveMotion, "0s", "reduced motion removes Settings action transitions");
       }
+      await page.waitForTimeout(120); // settle existing navigation color transitions before paint assertions
       await inspectSettingsLayout(page, name);
       evidence.push(await screenshot(page, output, `${name}.png`));
       if (name === "settings-busy") {
@@ -1080,10 +1253,10 @@ async function runScenario(name, context) {
         await page.getByRole("button", { name: "Working…" }).waitFor();
         await application.click();
         await page.getByRole("heading", { name: "Clackly Settings" }).waitFor();
-        await page.waitForFunction(() => !document.querySelector("#locale-preference")?.disabled);
+        await page.waitForFunction(() => document.querySelector("#locale-preference")?.getAttribute("aria-disabled") === "false");
         assert.equal(await page.getByRole("combobox", { name: "Language" }).isDisabled(), false, "application fallback cancels the pending config request without retaining busy state");
       }
-      checks.push(`${name}: hostless local Settings fixture rendered the approved three-column Settings UI at 760×560 with local Feature search, application footer, configuration action strip, inspector-only effective status and real binding rows; screenshot is renderer-paint evidence only and does not validate Electron or Resolve.`);
+      checks.push(`${name}: hostless local Settings fixture rendered the approved two-pane Settings UI at 760×560 with local Feature search, application footer, configuration action strip, integrated effective status and real binding rows; screenshot is renderer-paint evidence only and does not validate Electron or Resolve.`);
       return;
     } else if (name === "browser-preview") {
       await inspectBrowserPreviewLayout(page, name);
@@ -1314,9 +1487,10 @@ async function runScenario(name, context) {
       assert.equal(await panel.locator(".interaction-preview-note").count(), 0, "Host-injected Interaction Panel has no browser-preview execution note");
       assert.doesNotMatch(await panel.innerText(), /Automatically send the current Resolve selection/, "Panel omits Command descriptions");
       const interactionInputs = await rows.locator(".interaction-input").evaluateAll((elements) => (
-        elements.map((element) => element.textContent.replace(/\s+/g, ""))
+        elements.map((element) => element.getAttribute("aria-label"))
       ));
-      assert.deepEqual(interactionInputs, ["Click", "Ctrl+Click", "Ctrl+Shift+Click"], "Panel preserves compact canonical input mappings");
+      assert.deepEqual(interactionInputs, ["Click", "Ctrl + Click", "Ctrl + Shift + Click"], "Panel preserves complete accessible binding labels");
+      assert.deepEqual(await rows.locator("[data-mouse-button]").evaluateAll((els) => els.map((el) => el.dataset.mouseButton)), ["left", "left", "left"], "mouse icons consume binding semantics");
       assert.deepEqual(await rows.locator(".interaction-action-name").allInnerTexts(), ["Export to After Effects", "Export Audio to After Effects", "Export Video to After Effects"], "Panel uses registered action Command labels");
       await page.mouse.move(248, 319);
       await inspectLayout(page, name);
