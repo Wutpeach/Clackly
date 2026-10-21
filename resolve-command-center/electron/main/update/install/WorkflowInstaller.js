@@ -4,10 +4,10 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { assetUrl, installedVersion, stableVersion } = require('../identity');
 const { readPointer, projectOutcome } = require('./outcome');
-const SCRIPT_NAMES = ['executor.ps1', 'launch.ps1', 'recover.ps1', 'WorkflowTransaction.psm1', 'ExecutorSupport.psm1'];
+const SCRIPT_NAMES = ['executor.ps1', 'launch.ps1', 'recover.ps1', 'WorkflowTransaction.psm1', 'ExecutorSupport.psm1','LocalNative.psm1'];
 const REASONS = new Set(['publisher-unverified', 'host-unqualified', 'target-unverified', 'permission-denied',
   'permission-cancelled', 'process-unknown', 'host-running', 'concurrent-install', 'recovery-required',
-  'invalid-package', 'install-failed', 'unsupported-host']);
+  'native-missing', 'native-invalid', 'native-incompatible', 'invalid-package', 'install-failed', 'unsupported-host']);
 
 function normalPath(file, { missing = false } = {}) {
   if (typeof file !== 'string' || path.resolve(file) !== file || file.startsWith('\\\\') || file.slice(2).includes(':')) throw new Error('target-unverified');

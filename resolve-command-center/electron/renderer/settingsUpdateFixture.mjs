@@ -3,7 +3,8 @@ export const SETTINGS_UPDATE_SCENARIOS = Object.freeze([
   "idle", "no-release", "up-to-date", "available", "checking", "rate-limit", "offline", "timeout",
   "downloading", "verifying", "cancelled", "failure", "corrupt", "space", "version", "downloaded", "unavailable",
   "install-ready", "confirmation", "waiting-exit", "installing", "installed", "rolled-back", "install-failed",
-  "install-cancelled", "permission-denied", "permission-cancelled", "recovery-required", "publisher-unverified"
+  "install-cancelled", "permission-denied", "permission-cancelled", "recovery-required", "publisher-unverified",
+  "native-missing", "native-invalid", "native-incompatible"
 ]);
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const FIXTURE_TIME = 1_791_958_800_000;
@@ -42,7 +43,9 @@ export function createSettingsUpdateFixture({ search = "", schedule = setTimeout
       "rolled-back": ["rolled-back", "install-failed"], "install-failed": ["failed", "install-failed"],
       "install-cancelled": ["cancelled", null], "permission-denied": ["unavailable", "permission-denied"],
       "permission-cancelled": ["cancelled", "permission-cancelled"], "recovery-required": ["failed", "recovery-required"],
-      "publisher-unverified": ["unavailable", "publisher-unverified"]
+      "publisher-unverified": ["unavailable", "publisher-unverified"],
+    "native-missing": ["failed", "native-missing"], "native-invalid": ["failed", "native-invalid"],
+    "native-incompatible": ["failed", "native-incompatible"]
     }[scenario];
     if (scenario === "downloaded" || installation) {
       state.status = "downloaded";

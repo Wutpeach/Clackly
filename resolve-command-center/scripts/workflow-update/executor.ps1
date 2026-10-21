@@ -87,7 +87,7 @@ try {
 } catch {
     $reason = Get-UpdateFailureReason $_
     if ($reason -cnotin @('publisher-unverified','host-unqualified','target-unverified','permission-denied','permission-cancelled',
-        'process-unknown','host-running','concurrent-install','recovery-required','invalid-package')) { $reason = 'install-failed' }
+        'process-unknown','host-running','concurrent-install','recovery-required','native-missing','native-invalid','native-incompatible','invalid-package')) { $reason = 'install-failed' }
     $result = @{status='failed';reason=$reason}
     if ($requestValidated) { try { $result.oldHash = Get-TreeHash $locations.Target } catch {} }
 }

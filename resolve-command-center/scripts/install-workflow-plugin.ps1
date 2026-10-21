@@ -1,9 +1,10 @@
+[CmdletBinding()]
 param(
   [ValidateSet("Junction", "Copy")]
   [string]$Mode = "Junction",
   [string]$PluginRoot = "$env:PROGRAMDATA\Blackmagic Design\DaVinci Resolve\Support\Workflow Integration Plugins",
-  [string]$WorkflowNodeSource = "$env:PROGRAMDATA\Blackmagic Design\DaVinci Resolve\Support\Developer\Workflow Integrations\Examples\SamplePlugin\WorkflowIntegration.node",
-  [string]$PackageRoot = ""
+  [string]$PackageRoot = "",
+  [string]$Archive = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,24 +14,15 @@ $IsPackageInstall = ![string]::IsNullOrWhiteSpace($PackageRoot)
 $ResolvedPackageRoot = $null
 $PackageRuntimeRoot = $null
 
-if ($IsPackageInstall) {
-  $ResolvedPackageRoot = (Resolve-Path -LiteralPath $PackageRoot).Path
-  $AppRoot = Join-Path $ResolvedPackageRoot "resources\app"
-  $PackageRuntimeRoot = Join-Path $ResolvedPackageRoot "resources\runtimes"
-  foreach ($required in @(
-    (Join-Path $AppRoot "manifest.xml"),
-    (Join-Path $AppRoot "package.json"),
-    (Join-Path $AppRoot "workflow-plugin\main.js"),
-    (Join-Path $AppRoot "workflow-plugin\WorkflowIntegration.node"),
-    (Join-Path $PackageRuntimeRoot "manifest.json")
-  )) {
-    if (!(Test-Path -LiteralPath $required -PathType Leaf)) {
-      throw "Packaged Workflow Integration file was not found: $required"
-    }
-  }
-} else {
-  $AppRoot = $SourceAppRoot
+if ($PSBoundParameters.ContainsKey('PackageRoot')) { throw 'PackageRoot is not a production trust boundary. Use -Archive with the original official Release ZIP.' }
+if ($PSBoundParameters.ContainsKey('Archive')) {
+  if ([string]::IsNullOrWhiteSpace($Archive)) { throw 'Archive must identify the original official Release ZIP.' }
+  if ($PSBoundParameters.ContainsKey('PluginRoot') -or $PSBoundParameters.ContainsKey('Mode')) { throw 'Archive installation uses the fixed production target.' }
+  & (Join-Path $PSScriptRoot 'workflow-update\bootstrap.ps1') -Archive $Archive
+  exit $LASTEXITCODE
 }
+$AppRoot = $SourceAppRoot
+$WorkflowNodeSource = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'Blackmagic Design\DaVinci Resolve\Support\Developer\Workflow Integrations\Examples\SamplePlugin\WorkflowIntegration.node'
 
 $PluginId = "com.wutpeach.clackly"
 $PluginPath = Join-Path $PluginRoot $PluginId

@@ -6,9 +6,6 @@ const path = require("node:path");
 
 const APP_ROOT = path.resolve(__dirname, "..");
 const PLUGIN_ID = "com.wutpeach.clackly";
-const NATIVE_SIZE = 379_904;
-const NATIVE_SHA256 = "C442DFD013DA2244F53BA8B36B9439CCCC197DF90B999D0074031C6D921B7B05";
-
 function sha256(filePath) {
   return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex").toUpperCase();
 }
@@ -143,18 +140,15 @@ function assertPackageIdentity({ appRoot = APP_ROOT, packageRoot }) {
     || repositoryPackage.version !== packagedManifest.version || packagedManifest.id !== PLUGIN_ID) {
     throw new Error("package.json and Workflow manifest version/id authorities disagree");
   }
-  const workflowNode = path.join(packagedApp, "workflow-plugin", "WorkflowIntegration.node");
-  const stats = fs.statSync(workflowNode);
-  if (!stats.isFile() || stats.size !== NATIVE_SIZE || sha256(workflowNode) !== NATIVE_SHA256) {
-    throw new Error("WorkflowIntegration.node does not match the qualified Beta identity");
-  }
+  const nativeEntries = listTree(packageRoot).filter((entry) => /(?:^|\/)WorkflowIntegration\.node(?:\/|$)/i.test(entry.relativePath));
+  if (nativeEntries.length) throw new Error("WorkflowIntegration.node is forbidden in distribution payloads; provision it locally at installation");
   for (const required of [
     path.join(packagedApp, "workflow-plugin", "main.js"),
     path.join(packageRoot, "resources", "runtimes", "manifest.json")
   ]) {
     if (!fs.statSync(required).isFile()) throw new Error(`Missing required packaged file: ${required}`);
   }
-  return { version: repositoryPackage.version, workflowNode };
+  return { version: repositoryPackage.version };
 }
 
 function copyRequiredTemplate(sourceRoot, outputRoot, templateName, destinationName = templateName) {
@@ -180,6 +174,9 @@ function createDistribution({ appRoot = APP_ROOT, packageRoot = path.join(APP_RO
   const tools = path.join(output, "tools");
   fs.mkdirSync(tools);
   for (const file of ["Install-Clackly.ps1", "Uninstall-Clackly.ps1", "ClacklyInstaller.psm1"]) copyRequiredTemplate(templateRoot, tools, file);
+  for (const file of ["WorkflowTransaction.psm1", "LocalNative.psm1"]) {
+    copyRequiredTemplate(path.join(appRoot, "scripts", "workflow-update"), tools, file);
+  }
   fs.cpSync(packageRoot, path.join(output, "payload", "win-unpacked"), { recursive: true, dereference: false, errorOnExist: true });
   writeHashManifest(output);
   verifyHashManifest(output);
@@ -252,7 +249,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  APP_ROOT, PLUGIN_ID, NATIVE_SIZE, NATIVE_SHA256, sha256, assertContained, assertSafeRelativePath,
+  APP_ROOT, PLUGIN_ID, sha256, assertContained, assertSafeRelativePath,
   getExistingLstatOrNull, assertNormalExistingDirectory, removeOwnedOutput, listTree, assertSafePackageSource, writeHashManifest, verifyHashManifest, readWorkflowManifest, assertPackageIdentity,
   createDistribution, createAndVerifyZip, runExistingPackage, packageInternalBeta
 };

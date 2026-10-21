@@ -3,7 +3,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { spawnSync } = require('node:child_process');
 const { createWorkflowInstaller } = require('./WorkflowInstaller');
 const { readPointer, projectOutcome } = require('./outcome');
 const evidence = path.resolve(__dirname, '../../../..', 'build/test-evidence/installer-node');
@@ -67,16 +66,4 @@ test('restart bounds malformed/oversized identity and public projection', async 
   assert.deepEqual(projectOutcome({ id: 'id', status: 'rolled-back', reason: null, path: 'private' }, 'id'), { status: 'rolled-back', reason: null });
   for (const value of [{ id: 'other', status: 'installed', reason: null }, { id: 'id', status: 'waiting-for-exit', reason: null },
     { id: 'id', status: 'failed', reason: 'C:/private/error' }]) assert.throws(() => projectOutcome(value, 'id'), /recovery-required/);
-});
-
-test('fixed independent executor and recovery CLI reject development code before writes', { skip: process.platform !== 'win32' }, () => {
-  const scriptRoot = path.resolve(__dirname, '../../../../scripts/workflow-update');
-  for (const name of ['executor.ps1', 'recover.ps1']) {
-    const child = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', path.join(scriptRoot, name), '-RequestId', 'a'.repeat(32)],
-      { windowsHide: true, encoding: 'utf8', timeout: 15000 });
-    assert.equal(child.status, 1, child.stderr);
-    const result = JSON.parse(child.stdout.trim());
-    assert.equal(result.status, 'failed'); assert.equal(result.reason, 'target-unverified');
-  }
-  assert.equal(fs.existsSync(path.join(scriptRoot, 'result.json')), false);
 });

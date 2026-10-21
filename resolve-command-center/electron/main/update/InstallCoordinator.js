@@ -1,7 +1,8 @@
 // Main-process only. Renderer intents never provide a target, executable, or package path.
 const REASONS = new Set(['qualification-required', 'publisher-unverified', 'host-unqualified',
   'target-unverified', 'permission-denied', 'permission-cancelled', 'process-unknown', 'host-running',
-  'concurrent-install', 'recovery-required', 'invalid-package', 'install-failed', 'no-candidate', 'unsupported-host']);
+  'concurrent-install', 'recovery-required', 'invalid-package', 'install-failed', 'no-candidate', 'unsupported-host',
+  'native-missing', 'native-invalid', 'native-incompatible']);
 const RESULTS = new Set(['waiting-for-exit', 'installing', 'installed', 'rolled-back', 'failed', 'cancelled']);
 const TERMINAL = new Set(['installed', 'rolled-back', 'failed', 'cancelled']);
 function reason(value, fallback = 'qualification-required') { return REASONS.has(value) ? value : fallback; }

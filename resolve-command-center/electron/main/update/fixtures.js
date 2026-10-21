@@ -8,12 +8,31 @@ function manifest(version = '0.2.0', id = 'com.wutpeach.clackly', entry = 'workf
   return `<BlackmagicDesign><Plugin><Id>${id}</Id><Version>${version}</Version><FilePath>${entry}</FilePath></Plugin></BlackmagicDesign>`;
 }
 function payload(version = '0.2.0') {
-  return [
+  const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+  const runtime = { schemaVersion: 1, profiles: [{ id: 'python-test', runtimeVersion: '3.14.4', platform: 'win32', architecture: 'x64', executable: 'python/test/python.exe' }] };
+  const lock = JSON.stringify({ profileId: 'python-test', version: '3.14.4', asset: { sha256: hash('asset') } });
+  const entries = [
     ['plugin/package.json', JSON.stringify({ name: 'clackly', version })],
     ['plugin/manifest.xml', manifest(version)], ['plugin/workflow-plugin/main.js', 'const PLUGIN_ID = "com.wutpeach.clackly"; module.exports = {};'],
-    ['plugin/workflow-plugin/WorkflowIntegration.node', 'offline native fixture'],
-    ['plugin/dist/renderer/index.html', '<html></html>'], ['plugin/resources/runtimes/manifest.json', '{}']
+    ['plugin/dist/renderer/index.html', '<html></html>'], ['plugin/resources/runtimes/manifest.json', JSON.stringify(runtime)],
+    ['plugin/electron/main/update/UpdateService.js', 'service'],
+    ...['WorkflowTransaction.psm1', 'executor.ps1', 'launch.ps1', 'recover.ps1'].map((name) => ['plugin/scripts/workflow-update/' + name, 'executor']),
+    ['plugin/resources/runtimes/python.lock.json', lock],
+    ['plugin/resources/runtimes/python/test/runtime.json', JSON.stringify({ runtimeVersion: '3.14.4', source: { sha256: hash('asset') }, build: { lockSha256: hash(lock), applicationSources: [] } })],
+    ...['python.exe', 'python314.dll', 'python314.zip', 'python314._pth', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.md', 'python-embed.sigstore',
+      'python-embed.spdx.json', 'application.spdx.json', 'clackly/bootstrap.py', 'clackly/persistent_bootstrap.py', 'clackly/python_runner.py']
+      .map((name) => ['plugin/resources/runtimes/python/test/' + name, 'runtime'])
   ];
+  const files = entries.map(([name, bytes]) => ({ path: name.slice(7), size: Buffer.byteLength(bytes), sha256: hash(bytes) }))
+    .sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  const releaseManifest = { schemaVersion: 2,
+    package: { name: 'clackly', id: 'com.wutpeach.clackly', version, platform: 'win32', arch: 'x64', entrypoint: 'workflow-plugin/main.js' },
+    source: { repository: 'Wutpeach/Clackly', tag: 'v' + version, commit: 'a'.repeat(40), dirty: false, workflowPath: '.github/workflows/workflow-release.yml' },
+    build: { publishable: true },
+    runtime: { manifestPath: 'resources/runtimes/manifest.json', manifestSha256: hash(JSON.stringify(runtime)),
+      profiles: [{ id: 'python-test', version: '3.14.4', lockPath: 'resources/runtimes/python.lock.json', lockSha256: hash(lock) }] },
+    native: { path: 'workflow-plugin/WorkflowIntegration.node', provisioning: 'local-resolve', source: 'programdata-sampleplugin', platform: 'win32', arch: 'x64' }, files };
+  return [...entries, ['plugin/clackly-release.json', JSON.stringify(releaseManifest)]];
 }
 function crc32(buffer) {
   let crc = 0xffffffff;

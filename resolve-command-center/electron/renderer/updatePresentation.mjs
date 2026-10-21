@@ -21,7 +21,8 @@ export const INSTALLATION_STATUSES = Object.freeze([
 export const INSTALLATION_REASONS = Object.freeze([
   "qualification-required", "publisher-unverified", "host-unqualified", "target-unverified",
   "permission-denied", "permission-cancelled", "process-unknown", "host-running",
-  "concurrent-install", "recovery-required", "invalid-package", "install-failed", "no-candidate", "unsupported-host"
+  "concurrent-install", "recovery-required", "invalid-package", "install-failed", "no-candidate", "unsupported-host",
+  "native-missing", "native-invalid", "native-incompatible"
 ]);
 
 export function unavailableUpdateSnapshot() {

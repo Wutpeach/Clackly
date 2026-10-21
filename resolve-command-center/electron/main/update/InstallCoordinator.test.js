@@ -2,6 +2,22 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { InstallCoordinator } = require('./InstallCoordinator');
 const candidate = { name: 'a'.repeat(32) + '.zip', version: '0.2.0', digest: 'b'.repeat(64), size: 100 };
+test('local component failures survive the installer handoff and validated restart outcome', async () => {
+  for (const reason of ['native-missing', 'native-invalid', 'native-incompatible']) {
+    const outcome = { status: 'failed', reason };
+    const states = [];
+    const installer = { qualify: async () => ({ ready: true }), start: async () => outcome, readState: async () => outcome };
+    const coordinator = new InstallCoordinator({ installer, publish: (state) => states.push(state) });
+    await coordinator.setCandidate(candidate);
+    await coordinator.prepare();
+    await coordinator.confirm();
+    assert.deepEqual(states.at(-1), outcome);
+    const restored = new InstallCoordinator({ installer, publish: (state) => states.push(state) });
+    await restored.restore();
+    assert.deepEqual(states.at(-1), outcome);
+  }
+});
+
 test('confirmation requires the same retained candidate and repeats qualification before handoff', async () => {
   let ready = true; const started = []; const states = [];
   const coordinator = new InstallCoordinator({ publish: (state) => states.push(state), installer: {

@@ -3,6 +3,14 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 Import-Module (Join-Path $PSScriptRoot 'WorkflowTransaction.psm1') -Force -DisableNameChecking
 Import-Module (Join-Path $PSScriptRoot 'ExecutorSupport.psm1') -Force -DisableNameChecking
+function Invoke-UpdateTransaction($Context,[scriptblock]$Observe={ 'closed' },[scriptblock]$Checkpoint={},[scriptblock]$Cancelled={$false}) {
+    WorkflowTransaction\Invoke-UpdateTransaction $Context -Observe $Observe -Checkpoint $Checkpoint -Cancelled $Cancelled -Provision {
+        param($root,$workflow)
+        $file=Join-Path $root 'workflow-plugin/WorkflowIntegration.node'
+        [IO.File]::WriteAllText($file,'INERT TEST NATIVE - NEVER LOAD')
+        return @{path='workflow-plugin/WorkflowIntegration.node';size=(Get-Item -LiteralPath $file).Length;sha256=(Get-UpdateHash $file)}
+    }
+}
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
 $publishedEvidence = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../build/test-evidence/installer'))
 # Generated transaction fixtures must not be live-indexed while atomic rename
@@ -24,31 +32,39 @@ function New-Fixture([string]$Name) {
     $source = Join-Path $base 'source'
     foreach ($dir in @($scan,$transactions,$target,$source)) { [IO.Directory]::CreateDirectory($dir) | Out-Null }
     Write-Text (Join-Path $target 'old.txt') 'OLD COMPLETE TREE'
+    Write-Text (Join-Path $target 'workflow-plugin/WorkflowIntegration.node') 'LEGACY NATIVE-INCLUSIVE OLD INSTALL'
     Write-Text (Join-Path $target 'package.json') '{"name":"clackly","version":"0.1.0"}'
     Write-Text (Join-Path $target 'manifest.xml') '<BlackmagicDesign><Plugin><Id>com.wutpeach.clackly</Id><Version>0.1.0</Version><FilePath>workflow-plugin/main.js</FilePath></Plugin></BlackmagicDesign>'
     Write-Text (Join-Path $scan 'sibling/sentinel.txt') 'SIBLING'
     Write-Text (Join-Path $base 'AppData/Clackly/preferences.json') '{"keep":true}'
     Write-Text (Join-Path $source 'package.json') '{"name":"clackly","version":"0.2.0"}'
     Write-Text (Join-Path $source 'manifest.xml') '<BlackmagicDesign><Plugin><Id>com.wutpeach.clackly</Id><Version>0.2.0</Version><FilePath>workflow-plugin/main.js</FilePath></Plugin></BlackmagicDesign>'
-    Write-Text (Join-Path $source 'workflow-plugin/main.js') '// INERT TEST PACKAGE - NEVER EXECUTE'
+    Write-Text (Join-Path $source 'workflow-plugin/main.js') 'const PLUGIN_ID = "com.wutpeach.clackly"; // INERT TEST PACKAGE - NEVER EXECUTE'
     Write-Text (Join-Path $source 'dist/renderer/index.html') '<p>Fixture</p>'
-    Write-Text (Join-Path $source 'resources/runtimes/python.exe') 'INERT TEST INTERPRETER - NEVER EXECUTE'
-    Write-Text (Join-Path $source 'resources/runtimes/python.lock.json') '{}'
-    Write-Json (Join-Path $source 'resources/runtimes/manifest.json') @{schemaVersion=1;profiles=@(@{id='fixture';runtimeVersion='3.14.4';platform='win32';architecture='x64';executable='python.exe'})}
-    $native = [byte[]]::new(128); $native[0]=77; $native[1]=90; $native[60]=64; $native[64]=80; $native[65]=69; $native[68]=100; $native[69]=134
-    [IO.File]::WriteAllBytes((Join-Path $source 'workflow-plugin/WorkflowIntegration.node'), $native)
-    $manifest = @{schemaVersion=1;package=@{id='com.wutpeach.clackly';name='clackly';version='0.2.0';platform='win32';arch='x64';entrypoint='workflow-plugin/main.js'};
+    foreach ($file in @('python.exe','python314.dll','python314.zip','python314._pth','LICENSE.txt','THIRD_PARTY_NOTICES.md','python-embed.sigstore','python-embed.spdx.json','application.spdx.json','clackly/bootstrap.py','clackly/persistent_bootstrap.py','clackly/python_runner.py')) {
+        Write-Text (Join-Path $source ('resources/runtimes/fixture/'+$file)) 'INERT TEST RUNTIME - NEVER EXECUTE'
+    }
+    Write-Json (Join-Path $source 'resources/runtimes/fixture/python.lock.json') @{profileId='fixture';version='3.14.4';asset=@{sha256=('c'*64)}}
+    $lockHash=Get-UpdateHash (Join-Path $source 'resources/runtimes/fixture/python.lock.json')
+    Write-Json (Join-Path $source 'resources/runtimes/fixture/runtime.json') @{runtimeVersion='3.14.4';source=@{sha256=('c'*64)};build=@{lockSha256=$lockHash;applicationSources=@(@{path='clackly/bootstrap.py';sha256=(Get-UpdateHash (Join-Path $source 'resources/runtimes/fixture/clackly/bootstrap.py'))})}}
+    Write-Json (Join-Path $source 'resources/runtimes/manifest.json') @{schemaVersion=1;profiles=@(@{id='fixture';runtimeVersion='3.14.4';platform='win32';architecture='x64';executable='fixture/python.exe'})}
+    foreach ($file in @('electron/main/update/UpdateService.js','scripts/workflow-update/WorkflowTransaction.psm1','scripts/workflow-update/executor.ps1','scripts/workflow-update/launch.ps1','scripts/workflow-update/recover.ps1')) {Write-Text (Join-Path $source $file) '// INERT FIXTURE - NEVER EXECUTE'}
+    $manifest = @{schemaVersion=2;package=@{id='com.wutpeach.clackly';name='clackly';version='0.2.0';platform='win32';arch='x64';entrypoint='workflow-plugin/main.js'};
         source=@{repository='Wutpeach/Clackly';tag='v0.2.0';commit=('a'*40);dirty=$true;workflowPath='.github/workflows/workflow-release.yml'};build=@{publishable=$false};
         runtime=@{manifestPath='resources/runtimes/manifest.json';manifestSha256=(Get-UpdateHash (Join-Path $source 'resources/runtimes/manifest.json'));
-            profiles=@(@{id='fixture';version='3.14.4';lockPath='resources/runtimes/python.lock.json';lockSha256=(Get-UpdateHash (Join-Path $source 'resources/runtimes/python.lock.json'))})};
-        native=@{path='workflow-plugin/WorkflowIntegration.node';size=128;sha256=(Get-UpdateHash (Join-Path $source 'workflow-plugin/WorkflowIntegration.node'));qualification='local-development'};
+            profiles=@(@{id='fixture';version='3.14.4';lockPath='resources/runtimes/fixture/python.lock.json';lockSha256=$lockHash})};
+        native=@{path='workflow-plugin/WorkflowIntegration.node';provisioning='local-resolve';source='programdata-sampleplugin';platform='win32';arch='x64'};
         files=@(Get-TreeFiles $source)}
     Write-Json (Join-Path $source 'clackly-release.json') $manifest
     $context = @{Id=[Guid]::NewGuid().ToString('N');ScanRoot=$scan;TransactionRoot=$transactions;Target=$target;PackageRoot=$source;Version='0.2.0';
         Digest=('b'*64);Size=12345;
         ResolveExecutable=(Join-Path $base 'Resolve.exe');WorkflowExecutable=(Join-Path $base 'Electron/electron.exe')}
     Write-Json (Join-Path $base 'context.json') $context
-    return @{Base=$base;Context=$context;Old=(Get-TreeHash $target);New=(Get-TreeHash $source)}
+    $nativePath=Join-Path $source 'workflow-plugin/WorkflowIntegration.node'
+    [IO.File]::WriteAllText($nativePath,'INERT TEST NATIVE - NEVER LOAD')
+    $newHash=Get-TreeHash $source
+    [IO.File]::Delete($nativePath)
+    return @{Base=$base;Context=$context;Old=(Get-TreeHash $target);New=$newHash}
 }
 function Read-FixtureContext([string]$Base) {
     Assert-True ([IO.File]::ReadAllText((Join-Path $Root '.clackly-test-owner')) -ceq 'TRA-25 R2 OWNED SYNTHETIC TARGETS') 'missing test marker'
@@ -205,7 +221,7 @@ try {
 $destination=Join-Path $f.Base 'expanded'
 Expand-UpdateArchive $zipPath $destination (Get-UpdateHash $zipPath) (Get-Item -LiteralPath $zipPath).Length
 Assert-UpdatePackage $destination '0.2.0' | Out-Null
-Assert-True ((Get-TreeHash $destination) -ceq $f.New) 'archive roundtrip incomplete'
+Assert-True ((Get-TreeHash $destination) -ceq (Get-TreeHash $f.Context.PackageRoot)) 'archive roundtrip incomplete'
 Record 'actual-zip-whole-inventory-roundtrip'
 
 foreach ($badName in @('plugin/../escape','plugin/CON','plugin/file.','plugin/a\b','other/file')) {
@@ -284,6 +300,91 @@ Record 'refuses-foreign-installed-identity'
 
 # R3 focused observable regressions. All targets and host states are fictitious;
 # this suite never invokes the production launcher, UAC or installed directories.
+foreach ($point in @('success','after-stage','after-activation')) {
+    $f=New-Fixture ('initial-'+$point)
+    [IO.Directory]::Move($f.Context.Target,(Join-Path $f.Base 'preexisting-fixture-retained'))
+    $f.Context.InitialInstall=$true
+    $result=Invoke-UpdateTransaction $f.Context -Observe {'closed'} -Checkpoint {param($p) if ($p -ceq $point) {throw 'initial-test-failure'}}
+    $paths=Get-TransactionPaths $f.Context
+    if ($point -ceq 'success') {
+        Assert-True ($result.status -ceq 'installed' -and (Get-TreeHash $paths.Target) -ceq $f.New -and !(Test-Path -LiteralPath $paths.Backup)) 'initial success tree'
+        Assert-True ((Get-UpdateTransactionState $f.Context).status -ceq 'installed') 'initial restart inspection'
+    } else {
+        Assert-True ($result.status -ceq 'failed' -and !(Test-Path -LiteralPath $paths.Target)) 'initial failure must restore absence'
+        Assert-True ((Get-UpdateTransactionState $f.Context).status -ceq 'failed') 'initial failure inspection'
+    }
+    Assert-Sentinels $f; Record ('native-free-initial-'+$point)
+}
+foreach ($reason in @('native-missing','native-invalid','native-incompatible')) {
+    $f=New-Fixture ('provider-'+$reason)
+    $result=WorkflowTransaction\Invoke-UpdateTransaction $f.Context -Observe {'closed'} -Provision {throw $reason}
+    $paths=Get-TransactionPaths $f.Context
+    Assert-True ($result.reason -ceq $reason -and (Get-TreeHash $paths.Target) -ceq $f.Old -and !(Test-Path -LiteralPath $paths.Backup)) 'native rejection moved prior tree'
+    Assert-Sentinels $f; Record ($reason+'-before-backup')
+}
+# Production package gates run over inert data only; no fixture JS executes.
+foreach ($kind in @('native-other-path','runtime-provenance','runtime-source','main-identity')) {
+    $f=New-Fixture ('strict-'+$kind); $source=$f.Context.PackageRoot
+    switch ($kind) {
+        'native-other-path' {Write-Text (Join-Path $source 'other/workflowintegration.NODE') 'FORBIDDEN'}
+        'runtime-provenance' {$file=Join-Path $source 'resources/runtimes/fixture/runtime.json';$metadata=Read-UpdateJson $file;$metadata.source.sha256='d'*64;Write-Json $file $metadata}
+        'runtime-source' {Write-Text (Join-Path $source 'resources/runtimes/fixture/clackly/bootstrap.py') 'SOURCE TAMPER'}
+        'main-identity' {Write-Text (Join-Path $source 'workflow-plugin/main.js') 'const PLUGIN_ID = "foreign";'}
+    }
+    $manifest=Read-UpdateJson (Join-Path $source 'clackly-release.json')
+    $manifest.files=@(Get-TreeFiles $source | Where-Object {$_.path -cne 'clackly-release.json'})
+    Write-Json (Join-Path $source 'clackly-release.json') $manifest
+    $accepted=$false
+    try {Assert-UpdatePackage $source '0.2.0' | Out-Null;$accepted=$true} catch {}
+    Assert-True (!$accepted) ('strict gate accepted '+$kind); Record ('strict-package-'+$kind)
+}
+$f=New-Fixture 'first-archive'
+$source=$f.Context.PackageRoot; $zipPath=Join-Path $f.Base 'first.zip'
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip=[IO.Compression.ZipFile]::Open($zipPath,'Create')
+try {foreach($entry in @(Get-TreeFiles $source)) {[IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip,(Join-Path $source $entry.path),('plugin/'+$entry.path)) | Out-Null}} finally {$zip.Dispose()}
+$digest=Get-UpdateHash $zipPath; $size=(Get-Item -LiteralPath $zipPath).Length
+$official=@{id=123;draft=$false;prerelease=$false;tag_name='v0.2.0';assets=@(@{name='Clackly-Workflow-0.2.0-win-x64.zip';id=456;state='uploaded';size=$size;digest=('sha256:'+$digest);content_type='application/zip';browser_download_url='https://github.com/Wutpeach/Clackly/releases/download/v0.2.0/Clackly-Workflow-0.2.0-win-x64.zip'})}
+$request=Get-OfficialArchiveRequest $zipPath -Fetch {$official}
+Assert-True ($request.digest -ceq $digest -and $request.releaseId -eq 123) 'first archive identity'
+$official.assets[0].digest='sha256:'+('0'*64)
+$accepted=$false;try {Get-OfficialArchiveRequest $zipPath -Fetch {$official} | Out-Null;$accepted=$true} catch {Assert-True ($_.Exception.Message -ceq 'publisher-unverified') 'first archive wrong digest reason'}
+Assert-True (!$accepted) 'first archive accepted nonofficial bytes';Record 'first-archive-official-metadata-byte-binding'
+$malformed=Join-Path $f.Base 'misreported-manifest-length.zip';$zipBytes=[IO.File]::ReadAllBytes($zipPath);$changed=$false
+for($offset=0;$offset -lt $zipBytes.Length-46;$offset++) {
+    if ([BitConverter]::ToUInt32($zipBytes,$offset) -ne 33639248) {continue}
+    $length=[BitConverter]::ToUInt16($zipBytes,$offset+28)
+    if ($offset+46+$length -gt $zipBytes.Length) {continue}
+    if ([Text.Encoding]::UTF8.GetString($zipBytes,$offset+46,$length) -ceq 'plugin/clackly-release.json') {
+        [Array]::Copy([BitConverter]::GetBytes([uint32]1),0,$zipBytes,$offset+24,4);$changed=$true;break
+    }
+}
+Assert-True $changed 'malformed fixture did not locate manifest directory record'
+[IO.File]::WriteAllBytes($malformed,$zipBytes)
+$accepted=$false
+try {Get-OfficialArchiveRequest $malformed -Fetch {throw 'network must not run for malformed data'} | Out-Null;$accepted=$true}
+catch {Assert-True ($_.Exception.Message -ceq 'invalid-package') 'misreported manifest actual-read bound'}
+Assert-True (!$accepted) 'oversized actual manifest accepted';Record 'first-archive-misreported-manifest-stream-length'
+foreach($kind in @('directory-without-slash','file-with-slash','native-anywhere')) {
+    $bad=Join-Path $f.Base ($kind+'.zip');$zip=[IO.Compression.ZipFile]::Open($bad,'Create')
+    try {
+        if ($kind -ceq 'directory-without-slash') {$e=$zip.CreateEntry('plugin/bad');$e.ExternalAttributes=1073741824}
+        elseif ($kind -ceq 'file-with-slash') {$e=$zip.CreateEntry('plugin/bad/');$e.ExternalAttributes=-2147483648}
+        else {$zip.CreateEntry('plugin/other/workflowintegration.NODE') | Out-Null}
+    } finally {$zip.Dispose()}
+    $destination=Join-Path $f.Base ('expanded-'+$kind);$accepted=$false
+    try {Expand-UpdateArchive $bad $destination (Get-UpdateHash $bad) (Get-Item -LiteralPath $bad).Length;$accepted=$true} catch {}
+    Assert-True (!$accepted -and !(Test-Path -LiteralPath $destination)) ('unsafe type/native extracted '+$kind);Record ('strict-archive-'+$kind)
+}
+$f=New-Fixture 'initial-recovery-rollback-intent'
+[IO.Directory]::Move($f.Context.Target,(Join-Path $f.Base 'old-fixture-retained'))
+$f.Context.InitialInstall=$true
+Invoke-UpdateTransaction $f.Context -Observe {'closed'} | Out-Null
+$paths=Get-TransactionPaths $f.Context;$record=Read-UpdateJson $paths.Journal
+$record.state='rollback-intent';Write-Json $paths.Journal $record
+$result=Invoke-UpdateRecovery $f.Context -Observe {'closed'}
+Assert-True ($result.status -ceq 'rolled-back' -and !(Test-Path -LiteralPath $paths.Target) -and (Get-TreeHash $paths.Failed) -ceq $f.New) 'initial rollback durable recovery'
+Record 'initial-durable-rollback-intent-preserves-absence'
 $f=New-Fixture 'wait-cancel-ack'
 $marker=Join-Path $f.Base 'cancel.request'
 $closed=Wait-UpdateHostExit $f.Context -Cancelled {Test-Path -LiteralPath $marker} -Observe {param($c) Write-Text $marker 'intent'; 'host-running'}
@@ -347,7 +448,7 @@ Assert-True ($outcome.status -ceq 'cancelled' -and $outcome.reason -ceq 'permiss
 $outcome=Get-UpdatePermissionOutcome $wrapped ('a'*64)
 Assert-True ($outcome.status -ceq 'failed' -and $outcome.reason -ceq 'permission-denied') 'access denied was presented as consent cancellation'
 Record 'native-consent-cancel-is-cancelled-and-denial-remains-failed'
-$published=@{build=@{publishable=$true};source=@{dirty=$false};native=@{qualification='release-qualified'}}
+$published=@{schemaVersion=2;build=@{publishable=$true};source=@{dirty=$false};native=@{qualification='release-qualified'}}
 Assert-PublishedUpdatePackage $published
 $published.build.publishable=$false
 try {Assert-PublishedUpdatePackage $published; throw 'local-development payload accepted by production'}

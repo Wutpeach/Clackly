@@ -29,7 +29,7 @@ function Assert-InstalledExecutor([string]$Scripts, $Locations, [string]$Operati
         # tree contains its fixed recovery entrypoint at this derived location.
         $root = $backup
     }
-    foreach ($name in @('executor.ps1','launch.ps1','recover.ps1','WorkflowTransaction.psm1','ExecutorSupport.psm1')) {
+    foreach ($name in @('executor.ps1','launch.ps1','recover.ps1','WorkflowTransaction.psm1','ExecutorSupport.psm1','LocalNative.psm1')) {
         Assert-NormalPath (Join-Path $Scripts $name) | Out-Null
     }
     $pkg = Read-UpdateJson (Join-Path $root 'package.json') 65536
@@ -47,7 +47,7 @@ function Assert-ProtectedExecutor([string]$Scripts, [switch]$DirectoryOnly) {
         [Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor [Security.AccessControl.FileSystemRights]::ChangePermissions -bor
         [Security.AccessControl.FileSystemRights]::TakeOwnership
     $paths = @()
-    if (!$DirectoryOnly) { $paths = @('executor.ps1','launch.ps1','recover.ps1','WorkflowTransaction.psm1','ExecutorSupport.psm1') | ForEach-Object { Join-Path $Scripts $_ } }
+    if (!$DirectoryOnly) { $paths = @('executor.ps1','launch.ps1','recover.ps1','WorkflowTransaction.psm1','ExecutorSupport.psm1','LocalNative.psm1') | ForEach-Object { Join-Path $Scripts $_ } }
     $cursor = $Scripts
     while ($cursor) { $paths += $cursor; $cursor = Split-Path -Parent $cursor }
     foreach ($file in $paths) {
@@ -61,7 +61,7 @@ function Assert-ProtectedExecutor([string]$Scripts, [switch]$DirectoryOnly) {
     }
 }
 
-function Assert-OfficialRelease($Request, [scriptblock]$Fetch = { param($url)
+function Invoke-OfficialReleaseJson([string]$url) {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $client = [Net.HttpWebRequest]::Create($url)
     $client.AllowAutoRedirect = $false; $client.Timeout = 30000; $client.ReadWriteTimeout = 30000
@@ -79,7 +79,9 @@ function Assert-OfficialRelease($Request, [scriptblock]$Fetch = { param($url)
             return $text.ToString() | ConvertFrom-Json
         } finally { $reader.Dispose() }
     } finally { $response.Dispose() }
-}) {
+}
+
+function Assert-OfficialRelease($Request, [scriptblock]$Fetch = { param($url) Invoke-OfficialReleaseJson $url }) {
     # The API's TLS identity and exact official release asset are V1 authority.
     # Its digest is byte integrity, not an independent publisher signature.
     if ($Request.version -cnotmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' -or
@@ -98,6 +100,36 @@ function Assert-OfficialRelease($Request, [scriptblock]$Fetch = { param($url)
         $asset.digest -ine ('sha256:' + $Request.digest) -or $asset.browser_download_url -cne $url) { throw 'publisher-unverified' }
 }
 
+function Get-OfficialArchiveRequest([string]$Archive, [scriptblock]$Fetch = {param($url) Invoke-OfficialReleaseJson $url}) {
+    Assert-NormalPath $Archive | Out-Null
+    $size=(Get-Item -LiteralPath $Archive).Length
+    if ($size -le 0 -or $size -gt 1073741824) { throw 'invalid-package' }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip=[IO.Compression.ZipFile]::OpenRead($Archive)
+    try {
+        $entries=@($zip.Entries | Where-Object { $_.FullName -ceq 'plugin/clackly-release.json' })
+        if ($entries.Count -ne 1 -or $entries[0].Length -gt 8388608) { throw 'invalid-package' }
+        $stream=$entries[0].Open();$buffer=[byte[]]::new(65536);$bytes=[IO.MemoryStream]::new()
+        try {
+            while (($count=$stream.Read($buffer,0,$buffer.Length)) -gt 0) {
+                if ($bytes.Length+$count -gt 8388608 -or $bytes.Length+$count -gt $entries[0].Length) {throw 'invalid-package'}
+                $bytes.Write($buffer,0,$count)
+            }
+            if ($bytes.Length -ne $entries[0].Length) {throw 'invalid-package'}
+            $manifest=[Text.Encoding]::UTF8.GetString($bytes.ToArray()) | ConvertFrom-Json
+        } finally {$stream.Dispose();$bytes.Dispose()}
+        $version=$manifest.package.version
+        if ($version -cnotmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' -or $version.Length -gt 64) { throw 'invalid-package' }
+    } finally { $zip.Dispose() }
+    $release=& $Fetch ('https://api.github.com/repos/Wutpeach/Clackly/releases/tags/v'+$version)
+    $name='Clackly-Workflow-'+$version+'-win-x64.zip'
+    $assets=@($release.assets | Where-Object { $_.name -ceq $name })
+    if ($assets.Count -ne 1) { throw 'publisher-unverified' }
+    $request=@{version=$version;releaseId=$release.id;assetId=$assets[0].id;size=$size;digest=(Get-UpdateHash $Archive)}
+    Assert-OfficialRelease $request -Fetch $Fetch
+    return $request
+}
+
 function Write-ExecutorJson([string]$Path,$Value) {
     Assert-NormalPath $Path -AllowMissing | Out-Null
     $file = [IO.File]::Open($Path,'CreateNew','Write','None')
@@ -110,8 +142,8 @@ function Write-ExecutorJson([string]$Path,$Value) {
 function Assert-PublishedUpdatePackage($Manifest) {
     # Consistency with the official published payload, not publisher proof.
     # SDK version/host-matrix/attestation remain optional metadata.
-    if ($Manifest.build.publishable -ne $true -or $Manifest.source.dirty -ne $false -or
-        $Manifest.native.qualification -cne 'release-qualified') { throw 'invalid-package' }
+    if ($Manifest.schemaVersion -ne 2 -or $Manifest.build.publishable -isnot [bool] -or $Manifest.source.dirty -isnot [bool] -or
+        $Manifest.build.publishable -ne $true -or $Manifest.source.dirty -ne $false) { throw 'invalid-package' }
 }
 
 function Get-UpdatePermissionOutcome($Failure, [string]$OldHash) {
@@ -156,4 +188,4 @@ namespace Clackly { public static class UpdateAccess {
     }
 }
 
-Export-ModuleMember -Function Get-ExecutorLocations, Get-UpdateRequestKey, Assert-InstalledExecutor, Assert-ProtectedExecutor, Assert-OfficialRelease, Write-ExecutorJson, Wait-UpdateHostExit, Assert-UpdateWriteAccess, Assert-PublishedUpdatePackage, Get-UpdatePermissionOutcome
+Export-ModuleMember -Function Get-OfficialArchiveRequest, Get-ExecutorLocations, Get-UpdateRequestKey, Assert-InstalledExecutor, Assert-ProtectedExecutor, Assert-OfficialRelease, Write-ExecutorJson, Wait-UpdateHostExit, Assert-UpdateWriteAccess, Assert-PublishedUpdatePackage, Get-UpdatePermissionOutcome

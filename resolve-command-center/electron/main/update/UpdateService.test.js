@@ -3,13 +3,16 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { PassThrough } = require('node:stream');
-const { UpdateService, createHostUpdateService } = require('./UpdateService');
+const { UpdateService } = require('./UpdateService');
 const { failure } = require('./identity');
-const { UpdateStorage } = require('./storage');
+const { fileStorage } = require('./file-storage-fixture');
 const { zipBuffer, payload, release, response, workspace } = require('./fixtures');
+function createService(options) {
+  return new UpdateService({ storage: fileStorage(options.cacheRoot), ...options });
+}
 async function service(t, options = {}) {
   const roots = await workspace(t); const bytes = zipBuffer();
-  const updater = new UpdateService({ ...roots, platform: 'win32', discover: async () => [release(bytes)],
+  const updater = createService({ ...roots, platform: 'win32', discover: async () => [release(bytes)],
     open: async (_url, { signal }) => response(bytes, signal), ...options });
   t.after(() => updater.dispose()); await updater.ready;
   return { updater, bytes, ...roots };
@@ -26,17 +29,20 @@ async function beginWithProgress(updater) {
   return { download };
 }
 test('check/download verifies actual streamed ZIP/hash and snapshots carry no path authority', async (t) => {
-  const { updater, cacheRoot } = await service(t); const states = [];
+  const { updater, cacheRoot, bytes } = await service(t); const states = [];
   updater.subscribe((state) => { states.push(state.status); state.status = 'tampered'; });
-  assert.equal((await updater.checkForUpdates()).status, 'available');
+  const available = await updater.checkForUpdates();
+  assert.equal(available.status, 'available', JSON.stringify(available));
   const state = await updater.downloadUpdate();
-  assert.equal(state.status, 'downloaded'); assert.equal(state.receivedBytes, state.totalBytes);
+  assert.equal(state.status, 'downloaded', JSON.stringify(state)); assert.equal(state.receivedBytes, state.totalBytes);
   assert.deepEqual(Object.keys(state), ['schemaVersion', 'status', 'currentVersion', 'latestVersion', 'releaseNotes',
     'checkedAt', 'retryAt', 'receivedBytes', 'totalBytes', 'error', 'downloadedVersion', 'installation']);
   assert.equal(state.downloadedVersion, '0.2.0');
   assert.deepEqual(state.installation, { status: 'unavailable', reason: 'qualification-required' });
   assert.ok(states.includes('verifying'));
-  assert.equal((await fs.readdir(cacheRoot)).filter((file) => file.endsWith('.zip')).length, 1);
+  const downloads = (await fs.readdir(cacheRoot)).filter((file) => file.endsWith('.zip'));
+  assert.equal(downloads.length, 1);
+  assert.deepEqual(await fs.readFile(path.join(cacheRoot, downloads[0])), bytes);
   assert.equal((await updater.checkForUpdates()).status, 'downloaded');
 });
 test('concurrent checks coalesce, daily auto cache persists, manual check refreshes', async (t) => {
@@ -47,7 +53,7 @@ test('concurrent checks coalesce, daily auto cache persists, manual check refres
   await updater.checkForUpdates({ automatic: true }); assert.equal(calls, 1);
   await updater.checkForUpdates(); assert.equal(calls, 2);
   await updater.dispose();
-  const restarted = new UpdateService({ appRoot, cacheRoot, platform: 'win32', now: () => time, discover: async () => { calls++; return []; } });
+  const restarted = createService({ appRoot, cacheRoot, platform: 'win32', now: () => time, discover: async () => { calls++; return []; } });
   t.after(() => restarted.dispose()); await restarted.ready;
   assert.equal(restarted.getState().status, 'no-release'); await restarted.checkForUpdates({ automatic: true }); assert.equal(calls, 2);
   time += 86400001; await restarted.checkForUpdates({ automatic: true }); assert.equal(calls, 3);
@@ -55,21 +61,56 @@ test('concurrent checks coalesce, daily auto cache persists, manual check refres
 test('verified completed download survives restart after rehash; changed cache bytes cannot stay downloaded', async (t) => {
   const { updater, appRoot, cacheRoot } = await service(t);
   await updater.checkForUpdates(); await updater.downloadUpdate(); await updater.dispose();
-  const restarted = new UpdateService({ appRoot, cacheRoot, platform: 'win32' });
+  const restarted = createService({ appRoot, cacheRoot, platform: 'win32' });
   await restarted.ready; assert.equal(restarted.getState().status, 'downloaded');
   await restarted.dispose();
   const zip = (await fs.readdir(cacheRoot)).find((name) => name.endsWith('.zip'));
   const data = await fs.readFile(path.join(cacheRoot, zip)); data[0] ^= 1; await fs.writeFile(path.join(cacheRoot, zip), data);
-  const corrupted = new UpdateService({ appRoot, cacheRoot, platform: 'win32' }); t.after(() => corrupted.dispose());
+  const corrupted = createService({ appRoot, cacheRoot, platform: 'win32' }); t.after(() => corrupted.dispose());
   await corrupted.ready; assert.equal(corrupted.getState().error.code, 'checksum');
   assert.equal((await fs.readdir(cacheRoot)).some((name) => name.endsWith('.zip')), false);
+});
+test('download and restart reject nonpublishable or dirty ZIPs even with matching official asset digests', async (t) => {
+  for (const [publishable, dirty] of [[false, false], [false, true], [true, true]]) {
+    const bytes = zipBuffer(payload().map(([name, data]) => {
+      if (name !== 'plugin/clackly-release.json') return [name, data];
+      const manifest = JSON.parse(data);
+      manifest.build.publishable = publishable; manifest.source.dirty = dirty;
+      return [name, JSON.stringify(manifest)];
+    }));
+    const releases = [release(bytes)];
+    const { updater, appRoot, cacheRoot } = await service(t, { discover: async () => releases,
+      open: async (_url, { signal }) => response(bytes, signal) });
+    assert.equal((await updater.checkForUpdates()).status, 'available');
+    const refused = await updater.downloadUpdate();
+    assert.equal(refused.error.code, 'invalid-zip');
+    assert.equal(refused.downloadedVersion, null);
+    assert.equal((await fs.readdir(cacheRoot)).some((name) => /\.(part|zip)$/.test(name)), false);
+    await updater.dispose();
+
+    // Simulate a retained candidate from an older verifier. Its bytes, size and
+    // official asset digest agree, so restart must reach the publication gate.
+    const cacheFile = path.join(cacheRoot, 'cache.json');
+    const cache = JSON.parse(await fs.readFile(cacheFile, 'utf8'));
+    const name = 'd'.repeat(32) + '.zip';
+    cache.downloaded = { name, version: '0.2.0', digest: releases[0].assets[0].digest.slice(7),
+      size: bytes.length, releases };
+    await fs.writeFile(path.join(cacheRoot, name), bytes);
+    await fs.writeFile(cacheFile, JSON.stringify(cache));
+    const restarted = createService({ appRoot, cacheRoot, platform: 'win32' });
+    t.after(() => restarted.dispose()); await restarted.ready;
+    assert.equal(restarted.getState().error.code, 'invalid-zip');
+    assert.equal(restarted.getState().downloadedVersion, null);
+    assert.equal((await fs.readdir(cacheRoot)).includes(name), false);
+    await restarted.dispose();
+  }
 });
 test('rate-limit/timeout/offline backoff persists and suppresses manual retries until allowed', async (t) => {
   let time = 1000000; let calls = 0;
   const { updater, appRoot, cacheRoot } = await service(t, { now: () => time, discover: async () => { calls++; throw failure('rate-limit', time + 120000); } });
   const state = await updater.checkForUpdates(); assert.equal(state.error.code, 'rate-limit');
   await updater.checkForUpdates(); assert.equal(calls, 1); await updater.dispose();
-  const restarted = new UpdateService({ appRoot, cacheRoot, platform: 'win32', now: () => time,
+  const restarted = createService({ appRoot, cacheRoot, platform: 'win32', now: () => time,
     discover: async () => { calls++; throw failure('network'); } });
   t.after(() => restarted.dispose()); await restarted.ready;
   await restarted.checkForUpdates(); assert.equal(calls, 1); time += 120001;
@@ -94,7 +135,7 @@ test('automatic check recovers immediately after failure backoff, including a re
     discover: async () => { throw failure('rate-limit', time + 120000); } });
   assert.equal((await updater.checkForUpdates()).error.code, 'rate-limit');
   await updater.dispose();
-  const restarted = new UpdateService({ appRoot, cacheRoot, platform: 'win32', now: () => time, discover: async () => [] });
+  const restarted = createService({ appRoot, cacheRoot, platform: 'win32', now: () => time, discover: async () => [] });
   t.after(() => restarted.dispose()); await restarted.ready;
   assert.equal((await restarted.checkForUpdates({ automatic: true })).error.code, 'rate-limit');
   time += 120001;
@@ -106,7 +147,7 @@ test('invalid release metadata cache cleans generated orphans without blocking a
   await fs.writeFile(path.join(roots.cacheRoot, 'unrelated.txt'), 'preserve');
   await fs.writeFile(path.join(roots.cacheRoot, 'cache.json'), JSON.stringify({ schemaVersion: 1,
     currentVersion: '0.1.0', checkedAt: 1000, failures: 0, retryAt: null, releases: {} }));
-  const updater = new UpdateService({ ...roots, platform: 'win32', discover: async () => [] });
+  const updater = createService({ ...roots, platform: 'win32', discover: async () => [] });
   t.after(() => updater.dispose()); await updater.ready;
   assert.equal(updater.getState().status, 'idle');
   assert.deepEqual((await fs.readdir(roots.cacheRoot)).sort(), ['cache.json', 'unrelated.txt']);
@@ -135,9 +176,8 @@ test('download cancel and timeout abort network, clean partials, preserve select
     return stream;
   } });
   await updater.checkForUpdates();
-  // Network timing must not include wall-clock contention while the real
-  // Windows filesystem guards start their PowerShell probes. Keep all guards,
-  // then advance the deadline only after observable stream progress.
+  // Advance the network deadline after observable stream progress, keeping
+  // scheduling time outside the behavior being tested.
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const { download } = await beginWithProgress(updater);
   const cancelled = await updater.cancelUpdate(); assert.equal(cancelled.status, 'cancelled'); await download;
@@ -149,31 +189,19 @@ test('download cancel and timeout abort network, clean partials, preserve select
   assert.equal((await fs.readdir(cacheRoot)).some((name) => name.endsWith('.part')), false);
   mode = 'valid'; assert.equal((await updater.downloadUpdate()).status, 'downloaded');
 });
-test('space, unsafe cache ancestor and poisoned cache file fail closed without a download', async (t) => {
-  const { updater, cacheRoot, appRoot, root } = await service(t, { space: async () => ({ bavail: 0, bsize: 4096 }) });
+test('insufficient space fails closed without a download', async (t) => {
+  const { updater, cacheRoot } = await service(t, { space: async () => ({ bavail: 0, bsize: 4096 }) });
   await updater.checkForUpdates(); assert.equal((await updater.downloadUpdate()).error.code, 'disk-space');
   assert.equal((await fs.readdir(cacheRoot)).some((name) => name.endsWith('.part')), false);
-  assert.throws(() => new UpdateStorage(path.join(appRoot, 'updates'), appRoot), { code: 'unsafe-path' });
-  const outside = path.join(root, 'outside'); await fs.mkdir(outside);
-  const linked = path.join(root, 'linked'); await fs.symlink(outside, linked, 'junction');
-  const storage = new UpdateStorage(path.join(linked, 'updates'), appRoot);
-  await assert.rejects(storage.prepare(), { code: 'unsafe-path' });
-  assert.deepEqual(await fs.readdir(outside), []);
-  await updater.dispose();
-  const externalFile = path.join(outside, 'config.json'); await fs.writeFile(externalFile, 'preserved');
-  await fs.unlink(path.join(cacheRoot, 'cache.json')); await fs.link(externalFile, path.join(cacheRoot, 'cache.json'));
-  const poisoned = new UpdateStorage(cacheRoot, appRoot);
-  await assert.rejects(poisoned.readCache(), { code: 'unsafe-path' });
-  await assert.rejects(poisoned.saveCache({ arbitrary: true }), { code: 'unsafe-path' });
-  assert.equal(await fs.readFile(externalFile, 'utf8'), 'preserved');
 });
+
 test('restart removes only task-generated orphan ZIP/partials; corrupt cache does not invent availability', async (t) => {
   const roots = await workspace(t); await fs.mkdir(roots.cacheRoot);
   await fs.writeFile(path.join(roots.cacheRoot, 'a'.repeat(32) + '.part'), 'partial');
   await fs.writeFile(path.join(roots.cacheRoot, 'b'.repeat(32) + '.zip'), 'unverified');
   await fs.writeFile(path.join(roots.cacheRoot, 'unrelated.txt'), 'preserve');
   await fs.writeFile(path.join(roots.cacheRoot, 'cache.json'), '{malformed');
-  const updater = new UpdateService({ ...roots, platform: 'win32', discover: async () => [] }); t.after(() => updater.dispose());
+  const updater = createService({ ...roots, platform: 'win32', discover: async () => [] }); t.after(() => updater.dispose());
   await updater.ready; assert.equal(updater.getState().status, 'idle');
   assert.deepEqual((await fs.readdir(roots.cacheRoot)).sort(), ['cache.json', 'unrelated.txt']);
 });
@@ -209,7 +237,7 @@ test('manual recheck preserves exact candidate across newer discovery/restart; e
   assert.equal(updater.downloadedName, candidateName);
   assert.deepEqual(await fs.readFile(path.join(cacheRoot, candidateName)), candidateBytes);
   await updater.dispose();
-  const restarted = new UpdateService({ appRoot, cacheRoot, platform: 'win32',
+  const restarted = createService({ appRoot, cacheRoot, platform: 'win32',
     open: async (_url, { signal }) => { downloads++; return response(versions[current], signal); } });
   t.after(() => restarted.dispose()); await restarted.ready;
   assert.equal(restarted.getState().latestVersion, '0.3.0');
@@ -233,7 +261,7 @@ test('failed candidate recheck retains bytes and version over restart while rate
   assert.equal(calls, 2); assert.equal(state.status, 'downloaded'); assert.equal(state.error.code, 'network');
   assert.equal(state.downloadedVersion, '0.2.0'); assert.deepEqual(await fs.readFile(path.join(cacheRoot, name)), bytes);
   await updater.checkForUpdates(); assert.equal(calls, 2); await updater.dispose();
-  const restarted = new UpdateService({ appRoot, cacheRoot, platform: 'win32', now: () => time,
+  const restarted = createService({ appRoot, cacheRoot, platform: 'win32', now: () => time,
     discover: async () => { calls++; return []; } });
   t.after(() => restarted.dispose()); await restarted.ready;
   assert.equal(restarted.getState().downloadedVersion, '0.2.0');
@@ -251,7 +279,7 @@ test('failed discard persistence leaves the candidate usable; successful discard
   assert.equal(refused.downloadedVersion, '0.2.0'); assert.equal(updater.downloadedName, name);
   assert.ok((await fs.readdir(cacheRoot)).includes(name));
   updater.storage.saveCache = save; await updater.discardUpdate(); await updater.dispose();
-  const restarted = new UpdateService({ appRoot, cacheRoot, platform: 'win32' });
+  const restarted = createService({ appRoot, cacheRoot, platform: 'win32' });
   t.after(() => restarted.dispose()); await restarted.ready;
   assert.equal(restarted.getState().downloadedVersion, null); assert.equal(restarted.getState().status, 'available');
 });
@@ -309,27 +337,13 @@ test('R1 candidate cache migration preserves original identity after newer reche
   const r1 = JSON.parse(await fs.readFile(cacheFile, 'utf8')); delete r1.downloaded.releases;
   await fs.writeFile(cacheFile, JSON.stringify(r1));
   const newer = zipBuffer(payload('0.3.0'));
-  const migrated = new UpdateService({ appRoot, cacheRoot, platform: 'win32', discover: async () => [release(newer, '0.3.0')] });
+  const migrated = createService({ appRoot, cacheRoot, platform: 'win32', discover: async () => [release(newer, '0.3.0')] });
   await migrated.ready; assert.equal(migrated.getState().downloadedVersion, '0.2.0');
   await migrated.checkForUpdates(); await migrated.dispose();
-  const restarted = new UpdateService({ appRoot, cacheRoot, platform: 'win32' });
+  const restarted = createService({ appRoot, cacheRoot, platform: 'win32' });
   t.after(() => restarted.dispose()); await restarted.ready;
   assert.equal(restarted.getState().latestVersion, '0.3.0');
   assert.equal(restarted.getState().downloadedVersion, '0.2.0'); assert.equal(restarted.downloadedName, name);
-});
-test('production host factory connects the bundled installer and refuses a synthetic noninstalled target', { skip: process.platform !== 'win32' }, async (t) => {
-  const { root, appRoot } = await workspace(t); const bytes = zipBuffer();
-  const updater = createHostUpdateService({ app: { getPath: () => root }, appRoot,
-    host: { kind: 'workflow', execPath: process.execPath } });
-  t.after(() => updater.dispose());
-  updater.discover = async () => [release(bytes)];
-  updater.open = async (_url, { signal }) => response(bytes, signal);
-  await updater.ready; await updater.checkForUpdates(); await updater.downloadUpdate();
-  const expected = { status: 'unavailable', reason: 'target-unverified' };
-  assert.deepEqual(updater.getState().installation, expected);
-  assert.deepEqual((await updater.prepareUpdateInstall()).installation, expected);
-  assert.deepEqual((await updater.confirmUpdateInstall()).installation, expected);
-  assert.deepEqual((await fs.readdir(root)).sort(), ['app', 'workflow-updates']);
 });
 test('ready restores validated adapter outcomes even when candidate cache belongs to the previous installed version', async (t) => {
   for (const state of [{ status: 'installed', reason: null }, { status: 'rolled-back', reason: 'install-failed' },

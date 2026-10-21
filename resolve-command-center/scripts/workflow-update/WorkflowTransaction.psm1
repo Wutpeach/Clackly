@@ -1,11 +1,13 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+Import-Module (Join-Path $PSScriptRoot 'LocalNative.psm1') -Force -DisableNameChecking
 
 # This module contains no elevation, process termination, downloaded-code execution,
 # recursive deletion or background registration. Production authority belongs to
 # executor.ps1; fixture callers inject process observations, never product CLI flags.
 function Stop-Update([string]$Reason) { throw [InvalidOperationException]::new($Reason) }
 function Get-UpdateFailureReason($Failure) {
+    if ($Failure.Exception.Message -cin @('native-missing','native-invalid','native-incompatible')) {return $Failure.Exception.Message}
     $exception = $Failure.Exception
     while ($exception) {
         if ($exception -is [UnauthorizedAccessException] -or
@@ -101,19 +103,38 @@ function Assert-InstalledUpdateTarget([string]$Root, [string]$CandidateVersion) 
     Stop-Update 'invalid-package'
 }
 
-function Assert-UpdatePackage([string]$Root, [string]$Version) {
+function Assert-UpdatePackage([string]$Root, [string]$Version, $NativeIdentity = $null) {
     $manifest = Read-UpdateJson (Join-Path $Root 'clackly-release.json')
-    if ($manifest.schemaVersion -ne 1 -or $manifest.package.id -cne 'com.wutpeach.clackly' -or
+    if ($manifest.schemaVersion -ne 2 -or $manifest.package.id -cne 'com.wutpeach.clackly' -or
         $manifest.package.name -cne 'clackly' -or $manifest.package.version -cne $Version -or
         $manifest.package.platform -cne 'win32' -or $manifest.package.arch -cne 'x64' -or
         $manifest.package.entrypoint -cne 'workflow-plugin/main.js' -or
         $manifest.source.repository -cne 'Wutpeach/Clackly' -or $manifest.source.tag -cne ('v' + $Version) -or
         $manifest.source.workflowPath -cne '.github/workflows/workflow-release.yml' -or
-        $manifest.source.commit -cnotmatch '^[0-9a-f]{40}$') { Stop-Update 'invalid-package' }
-    $actual = @(Get-TreeFiles $Root | Where-Object { $_.path -cne 'clackly-release.json' })
+        $manifest.source.commit -cnotmatch '^[0-9a-f]{40}$' -or $manifest.source.dirty -isnot [bool] -or
+        $manifest.build.publishable -isnot [bool] -or ($manifest.build.publishable -and $manifest.source.dirty) -or
+        $Version -cnotmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { Stop-Update 'invalid-package' }
+    $all = @(Get-TreeFiles $Root)
+    $nativePath = 'workflow-plugin/WorkflowIntegration.node'
+    $nativeFiles = @($all | Where-Object { $_.path -imatch '(^|/)WorkflowIntegration\.node(/|$)' })
+    if ($null -eq $NativeIdentity) {
+        if ($nativeFiles.Count) { Stop-Update 'invalid-package' }
+    } elseif ($NativeIdentity.path -cne $nativePath -or $NativeIdentity.sha256 -cnotmatch '^[a-f0-9]{64}$' -or
+        $NativeIdentity.size -le 0 -or $nativeFiles.Count -ne 1 -or $nativeFiles[0].path -cne $nativePath -or
+        $nativeFiles[0].size -ne $NativeIdentity.size -or $nativeFiles[0].sha256 -cne $NativeIdentity.sha256) { Stop-Update 'native-invalid' }
+    $actual = @($all | Where-Object { $_.path -cne 'clackly-release.json' -and $_.path -cne $nativePath })
     $expected = @($manifest.files)
-    if (!$actual.Count -or $actual.Count -ne $expected.Count) { Stop-Update 'invalid-package' }
+    if (!$actual.Count -or $expected.Count -gt 20000 -or $actual.Count -ne $expected.Count) { Stop-Update 'invalid-package' }
+    $names=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     for ($i=0; $i -lt $actual.Count; $i++) {
+        $name=$expected[$i].path
+        if (!$name -or $name.Length -gt 233 -or $name -match '[\x00-\x1f\x7f\\:]' -or
+            $name -match '(^|/)(\.\.?|[^/]*[ .]|(?i:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.[^/]*)?)(/|$)' -or
+            $name.StartsWith('/') -or $name.EndsWith('/') -or $name.Contains('//') -or $name.IndexOfAny([char[]]'<>"|?*') -ge 0 -or
+            !$names.Add($name) -or $name -imatch '(^|/)WorkflowIntegration\.node(/|$)' -or $name -ceq 'clackly-release.json' -or
+            $name -imatch '^(electron\.exe|Clackly\.exe|payload/|tools/|resources/app/)' -or
+            $name -cmatch '(^|/)node_modules/(electron|electron-builder|vite|playwright)/' -or
+            $expected[$i].size -lt 0 -or $expected[$i].sha256 -cnotmatch '^[a-f0-9]{64}$') {Stop-Update 'invalid-package'}
         if ($actual[$i].path -cne $expected[$i].path -or $actual[$i].size -ne $expected[$i].size -or
             $actual[$i].sha256 -cne $expected[$i].sha256) { Stop-Update 'invalid-package' }
     }
@@ -122,34 +143,47 @@ function Assert-UpdatePackage([string]$Root, [string]$Version) {
     if ($pkg.name -cne 'clackly' -or $pkg.version -cne $Version -or
         $xml.BlackmagicDesign.Plugin.Id -cne 'com.wutpeach.clackly' -or $xml.BlackmagicDesign.Plugin.Version -cne $Version -or
         $xml.BlackmagicDesign.Plugin.FilePath -cne 'workflow-plugin/main.js') { Stop-Update 'invalid-package' }
-    foreach ($required in @('workflow-plugin/main.js', 'dist/renderer/index.html', 'resources/runtimes/manifest.json', 'workflow-plugin/WorkflowIntegration.node')) {
-        if ($actual.path -cnotcontains $required) { Stop-Update 'invalid-package' }
+    $mainFile=Join-Path $Root 'workflow-plugin/main.js'
+    if ((Get-Item -LiteralPath $mainFile).Length -gt 1048576) {Stop-Update 'invalid-package'}
+    $ids=[regex]::Matches([IO.File]::ReadAllText($mainFile),'\bconst\s+PLUGIN_ID\s*=\s*["'']([^"'']+)["'']\s*;')
+    if ($ids.Count -ne 1 -or $ids[0].Groups[1].Value -cne 'com.wutpeach.clackly') {Stop-Update 'invalid-package'}
+    foreach ($required in @('package.json','manifest.xml','workflow-plugin/main.js','dist/renderer/index.html','resources/runtimes/manifest.json',
+        'electron/main/update/UpdateService.js','scripts/workflow-update/WorkflowTransaction.psm1','scripts/workflow-update/executor.ps1',
+        'scripts/workflow-update/launch.ps1','scripts/workflow-update/recover.ps1')) {
+        if ($actual.path -cnotcontains $required -or (Get-Item -LiteralPath (Join-Path $Root $required)).Length -lt 1) { Stop-Update 'invalid-package' }
     }
     if ($manifest.runtime.manifestPath -cne 'resources/runtimes/manifest.json' -or
         (Get-UpdateHash (Join-Path $Root $manifest.runtime.manifestPath)) -cne $manifest.runtime.manifestSha256 -or
         $manifest.native.path -cne 'workflow-plugin/WorkflowIntegration.node' -or
-        (Get-Item -LiteralPath (Join-Path $Root $manifest.native.path)).Length -ne $manifest.native.size -or
-        (Get-UpdateHash (Join-Path $Root $manifest.native.path)) -cne $manifest.native.sha256) { Stop-Update 'invalid-package' }
+        $manifest.native.provisioning -cne 'local-resolve' -or $manifest.native.source -cne 'programdata-sampleplugin' -or
+        $manifest.native.platform -cne 'win32' -or $manifest.native.arch -cne 'x64' -or @($manifest.native.PSObject.Properties).Count -ne 5) { Stop-Update 'invalid-package' }
     $runtime = Read-UpdateJson (Join-Path $Root $manifest.runtime.manifestPath)
     if ($runtime.schemaVersion -ne 1 -or @($runtime.profiles).Count -eq 0 -or
         @($runtime.profiles).Count -ne @($manifest.runtime.profiles).Count) { Stop-Update 'invalid-package' }
     foreach ($profile in @($runtime.profiles)) {
         $record = @($manifest.runtime.profiles | Where-Object { $_.id -ceq $profile.id })
+        if (!$profile.id -or $profile.runtimeVersion -cnotmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {Stop-Update 'invalid-package'}
         if ($record.Count -ne 1 -or $profile.platform -cne 'win32' -or $profile.architecture -cne 'x64' -or
             $record[0].version -cne $profile.runtimeVersion -or $actual.path -cnotcontains $record[0].lockPath -or
             $actual.path -cnotcontains ('resources/runtimes/' + $profile.executable) -or
             (Get-UpdateHash (Join-Path $Root $record[0].lockPath)) -cne $record[0].lockSha256) { Stop-Update 'invalid-package' }
+        $lock=Read-UpdateJson (Join-Path $Root $record[0].lockPath)
+        $base=([IO.Path]::GetDirectoryName($profile.executable)).Replace('\','/')
+        $prefix='resources/runtimes/'+$base+'/'
+        $stem='python'+(($profile.runtimeVersion.Split('.')[0..1]) -join '')
+        foreach ($name in @('python.exe',($stem+'.dll'),($stem+'.zip'),($stem+'._pth'),'runtime.json','LICENSE.txt','THIRD_PARTY_NOTICES.md',
+            'python-embed.sigstore','python-embed.spdx.json','application.spdx.json','clackly/bootstrap.py','clackly/persistent_bootstrap.py','clackly/python_runner.py')) {
+            $required=$prefix+$name
+            if ($actual.path -cnotcontains $required -or (Get-Item -LiteralPath (Join-Path $Root $required)).Length -lt 1) {Stop-Update 'invalid-package'}
+        }
+        $metadata=Read-UpdateJson (Join-Path $Root ($prefix+'runtime.json'))
+        if ($lock.profileId -cne $profile.id -or $lock.version -cne $profile.runtimeVersion -or $metadata.runtimeVersion -cne $lock.version -or
+            $metadata.source.sha256 -cne $lock.asset.sha256 -or $metadata.build.lockSha256 -cne $record[0].lockSha256) {Stop-Update 'invalid-package'}
+        foreach ($source in @($metadata.build.applicationSources)) {
+            $required=$prefix+$source.path
+            if ($actual.path -cnotcontains $required -or (Get-UpdateHash (Join-Path $Root $required)) -cne $source.sha256) {Stop-Update 'invalid-package'}
+        }
     }
-    # Validate PE identity without loading any native bytes.
-    $native = [IO.File]::OpenRead((Join-Path $Root $manifest.native.path))
-    $reader = [IO.BinaryReader]::new($native)
-    try {
-        if ($native.Length -lt 128 -or $reader.ReadUInt16() -ne 23117) { Stop-Update 'invalid-package' }
-        $native.Position = 60; $offset = $reader.ReadUInt32()
-        if ($offset -gt $native.Length - 6) { Stop-Update 'invalid-package' }
-        $native.Position = $offset
-        if ($reader.ReadUInt32() -ne 17744 -or $reader.ReadUInt16() -ne 34404) { Stop-Update 'invalid-package' }
-    } finally { $reader.Dispose(); $native.Dispose() }
     return $manifest
 }
 
@@ -161,7 +195,7 @@ function Expand-UpdateArchive([string]$Archive, [string]$Destination, [string]$D
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = [IO.Compression.ZipFile]::OpenRead($Archive)
     try {
-        if ($zip.Entries.Count -gt 50000) { Stop-Update 'invalid-package' }
+        if ($zip.Entries.Count -gt 20000) { Stop-Update 'invalid-package' }
         $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         $spelling = [Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
         $total = 0L
@@ -173,7 +207,9 @@ function Expand-UpdateArchive([string]$Archive, [string]$Destination, [string]$D
                 $name -match '(^|/)(\.\.?|[^/]*[ .]|(?i:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.[^/]*)?)(/|$)' -or
                 $name.Contains('//') -or $name.IndexOfAny([char[]]'<>"|?*') -ge 0 -or
                 ($entry.ExternalAttributes -band 1024) -ne 0 -or
-                ($mode -ne 0 -and $mode -ne 32768 -and $mode -ne 16384) -or !$seen.Add($name.TrimEnd('/'))) { Stop-Update 'invalid-package' }
+                ($mode -ne 0 -and $mode -ne 32768 -and $mode -ne 16384) -or
+                ($mode -eq 16384 -and !$name.EndsWith('/')) -or ($mode -eq 32768 -and $name.EndsWith('/')) -or
+                ($name.EndsWith('/') -and $entry.Length -ne 0) -or $name -imatch '(^|/)WorkflowIntegration\.node(/|$)' -or !$seen.Add($name.TrimEnd('/'))) { Stop-Update 'invalid-package' }
             $prefix = ''
             foreach ($segment in $name.TrimEnd('/').Split('/')) {
                 $prefix = if ($prefix) { $prefix + '/' + $segment } else { $segment }
@@ -287,13 +323,19 @@ function Assert-SwitchSafe($Context, $Paths, [scriptblock]$Observe) {
     if ($state -cne 'closed') { if ($state -ceq 'host-running') { Stop-Update 'host-running' }; Stop-Update 'process-unknown' }
 }
 
+function Get-TargetTreeHash([string]$Path) {
+    Assert-NormalPath $Path -AllowMissing | Out-Null
+    if (!(Test-Path -LiteralPath $Path)) { return 'absent' }
+    return Get-TreeHash $Path
+}
+
 function Assert-TransactionRecord($Context, $Paths, $Record) {
     if ($Record.schemaVersion -ne 1 -or $Record.id -cne $Context.Id -or $Record.target -cne $Paths.Target -or
         $Record.backup -cne $Paths.Backup -or $Record.stage -cne $Paths.Stage -or
         $Record.version -cne $Context.Version -or $Record.candidateDigest -cne $Context.Digest -or
         $Record.candidateSize -ne $Context.Size -or $Record.candidateDigest -cnotmatch '^[0-9a-f]{64}$' -or
         $Record.candidateSize -le 0 -or $Record.candidateSize -gt 4294967296 -or
-        $Record.oldHash -cnotmatch '^[0-9a-f]{64}$' -or $Record.newHash -cnotmatch '^[0-9a-f]{64}$') { Stop-Update 'recovery-required' }
+        ($Record.oldHash -cne 'absent' -and $Record.oldHash -cnotmatch '^[0-9a-f]{64}$') -or $Record.newHash -cnotmatch '^[0-9a-f]{64}$') { Stop-Update 'recovery-required' }
 }
 
 function Invoke-UpdateRecoveryLocked($Context, $Paths, [scriptblock]$Observe) {
@@ -302,8 +344,23 @@ function Invoke-UpdateRecoveryLocked($Context, $Paths, [scriptblock]$Observe) {
     Assert-TransactionRecord $Context $Paths $record
     if ($record.state -cnotin @('staging','prepared','backup-intent','activate-intent','verified','rollback-intent','rolled-back')) { Stop-Update 'recovery-required' }
     Assert-SwitchSafe $Context $Paths $Observe
+    if ($record.oldHash -ceq 'absent') {
+        if (Test-Path -LiteralPath $Paths.Backup) { Stop-Update 'recovery-required' }
+        $current=Get-TargetTreeHash $Paths.Target
+        if ($current -ceq $record.newHash -and $record.state -cne 'rollback-intent') {
+            Assert-UpdatePackage $Paths.Target $Context.Version $record.native | Out-Null
+            Complete-TransactionJournal $Paths $record 'verified' 'installed' $null
+            return @{status='installed';reason=$null}
+        }
+        if ($current -ceq $record.newHash -and $record.state -ceq 'rollback-intent') {
+            Assert-SwitchSafe $Context $Paths $Observe
+            [IO.Directory]::Move($Paths.Target,$Paths.Failed)
+        } elseif ($current -cne 'absent') { Stop-Update 'recovery-required' }
+        Complete-TransactionJournal $Paths $record 'rolled-back' 'rolled-back' $null
+        return @{status='rolled-back';reason=$null}
+    }
     if (Test-Path -LiteralPath $Paths.Target) {
-        $activeHash = Get-TreeHash $Paths.Target
+        $activeHash = Get-TargetTreeHash $Paths.Target
         if ($activeHash -ceq $record.oldHash) {
             Complete-TransactionJournal $Paths $record 'rolled-back' 'rolled-back' $null
             return @{status='rolled-back'; reason=$null}
@@ -323,7 +380,7 @@ function Invoke-UpdateRecoveryLocked($Context, $Paths, [scriptblock]$Observe) {
     Write-TransactionJournal $Paths $record 'rollback-intent'
     Assert-SwitchSafe $Context $Paths $Observe
     [IO.Directory]::Move($Paths.Backup, $Paths.Target)
-    if ((Get-TreeHash $Paths.Target) -cne $record.oldHash) { Stop-Update 'recovery-required' }
+    if ((Get-TargetTreeHash $Paths.Target) -cne $record.oldHash) { Stop-Update 'recovery-required' }
     Complete-TransactionJournal $Paths $record 'rolled-back' 'rolled-back' $null
     return @{status='rolled-back'; reason=$null}
 }
@@ -344,16 +401,17 @@ function Get-UpdateTransactionState($Context) {
         # Merely seeing a live PID, pending journal or outcome string never proves
         # an executor is healthy. Interrupted and unfinished cases require recovery.
         if ($record.state -cnotin @('verified','rolled-back')) { Stop-Update 'recovery-required' }
-        $activeHash = Get-TreeHash $paths.Target
+        $activeHash = Get-TargetTreeHash $paths.Target
         if ($record.state -ceq 'verified') {
-            if ($activeHash -cne $record.newHash -or (Get-TreeHash $paths.Backup) -cne $record.oldHash) { Stop-Update 'recovery-required' }
-            Assert-UpdatePackage $paths.Target $Context.Version | Out-Null
+            if ($activeHash -cne $record.newHash -or ($record.oldHash -cne 'absent' -and (Get-TreeHash $paths.Backup) -cne $record.oldHash) -or
+                ($record.oldHash -ceq 'absent' -and (Test-Path -LiteralPath $paths.Backup))) { Stop-Update 'recovery-required' }
+            Assert-UpdatePackage $paths.Target $Context.Version $record.native | Out-Null
             return @{status='installed';reason=$null}
         }
         if ($activeHash -cne $record.oldHash) { Stop-Update 'recovery-required' }
         if ($record.outcomeStatus -cnotin @('failed','cancelled','rolled-back') -or
             ($null -ne $record.outcomeReason -and $record.outcomeReason -cnotin @('host-running','process-unknown','permission-denied',
-                'permission-cancelled','invalid-package','recovery-required','install-failed'))) { Stop-Update 'recovery-required' }
+                'permission-cancelled','invalid-package','native-missing','native-invalid','native-incompatible','recovery-required','install-failed'))) { Stop-Update 'recovery-required' }
         return @{status=$record.outcomeStatus;reason=$record.outcomeReason}
     } finally { $lock.Dispose() }
 }
@@ -365,7 +423,7 @@ function Restore-PreviousUpdate($Context, [scriptblock]$Observe = {param($c) Get
         if (Test-Path -LiteralPath ($paths.Journal + '.next')) { Stop-Update 'recovery-required' }
         $record = Read-UpdateJson $paths.Journal 65536
         Assert-TransactionRecord $Context $paths $record
-        if ($record.state -cne 'verified' -or (Get-TreeHash $paths.Target) -cne $record.newHash -or
+        if ($record.oldHash -ceq 'absent' -or $record.state -cne 'verified' -or (Get-TargetTreeHash $paths.Target) -cne $record.newHash -or
             (Get-TreeHash $paths.Backup) -cne $record.oldHash) { Stop-Update 'recovery-required' }
         Assert-SwitchSafe $Context $paths $Observe
         Write-TransactionJournal $paths $record 'rollback-intent'
@@ -374,7 +432,8 @@ function Restore-PreviousUpdate($Context, [scriptblock]$Observe = {param($c) Get
 }
 
 function Invoke-UpdateTransaction($Context, [scriptblock]$Observe = { param($c) Get-CanonicalHostState $c.ResolveExecutable $c.WorkflowExecutable },
-    [scriptblock]$Checkpoint = {}, [scriptblock]$Cancelled = { $false }) {
+    [scriptblock]$Checkpoint = {}, [scriptblock]$Cancelled = { $false },
+    [scriptblock]$Provision = {param($root,$workflow) Copy-LocalResolveNative $root $workflow}) {
     $paths = Get-TransactionPaths $Context
     $lock = Open-TransactionLock $paths
     $record = $null
@@ -389,12 +448,13 @@ function Invoke-UpdateTransaction($Context, [scriptblock]$Observe = { param($c) 
         Assert-SwitchSafe $Context $paths $Observe
         if (& $Cancelled) { return @{status='cancelled';reason=$null} }
         Assert-UpdatePackage $Context.PackageRoot $Context.Version | Out-Null
-        Assert-InstalledUpdateTarget $paths.Target $Context.Version
-        $oldHash = Get-TreeHash $paths.Target
+        if (Test-Path -LiteralPath $paths.Target) { Assert-InstalledUpdateTarget $paths.Target $Context.Version }
+        elseif (!$Context.ContainsKey('InitialInstall') -or !$Context.InitialInstall) { Stop-Update 'target-unverified' }
+        $oldHash = Get-TargetTreeHash $paths.Target
         $newHash = Get-TreeHash $Context.PackageRoot
         $record = @{schemaVersion=1;id=$Context.Id;target=$paths.Target;backup=$paths.Backup;stage=$paths.Stage;
             version=$Context.Version;candidateDigest=$Context.Digest;candidateSize=$Context.Size;
-            oldHash=$oldHash;newHash=$newHash;state='staging';ownerPid=$PID;ownerCreated=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o')}
+            oldHash=$oldHash;newHash=$newHash;native=$null;state='staging';ownerPid=$PID;ownerCreated=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o')}
         Assert-TransactionRecord $Context $paths $record
         Write-TransactionJournal $paths $record 'staging'
         & $Checkpoint 'before-stage'
@@ -402,6 +462,10 @@ function Invoke-UpdateTransaction($Context, [scriptblock]$Observe = { param($c) 
         Copy-Item -LiteralPath $Context.PackageRoot -Destination $paths.Stage -Recurse -ErrorAction Stop
         Assert-UpdatePackage $paths.Stage $Context.Version | Out-Null
         if ((Get-TreeHash $paths.Stage) -cne $newHash) { Stop-Update 'invalid-package' }
+        $record.native = & $Provision $paths.Stage $Context.WorkflowExecutable
+        Assert-UpdatePackage $paths.Stage $Context.Version $record.native | Out-Null
+        $newHash = Get-TreeHash $paths.Stage
+        $record.newHash = $newHash
         Write-TransactionJournal $paths $record 'prepared'
         & $Checkpoint 'after-stage'
         if (& $Cancelled) {
@@ -412,17 +476,17 @@ function Invoke-UpdateTransaction($Context, [scriptblock]$Observe = { param($c) 
         # This durable boundary precedes the first old-tree move. Cancellation
         # is intent only after this point and cannot trigger a rollback.
         & $Checkpoint 'backup-intent'
-        if ((Get-TreeHash $paths.Target) -cne $oldHash) { Stop-Update 'recovery-required' }
+        if ((Get-TargetTreeHash $paths.Target) -cne $oldHash) { Stop-Update 'recovery-required' }
         Assert-SwitchSafe $Context $paths $Observe
-        [IO.Directory]::Move($paths.Target, $paths.Backup)
+        if ($oldHash -cne 'absent') { [IO.Directory]::Move($paths.Target, $paths.Backup) }
         & $Checkpoint 'after-backup'
         Write-TransactionJournal $paths $record 'activate-intent'
         if ((Get-TreeHash $paths.Stage) -cne $newHash) { Stop-Update 'invalid-package' }
         Assert-SwitchSafe $Context $paths $Observe
         [IO.Directory]::Move($paths.Stage, $paths.Target)
         & $Checkpoint 'after-activation'
-        Assert-UpdatePackage $paths.Target $Context.Version | Out-Null
-        if ((Get-TreeHash $paths.Target) -cne $newHash) { Stop-Update 'invalid-package' }
+        Assert-UpdatePackage $paths.Target $Context.Version $record.native | Out-Null
+        if ((Get-TargetTreeHash $paths.Target) -cne $newHash) { Stop-Update 'invalid-package' }
         Complete-TransactionJournal $paths $record 'verified' 'installed' $null
         & $Checkpoint 'after-verification'
         return @{status='installed';reason=$null}
@@ -434,21 +498,27 @@ function Invoke-UpdateTransaction($Context, [scriptblock]$Observe = { param($c) 
                 if ((Get-TreeHash $paths.Backup) -cne $record.oldHash) { Stop-Update 'recovery-required' }
                 Write-TransactionJournal $paths $record 'rollback-intent'
                 if (Test-Path -LiteralPath $paths.Target) {
-                    if ((Get-TreeHash $paths.Target) -cne $record.newHash) { Stop-Update 'recovery-required' }
+                    if ((Get-TargetTreeHash $paths.Target) -cne $record.newHash) { Stop-Update 'recovery-required' }
                     Assert-SwitchSafe $Context $paths $Observe
                     [IO.Directory]::Move($paths.Target, $paths.Failed)
                 }
                 Assert-SwitchSafe $Context $paths $Observe
                 [IO.Directory]::Move($paths.Backup, $paths.Target)
-                if ((Get-TreeHash $paths.Target) -cne $record.oldHash) { Stop-Update 'recovery-required' }
+                if ((Get-TargetTreeHash $paths.Target) -cne $record.oldHash) { Stop-Update 'recovery-required' }
                 Complete-TransactionJournal $paths $record 'rolled-back' 'rolled-back' 'install-failed'
                 return @{status='rolled-back';reason='install-failed'}
             }
-            if ((Get-TreeHash $paths.Target) -cne $record.oldHash) { Stop-Update 'recovery-required' }
-            if ($reason -cnotin @('host-running','process-unknown','permission-denied','permission-cancelled','invalid-package','recovery-required')) { $reason='install-failed' }
+            if ($record.oldHash -ceq 'absent' -and (Test-Path -LiteralPath $paths.Target)) {
+                Write-TransactionJournal $paths $record 'rollback-intent'
+                if ((Get-TreeHash $paths.Target) -cne $record.newHash) { Stop-Update 'recovery-required' }
+                Assert-SwitchSafe $Context $paths $Observe
+                [IO.Directory]::Move($paths.Target,$paths.Failed)
+            }
+            if ((Get-TargetTreeHash $paths.Target) -cne $record.oldHash) { Stop-Update 'recovery-required' }
+            if ($reason -cnotin @('host-running','process-unknown','permission-denied','permission-cancelled','invalid-package','native-missing','native-invalid','native-incompatible','recovery-required')) { $reason='install-failed' }
             Complete-TransactionJournal $paths $record 'rolled-back' 'failed' $reason
         } catch { return @{status='failed';reason='recovery-required'} }
-        if ($reason -cnotin @('host-running','process-unknown','permission-denied','permission-cancelled','invalid-package','recovery-required')) { $reason='install-failed' }
+        if ($reason -cnotin @('host-running','process-unknown','permission-denied','permission-cancelled','invalid-package','native-missing','native-invalid','native-incompatible','recovery-required')) { $reason='install-failed' }
         return @{status='failed';reason=$reason}
     } finally { $lock.Dispose() }
 }

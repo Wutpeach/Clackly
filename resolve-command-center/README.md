@@ -214,31 +214,25 @@ This is a better fit than a Utility script for lifecycle-sensitive development:
 
 Important boundary: Resolve scans and registers Workflow Integration plugins on startup, but the official documentation describes loading the plugin from `Workspace > Workflow Integrations`. That is a real plugin lifecycle after load, not guaranteed silent background auto-start.
 
-Install the development Workflow Plugin from `resolve-command-center/`:
+For a first installation, keep the original native-free Workflow ZIP downloaded from the official Release. From a reviewed source checkout's `resolve-command-center/` directory, pass that archive to the fixed installer:
 
-```powershell
-npm install
-npm run build
-npm run workflow:install
-```
+~~~powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1 -Archive "<downloaded-Workflow-ZIP>"
+~~~
 
-`npm run workflow:install` copies `WorkflowIntegration.node` from Resolve's official developer examples into `workflow-plugin/`, then creates a junction at:
+The installer refetches official Release metadata, checks the exact asset identity, size and SHA-256, validates the complete native-free ZIP, provisions the official local Resolve native component, then uses the protected installation transaction. It installs at:
 
-```text
+~~~text
 %PROGRAMDATA%\Blackmagic Design\DaVinci Resolve\Support\Workflow Integration Plugins\com.wutpeach.clackly
-```
+~~~
 
-Restart DaVinci Resolve Studio after installation, then load `Clackly` from `Workspace > Workflow Integrations`. Press `Ctrl+Space`, type `marker`, and press `Enter`.
+The equivalent npm command is `npm run workflow:install:package -- "<downloaded-Workflow-ZIP>"`. An extracted directory does not retain the original Release archive digest and is not a production installation input. Development packages are validated through isolated test engines rather than a production bypass option.
 
-Do not use `npm run dev`, `npm start`, the Utility script, or an already-running standalone Electron window to validate the Workflow Integration command path. Those launch the bridge-backed external app from `electron/main/main.js`; Workflow Integration validation must use the Resolve menu-loaded plugin window from `workflow-plugin/main.js`.
+Use the reviewed checkout's fixed installer for first installation. In-app updates continue to use fixed installed code and do not execute scripts selected from the downloaded ZIP. Installation may wait for Resolve and its Workflow Electron host to close; cancellation remains available until backup/switch begins. Upgrades retain the complete old plugin tree for rollback. Native validation failures stop before backup or activation, and user settings are preserved.
 
-If you prefer a physical copy instead of a junction:
+After installation, restart DaVinci Resolve Studio yourself, then load `Clackly` from `Workspace > Workflow Integrations`. Press `Ctrl+Space`, type `marker`, and press `Enter`. Standalone `npm run dev`/`npm start` and the Utility script do not validate this menu-loaded Workflow Integration lifecycle.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1 -Mode Copy
-```
-
-The repository intentionally does not commit `WorkflowIntegration.node`; it is a Resolve-provided native module and is ignored by git.
+The repository and release ZIP intentionally exclude `WorkflowIntegration.node`. Installation reads the official local ProgramData SamplePlugin; it never requires copying the native file into the source checkout.
 
 ## Local Development
 
@@ -271,16 +265,14 @@ npm test
 Build and verify the Windows package with its hash-locked Managed Python Runtime:
 
 ```powershell
-npm run runtime:stage
 npm run package:win
 npm run package:verify
-npm run workflow:install:package
+node scripts/workflow-release/package.js --nonpublishable
 ```
 
-The packaged install copies `release/win-unpacked/resources/app` to Resolve's
-machine-wide Workflow Integration Plugins directory and carries the verified external
-Runtime with it. Restart Resolve after installation; `%APPDATA%` is not a Workflow
-Integration plugin scan root on Windows.
+These build commands require no Resolve SDK or native module. The release ZIP carries
+the verified Runtime; the first-install entry provisions the official local native
+component before activating the plugin in Resolve's machine-wide scan root.
 
 Official CPython 3.13.14 x64 is the current Managed Runtime for the qualified Resolve
 20.3.2 Windows tuple. See [Managed Python Runtime](docs/managed-python-runtime.md),
@@ -347,7 +339,9 @@ Resolve Utility menu scripts are run when selected from the menu; they are not a
 
 ## Workflow update package and native component
 
-Windows Workflow updates use one complete `Clackly-Workflow-<version>-win-x64.zip`, containing the application, built renderer, managed Python Runtime, and `workflow-plugin/WorkflowIntegration.node`. The native component comes from Blackmagic Design's official Workflow Integrations `Examples/SamplePlugin/`; it is supplied and hash-checked at build time, so users do not obtain a separate native module during installation. Blackmagic Design retains rights to its component; this attribution does not grant redistribution permission. The adjacent SDK terms review on 2026-10-15 did not establish an explicit public redistribution grant, so public release remains blocked pending clear evidence. See [release build inputs](scripts/workflow-release/README.md).
+Windows Workflow installation and updates use one `Clackly-Workflow-<version>-win-x64.zip` containing the application, built renderer and managed Python Runtime. The ZIP and schema-v2 release inventory exclude `WorkflowIntegration.node`. The installer obtains this component from the official local Resolve `%PROGRAMDATA%\Blackmagic Design\DaVinci Resolve\Support\Developer\Workflow Integrations\Examples\SamplePlugin` directory, validates its source, Windows x64 format and host compatibility, and records the copied bytes in the complete installation tree. The Resolve executable can be on a different drive from ProgramData.
+
+Missing, unsafe, corrupt or incompatible local native components stop installation before backup or switching. The installer does not download a native component or reuse one from an old plugin. Close Resolve and its Workflow Electron host when prompted; waiting remains cancellable until the backup/switch cutoff. Successful upgrades retain the complete previous tree; every successful installation requires a user-initiated Resolve restart. User settings under `%APPDATA%\Clackly` are preserved. See [release build and verification](scripts/workflow-release/README.md).
 
 ## Troubleshooting
 

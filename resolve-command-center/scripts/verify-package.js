@@ -165,7 +165,8 @@ async function verifyPackage({
   );
   assert.equal(fs.existsSync(path.join(packageRoot, "resources", "app.asar")), false);
   assert(fs.statSync(path.join(packageRoot, "resources", "app", "manifest.xml")).isFile());
-  assert(fs.statSync(path.join(packageRoot, "resources", "app", "workflow-plugin", "WorkflowIntegration.node")).isFile());
+  assert.equal(inventory(packageRoot).some((name) => /(?:^|\/)WorkflowIntegration\.node(?:\/|$)/i.test(name)), false,
+    "Packaged application must exclude the locally provisioned WorkflowIntegration.node");
   assert.equal(resolveRuntimeRoot({
     appRoot: path.join(packageRoot, "resources", "app")
   }), runtimeRoot, "Resolve-owned Electron must find the packaged sibling Runtime");

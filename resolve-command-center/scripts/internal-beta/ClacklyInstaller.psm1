@@ -1,8 +1,11 @@
 Set-StrictMode -Version Latest
+$transactionModule = Join-Path $PSScriptRoot 'WorkflowTransaction.psm1'
+if (![IO.File]::Exists($transactionModule)) { $transactionModule=Join-Path $PSScriptRoot '../workflow-update/WorkflowTransaction.psm1' }
+Import-Module $transactionModule -Force -DisableNameChecking
+$nativeModule = Join-Path (Split-Path -Parent $transactionModule) 'LocalNative.psm1'
+Import-Module $nativeModule -Force -DisableNameChecking
 
 $script:ClacklyPluginId = "com.wutpeach.clackly"
-$script:ClacklyNativeSize = 379904L
-$script:ClacklyNativeSha256 = "C442DFD013DA2244F53BA8B36B9439CCCC197DF90B999D0074031C6D921B7B05"
 $script:ClacklyExit = @{
   Success = 0
   InvalidPackage = 10
@@ -298,21 +301,6 @@ function Get-ClacklyPluginMetadata {
   }
 }
 
-function Assert-ClacklyNativeModule {
-  param([Parameter(Mandatory = $true)][string]$AppRoot, [int]$ErrorCode = $script:ClacklyExit.InvalidPackage)
-  $nodePath = Join-Path $AppRoot "workflow-plugin\WorkflowIntegration.node"
-  try {
-    $node = Get-ClacklySafeItem -Path $nodePath -File -ErrorCode $ErrorCode
-    $hash = Get-ClacklySha256 -Path $node.FullName
-    if ($node.Length -ne $script:ClacklyNativeSize -or $hash -cne $script:ClacklyNativeSha256) {
-      Throw-ClacklyError $ErrorCode "WorkflowIntegration.node does not match the qualified internal Beta identity."
-    }
-  } catch {
-    if ($_.Exception.Data.Contains("ClacklyExitCode")) { throw }
-    Throw-ClacklyError $ErrorCode "WorkflowIntegration.node could not be verified."
-  }
-}
-
 function Get-ClacklyExpectedInstalledInventory {
   param([Parameter(Mandatory = $true)]$Package)
   $expected = @{}
@@ -338,7 +326,10 @@ function Test-ClacklyPackage {
   $root = Get-ClacklyCanonicalPath $PackageRoot
   Assert-ClacklyNormalAncestorChain -Path $root -ErrorCode $script:ClacklyExit.InvalidPackage
   Get-ClacklySafeItem -Path $root -Directory | Out-Null
-  Test-ClacklyHashInventory -PackageRoot $root | Out-Null
+  $verifiedInventory=Test-ClacklyHashInventory -PackageRoot $root
+  if (@($verifiedInventory | Where-Object {$_.RelativePath -imatch '(^|/)WorkflowIntegration\.node(/|$)'}).Count) {
+    Throw-ClacklyError $script:ClacklyExit.InvalidPackage 'Release packages must not contain WorkflowIntegration.node.'
+  }
   $installBat = [string]::Concat([char]0x5B89, [char]0x88C5, " Clackly.bat")
   $uninstallBat = [string]::Concat([char]0x5378, [char]0x8F7D, " Clackly.bat")
   foreach ($relative in @($installBat, $uninstallBat, "README.txt", "tools/Install-Clackly.ps1", "tools/Uninstall-Clackly.ps1", "tools/ClacklyInstaller.psm1")) {
@@ -351,7 +342,9 @@ function Test-ClacklyPackage {
   Get-ClacklySafeItem -Path (Join-Path $appRoot "workflow-plugin\main.js") -File | Out-Null
   Get-ClacklySafeItem -Path (Join-Path $runtimeRoot "manifest.json") -File | Out-Null
   $metadata = Get-ClacklyPluginMetadata -AppRoot $appRoot
-  Assert-ClacklyNativeModule -AppRoot $appRoot
+  if ([IO.File]::Exists((Join-Path $appRoot 'workflow-plugin/WorkflowIntegration.node'))) {
+    Throw-ClacklyError $script:ClacklyExit.InvalidPackage 'Release packages must not contain WorkflowIntegration.node.'
+  }
   $package = [pscustomobject]@{ Root = $root; AppRoot = $appRoot; RuntimeRoot = $runtimeRoot; Id = $metadata.Id; Version = $metadata.Version; VersionObject = $metadata.VersionObject }
   $package | Add-Member -NotePropertyName ExpectedInstalledInventory -NotePropertyValue (Get-ClacklyExpectedInstalledInventory -Package $package)
   return $package
@@ -364,7 +357,7 @@ function Assert-ClacklyInstalledTree {
   if ($metadata.Id -ne $Package.Id -or $metadata.Version -ne $Package.Version) {
     Throw-ClacklyError $script:ClacklyExit.Activation "Installed plugin identity does not match the verified package."
   }
-  Assert-ClacklyNativeModule -AppRoot $Target -ErrorCode $script:ClacklyExit.Activation
+
   Get-ClacklySafeItem -Path (Join-Path $Target "resources\runtimes\manifest.json") -File -ErrorCode $script:ClacklyExit.Activation | Out-Null
   $actual = Get-ClacklyTreeInventory -Root $Target
   if ($actual.Count -ne $Package.ExpectedInstalledInventory.Count) {
@@ -387,7 +380,7 @@ function Get-ClacklyRecognizedTarget {
   }
   Assert-ClacklyNormalTree -Root $item.FullName -ErrorCode $script:ClacklyExit.UnsafeTarget
   $metadata = Get-ClacklyPluginMetadata -AppRoot $item.FullName -ErrorCode $script:ClacklyExit.UnsafeTarget
-  Assert-ClacklyNativeModule -AppRoot $item.FullName -ErrorCode $script:ClacklyExit.UnsafeTarget
+  Get-ClacklySafeItem -Path (Join-Path $item.FullName "workflow-plugin/WorkflowIntegration.node") -File -ErrorCode $script:ClacklyExit.UnsafeTarget | Out-Null
   Get-ClacklySafeItem -Path (Join-Path $item.FullName "resources\runtimes\manifest.json") -File -ErrorCode $script:ClacklyExit.UnsafeTarget | Out-Null
   return $metadata
 }
@@ -559,7 +552,8 @@ function Invoke-ClacklyInstallTransaction {
     [Parameter(Mandatory = $true)]$Package,
     [Parameter(Mandatory = $true)][string]$PluginRoot,
     [string]$ProcessState = "",
-    [scriptblock]$FailureInjector = $null
+    [scriptblock]$FailureInjector = $null,
+    [scriptblock]$Provision = {param($root) $pair=Get-ResolveHostPair; Copy-LocalResolveNative $root $pair.WorkflowExecutable}
   )
   $legacyCandidates = New-Object System.Collections.Generic.List[string]
   try {
@@ -602,6 +596,11 @@ function Invoke-ClacklyInstallTransaction {
     if (!(Test-Path -LiteralPath $stageResources)) { New-Item -ItemType Directory -Path $stageResources -Force -ErrorAction Stop | Out-Null }
     Assert-ClacklyNormalAncestorChain -Path $stageResources -ErrorCode $script:ClacklyExit.Staging
     Copy-ClacklyDirectoryContents -Source $Package.RuntimeRoot -Destination (Join-Path $stageResources "runtimes")
+    $native = & $Provision $stage
+    if ($native.path -cne 'workflow-plugin/WorkflowIntegration.node' -or $native.sha256 -cnotmatch '^[a-f0-9]{64}$' -or $native.size -le 0) {
+      Throw-ClacklyError $script:ClacklyExit.Staging 'native-invalid'
+    }
+    $Package.ExpectedInstalledInventory[$native.path.ToUpperInvariant()] = [pscustomobject]@{RelativePath=$native.path;Sha256=$native.sha256.ToUpperInvariant();Length=$native.size}
     Assert-ClacklyInstalledTree -Target $stage -Package $Package
     Invoke-ClacklyFailurePoint $FailureInjector "before-backup"
     if ($null -ne $existing) {

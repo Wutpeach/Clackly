@@ -10,7 +10,8 @@ const betaBuilder = require("./package-internal-beta");
 const appRoot = path.resolve(__dirname, "..");
 const templateRoot = path.join(__dirname, "internal-beta");
 const modulePath = path.join(templateRoot, "ClacklyInstaller.psm1");
-const qualifiedNode = path.join(appRoot, "workflow-plugin", "WorkflowIntegration.node");
+// Inert bytes are used only through an explicit module-level test provider.
+const fixtureNative = Buffer.from("INERT TEST NATIVE - NEVER LOAD");
 // PowerShell's filesystem provider returns long FullName paths; normalize the
 // fixture base once so complete retained-path assertions do not compare 8.3 aliases.
 const temporaryRoot = fs.realpathSync.native(os.tmpdir());
@@ -38,15 +39,19 @@ function invokeModule({ packageRoot, pluginRoot, processState = "closed", failur
   const injector = failurePoints.filter(Boolean).length || mutation
     ? `-FailureInjector { param($point) ${mutation} if (@(${failurePoints.filter(Boolean).map(powerShellLiteral).join(",")}) -contains $point) { throw 'injected failure' } }`
     : "";
+  const provision = uninstall ? "" : "-Provision { param($root) $file=Join-Path $root 'workflow-plugin/WorkflowIntegration.node'; [IO.File]::WriteAllText($file,'INERT TEST NATIVE - NEVER LOAD'); @{path='workflow-plugin/WorkflowIntegration.node';size=(Get-Item -LiteralPath $file).Length;sha256=([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([IO.File]::ReadAllBytes($file)))).Replace('-','').ToLowerInvariant()} }";
   const script = [
+    '$WarningPreference = "SilentlyContinue";',
+    '$ProgressPreference = "SilentlyContinue";',
     `$ErrorActionPreference = 'Stop'; Import-Module ${powerShellLiteral(modulePath)} -Force;`,
     packageArgument,
-    `$result = ${entry} ${uninstall ? "" : "-Package $package "}-PluginRoot ${powerShellLiteral(pluginRoot)} -ProcessState ${powerShellLiteral(processState)} ${injector};`,
+    `$result = ${entry} ${uninstall ? "" : "-Package $package "}-PluginRoot ${powerShellLiteral(pluginRoot)} -ProcessState ${powerShellLiteral(processState)} ${injector} ${provision};`,
     "$result | ConvertTo-Json -Compress"
   ].join(" ");
   const result = runPowerShell(script);
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  return JSON.parse(result.stdout.trim());
+  const parsed=JSON.parse(result.stdout.trim());
+  return parsed;
 }
 
 function preflightFailureCode(packageRoot) {
@@ -74,12 +79,12 @@ function createFixture(root, version = "0.1.0") {
   fs.writeFileSync(path.join(payloadApp, "manifest.xml"), `<?xml version="1.0"?><BlackmagicDesign><Plugin><Id>com.wutpeach.clackly</Id><Version>${version}</Version></Plugin></BlackmagicDesign>`, "utf8");
   fs.writeFileSync(path.join(payloadApp, "package.json"), JSON.stringify({ name: "clackly", version }), "utf8");
   fs.writeFileSync(path.join(payloadApp, "workflow-plugin", "main.js"), "module.exports = {};", "utf8");
-  fs.copyFileSync(qualifiedNode, path.join(payloadApp, "workflow-plugin", "WorkflowIntegration.node"));
   fs.writeFileSync(path.join(runtimeRoot, "manifest.json"), JSON.stringify({ schemaVersion: 1, profiles: [{ id: "fixture" }] }), "utf8");
   for (const file of ["安装 Clackly.bat", "卸载 Clackly.bat", "README.txt"]) fs.copyFileSync(path.join(templateRoot, file), path.join(packageRoot, file));
   const tools = path.join(packageRoot, "tools");
   fs.mkdirSync(tools);
   for (const file of ["Install-Clackly.ps1", "Uninstall-Clackly.ps1", "ClacklyInstaller.psm1"]) fs.copyFileSync(path.join(templateRoot, file), path.join(tools, file));
+  for (const file of ["WorkflowTransaction.psm1", "LocalNative.psm1"]) fs.copyFileSync(path.join(__dirname, "workflow-update", file), path.join(tools, file));
   betaBuilder.writeHashManifest(packageRoot);
   betaBuilder.verifyHashManifest(packageRoot);
   return packageRoot;
@@ -98,8 +103,9 @@ function createPackagedBuilderFixture(root, packagedVersion = "0.1.0") {
   fs.writeFileSync(path.join(appRoot, "package.json"), JSON.stringify({ name: "clackly", version: packagedVersion }), "utf8");
   fs.writeFileSync(path.join(appRoot, "manifest.xml"), `<BlackmagicDesign><Plugin><Id>com.wutpeach.clackly</Id><Version>${packagedVersion}</Version></Plugin></BlackmagicDesign>`, "utf8");
   fs.writeFileSync(path.join(appRoot, "workflow-plugin", "main.js"), "module.exports = {};", "utf8");
-  fs.copyFileSync(qualifiedNode, path.join(appRoot, "workflow-plugin", "WorkflowIntegration.node"));
   fs.writeFileSync(path.join(runtimeRoot, "manifest.json"), JSON.stringify({ schemaVersion: 1, profiles: [{ id: "fixture" }] }), "utf8");
+  fs.mkdirSync(path.join(sourceRoot, "scripts", "workflow-update"), { recursive: true });
+  for (const file of ["WorkflowTransaction.psm1", "LocalNative.psm1"]) fs.copyFileSync(path.join(__dirname, "workflow-update", file), path.join(sourceRoot, "scripts", "workflow-update", file));
   return { sourceRoot, packageRoot, appRoot };
 }
 
@@ -179,10 +185,10 @@ test("internal Beta builder rejects identity drift and verifies an extracted ZIP
     assert.throws(() => betaBuilder.assertPackageIdentity({ appRoot: sourceRoot, packageRoot }), /authorities disagree/);
     fs.writeFileSync(path.join(appRoot, "package.json"), JSON.stringify({ name: "clackly", version: "0.1.0" }), "utf8");
     fs.writeFileSync(path.join(appRoot, "manifest.xml"), "<BlackmagicDesign><Plugin><Id>com.wutpeach.clackly</Id><Version>0.1.0</Version></Plugin></BlackmagicDesign>", "utf8");
-    fs.appendFileSync(path.join(appRoot, "workflow-plugin", "WorkflowIntegration.node"), "changed", "utf8");
-    assert.throws(() => betaBuilder.assertPackageIdentity({ appRoot: sourceRoot, packageRoot }), /qualified Beta identity/);
-    fs.copyFileSync(qualifiedNode, path.join(appRoot, "workflow-plugin", "WorkflowIntegration.node"));
-    const outputRoot = path.join(root, "output");
+    fs.writeFileSync(path.join(appRoot, "workflow-plugin", "WorkflowIntegration.node"), fixtureNative);
+    assert.throws(() => betaBuilder.assertPackageIdentity({ appRoot: sourceRoot, packageRoot }), /forbidden in distribution/);
+    fs.unlinkSync(path.join(appRoot, "workflow-plugin", "WorkflowIntegration.node"));
+      const outputRoot = path.join(root, "output");
     assert.throws(() => betaBuilder.assertContained(outputRoot, path.join(outputRoot, "..", "escape")), /escapes its owned root/);
     const distribution = betaBuilder.createDistribution({ appRoot: sourceRoot, packageRoot, outputRoot, templateRoot });
     const zip = betaBuilder.createAndVerifyZip(distribution);
@@ -677,4 +683,16 @@ test("internal Beta production entries print retained archives on both success a
       assert.match(result.stdout, /Retained transaction path: D:\fixture 中文\archive-2/);
     }
   }
+});
+
+
+test("internal Beta rejects native bytes anywhere in a hash-consistent package", () => {
+  const root=fs.mkdtempSync(path.join(temporaryRoot,"clackly-beta-native-policy-"));
+  try {
+    const packageRoot=createFixture(root);
+    const native=path.join(packageRoot,"payload","win-unpacked","resources","app","other","workflowintegration.NODE");
+    fs.mkdirSync(path.dirname(native),{recursive:true}); fs.writeFileSync(native,fixtureNative);
+    betaBuilder.writeHashManifest(packageRoot);
+    assert.equal(preflightFailureCode(packageRoot),"10");
+  } finally {fs.rmSync(root,{recursive:true,force:true});}
 });

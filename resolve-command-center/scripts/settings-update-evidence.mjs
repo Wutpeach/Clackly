@@ -24,7 +24,8 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
   const installationStates = { "install-ready": "ready", confirmation: "awaiting-confirmation", "waiting-exit": "waiting-for-exit",
     installing: "installing", installed: "installed", "rolled-back": "rolled-back", "install-failed": "failed",
     "install-cancelled": "cancelled", "permission-denied": "unavailable", "permission-cancelled": "cancelled",
-    "recovery-required": "failed", "publisher-unverified": "unavailable" };
+    "recovery-required": "failed", "publisher-unverified": "unavailable",
+    "native-missing": "failed", "native-invalid": "failed", "native-incompatible": "failed" };
   const workflow = state.endsWith("-flow");
   url.searchParams.set("settings-update", state === "keyboard" ? "idle" : state === "candidate-flow" ? "downloaded" : workflow ? "install-ready" : state);
   if (state === "candidate-flow") url.searchParams.set("update-check", "newer");
@@ -162,6 +163,11 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
         await waitInstallation(installationStates[state]);
         assert.equal(await section.locator(".update-install-status").innerText(), t('install.status.' + installationStates[state]));
         assert.equal(await download.getAttribute("aria-disabled"), "true");
+        if (["native-missing", "native-invalid", "native-incompatible"].includes(state)) {
+          assert.equal(await section.locator(".update-install-reason").innerText(), t("install.reason." + state));
+          assert.equal(await section.getByRole("button", { name: t("install.prepare"), exact: true }).count(), 0);
+          assert.deepEqual(await section.locator(".update-versions dd").allTextContents(), ["0.1.0", "0.2.0", "0.2.0"]);
+        }
       }
       if (["checking", "downloading", "verifying", "rate-limit", "unavailable"].includes(state)) assert.equal(await check.getAttribute("aria-disabled"), "true");
       if (state === "rate-limit") assert.equal(await section.locator(".update-retry").count(), 1);

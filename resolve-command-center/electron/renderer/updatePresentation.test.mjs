@@ -48,6 +48,21 @@ test("update display bounds release text and byte progress without exposing raw 
   assert.equal(state({ downloadedVersion: "C:/private" }).downloadedVersion, null);
 });
 
+test("local Workflow component failures retain the candidate and expose a bounded repair reason", async () => {
+  for (const reason of ["native-missing", "native-invalid", "native-incompatible"]) {
+    const api = createSettingsUpdateFixture({ search: "?view=settings&settings-update=" + reason });
+    const snapshot = normalizeUpdateSnapshot(await api.getUpdateState());
+    const view = getUpdatePresentation(snapshot);
+    assert.deepEqual(snapshot.installation, { status: "failed", reason });
+    assert.equal(snapshot.currentVersion, "0.1.0");
+    assert.equal(snapshot.downloadedVersion, "0.2.0");
+    assert.equal(view.installationReasonKey, "settings.update.install.reason." + reason);
+    assert.equal(view.canPrepareInstall, false);
+    assert.equal(view.canConfirmInstall, false);
+    assert.equal(view.canDiscard, true);
+  }
+});
+
 test("retained candidates and installation qualifications control visible actions independently of discovery", () => {
   const candidate = { downloadedVersion: "0.2.0", latestVersion: "0.3.0", status: "available" };
   const blocked = getUpdatePresentation(state(candidate));

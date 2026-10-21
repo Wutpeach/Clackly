@@ -3,7 +3,7 @@ const path = require('node:path');
 const TERMINAL = new Set(['installed', 'rolled-back', 'failed', 'cancelled']);
 const REASONS = new Set(['publisher-unverified', 'host-unqualified', 'target-unverified', 'permission-denied',
   'permission-cancelled', 'process-unknown', 'host-running', 'concurrent-install', 'recovery-required',
-  'invalid-package', 'install-failed', 'unsupported-host']);
+  'native-missing', 'native-invalid', 'native-incompatible', 'invalid-package', 'install-failed', 'unsupported-host']);
 
 function readPointer(cacheRoot, normalPath) {
   const pointerFile = path.join(cacheRoot, 'installation.json');
