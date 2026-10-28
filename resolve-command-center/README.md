@@ -2,6 +2,22 @@
 
 Architecture-validation MVP for a DaVinci Resolve command palette. Electron owns the desktop UI, the command engine maps command intent to injected capabilities, and `resolve/` is the Resolve Adapter layer. Both the Workflow Integration path and Python fallback delegate project, timeline, timecode, frame-rate, drop-frame conversion, and marker operations to adapters in that directory.
 
+## Tests
+
+Run commands from this application directory after `npm ci`. The full suite requires Windows PowerShell, Python and Microsoft Edge (or Playwright Chromium, installed with `npx playwright install chromium`). It uses isolated fixtures and does not require an installed Resolve SDK or native module.
+
+| Command | Coverage |
+| --- | --- |
+| `npm test` | Attempts all three groups below sequentially, reports every outcome and exits unsuccessfully if any group fails. |
+| `npm run test:node` | Ordinary Node logic and filesystem/service tests, without the real-worker suites. |
+| `npm run test:integration` | Serial Node suites using real Python workers, PowerShell, Git and the headless browser, including Windows storage/installer guards. |
+| `npm run test:python` | All five unittest roots: bridge, Resolve, script runtime, export core and scripts; attempts every root even after a failure. |
+| `npm run test:list` | Exact commands and discovered files for each group, without executing tests. |
+
+Source `*.test.js`, `*.test.mjs` and `*.integration.js` suites are discovered outside generated/dependency trees. Each Node file belongs to exactly one group; mixed suites containing real children run as a whole in the serial group. Partition checks retain the critical release identity, ZIP inventory, Runtime/source, storage and installer coverage.
+
+The separate focused transaction suite is `powershell -NoProfile -NonInteractive -File scripts/workflow-update/WorkflowTransaction.test.ps1 -Mode Focused`. It verifies real isolated directory transactions and rollback. Main/PR CI reports it independently alongside Node, Python, source build and the verified nonpublishable Workflow ZIP. These results do not establish real Resolve host acceptance.
+
 Four existing sources own UI metadata: Capability Metadata owns Feature identity and schema, Command Metadata owns Command presentation, Interaction Binding owns executable mouse triggers, and Config Schema owns field labels and validation. Renderer code projects these records and contains no Command-id presentation table, prototype catalog, or shortcut badge fixture.
 
 ## Shared Application Composition

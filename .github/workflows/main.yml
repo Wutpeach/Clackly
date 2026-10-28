@@ -7,7 +7,24 @@ on:
 permissions:
   contents: read
 jobs:
-  verify:
+  node-logic:
+    name: Node logic
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: resolve-command-center
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: resolve-command-center/package-lock.json
+      - run: npm ci
+      - run: npm run test:node
+  windows-integration:
+    name: Serial subprocess and Windows integration
     runs-on: windows-latest
     defaults:
       run:
@@ -24,15 +41,59 @@ jobs:
         with:
           python-version: '3.13'
       - run: npm ci
-      - run: npm test
+      - name: Ensure the headless browser is available
+        run: |
+          if (!(Test-Path -LiteralPath 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe')) {
+            npx --no-install playwright install chromium
+            if ($LASTEXITCODE -ne 0) { throw 'Playwright browser setup failed' }
+          }
+      - run: npm run test:integration
+  windows-transactions:
+    name: Isolated Windows transactions and rollback
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: resolve-command-center
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Verify isolated native-free installation transactions
         run: powershell -NoProfile -NonInteractive -File scripts/workflow-update/WorkflowTransaction.test.ps1 -Mode Focused
+  python-tests:
+    name: Python (${{ matrix.suite }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [bridge, resolve, script-runtime, resolve2ae_core/tests, scripts]
+    defaults:
+      run:
+        working-directory: resolve-command-center
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - run: python -m unittest discover -s "${{ matrix.suite }}" -p "test_*.py"
+  source-build:
+    name: Renderer source build
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: resolve-command-center
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: resolve-command-center/package-lock.json
+      - run: npm ci
       - run: npm run build
-      - name: Verify release tooling without publication
-        run: npm run workflow:release:test
   workflow-package:
     name: Complete native-free Workflow ZIP
-    needs: verify
     runs-on: windows-latest
     defaults:
       run:
@@ -52,13 +113,33 @@ jobs:
         run: |
           node scripts/workflow-release/package.js --nonpublishable
           if ($LASTEXITCODE -ne 0) { throw 'Workflow package build failed' }
-          $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
-          node scripts/workflow-release/package.js --verify "release/workflow/Clackly-Workflow-$version-win-x64.zip"
-          if ($LASTEXITCODE -ne 0) { throw 'Workflow ZIP verification failed' }
-          Get-FileHash -Algorithm SHA256 -LiteralPath "release/workflow/Clackly-Workflow-$version-win-x64.zip"
+          @'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const { verifyArchive } = require('./scripts/workflow-release/package');
+          const version = require('./package.json').version;
+          const zipPath = 'release/workflow/Clackly-Workflow-' + version + '-win-x64.zip';
+          (async () => {
+            const { manifest, sha256, size } = await verifyArchive(zipPath, version);
+            assert.equal(manifest.build.publishable, false);
+            assert.equal(manifest.schemaVersion, 2);
+            assert.equal(manifest.source.commit, process.env.GITHUB_SHA);
+            assert.equal(manifest.files.some((file) => /WorkflowIntegration[.]node$/i.test(file.path)), false);
+            const summary = { zipPath, sha256, size, publishable: false, schemaVersion: manifest.schemaVersion,
+              sourceCommit: manifest.source.commit, runId: process.env.GITHUB_RUN_ID,
+              runAttempt: process.env.GITHUB_RUN_ATTEMPT, inventoryEntries: manifest.files.length,
+              nativeAbsent: true, runtime: manifest.runtime, nativePolicy: manifest.native };
+            fs.writeFileSync('release/workflow/development-verification.json',
+              JSON.stringify({ ...summary, manifest }, null, 2) + '\n');
+            console.log(JSON.stringify(summary, null, 2));
+          })().catch((error) => { console.error(error); process.exitCode = 1; });
+          '@ | node
+          if ($LASTEXITCODE -ne 0) { throw 'Development ZIP verification or evidence failed' }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: complete-workflow-development-zip
-          path: resolve-command-center/release/workflow/Clackly-Workflow-*-win-x64.zip
+          path: |
+            resolve-command-center/release/workflow/Clackly-Workflow-*-win-x64.zip
+            resolve-command-center/release/workflow/development-verification.json
           if-no-files-found: error
           retention-days: 14

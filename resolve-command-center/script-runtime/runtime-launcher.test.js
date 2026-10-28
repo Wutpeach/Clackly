@@ -1,5 +1,4 @@
 const assert = require("node:assert/strict");
-const { spawnSync } = require("node:child_process");
 const { EventEmitter } = require("node:events");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -11,7 +10,6 @@ const { RuntimeError } = require("./runtime/errors");
 const { RuntimeLauncher } = require("./runtime/launcher");
 
 const BOOTSTRAP = path.resolve(__dirname, "runtime", "bootstrap.py");
-const WORKER = path.resolve(__dirname, "runtime", "fixtures", "test_worker.py");
 
 function temporaryRoot(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "clackly-launcher-test-"));
@@ -68,21 +66,6 @@ async function expectRuntimeError(promise, code) {
   assert.ok(error instanceof RuntimeError, `Expected RuntimeError, received ${error}`);
   assert.equal(error.code, code);
   return error;
-}
-
-let pythonExecutable;
-function realPython() {
-  if (pythonExecutable) return pythonExecutable;
-  const command = process.platform === "win32" ? "python" : "python3";
-  const found = spawnSync(command, ["-c", "import os,sys;sys.stdout.write(os.path.realpath(sys.executable))"], {
-    encoding: "utf8",
-    shell: false,
-    windowsHide: true
-  });
-  assert.equal(found.status, 0, found.stderr);
-  pythonExecutable = fs.realpathSync(found.stdout);
-  assert.equal(path.isAbsolute(pythonExecutable), true);
-  return pythonExecutable;
 }
 
 test("Runtime Environment emits only the platform allowlist", () => {
@@ -394,51 +377,4 @@ test("Launcher reports cleanup alone and appends cleanup diagnostics to a primar
     "RUNTIME_PROTOCOL_INVALID"
   );
   assert.equal(protocol.details.cleanupError.code, "EACCES");
-});
-
-test("real worker covers success, Bootstrap, exit, protocol, timeout, and stream failures", async (t) => {
-  const root = temporaryRoot(t);
-  const executable = realPython();
-  const execute = (mode, overrides = {}) => new RuntimeLauncher({
-    bootstrapPath: WORKER,
-    temporaryRoot: root,
-    timeoutMs: 1000,
-    ...overrides
-  }).execute({ resolution: resolution(executable), request: { mode, value: { nested: true } } });
-
-  const success = await execute("success");
-  assert.deepEqual(success.response.runtime.value, { nested: true });
-  await expectRuntimeError(execute("python-exception"), "RUNTIME_BOOTSTRAP_FAILED");
-  await expectRuntimeError(execute("nonzero"), "RUNTIME_PROCESS_EXITED");
-  await expectRuntimeError(execute("empty"), "RUNTIME_PROTOCOL_EMPTY");
-  await expectRuntimeError(execute("invalid-json"), "RUNTIME_PROTOCOL_INVALID");
-  await expectRuntimeError(execute("invalid-envelope"), "RUNTIME_PROTOCOL_INVALID");
-  await expectRuntimeError(execute("stdout-flood", { maxStdoutBytes: 1024 }), "RUNTIME_OUTPUT_LIMIT");
-  await expectRuntimeError(execute("stderr-flood", { maxStderrBytes: 1024 }), "RUNTIME_OUTPUT_LIMIT");
-  await expectRuntimeError(execute("wait", { timeoutMs: 50 }), "RUNTIME_TIMEOUT");
-  assert.deepEqual(fs.readdirSync(root), []);
-});
-
-test("native worker abort does not terminate the Node parent", async (t) => {
-  const root = temporaryRoot(t);
-  const launcher = new RuntimeLauncher({
-    bootstrapPath: WORKER,
-    temporaryRoot: root,
-    timeoutMs: 2000
-  });
-  const aborted = await expectRuntimeError(
-    launcher.execute({ resolution: resolution(realPython()), request: { mode: "abort" } }),
-    "RUNTIME_NATIVE_CRASH"
-  );
-  assert.ok(aborted.details.process.signal
-    || aborted.details.process.nativeCrash
-    || (process.platform === "win32"
-      && /^Fatal Python error:/m.test(aborted.details.process.stderr)));
-
-  const after = await launcher.execute({
-    resolution: resolution(realPython()),
-    request: { mode: "success", value: "parent-alive" }
-  });
-  assert.equal(after.response.runtime.value, "parent-alive");
-  assert.deepEqual(fs.readdirSync(root), []);
 });

@@ -21,9 +21,12 @@ function powerShellLiteral(value) {
 }
 
 function runPowerShell(script) {
+  // EncodedCommand is UTF-16LE input; redirected console output is a separate
+  // contract. Do not decode the inherited Windows OEM code page as UTF-8.
+  const command = `[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); ${script}`;
   const result = childProcess.spawnSync("powershell.exe", [
-    "-NoProfile", "-ExecutionPolicy", "Bypass", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")
-  ], { encoding: "utf8" });
+    "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", Buffer.from(command, "utf16le").toString("base64")
+  ], { encoding: "utf8", windowsHide: true });
   return result;
 }
 
@@ -668,6 +671,7 @@ test("internal Beta elevation arguments preserve a quoted Unicode path and child
 });
 
 test("internal Beta production entries print retained archives on both success and failure", () => {
+  const retainedPaths = [String.raw`D:\fixture 中文\archive-1`, String.raw`D:\fixture 中文\archive-2`];
   for (const scriptName of ["Install-Clackly.ps1", "Uninstall-Clackly.ps1"]) {
     const content = fs.readFileSync(path.join(templateRoot, scriptName), "utf8");
     // Execute only the production result rendering block: no preflight, UAC or
@@ -675,12 +679,13 @@ test("internal Beta production entries print retained archives on both success a
     const outputBlock = content.slice(content.indexOf("  Write-Host $result.Message"), content.indexOf("  exit $result.Code"));
     assert.notEqual(outputBlock, "");
     for (const success of [true, false]) {
-      const script = `$result = [pscustomobject]@{ Success = $${success}; Message = 'fixture result'; RetainedPaths = @('D:\fixture 中文\archive-1', 'D:\fixture 中文\archive-2') }; ${outputBlock}`;
+      const script = `$result = [pscustomobject]@{ Success = $${success}; Message = 'fixture result'; RetainedPaths = @(${retainedPaths.map(powerShellLiteral).join(",")}) }; ${outputBlock}`;
       const result = runPowerShell(script);
       assert.equal(result.status, 0, result.stderr || result.stdout);
-      assert.match(result.stdout, /fixture result/);
-      assert.match(result.stdout, /Retained transaction path: D:\fixture 中文\archive-1/);
-      assert.match(result.stdout, /Retained transaction path: D:\fixture 中文\archive-2/);
+      assert.deepEqual(result.stdout.trimEnd().split(/\r?\n/), [
+        "fixture result",
+        ...retainedPaths.map((candidate) => `Retained transaction path: ${candidate}`)
+      ]);
     }
   }
 });

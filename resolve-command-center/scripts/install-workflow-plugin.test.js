@@ -37,7 +37,9 @@ test('production Archive cannot choose a target, native source, host or bypass',
   for (const extra of ['-WorkflowNodeSource','-WorkflowExecutable','-SkipSignature']) {
     const result=invoke(['-Archive',archive,extra,'untrusted']);
     assert.notEqual(result.status,0);
-    assert.match(result.stderr,/parameter.*cannot be found|找不到.*参数/is);
+    // PowerShell localizes this message and its OEM bytes need not be UTF-8.
+    // The error ID proves parameter binding refused the unsupported override.
+    assert.match(result.stderr,/FullyQualifiedErrorId\s*:\s*NamedParameterNotFound,install-workflow-plugin\.ps1/);
   }
 });
 
