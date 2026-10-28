@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Archive = '',
-    [ValidateSet('Install','Recover','Inspect')][string]$Operation = 'Install',
+    [ValidateSet('Install','Recover','Inspect','RestorePrevious')][string]$Operation = 'Install',
     [ValidatePattern('^[a-f0-9]{32}$')][string]$TransactionId = ''
 )
 Set-StrictMode -Version Latest
@@ -44,7 +44,9 @@ if ($Operation -eq 'Install') {
     $context=@{Id=$TransactionId;ScanRoot=$scan;TransactionRoot=$transactions;Target=$target;Version=$pointer.version;
         Digest=$pointer.digest;Size=$pointer.size;PackageRoot='';InitialInstall=$true;
         ResolveExecutable=$hostPair.ResolveExecutable;WorkflowExecutable=$hostPair.WorkflowExecutable}
-    $result=if ($Operation -eq 'Inspect') {Get-UpdateTransactionState $context} else {Invoke-UpdateRecovery $context}
+    $result=if ($Operation -eq 'Inspect') {Get-UpdateTransactionState $context}
+        elseif ($Operation -eq 'RestorePrevious') {Restore-PreviousUpdate $context}
+        else {Invoke-UpdateRecovery $context}
 }
 $result | ConvertTo-Json -Compress
 if ($result.status -eq 'failed') { exit 1 }

@@ -24,7 +24,7 @@ Assert-NormalPath $Root -AllowMissing | Out-Null
 function Assert-True($Value,[string]$Message) { if (!$Value) { throw $Message } }
 function Write-Json($File,$Value) { [IO.File]::WriteAllText($File,($Value | ConvertTo-Json -Depth 12)) }
 function Write-Text($File,[string]$Value) { [IO.Directory]::CreateDirectory((Split-Path -Parent $File)) | Out-Null; [IO.File]::WriteAllText($File,$Value) }
-function New-Fixture([string]$Name) {
+function New-Fixture([string]$Name, [string]$OldVersion='0.1.0', [string]$NewVersion='0.2.0') {
     $base = Join-Path $Root $Name
     $scan = Join-Path $base 'scan'
     $transactions = $scan + '.Clackly Updates'
@@ -33,12 +33,12 @@ function New-Fixture([string]$Name) {
     foreach ($dir in @($scan,$transactions,$target,$source)) { [IO.Directory]::CreateDirectory($dir) | Out-Null }
     Write-Text (Join-Path $target 'old.txt') 'OLD COMPLETE TREE'
     Write-Text (Join-Path $target 'workflow-plugin/WorkflowIntegration.node') 'LEGACY NATIVE-INCLUSIVE OLD INSTALL'
-    Write-Text (Join-Path $target 'package.json') '{"name":"clackly","version":"0.1.0"}'
-    Write-Text (Join-Path $target 'manifest.xml') '<BlackmagicDesign><Plugin><Id>com.wutpeach.clackly</Id><Version>0.1.0</Version><FilePath>workflow-plugin/main.js</FilePath></Plugin></BlackmagicDesign>'
+    Write-Json (Join-Path $target 'package.json') @{name='clackly';version=$OldVersion}
+    Write-Text (Join-Path $target 'manifest.xml') ('<BlackmagicDesign><Plugin><Id>com.wutpeach.clackly</Id><Version>'+$OldVersion+'</Version><FilePath>workflow-plugin/main.js</FilePath></Plugin></BlackmagicDesign>')
     Write-Text (Join-Path $scan 'sibling/sentinel.txt') 'SIBLING'
     Write-Text (Join-Path $base 'AppData/Clackly/preferences.json') '{"keep":true}'
-    Write-Text (Join-Path $source 'package.json') '{"name":"clackly","version":"0.2.0"}'
-    Write-Text (Join-Path $source 'manifest.xml') '<BlackmagicDesign><Plugin><Id>com.wutpeach.clackly</Id><Version>0.2.0</Version><FilePath>workflow-plugin/main.js</FilePath></Plugin></BlackmagicDesign>'
+    Write-Json (Join-Path $source 'package.json') @{name='clackly';version=$NewVersion}
+    Write-Text (Join-Path $source 'manifest.xml') ('<BlackmagicDesign><Plugin><Id>com.wutpeach.clackly</Id><Version>'+$NewVersion+'</Version><FilePath>workflow-plugin/main.js</FilePath></Plugin></BlackmagicDesign>')
     Write-Text (Join-Path $source 'workflow-plugin/main.js') 'const PLUGIN_ID = "com.wutpeach.clackly"; // INERT TEST PACKAGE - NEVER EXECUTE'
     Write-Text (Join-Path $source 'dist/renderer/index.html') '<p>Fixture</p>'
     foreach ($file in @('python.exe','python314.dll','python314.zip','python314._pth','LICENSE.txt','THIRD_PARTY_NOTICES.md','python-embed.sigstore','python-embed.spdx.json','application.spdx.json','clackly/bootstrap.py','clackly/persistent_bootstrap.py','clackly/python_runner.py')) {
@@ -49,14 +49,14 @@ function New-Fixture([string]$Name) {
     Write-Json (Join-Path $source 'resources/runtimes/fixture/runtime.json') @{runtimeVersion='3.14.4';source=@{sha256=('c'*64)};build=@{lockSha256=$lockHash;applicationSources=@(@{path='clackly/bootstrap.py';sha256=(Get-UpdateHash (Join-Path $source 'resources/runtimes/fixture/clackly/bootstrap.py'))})}}
     Write-Json (Join-Path $source 'resources/runtimes/manifest.json') @{schemaVersion=1;profiles=@(@{id='fixture';runtimeVersion='3.14.4';platform='win32';architecture='x64';executable='fixture/python.exe'})}
     foreach ($file in @('electron/main/update/UpdateService.js','scripts/workflow-update/WorkflowTransaction.psm1','scripts/workflow-update/executor.ps1','scripts/workflow-update/launch.ps1','scripts/workflow-update/recover.ps1')) {Write-Text (Join-Path $source $file) '// INERT FIXTURE - NEVER EXECUTE'}
-    $manifest = @{schemaVersion=2;package=@{id='com.wutpeach.clackly';name='clackly';version='0.2.0';platform='win32';arch='x64';entrypoint='workflow-plugin/main.js'};
-        source=@{repository='Wutpeach/Clackly';tag='v0.2.0';commit=('a'*40);dirty=$true;workflowPath='.github/workflows/workflow-release.yml'};build=@{publishable=$false};
+    $manifest = @{schemaVersion=2;package=@{id='com.wutpeach.clackly';name='clackly';version=$NewVersion;platform='win32';arch='x64';entrypoint='workflow-plugin/main.js'};
+        source=@{repository='Wutpeach/Clackly';tag=('v'+$NewVersion);commit=('a'*40);dirty=$true;workflowPath='.github/workflows/workflow-release.yml'};build=@{publishable=$false};
         runtime=@{manifestPath='resources/runtimes/manifest.json';manifestSha256=(Get-UpdateHash (Join-Path $source 'resources/runtimes/manifest.json'));
             profiles=@(@{id='fixture';version='3.14.4';lockPath='resources/runtimes/fixture/python.lock.json';lockSha256=$lockHash})};
         native=@{path='workflow-plugin/WorkflowIntegration.node';provisioning='local-resolve';source='programdata-sampleplugin';platform='win32';arch='x64'};
         files=@(Get-TreeFiles $source)}
     Write-Json (Join-Path $source 'clackly-release.json') $manifest
-    $context = @{Id=[Guid]::NewGuid().ToString('N');ScanRoot=$scan;TransactionRoot=$transactions;Target=$target;PackageRoot=$source;Version='0.2.0';
+    $context = @{Id=[Guid]::NewGuid().ToString('N');ScanRoot=$scan;TransactionRoot=$transactions;Target=$target;PackageRoot=$source;Version=$NewVersion;
         Digest=('b'*64);Size=12345;
         ResolveExecutable=(Join-Path $base 'Resolve.exe');WorkflowExecutable=(Join-Path $base 'Electron/electron.exe')}
     Write-Json (Join-Path $base 'context.json') $context
@@ -300,6 +300,74 @@ Record 'refuses-foreign-installed-identity'
 
 # R3 focused observable regressions. All targets and host states are fictitious;
 # this suite never invokes the production launcher, UAC or installed directories.
+# Execute the real bootstrap recovery branch against fixture-local fixed roots.
+# Do not execute its top-level production location/host discovery or Install path.
+$tokens=$null; $parseErrors=$null
+$bootstrapAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'bootstrap.ps1'),[ref]$tokens,[ref]$parseErrors)
+Assert-True (!$parseErrors) 'bootstrap parse errors'
+$bootstrapDispatch=$bootstrapAst.EndBlock.Statements | Where-Object {
+    $_ -is [Management.Automation.Language.IfStatementAst] -and $_.Clauses[0].Item1.Extent.Text -ceq '$Operation -eq ''Install'''
+}
+Assert-True ($null -ne $bootstrapDispatch.ElseClause) 'missing bootstrap recovery branch'
+$bootstrapRecovery=[scriptblock]::Create(($bootstrapDispatch.ElseClause.Statements | ForEach-Object {$_.Extent.Text}) -join [Environment]::NewLine)
+function Invoke-BootstrapFixture($Fixture, [string]$Operation='RestorePrevious') {
+    $scan=$Fixture.Context.ScanRoot; $transactions=$Fixture.Context.TransactionRoot; $target=$Fixture.Context.Target
+    $hostPair=@{ResolveExecutable=$Fixture.Context.ResolveExecutable;WorkflowExecutable=$Fixture.Context.WorkflowExecutable}
+    $TransactionId=$Fixture.Context.Id; $Archive=''
+    function Restore-PreviousUpdate($Context) {
+        WorkflowTransaction\Restore-PreviousUpdate $Context -Observe {$script:bootstrapObservation}
+    }
+    . $bootstrapRecovery
+    return $result
+}
+foreach ($case in @('restore','host-running','active-tamper','backup-tamper','pointer-digest','pointer-id')) {
+    $f=New-Fixture ('bootstrap-legacy-011-'+$case) '0.1.1' '0.1.2'
+    # The old downloadable schema included native bytes; legacy target validation
+    # preserves that complete opaque tree instead of treating it as a new package.
+    $oldNative=Join-Path $f.Context.Target 'workflow-plugin/WorkflowIntegration.node'
+    Write-Json (Join-Path $f.Context.Target 'clackly-release.json') @{schemaVersion=1;
+        package=@{id='com.wutpeach.clackly';name='clackly';version='0.1.1'};
+        native=@{path='workflow-plugin/WorkflowIntegration.node';size=(Get-Item -LiteralPath $oldNative).Length;sha256=(Get-UpdateHash $oldNative)};
+        files=@(Get-TreeFiles $f.Context.Target)}
+    $f.Old=Get-TreeHash $f.Context.Target
+    $f.Context.InitialInstall=$true
+    Assert-True (!(Test-Path -LiteralPath (Join-Path $f.Context.PackageRoot 'workflow-plugin/WorkflowIntegration.node'))) 'bootstrap candidate must be native-free'
+    $candidate=Assert-UpdatePackage $f.Context.PackageRoot '0.1.2'
+    Assert-True ($candidate.schemaVersion -eq 2 -and !$candidate.build.publishable) 'isolated candidate identity'
+    $installed=Invoke-UpdateTransaction $f.Context -Observe {'closed'}
+    $paths=Get-TransactionPaths $f.Context
+    Assert-True ($installed.status -ceq 'installed' -and (Get-TreeHash $paths.Target) -ceq $f.New -and
+        (Get-TreeHash $paths.Backup) -ceq $f.Old) 'legacy bootstrap upgrade must retain complete old tree'
+    $journal=Read-UpdateJson $paths.Journal
+    Assert-True ($journal.native.sha256 -ceq (Get-UpdateHash (Join-Path $paths.Target 'workflow-plugin/WorkflowIntegration.node')) -and
+        $journal.native.sha256 -cne (Get-UpdateHash (Join-Path $paths.Backup 'workflow-plugin/WorkflowIntegration.node'))) 'staged native must be newly provisioned and journaled'
+    $pointerFile=Join-Path $f.Context.TransactionRoot ($f.Context.Id+'.bootstrap')
+    $pointer=@{id=$f.Context.Id;version='0.1.2';digest=$f.Context.Digest;size=$f.Context.Size}
+    $script:bootstrapObservation='closed'
+    switch ($case) {
+        'host-running' {$script:bootstrapObservation='host-running'}
+        'active-tamper' {Write-Text (Join-Path $paths.Target 'tampered.txt') 'UNKNOWN NEW BYTES'}
+        'backup-tamper' {Write-Text (Join-Path $paths.Backup 'tampered.txt') 'UNKNOWN OLD BYTES'}
+        'pointer-digest' {$pointer.digest='c'*64}
+        'pointer-id' {$pointer.id=[Guid]::NewGuid().ToString('N')}
+    }
+    Write-Json $pointerFile $pointer
+    $before=Get-TreeHash $f.Base
+    if ($case -ceq 'restore') {
+        Assert-True ((Invoke-BootstrapFixture $f 'Inspect').status -ceq 'installed') 'bootstrap inspection must bind same transaction'
+        $restored=Invoke-BootstrapFixture $f
+        Assert-True ($restored.status -ceq 'rolled-back' -and (Get-TreeHash $paths.Target) -ceq $f.Old -and
+            (Get-TreeHash $paths.Failed) -ceq $f.New) 'bootstrap restore must preserve exact old and new trees'
+        Assert-True ((Invoke-BootstrapFixture $f 'Inspect').status -ceq 'rolled-back') 'bootstrap restored inspection'
+    } else {
+        $expected=if ($case -ceq 'host-running') {'host-running'} else {'recovery-required'}
+        $accepted=$false
+        try {Invoke-BootstrapFixture $f | Out-Null; $accepted=$true}
+        catch {Assert-True ($_.Exception.Message -ceq $expected) ('bootstrap refusal reason '+$case)}
+        Assert-True (!$accepted -and (Get-TreeHash $f.Base) -ceq $before) ('bootstrap refusal must preserve all evidence '+$case)
+    }
+    Assert-Sentinels $f; Record ('bootstrap-legacy-011-to-012-'+$case)
+}
 foreach ($point in @('success','after-stage','after-activation')) {
     $f=New-Fixture ('initial-'+$point)
     [IO.Directory]::Move($f.Context.Target,(Join-Path $f.Base 'preexisting-fixture-retained'))

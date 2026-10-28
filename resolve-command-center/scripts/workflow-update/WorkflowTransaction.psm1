@@ -110,7 +110,9 @@ function Assert-UpdatePackage([string]$Root, [string]$Version, $NativeIdentity =
         $manifest.package.platform -cne 'win32' -or $manifest.package.arch -cne 'x64' -or
         $manifest.package.entrypoint -cne 'workflow-plugin/main.js' -or
         $manifest.source.repository -cne 'Wutpeach/Clackly' -or $manifest.source.tag -cne ('v' + $Version) -or
-        $manifest.source.workflowPath -cne '.github/workflows/workflow-release.yml' -or
+        !($manifest.source.workflowPath -ceq '.github/workflows/workflow-release.yml' -or
+            ($manifest.build.publishable -is [bool] -and !$manifest.build.publishable -and
+                ($null -eq $manifest.source.workflowPath -or $manifest.source.workflowPath -ceq '.github/workflows/main.yml'))) -or
         $manifest.source.commit -cnotmatch '^[0-9a-f]{40}$' -or $manifest.source.dirty -isnot [bool] -or
         $manifest.build.publishable -isnot [bool] -or ($manifest.build.publishable -and $manifest.source.dirty) -or
         $Version -cnotmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { Stop-Update 'invalid-package' }

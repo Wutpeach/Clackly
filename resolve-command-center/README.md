@@ -250,6 +250,16 @@ After installation, restart DaVinci Resolve Studio yourself, then load `Clackly`
 
 The repository and release ZIP intentionally exclude `WorkflowIntegration.node`. Installation reads the official local ProgramData SamplePlugin; it never requires copying the native file into the source checkout.
 
+The reviewed Archive installer also supports a recognized older installation when its legacy updater cannot consume the new package schema. Keep the console's recorded recovery transaction ID. From the same reviewed checkout, use the fixed bootstrap entry for inspection, interrupted recovery or explicit restoration of the retained previous version:
+
+~~~powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workflow-update/bootstrap.ps1 -Operation Inspect -TransactionId <recorded-id>
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workflow-update/bootstrap.ps1 -Operation Recover -TransactionId <recorded-id>
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workflow-update/bootstrap.ps1 -Operation RestorePrevious -TransactionId <recorded-id>
+~~~
+
+RestorePrevious requires a successful upgrade, unchanged complete current/backup trees and closed hosts; it retains the replaced new tree. It cannot restore an earlier version after a first installation with no previous tree. Bootstrap IDs are separate from in-app updater RequestId records. The console bootstrap does not elevate or close/restart Resolve; Release publication and real installation remain separately authorized actions.
+
 ## Local Development
 
 Resolve 20.3.2.9 with its bundled Electron 36.3.2 is the qualified host baseline. The local Electron dependency is pinned exactly to 36.3.2 so development and automated window-contract tests cannot silently adopt newer APIs. Native window behavior must be validated through the Resolve Workflow Integration plugin: standalone Electron tests and renderer screenshots cannot prove Resolve-hosted DWM corners and shadow, the real `16px` inter-window gap, focus retention, z-order, or native hit testing across the D6/D7 lifecycle.

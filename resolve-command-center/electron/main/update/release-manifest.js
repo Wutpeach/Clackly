@@ -30,7 +30,9 @@ function validateManifest(manifest, version) {
     || manifest.package.platform !== 'win32' || manifest.package.arch !== 'x64'
     || manifest.package.entrypoint !== 'workflow-plugin/main.js'
     || manifest.source?.repository !== 'Wutpeach/Clackly' || manifest.source.tag !== `v${version}`
-    || manifest.source.workflowPath !== '.github/workflows/workflow-release.yml'
+    || !(manifest.source.workflowPath === '.github/workflows/workflow-release.yml'
+      || manifest.build?.publishable === false && (manifest.source.workflowPath === null
+        || manifest.source.workflowPath === '.github/workflows/main.yml'))
     || !/^[a-f0-9]{40}$/.test(manifest.source.commit) || typeof manifest.source.dirty !== 'boolean'
     || typeof manifest.build?.publishable !== 'boolean'
     || manifest.build.publishable && manifest.source.dirty) throw new Error('Release manifest identity is invalid');

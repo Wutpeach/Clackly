@@ -4,8 +4,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const cp = require('node:child_process');
 const { payload, zipBuffer } = require('../../electron/main/update/fixtures');
-const { sourceIdentity, validateManifest, validateInventory, validatePlugin, verifyArchive, validateDependencies } = require('./package');
+const { verifyZip } = require('../../electron/main/update/zip');
+const { sourceIdentity, validateManifest, validateInventory, validatePlugin, verifyArchive, validateDependencies, powershell, quote } = require('./package');
 const hash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 function fixture() {
   const all = payload();
@@ -47,6 +49,50 @@ test('manifest rejects invalid provenance, version, runtime/native and false pub
     (m) => { m.build.publishable = true; }, (m) => { m.schemaVersion = 1; }, (m) => { m.files.reverse(); }]) {
     const { manifest } = fixture(); change(manifest); assert.throws(() => validateManifest(manifest, '0.2.0'));
   }
+});
+test('main and local development ZIP provenance never passes production verification', async (t) => {
+  const root = workspace(t);
+  for (const workflowPath of ['.github/workflows/main.yml', null]) {
+    const data = fixture(); data.manifest.source.workflowPath = workflowPath;
+    const file = archive(root, data);
+    assert.equal((await verifyArchive(file, '0.2.0')).manifest.source.workflowPath, workflowPath);
+    await assert.rejects(verifyZip(file, '0.2.0'), { code: 'invalid-zip' });
+    data.manifest.source.dirty = false; data.manifest.build.publishable = true;
+    await assert.rejects(verifyArchive(archive(root, data), '0.2.0'), { code: 'invalid-zip' });
+  }
+});
+
+test('PowerShell package and production gates distinguish development workflow provenance', { skip: process.platform !== 'win32' }, (t) => {
+  const root = fs.realpathSync.native(workspace(t)); const data = fixture();
+  for (const [name, bytes] of data.entries) {
+    const file = path.join(root, name.slice(7));
+    fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, bytes);
+  }
+  fs.writeFileSync(path.join(root, 'clackly-release.json'), JSON.stringify(data.manifest));
+  powershell(`
+    Import-Module ${quote(path.resolve(__dirname, '../workflow-update/WorkflowTransaction.psm1'))} -Force -DisableNameChecking;
+    Import-Module ${quote(path.resolve(__dirname, '../workflow-update/ExecutorSupport.psm1'))} -Force -DisableNameChecking;
+    $root = ${quote(root)}; $file = Join-Path $root 'clackly-release.json';
+    $manifest = Read-UpdateJson $file; $manifest.source.dirty = $false;
+    foreach ($publishable in @($false, $true)) {
+      foreach ($workflow in @('.github/workflows/workflow-release.yml', '.github/workflows/main.yml', $null, '.github/workflows/foreign.yml', '')) {
+        $manifest.build.publishable = $publishable; $manifest.source.workflowPath = $workflow;
+        [IO.File]::WriteAllText($file, ($manifest | ConvertTo-Json -Depth 12));
+        $expected = $workflow -ceq '.github/workflows/workflow-release.yml' -or
+          (!$publishable -and ($null -eq $workflow -or $workflow -ceq '.github/workflows/main.yml'));
+        $accepted = $false; $production = $false;
+        try { $verified = Assert-UpdatePackage $root '0.2.0'; $accepted = $true;
+          Assert-PublishedUpdatePackage $verified; $production = $true;
+        } catch { if ($_.Exception.Message -cne 'invalid-package') { throw } }
+        if ($accepted -ne $expected -or $production -ne ($expected -and $publishable)) { throw 'Incorrect workflow publication qualification' }
+      }
+    }
+    $manifest.source.PSObject.Properties.Remove('workflowPath');
+    [IO.File]::WriteAllText($file, ($manifest | ConvertTo-Json -Depth 12));
+    $accepted = $false; try { Assert-UpdatePackage $root '0.2.0' | Out-Null; $accepted = $true } catch {}
+    if ($accepted) { throw 'Missing workflow provenance accepted' }
+    Write-Output 'PASS workflow provenance matrix';
+  `);
 });
 
 test('publication uses a clean exact source and local-native policy without an SDK pin', () => {
@@ -91,6 +137,34 @@ test('source identity rejects tag mismatch and production dirty state', () => {
   const version = require('../../package.json').version;
   const source = sourceIdentity(version, { publishable: false }); assert.match(source.commit, /^[a-f0-9]{40}$/);
   if (source.dirty) assert.throws(() => sourceIdentity(version), /clean committed/);
+});
+test('source identity records actual local/main/release origin and retains exact-tag publication gates', (t) => {
+  const root = workspace(t); const version = '0.2.0';
+  const git = (args) => cp.execFileSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true }).trim();
+  git(['init', '--quiet']); fs.writeFileSync(path.join(root, 'source.txt'), 'fixture'); git(['add', 'source.txt']);
+  git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'fixture']);
+  git(['tag', 'v0.2.0']);
+  const identity = (environment, publishable = false) => sourceIdentity(version, { appRoot: root, publishable, environment });
+  const main = { GITHUB_WORKFLOW_REF: 'Wutpeach/Clackly/.github/workflows/main.yml@refs/heads/main',
+    GITHUB_REF: 'refs/heads/main', GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2' };
+  const release = { ...main, GITHUB_WORKFLOW_REF: 'Wutpeach/Clackly/.github/workflows/workflow-release.yml@refs/tags/v0.2.0', GITHUB_REF: 'refs/tags/v0.2.0' };
+  const local = identity({ GITHUB_WORKFLOW: 'Windows Workflow draft release', GITHUB_RUN_ID: 'fictional' });
+  assert.equal(local.workflowPath, null); assert.equal(local.runId, null); assert.equal(local.runAttempt, null);
+  const fromMain = identity(main);
+  assert.equal(fromMain.workflowPath, '.github/workflows/main.yml'); assert.equal(fromMain.runId, '123'); assert.equal(fromMain.runAttempt, '2');
+  assert.equal(identity({ ...main, GITHUB_WORKFLOW_REF: main.GITHUB_WORKFLOW_REF.replace('refs/heads/main', 'refs/pull/1/merge') }).workflowPath, '.github/workflows/main.yml');
+  assert.equal(identity(release, true).workflowPath, '.github/workflows/workflow-release.yml');
+  assert.throws(() => identity({}, true), /canonical release workflow/);
+  assert.throws(() => identity({ ...main, GITHUB_REF: release.GITHUB_REF }, true), /canonical release workflow/);
+  for (const workflowRef of ['foreign/Clackly/.github/workflows/main.yml@refs/heads/main',
+    'Wutpeach/Clackly/.github/workflows/foreign.yml@refs/heads/main']) {
+    assert.throws(() => identity({ ...main, GITHUB_WORKFLOW_REF: workflowRef }), /canonical Clackly workflow/);
+  }
+  assert.throws(() => identity({ ...release, GITHUB_REF: 'refs/heads/main' }, true), /runner ref/);
+  assert.throws(() => identity({ ...release, GITHUB_WORKFLOW_REF: release.GITHUB_WORKFLOW_REF.replace('v0.2.0', 'v0.1.0') }, true), /canonical release workflow/);
+  fs.writeFileSync(path.join(root, 'source.txt'), 'new fixture'); git(['add', 'source.txt']);
+  git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'next fixture']);
+  assert.throws(() => identity(release, true), /exact source commit/);
 });
 test('production dependencies must match exact locked version', (t) => {
   const root = workspace(t); const dir = path.join(root, 'node_modules/example'); fs.mkdirSync(dir, { recursive: true });

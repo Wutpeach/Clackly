@@ -19,17 +19,23 @@ const inventory = (root) => listTree(root, { exclude: new Set([RELEASE_MANIFEST]
 function git(args, appRoot = APP_ROOT) {
   return cp.execFileSync('git', args, { cwd: appRoot, encoding: 'utf8', windowsHide: true }).trim();
 }
-function sourceIdentity(version, { appRoot = APP_ROOT, publishable = true, tag = `v${version}` } = {}) {
+function sourceIdentity(version, { appRoot = APP_ROOT, publishable = true, tag = `v${version}`, environment = process.env } = {}) {
   if (!VERSION.test(version) || tag !== `v${version}`) throw new Error('Tag must exactly match v<package.json version>');
   const commit = git(['rev-parse', 'HEAD'], appRoot);
   const dirty = Boolean(git(['status', '--porcelain', '--untracked-files=normal'], appRoot));
   if (!/^[a-f0-9]{40}$/.test(commit)) throw new Error('Source commit is invalid');
   if (publishable && dirty) throw new Error('Publication requires a clean committed worktree');
   if (publishable && git(['rev-parse', `${tag}^{commit}`], appRoot) !== commit) throw new Error('Tag must point to the exact source commit');
-  if (publishable && process.env.GITHUB_REF && process.env.GITHUB_REF !== `refs/tags/${tag}`) throw new Error('Release runner ref differs from source tag');
+  if (publishable && environment.GITHUB_REF && environment.GITHUB_REF !== `refs/tags/${tag}`) throw new Error('Release runner ref differs from source tag');
+  const workflowRef = environment.GITHUB_WORKFLOW_REF;
+  const workflow = workflowRef && /^Wutpeach\/Clackly\/(\.github\/workflows\/(?:main|workflow-release)\.yml)@refs\/.+$/.exec(workflowRef);
+  if (workflowRef && !workflow) throw new Error('Source workflow is not a canonical Clackly workflow');
+  const workflowPath = workflow ? workflow[1] : null;
+  if (publishable && workflowRef !== `Wutpeach/Clackly/.github/workflows/workflow-release.yml@refs/tags/${tag}`) throw new Error('Publication requires the canonical release workflow at the source tag');
   return { repository: 'Wutpeach/Clackly', tag, commit, dirty,
-    workflowPath: '.github/workflows/workflow-release.yml',
-    runId: process.env.GITHUB_RUN_ID || null, runAttempt: process.env.GITHUB_RUN_ATTEMPT || null };
+    workflowPath,
+    runId: workflow ? environment.GITHUB_RUN_ID || null : null,
+    runAttempt: workflow ? environment.GITHUB_RUN_ATTEMPT || null : null };
 }
 
 function validatePlugin(root, version) {

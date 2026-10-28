@@ -22,7 +22,7 @@ node scripts/workflow-release/package.js --nonpublishable --output <new-output-d
 node scripts/workflow-release/package.js --verify <Clackly-Workflow-X.Y.Z-win-x64.zip>
 ~~~
 
-No Resolve SDK, native module, vendor artifact, SDK download or native pin is required to build or verify this ZIP. Managed Python Runtime staging still downloads its hash-locked upstream assets. A development ZIP records the actual source commit and dirty state with `publishable:false`; it is not a tagged release.
+No Resolve SDK, native module, vendor artifact, SDK download or native pin is required to build or verify this ZIP. Managed Python Runtime staging still downloads its hash-locked upstream assets. A development ZIP records the actual source commit and dirty state with `publishable:false`; it is not a tagged release. Its `source.workflowPath` is `null` for a local build or the canonical workflow path identified by `GITHUB_WORKFLOW_REF` in CI. Main/PR artifacts identify `.github/workflows/main.yml`. Publishable generation requires the canonical Release workflow in addition to the existing clean exact-tag checks; main/local development provenance cannot qualify as a production release.
 
 The builder checks package/Workflow identities, production dependency locks, current installer/source bytes, managed Runtime provenance, complete inventory, ZIP paths/types/collisions/expansion and every file's bytes. The same lightweight release contract runs when Electron downloads or restores a retained candidate. Schema-v1/native-inclusive release assets are rejected.
 
@@ -37,6 +37,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-workflow-plu
 The entry independently refetches official Release metadata and verifies the exact original asset identity, size, SHA-256 and strict complete ZIP before local-native provisioning. An extracted directory cannot prove that asset digest and is not accepted for production installation. Development ZIPs are exercised with isolated test engines; no production bypass flag is provided.
 
 The equivalent npm command is `npm run workflow:install:package -- "<downloaded-Workflow-ZIP>"`. In-app updates use fixed installed code; the candidate ZIP cannot select executable installer code. Restart Resolve yourself after activation. The initial entry and updates use the same local-native validation and transaction safeguards.
+
+The same fixed Archive installer also upgrades a recognized older Clackly installation and retains every old file. A legacy schema-v1 updater cannot install schema-v2 ZIPs; use the reviewed checkout's Archive route after publication and installation are separately authorized.
+
+The console bootstrap prints a recovery transaction ID. From that same reviewed checkout, inspect or recover an interrupted transaction, or explicitly restore the retained previous version after a successful upgrade:
+
+~~~powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workflow-update/bootstrap.ps1 -Operation Inspect -TransactionId <recorded-id>
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workflow-update/bootstrap.ps1 -Operation Recover -TransactionId <recorded-id>
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workflow-update/bootstrap.ps1 -Operation RestorePrevious -TransactionId <recorded-id>
+~~~
+
+RestorePrevious uses the fixed bootstrap pointer, journal, target and current paired host. It requires a verified successful upgrade and matching complete active/backup trees, retains the replaced new version, and refuses a running or unknown host and changed evidence. A first install with no prior version has nothing to restore. Bootstrap TransactionId and the in-app updater's RequestId are separate records; do not pass a bootstrap ID to recover.ps1. The console bootstrap does not elevate or close/restart Resolve.
 
 ## CI and publication
 

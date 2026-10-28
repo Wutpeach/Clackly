@@ -3,7 +3,7 @@
   <Plugin>
     <Id>com.wutpeach.clackly</Id>
     <Name>Clackly</Name>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <Description>Command palette MVP for DaVinci Resolve.</Description>
     <FilePath>workflow-plugin/main.js</FilePath>
   </Plugin>
