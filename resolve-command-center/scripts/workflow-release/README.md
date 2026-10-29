@@ -2,6 +2,8 @@
 
 The single release asset is `Clackly-Workflow-<version>-win-x64.zip` with one top-level `plugin/` tree. It contains the application, built renderer and hash-locked managed Python Runtime. It excludes `WorkflowIntegration.node`, standalone Electron and the legacy Beta wrapper. A local ignored native file must never enter a staged application or archive.
 
+Application packaging selects production source roots and the fixed installer/module closure. Staged application and final ZIP verification refuse tests, fixtures, synthetic OTIO/AE outputs, diagnostics, private/task evidence and SDK/native material, even when their bytes appear in a complete hash inventory. There is no small-file or historical fixture exemption. Production dependencies, Runtime notices/provenance and complete inventory/runtime/source-staleness checks remain required.
+
 `clackly-release.json` uses schema version 2. Its exact sorted file inventory describes the downloadable bytes; its native policy is:
 
 ~~~json

@@ -3,7 +3,7 @@ const path = require('node:path');
 const cp = require('node:child_process');
 const crypto = require('node:crypto');
 const { listTree, assertNormalExistingDirectory, readWorkflowManifest } = require('../package-internal-beta');
-const { verifyPackage } = require('../verify-package');
+const { verifyPackage, assertProductPayload, PRODUCTION_INSTALLER_FILES } = require('../verify-package');
 const { verifyZip } = require('../../electron/main/update/zip');
 const { VERSION, RELEASE_MANIFEST, NATIVE_POLICY, validateManifest, validateInventory, validateRuntime } = require('../../electron/main/update/release-manifest');
 
@@ -42,6 +42,7 @@ function validatePlugin(root, version) {
   assertNormalExistingDirectory(root);
   const manifest = validateManifest(readJson(path.join(root, RELEASE_MANIFEST)), version);
   if (JSON.stringify(inventory(root)) !== JSON.stringify(manifest.files)) throw new Error('Plugin inventory/hash differs from release manifest');
+  assertProductPayload(manifest.files.map((item) => item.path));
   const pkg = readJson(path.join(root, 'package.json'));
   const xml = readWorkflowManifest(path.join(root, 'manifest.xml'));
   if (pkg.name !== 'clackly' || pkg.version !== version || xml.version !== version
@@ -58,6 +59,15 @@ function validateDependencies(plugin, lock) {
   }
 }
 
+function validatePackagedSources(appRoot, plugin) {
+  for (const file of ['dist/renderer/index.html', 'workflow-plugin/main.js',
+    'electron/main/update/release-manifest.js', 'electron/main/update/zip.js', ...PRODUCTION_INSTALLER_FILES]) {
+    if (digest(fs.readFileSync(path.join(appRoot, file))) !== digest(fs.readFileSync(path.join(plugin, file)))) {
+      throw new Error('Packaged source is stale: ' + file);
+    }
+  }
+}
+
 function powershell(script) {
   cp.execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
     '-EncodedCommand', Buffer.from(`$ErrorActionPreference='Stop'; ${script}`, 'utf16le').toString('base64')],
@@ -70,6 +80,7 @@ async function verifyArchive(file, version) {
   // Local package verification also covers explicitly nonpublishable development ZIPs.
   // Download/restart callers retain verifyZip's production-only default.
   const result = await verifyZip(file, version, { allowNonpublishable: true });
+  assertProductPayload(result.manifest.files.map((item) => item.path));
   return { manifest: result.manifest, sha256: digest(fs.readFileSync(file)), size: fs.statSync(file).size };
 }
 
@@ -94,13 +105,7 @@ async function buildWorkflow({ appRoot = APP_ROOT, packageRoot = path.join(appRo
     if (fs.existsSync(runtimes)) throw new Error('App must not contain a second embedded Runtime tree');
     fs.cpSync(path.join(packageRoot, 'resources/runtimes'), runtimes, { recursive: true, dereference: false, errorOnExist: true });
     validateDependencies(plugin, readJson(path.join(appRoot, 'package-lock.json')));
-    const installerFiles = listTree(path.join(appRoot, 'scripts/workflow-update'))
-      .map((item) => `scripts/workflow-update/${item.relativePath}`);
-    for (const file of ['dist/renderer/index.html', 'workflow-plugin/main.js',
-      'scripts/install-workflow-plugin.ps1', 'electron/main/update/release-manifest.js',
-      'electron/main/update/zip.js', ...installerFiles]) {
-      if (digest(fs.readFileSync(path.join(appRoot, file))) !== digest(fs.readFileSync(path.join(plugin, file)))) throw new Error(`Packaged source is stale: ${file}`);
-    }
+    validatePackagedSources(appRoot, plugin);
     const files = inventory(plugin);
     const runtimeManifest = readJson(path.join(runtimes, 'manifest.json'));
     const locks = fs.readdirSync(runtimes).filter((name) => name.endsWith('.lock.json'));
@@ -147,4 +152,4 @@ if (require.main === module) {
       publishable: !args.includes('--nonpublishable'), tag: value('--tag') }), null, 2));
   })().catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
-module.exports = { VERSION, RELEASE_MANIFEST, inventory, sourceIdentity, validateManifest, validateInventory, validatePlugin, validateDependencies, verifyArchive, buildWorkflow, powershell, quote };
+module.exports = { VERSION, RELEASE_MANIFEST, inventory, sourceIdentity, validateManifest, validateInventory, validatePlugin, validateDependencies, validatePackagedSources, verifyArchive, buildWorkflow, powershell, quote };

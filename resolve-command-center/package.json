@@ -1,6 +1,6 @@
 {
   "name": "clackly",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Architecture-validation MVP command palette for DaVinci Resolve.",
   "main": "electron/main/main.js",
@@ -36,8 +36,24 @@
       "output": "release"
     },
     "files": [
-      "**/*",
+      "package.json",
+      "manifest.xml",
+      "{app,bridge,capability,command-engine,command-search,command-usage,config,execution-adapter,feature-status,feature-ui,interaction,localization,preferences,resolve,resolve2ae_core,script-runtime,shortcut}/**/*",
+      "electron/{main,shared}/**/*",
+      "dist/renderer/**/*",
+      "workflow-plugin/main.js",
+      "scripts/install-workflow-plugin.ps1",
+      "scripts/resolve2ae_export.py",
+      "scripts/workflow-update/{bootstrap,executor,launch,recover}.ps1",
+      "scripts/workflow-update/{WorkflowTransaction,ExecutorSupport,LocalNative}.psm1",
+      "node_modules/**/*",
+      "!**/*.{test,spec,integration}.*",
+      "!**/test_*.py",
+      "!**/{fixtures,*-fixture}.js",
+      "!**/{test,tests,__tests__,fixtures,__fixtures__,snapshots,output,outputs,test-output,test-outputs,diagnostics,evidence,private,sdk,__pycache__}{,/**/*}",
+      "!**/*.{otio,aep,jsx,log,dmp,pyc,pyo,node}",
       "!**/WorkflowIntegration.node",
+      "!resolve/feasibility{,/**/*}",
       "!build{,/**/*}",
       "!release{,/**/*}",
       "!resources/runtimes{,/**/*}"

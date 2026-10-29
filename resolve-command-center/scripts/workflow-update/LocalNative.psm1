@@ -1,6 +1,64 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# Private, bounded context only. Callers must explicitly extract it from the
+# exception chain into their own protected evidence; this module never logs it.
+function ConvertTo-NativeDiagnosticText($Value,[int]$Limit) {
+    if ($null -eq $Value) { return $null }
+    $text=[string]$Value
+    if ($text.Length -gt $Limit) { return $text.Substring(0,$Limit) }
+    return $text
+}
+
+function Add-NativeFailureContext([Management.Automation.ErrorRecord]$Record,[string]$Checkpoint) {
+    try {
+        $exception=$Record.Exception
+        $cursor=$exception
+        for ($depth=0; $cursor -and $depth -lt 32; $depth++) {
+            if ($cursor.Data.Contains('Clackly.LocalNative.FirstFailure')) { return }
+            $cursor=$cursor.InnerException
+        }
+        # Do not shadow a possible earlier context beyond the traversal bound.
+        if ($cursor) { return }
+        $causes=@(); $cursor=$exception
+        for ($depth=0; $cursor -and $depth -lt 8; $depth++) {
+            $nativeCode=$null
+            if ($cursor -is [ComponentModel.Win32Exception]) { $nativeCode=$cursor.NativeErrorCode }
+            $causes+=@{
+                type=ConvertTo-NativeDiagnosticText $cursor.GetType().FullName 256
+                message=ConvertTo-NativeDiagnosticText $cursor.Message 2048
+                hResult=$cursor.HResult; nativeErrorCode=$nativeCode
+            }
+            $cursor=$cursor.InnerException
+        }
+        $invocation=$Record.InvocationInfo
+        $invocationContext=$null
+        if ($invocation) {
+            $commandName=$null
+            if ($invocation.MyCommand) { $commandName=$invocation.MyCommand.Name }
+            $invocationContext=@{
+                invocationName=ConvertTo-NativeDiagnosticText $invocation.InvocationName 256
+                commandName=ConvertTo-NativeDiagnosticText $commandName 256
+                scriptName=ConvertTo-NativeDiagnosticText $invocation.ScriptName 1024
+                line=ConvertTo-NativeDiagnosticText $invocation.Line 1024
+                positionMessage=ConvertTo-NativeDiagnosticText $invocation.PositionMessage 2048
+                scriptLineNumber=$invocation.ScriptLineNumber; offsetInLine=$invocation.OffsetInLine
+            }
+        }
+        $exception.Data['Clackly.LocalNative.FirstFailure']=@{
+            schemaVersion=1; checkpoint=ConvertTo-NativeDiagnosticText $Checkpoint 96
+            exceptionType=$causes[0].type; message=$causes[0].message
+            fullyQualifiedErrorId=ConvertTo-NativeDiagnosticText $Record.FullyQualifiedErrorId 512
+            hResult=$exception.HResult; nativeErrorCode=$causes[0].nativeErrorCode
+            invocation=$invocationContext
+            scriptStackTrace=ConvertTo-NativeDiagnosticText $Record.ScriptStackTrace 2048
+            exceptions=$causes
+        }
+    } catch {
+        # Evidence failure must never replace the rejection being diagnosed.
+    }
+}
+
 # Direct isolated module tests may inject observations. No production CLI exposes
 # these seams or a source path. Location alone never confers publisher trust.
 function Get-LocalResolveNativePath {
@@ -76,13 +134,20 @@ namespace Clackly {
 }
 
 function Open-NativeReadLock([string]$Path) {
+    $checkpoint='read-lock.path'
     try {
         Assert-NormalPath $Path | Out-Null
+        $checkpoint='read-lock.initialize-identity'
         Initialize-NativeFileIdentity
+        $checkpoint='read-lock.open'
         $stream = [IO.File]::Open($Path,'Open','Read','Read')
+        $checkpoint='read-lock.identity'
         try { [Clackly.NativeIdentity]::Read($stream) | Out-Null; return $stream }
-        catch { $stream.Dispose(); throw }
-    } catch { throw 'native-invalid' }
+        catch { Add-NativeFailureContext $_ $checkpoint; $stream.Dispose(); throw }
+    } catch {
+        Add-NativeFailureContext $_ $checkpoint
+        throw [InvalidOperationException]::new('native-invalid',$_.Exception)
+    }
 }
 
 function Assert-NativePe($Stream, [switch]$Dll) {
@@ -152,31 +217,48 @@ function Assert-ProtectedHostPath([string]$Path,[switch]$Ancestor) {
 
 function Assert-ResolveNativeCompatibility([string]$NativePath,[string]$WorkflowExecutable) {
     $resolveLock=$null; $electronLock=$null; $scriptLock=$null; $packageLock=$null
+    $checkpoint='compatibility.host-pair'
     try {
         $pair=Get-ResolveHostPair $WorkflowExecutable
         $hostRoot=Split-Path -Parent $pair.ResolveExecutable
         $electronRoot=Split-Path -Parent $pair.WorkflowExecutable
         # Vendor signatures alone cannot prevent dependency sideloading from a
         # writable host installation. Inspect current ACLs without modifying any.
+        $checkpoint='compatibility.resolve-directory-protection'
         Assert-ProtectedHostPath $hostRoot
+        $checkpoint='compatibility.electron-directory-protection'
         Assert-ProtectedHostPath $electronRoot
+        $checkpoint='compatibility.electron-tree-protection'
         foreach ($item in @(Get-ChildItem -LiteralPath $electronRoot -Recurse -Force)) {Assert-ProtectedHostPath $item.FullName}
         $cursor=$electronRoot
+        $checkpoint='compatibility.host-ancestor-protection'
         while ($cursor) {Assert-ProtectedHostPath $cursor -Ancestor; $cursor=Split-Path -Parent $cursor}
+        $checkpoint='compatibility.resolve-read-lock'
         $resolveLock=Open-NativeReadLock $pair.ResolveExecutable
+        $checkpoint='compatibility.electron-read-lock'
         $electronLock=Open-NativeReadLock $pair.WorkflowExecutable
-        Assert-NativePe $resolveLock; Assert-NativePe $electronLock
-        Assert-BlackmagicSignature $pair.ResolveExecutable -ResolveHost; Assert-BlackmagicSignature $pair.WorkflowExecutable
+        $checkpoint='compatibility.resolve-pe'
+        Assert-NativePe $resolveLock
+        $checkpoint='compatibility.electron-pe'
+        Assert-NativePe $electronLock
+        $checkpoint='compatibility.resolve-signature'
+        Assert-BlackmagicSignature $pair.ResolveExecutable -ResolveHost
+        $checkpoint='compatibility.electron-signature'
+        Assert-BlackmagicSignature $pair.WorkflowExecutable
+        $checkpoint='compatibility.electron-hash'
         $hostHash=Get-NativeStreamHash $electronLock
         # The controlled script lives beside this transaction, outside plugin
         # scanning, never in a downloaded payload or an ambient user profile.
         $stageRoot=Split-Path -Parent (Split-Path -Parent $NativePath)
         $probe=Join-Path (Split-Path -Parent $stageRoot) ((Split-Path -Leaf $stageRoot)+'.native-probe')
+        $checkpoint='compatibility.probe-path'
         Assert-NormalPath $probe -AllowMissing | Out-Null
         if (Test-Path -LiteralPath $probe) {throw 'native-incompatible'}
+        $checkpoint='compatibility.probe-directories'
         [IO.Directory]::CreateDirectory($probe) | Out-Null
         foreach ($name in @('profile','session','crashes','logs')) {[IO.Directory]::CreateDirectory((Join-Path $probe $name)) | Out-Null}
         $package=Join-Path $probe 'package.json'; $script=Join-Path $probe 'main.js'
+        $checkpoint='compatibility.probe-package-write'
         [IO.File]::WriteAllText($package,'{"name":"clackly-native-probe","version":"1.0.0","main":"main.js"}')
         $scriptText=@'
 const { app } = require('electron');
@@ -195,12 +277,19 @@ try {
 } catch (_) { /* No paths or vendor exception text enters the public outcome. */ }
 app.whenReady().then(() => app.exit(code), () => app.exit(42));
 '@
+        $checkpoint='compatibility.probe-script-write'
         [IO.File]::WriteAllText($script,$scriptText)
-        $packageLock=Open-NativeReadLock $package; $scriptLock=Open-NativeReadLock $script
+        $checkpoint='compatibility.probe-package-read-lock'
+        $packageLock=Open-NativeReadLock $package
+        $checkpoint='compatibility.probe-script-read-lock'
+        $scriptLock=Open-NativeReadLock $script
+        $checkpoint='compatibility.probe-script-content'
         $reader=[IO.StreamReader]::new($scriptLock,[Text.Encoding]::UTF8,$true,4096,$true)
         try {if ($reader.ReadToEnd() -cne $scriptText) {throw 'native-incompatible'}} finally {$reader.Dispose();$scriptLock.Position=0}
+        $checkpoint='compatibility.probe-package-content'
         $reader=[IO.StreamReader]::new($packageLock,[Text.Encoding]::UTF8,$true,4096,$true)
         try {if ($reader.ReadToEnd() -cne '{"name":"clackly-native-probe","version":"1.0.0","main":"main.js"}') {throw 'native-incompatible'}} finally {$reader.Dispose();$packageLock.Position=0}
+        $checkpoint='compatibility.probe-start-info'
         $start=[Diagnostics.ProcessStartInfo]::new()
         $start.FileName=$pair.WorkflowExecutable
         $start.Arguments='--user-data-dir="'+(Join-Path $probe 'profile')+'" --crash-dumps-dir="'+(Join-Path $probe 'crashes')+'" --disable-crash-reporter "'+$probe+'"'
@@ -210,14 +299,22 @@ app.whenReady().then(() => app.exit(code), () => app.exit(42));
         foreach ($key in @('ELECTRON_RUN_AS_NODE','NODE_OPTIONS','NODE_PATH','ELECTRON_ENABLE_LOGGING','ELECTRON_LOG_FILE','ELECTRON_EXTRA_LAUNCH_ARGS','ELECTRON_OVERRIDE_DIST_PATH')) {$start.EnvironmentVariables.Remove($key)}
         $start.EnvironmentVariables['CLACKLY_NATIVE_PROBE_FILE']=$NativePath
         $start.EnvironmentVariables['TEMP']=$probe; $start.EnvironmentVariables['TMP']=$probe
+        $checkpoint='compatibility.probe-run'
         if ([Clackly.NativeIdentity]::RunProbe($start) -ne 0) {throw 'native-incompatible'}
         $resultPath=Join-Path $probe 'result.json'
+        $checkpoint='compatibility.probe-result-path'
         Assert-NormalPath $resultPath | Out-Null
+        $checkpoint='compatibility.probe-result-size'
         if ((Get-Item -LiteralPath $resultPath).Length -gt 65536) {throw 'native-incompatible'}
+        $checkpoint='compatibility.probe-result-read'
         $record=[IO.File]::ReadAllText($resultPath) | ConvertFrom-Json
+        $checkpoint='compatibility.probe-result-identity'
         if ($record.execPath -ine $pair.WorkflowExecutable -or $record.electron -notmatch '^\d+\.\d+\.\d+' -or
             $record.node -notmatch '^\d+\.\d+\.\d+' -or $record.napi -notmatch '^[1-9][0-9]*$' -or (Get-NativeStreamHash $electronLock) -cne $hostHash) {throw 'native-incompatible'}
-    } catch {throw [InvalidOperationException]::new('native-incompatible',$_.Exception)}
+    } catch {
+        Add-NativeFailureContext $_ $checkpoint
+        throw [InvalidOperationException]::new('native-incompatible',$_.Exception)
+    }
     finally {
         foreach ($handle in @($scriptLock,$packageLock,$electronLock,$resolveLock)) {if ($handle) {$handle.Dispose()}}
         # Retain the bounded transaction-owned probe evidence; never delete an
@@ -229,39 +326,74 @@ function Copy-LocalResolveNative([string]$StageRoot,[string]$WorkflowExecutable,
     [scriptblock]$Source = { Get-LocalResolveNativePath },
     [scriptblock]$Signature = {param($p) Assert-BlackmagicSignature $p},
     [scriptblock]$Compatibility = {param($p,$w) Assert-ResolveNativeCompatibility $p $w}) {
-    $sourcePath=& $Source
-    if (![IO.File]::Exists($sourcePath)) {
-        try { Assert-NormalPath $sourcePath -AllowMissing | Out-Null } catch { throw 'native-invalid' }
-        throw 'native-missing'
-    }
-    $destination=Join-Path $StageRoot 'workflow-plugin\WorkflowIntegration.node'
+    $checkpoint='copy.source'
+    try {
+        $sourcePath=& $Source
+        $checkpoint='copy.source-present'
+        if (![IO.File]::Exists($sourcePath)) {
+            try { Assert-NormalPath $sourcePath -AllowMissing | Out-Null } catch {
+                Add-NativeFailureContext $_ 'copy.missing-source-path'
+                throw [InvalidOperationException]::new('native-invalid',$_.Exception)
+            }
+            throw 'native-missing'
+        }
+        $checkpoint='copy.destination'
+        $destination=Join-Path $StageRoot 'workflow-plugin\WorkflowIntegration.node'
+    } catch { Add-NativeFailureContext $_ $checkpoint; throw }
     $input=$null; $output=$null; $staged=$null
+    $checkpoint='copy.source-read-lock'
     try {
         $input=Open-NativeReadLock $sourcePath
-        $identity=[Clackly.NativeIdentity]::Read($input); $hash=Get-NativeStreamHash $input
+        $checkpoint='copy.source-identity'
+        $identity=[Clackly.NativeIdentity]::Read($input)
+        $checkpoint='copy.source-hash'
+        $hash=Get-NativeStreamHash $input
+        $checkpoint='copy.source-pe'
         Assert-NativePe $input -Dll
+        $checkpoint='copy.destination-path'
         Assert-NormalPath $destination -AllowMissing | Out-Null
+        $checkpoint='copy.destination-create'
         $output=[IO.File]::Open($destination,'CreateNew','Write','None')
-        $input.CopyTo($output); $output.Flush($true); $output.Dispose(); $output=$null
+        $checkpoint='copy.bytes'
+        $input.CopyTo($output)
+        $checkpoint='copy.flush'
+        $output.Flush($true)
+        $checkpoint='copy.close-output'
+        $output.Dispose(); $output=$null
+        $checkpoint='copy.read-only'
         [IO.File]::SetAttributes($destination,[IO.FileAttributes]::ReadOnly)
+        $checkpoint='copy.staged-read-lock'
         $staged=Open-NativeReadLock $destination
+        $checkpoint='copy.staged-identity'
         $stageIdentity=[Clackly.NativeIdentity]::Read($staged)
+        $checkpoint='copy.staged-pe'
         Assert-NativePe $staged -Dll
+        $checkpoint='copy.content-identity'
         if ((Get-NativeStreamHash $staged) -cne $hash -or [Clackly.NativeIdentity]::Read($input) -cne $identity -or (Get-NativeStreamHash $input) -cne $hash) { throw 'native-invalid' }
+        $checkpoint='copy.signature'
         $null=& $Signature $destination
+        $checkpoint='copy.compatibility'
         $null=& $Compatibility $destination $WorkflowExecutable
-        Assert-NormalPath $sourcePath | Out-Null; Assert-NormalPath $destination | Out-Null
+        $checkpoint='copy.final-source-path'
+        Assert-NormalPath $sourcePath | Out-Null
+        $checkpoint='copy.final-destination-path'
+        Assert-NormalPath $destination | Out-Null
+        $checkpoint='copy.final-source-read-lock'
         $freshSource=Open-NativeReadLock $sourcePath; $freshStage=$null
         try {
+            $checkpoint='copy.final-staged-read-lock'
             $freshStage=Open-NativeReadLock $destination
+            $checkpoint='copy.final-identity'
             if ([Clackly.NativeIdentity]::Read($freshSource) -cne $identity -or [Clackly.NativeIdentity]::Read($freshStage) -cne $stageIdentity -or
                 [Clackly.NativeIdentity]::Read($staged) -cne $stageIdentity -or (Get-NativeStreamHash $staged) -cne $hash) { throw 'native-invalid' }
         } finally { $freshSource.Dispose(); if ($freshStage) {$freshStage.Dispose()} }
         return @{path='workflow-plugin/WorkflowIntegration.node';size=$staged.Length;sha256=$hash}
     } catch {
+        Add-NativeFailureContext $_ $checkpoint
         if ($_.Exception.Message -cin @('native-missing','native-invalid','native-incompatible')) { throw }
-        throw 'native-invalid'
-    } finally { if ($input) {$input.Dispose()}; if ($output) {$output.Dispose()}; if ($staged) {$staged.Dispose()} }
+        throw [InvalidOperationException]::new('native-invalid',$_.Exception)
+    }
+    finally { if ($input) {$input.Dispose()}; if ($output) {$output.Dispose()}; if ($staged) {$staged.Dispose()} }
 }
 
 Export-ModuleMember -Function Get-LocalResolveNativePath, Copy-LocalResolveNative, Get-ResolveHostPair, Assert-ResolveNativeCompatibility

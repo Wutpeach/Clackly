@@ -7,13 +7,32 @@ const crypto = require('node:crypto');
 const cp = require('node:child_process');
 const { payload, zipBuffer } = require('../../electron/main/update/fixtures');
 const { verifyZip } = require('../../electron/main/update/zip');
-const { sourceIdentity, validateManifest, validateInventory, validatePlugin, verifyArchive, validateDependencies, powershell, quote } = require('./package');
+const { sourceIdentity, validateManifest, validateInventory, validatePlugin, verifyArchive, validateDependencies, validatePackagedSources, powershell, quote } = require('./package');
+const { assertProductPayload, PRODUCTION_INSTALLER_FILES, verifyPackage } = require('../verify-package');
 const hash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 function fixture() {
-  const all = payload();
+  // Use a normal Runtime directory, keeping test fixture names out of product paths.
+  const all = payload().map(([name, bytes]) => [name.replaceAll('python/test/', 'python/cpython/'),
+    String(bytes).replaceAll('python/test/', 'python/cpython/')]);
   const manifest = JSON.parse(all.find(([name]) => name === 'plugin/clackly-release.json')[1]);
   manifest.build.publishable = false; manifest.source.dirty = true;
-  return { entries: all.filter(([name]) => name !== 'plugin/clackly-release.json'), manifest };
+  const data = { entries: all.filter(([name]) => name !== 'plugin/clackly-release.json'), manifest };
+  for (const file of PRODUCTION_INSTALLER_FILES) {
+    if (!data.entries.some(([name]) => name === 'plugin/' + file)) data.entries.push(['plugin/' + file, 'inert executor']);
+  }
+  refreshInventory(data);
+  return data;
+}
+function refreshInventory(data) {
+  data.manifest.files = data.entries.map(([name, bytes]) => ({ path: name.slice(7),
+    size: Buffer.byteLength(bytes), sha256: hash(bytes) })).sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  data.manifest.runtime.manifestSha256 = data.manifest.files.find((item) => item.path === data.manifest.runtime.manifestPath).sha256;
+}
+function writePlugin(root, data) {
+  for (const [name, bytes] of [...data.entries, ['plugin/clackly-release.json', JSON.stringify(data.manifest)]]) {
+    const file = path.join(root, name.slice(7));
+    fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, bytes);
+  }
 }
 function workspace(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'clackly-release-test-'));
@@ -49,6 +68,99 @@ test('manifest rejects invalid provenance, version, runtime/native and false pub
     (m) => { m.build.publishable = true; }, (m) => { m.schemaVersion = 1; }, (m) => { m.files.reverse(); }]) {
     const { manifest } = fixture(); change(manifest); assert.throws(() => validateManifest(manifest, '0.2.0'));
   }
+});
+
+const contaminants = [
+  'electron/main/update/UpdateService.test.js', 'electron/main/update/windows.integration.js',
+  'electron/main/update/fixtures.js', 'electron/main/update/file-storage-fixture.js',
+  'script-runtime/runtime/fixtures/test_worker.py', 'resolve2ae_core/tests/snapshot.json',
+  'resolve/test_export.py', 'resolve/export.otio', 'resolve/export.aep',
+  'electron/main/diagnostics/receipt.json', 'scripts/diagnostic-sampler/receipt.json',
+  '.trellis/tasks/local-evidence.json', 'private/receipt.json', 'sdk/SamplePlugin/readme.txt',
+  'resources/runtimes/python/cpython/clackly/tests/fixture.py', 'node_modules/example/tests/fixture.json',
+  'capability/unexpected.node', 'resolve/feasibility/scripts/Clackly_Spike_0911_Lua.lua',
+  'resolve/feasibility/scripts/Clackly_Spike_0911_Python.py'
+];
+
+test('complete hash inventories cannot qualify nonproduct staged trees or ZIPs', async (t) => {
+  const root = workspace(t);
+  for (const file of contaminants) {
+    const data = fixture();
+    // Deliberately include the historical small OTIO size; no byte-count exemption.
+    data.entries.push(['plugin/' + file, file.endsWith('.otio') ? 'x'.repeat(606) : 'inert nonproduct fixture']);
+    refreshInventory(data);
+    const zip = archive(root, data);
+    await verifyZip(zip, '0.2.0', { allowNonpublishable: true });
+    await assert.rejects(verifyArchive(zip, '0.2.0'), /Nonproduct release payload/, file);
+    const plugin = path.join(root, String(contaminants.indexOf(file))); writePlugin(plugin, data);
+    assert.throws(() => validatePlugin(plugin, '0.2.0'), /Nonproduct release payload/, file);
+    const packageRoot = path.join(root, 'package-' + contaminants.indexOf(file));
+    writePlugin(path.join(packageRoot, 'resources/app'), data);
+    await assert.rejects(verifyPackage({ packageRoot }), /Nonproduct release payload/, file);
+  }
+});
+
+test('electron-builder selects runnable product sources and dependencies while omitting nonproduct files', (t) => {
+  const root = workspace(t);
+  const kept = ['package.json', 'manifest.xml', 'workflow-plugin/main.js', 'dist/renderer/index.html',
+    'dist/renderer/assets/renderer.js', 'electron/main/main.js', 'electron/main/preload.js',
+    'electron/shared/palette-geometry.json', 'app/createClacklyCore.js', 'capability/script.js',
+    'command-engine/commands/after-effects.json', 'localization/resources.mjs', 'resolve/adapter.py',
+    'resolve/ordinary_scripts.py', 'resolve2ae_core/export.py', 'script-runtime/runtime/bootstrap.py',
+    'script-runtime/runtime/launcher.js', 'scripts/resolve2ae_export.py', 'node_modules/react/index.js',
+    'node_modules/react/LICENSE', ...PRODUCTION_INSTALLER_FILES];
+  const omitted = [...contaminants, 'build/test-evidence/receipt.json', 'release/old.zip',
+    'scripts/workflow-update/LocalNativeDiagnostics.test.ps1', 'scripts/workflow-release/package.js',
+    'electron/renderer/settingsUpdateFixture.mjs', 'workflow-plugin/WorkflowIntegration.node'];
+  for (const file of [...kept, ...omitted]) {
+    fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); fs.writeFileSync(path.join(root, file), 'inert');
+  }
+  const { FileMatcher, getNodeModuleFileMatcher } = require('app-builder-lib/out/fileMatcher');
+  const files = require('../../package.json').build.files;
+  const filter = new FileMatcher(root, root, (pattern) => pattern, files).createFilter();
+  const selected = [];
+  function visit(directory, select = filter) {
+    for (const item of fs.readdirSync(directory)) {
+      const file = path.join(directory, item); const stat = fs.statSync(file);
+      if (!select(file, stat)) continue;
+      if (stat.isDirectory()) visit(file, select); else selected.push(path.relative(root, file).split(path.sep).join('/'));
+    }
+  }
+  visit(root);
+  // electron-builder walks production dependencies separately from app files.
+  const dependencyFilter = getNodeModuleFileMatcher(root, root, (pattern) => pattern, {},
+    { config: { files }, debugLogger: { isEnabled: false } }).createFilter();
+  visit(path.join(root, 'node_modules'), dependencyFilter);
+  assert.deepEqual(selected.sort(), kept.sort());
+  assertProductPayload(selected);
+});
+
+test('release identity agrees across package, lock roots and Workflow XML', () => {
+  const pkg = require('../../package.json'); const lock = require('../../package-lock.json');
+  const { readWorkflowManifest } = require('../package-internal-beta');
+  assert.equal(lock.version, pkg.version); assert.equal(lock.packages[''].version, pkg.version);
+  assert.equal(readWorkflowManifest(path.resolve(__dirname, '../../manifest.xml')).version, pkg.version);
+});
+
+test('excluding installer tests preserves exact production executor source verification', (t) => {
+  const root = workspace(t); const appRoot = path.join(root, 'source'); const plugin = path.join(root, 'plugin');
+  const files = ['dist/renderer/index.html', 'workflow-plugin/main.js',
+    'electron/main/update/release-manifest.js', 'electron/main/update/zip.js', ...PRODUCTION_INSTALLER_FILES];
+  for (const tree of [appRoot, plugin]) {
+    for (const file of files) {
+      fs.mkdirSync(path.dirname(path.join(tree, file)), { recursive: true }); fs.writeFileSync(path.join(tree, file), 'current product');
+    }
+  }
+  // Repository-only tests need no matching packaged copy.
+  fs.writeFileSync(path.join(appRoot, 'scripts/workflow-update/LocalNativeDiagnostics.test.ps1'), 'inert test');
+  validatePackagedSources(appRoot, plugin);
+  for (const file of files) {
+    fs.writeFileSync(path.join(plugin, file), 'stale product');
+    assert.throws(() => validatePackagedSources(appRoot, plugin), /Packaged source is stale/, file);
+    fs.writeFileSync(path.join(plugin, file), 'current product');
+  }
+  fs.unlinkSync(path.join(plugin, 'scripts/workflow-update/LocalNative.psm1'));
+  assert.throws(() => validatePackagedSources(appRoot, plugin), { code: 'ENOENT' });
 });
 test('main and local development ZIP provenance never passes production verification', async (t) => {
   const root = workspace(t);

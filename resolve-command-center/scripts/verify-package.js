@@ -4,6 +4,38 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { RuntimeLauncher } = require("../script-runtime/runtime/launcher");
 const { resolveRuntimeRoot } = require("../script-runtime/runtime/paths");
+const { listTree } = require("./package-internal-beta");
+
+// The fixed entrypoints and their adjacent module closure. Test/diagnostic tools
+// are deliberately outside the installed executor and source-staleness set.
+const PRODUCTION_INSTALLER_FILES = [
+  "scripts/install-workflow-plugin.ps1",
+  ...["bootstrap.ps1", "executor.ps1", "launch.ps1", "recover.ps1",
+    "WorkflowTransaction.psm1", "ExecutorSupport.psm1", "LocalNative.psm1"]
+    .map((name) => `scripts/workflow-update/${name}`)
+];
+
+function assertProductPayload(files) {
+  for (const file of files) {
+    const name = file.toLowerCase();
+    const base = name.split("/").at(-1);
+    const nonproduct = name.startsWith("resolve/feasibility/")
+      || name.split("/").some((part) => ["test", "tests", "__tests__", "fixtures", "__fixtures__",
+      "snapshots", "output", "outputs", "test-output", "test-outputs", "diagnostics", "evidence", "private", "sdk", "__pycache__"].includes(part))
+      || name.split("/").some((part) => part.startsWith("."))
+      || /[.](?:test|spec|integration)[.]/.test(base) || /^test_.*[.]py$/.test(base)
+      || /^(?:fixtures|.*-fixture)[.]js$/.test(base)
+      || /[.](?:otio|aep|jsx|log|dmp|pyc|pyo|node)$/.test(base);
+    const product = ["package.json", "manifest.xml", "clackly-release.json",
+      "workflow-plugin/main.js", "scripts/resolve2ae_export.py", ...PRODUCTION_INSTALLER_FILES].includes(file)
+      || ["node_modules/", "resources/runtimes/", "dist/renderer/"].some((prefix) => file.startsWith(prefix))
+      || (["app", "bridge", "capability", "command-engine", "command-search", "command-usage", "config", "execution-adapter",
+        "feature-status", "feature-ui", "interaction", "localization", "preferences", "resolve", "resolve2ae_core", "script-runtime", "shortcut"]
+        .includes(file.split("/")[0]) || file.startsWith("electron/main/") || file.startsWith("electron/shared/"))
+        && /[.](?:js|mjs|json|py)$/.test(file);
+    if (nonproduct || !product) throw new Error(`Nonproduct release payload: ${file}`);
+  }
+}
 
 function sha256(filePath) {
   return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
@@ -93,6 +125,9 @@ async function verifyPackage({
   appRoot = path.resolve(__dirname, ".."),
   packageRoot = path.resolve(process.argv[2] || path.join(path.resolve(__dirname, ".."), "release", "win-unpacked"))
 } = {}) {
+  assertProductPayload(listTree(path.join(packageRoot, "resources", "app")).map((item) => item.relativePath));
+  assertProductPayload(listTree(path.join(packageRoot, "resources", "runtimes"))
+    .map((item) => `resources/runtimes/${item.relativePath}`));
   const runtimeRoot = path.join(packageRoot, "resources", "runtimes");
   const profiles = loadLockedProfiles(runtimeRoot);
   const stagedRoot = path.join(appRoot, "build", "runtime-staging", "runtimes");
@@ -179,4 +214,5 @@ if (require.main === module) {
   });
 }
 
-module.exports = { assertApplicationSourceIdentity, productionPythonSourceInventory, verifyPackage };
+module.exports = { assertApplicationSourceIdentity, productionPythonSourceInventory, verifyPackage,
+  assertProductPayload, PRODUCTION_INSTALLER_FILES };

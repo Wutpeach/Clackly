@@ -57,4 +57,6 @@ try {Copy-LocalResolveNative $f.Stage 'D:\Resolve\Electron\electron.exe' -Source
 catch {Check ($_.Exception.Message -ceq 'native-invalid') 'inert production rejection reason'}
 Check (!$accepted) 'inert fixture gained production trust'
 Write-Output 'PASS inert-fixture-never-production-qualified'
+& (Join-Path $PSScriptRoot 'LocalNativeDiagnostics.test.ps1')
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Output ('EVIDENCE '+$root)
