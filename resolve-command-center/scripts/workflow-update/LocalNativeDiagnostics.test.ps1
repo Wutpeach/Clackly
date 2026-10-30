@@ -67,10 +67,32 @@ try {
     Write-Output 'PASS diagnostics-corrupt-pe-distinct-type-code-and-checkpoint'
 
     $f=New-DiagnosticFixture 'unsigned'
+    # The real signature provider may throw before returning a signature status.
+    # Observe this call's first ErrorRecord rather than assuming one CLR class.
+    $Error.Clear()
     $unsigned=Get-DiagnosticRejection { Copy-LocalResolveNative $f.Stage $f.Workflow -Source {$f.Source} } 'native-invalid'
+    # Module auto-loading can also append bare exceptions to PowerShell's history.
+    $unsignedRecords=@($Error | Where-Object {$_ -is [Management.Automation.ErrorRecord]})
+    Assert-Diagnostic ($unsignedRecords.Count -gt 0) 'signature original error record missing'
+    $unsignedOriginal=$unsignedRecords[$unsignedRecords.Count-1]
     $unsignedContext=Find-DiagnosticContext $unsigned.Exception
     Assert-DiagnosticContext $unsignedContext 'copy.signature'
-    Assert-Diagnostic ($unsignedContext.exceptionType -ceq 'System.Management.Automation.RuntimeException') 'signature original runtime error lost'
+    Assert-Diagnostic ([object]::ReferenceEquals((Find-DiagnosticContext $unsignedOriginal.Exception),$unsignedContext)) 'signature first context identity lost'
+    $cursor=$unsigned.Exception; $originalRetained=$false
+    for ($depth=0; $cursor -and $depth -lt 32; $depth++) {
+        if ([object]::ReferenceEquals($cursor,$unsignedOriginal.Exception)) { $originalRetained=$true; break }
+        $cursor=$cursor.InnerException
+    }
+    Assert-Diagnostic $originalRetained 'signature original exception identity lost'
+    Assert-Diagnostic ($unsignedContext.exceptionType -ceq $unsignedOriginal.Exception.GetType().FullName -and
+        $unsignedContext.fullyQualifiedErrorId -ceq $unsignedOriginal.FullyQualifiedErrorId -and
+        $unsignedContext.hResult -eq $unsignedOriginal.Exception.HResult) 'signature original error fields lost'
+    $cursor=$unsignedOriginal.Exception
+    foreach ($cause in $unsignedContext.exceptions) {
+        Assert-Diagnostic ($null -ne $cursor -and $cause.type -ceq $cursor.GetType().FullName -and $cause.hResult -eq $cursor.HResult) 'signature original exception chain changed'
+        $cursor=$cursor.InnerException
+    }
+    Assert-Diagnostic (!$cursor -or $unsignedContext.exceptions.Count -eq 8) 'signature original exception chain truncated early'
     Write-Output 'PASS diagnostics-real-inert-signature-refusal'
 
     $f=New-DiagnosticFixture 'destination-exists'
