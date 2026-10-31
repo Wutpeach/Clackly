@@ -21,7 +21,7 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
   const url = new URL(serverUrl);
   url.searchParams.set("view", "settings");
   url.searchParams.set("settings-preview", "application-empty");
-  const installationStates = { "install-ready": "ready", confirmation: "awaiting-confirmation", "waiting-exit": "waiting-for-exit",
+  const installationStates = { "install-ready": "ready", confirmation: "awaiting-confirmation", starting: "starting", "waiting-exit": "waiting-for-exit",
     installing: "installing", installed: "installed", "rolled-back": "rolled-back", "install-failed": "failed",
     "install-cancelled": "cancelled", "permission-denied": "unavailable", "permission-cancelled": "cancelled",
     "recovery-required": "failed", "publisher-unverified": "unavailable",
@@ -92,7 +92,10 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
       await focused(prepare, "explicit Not Now returns focus to prepare");
       await page.keyboard.press("Enter"); await waitInstallation("awaiting-confirmation");
       await page.keyboard.press("Tab"); await focused(confirm, "Tab reaches explicit confirmation");
-      await page.keyboard.press("Space"); await waitInstallation("waiting-for-exit");
+      await page.keyboard.press("Space"); await waitInstallation("starting");
+      assert.equal(await section.locator(".update-install-status").innerText(), t("install.status.starting"));
+      assert.equal(await confirm.count(), 0, "confirmation is removed while independent handoff is pending");
+      await waitInstallation("waiting-for-exit");
       await focused(check, "confirmation completion leaves focus on a stable control");
       const cancelWait = section.getByRole("button", { name: t("install.cancelWait"), exact: true });
       assert.equal(await cancelWait.getAttribute("aria-disabled"), "false", "cancel remains available while confirmation IPC is pending");
@@ -167,6 +170,12 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
           assert.equal(await section.locator(".update-install-reason").innerText(), t("install.reason." + state));
           assert.equal(await section.getByRole("button", { name: t("install.prepare"), exact: true }).count(), 0);
           assert.deepEqual(await section.locator(".update-versions dd").allTextContents(), ["0.1.0", "0.2.0", "0.2.0"]);
+        }
+if (state === "recovery-required") {
+  assert.equal(await section.locator(".update-install-reason").innerText(), t("install.reason.recovery-required"));
+  assert.equal(await section.getByRole("button", { name: t("discard"), exact: true }).getAttribute("aria-disabled"), "true");
+          assert.equal(await section.getByRole("button", { name: t("install.prepare"), exact: true }).count(), 0, "ambiguous request never offers unsafe retry");
+          assert.equal(await section.getByRole("button", { name: t("install.confirm"), exact: true }).count(), 0);
         }
       }
       if (["checking", "downloading", "verifying", "rate-limit", "unavailable"].includes(state)) assert.equal(await check.getAttribute("aria-disabled"), "true");

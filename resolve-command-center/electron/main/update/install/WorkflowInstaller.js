@@ -39,6 +39,55 @@ function publicReason(error) {
   if (['EACCES', 'EPERM', 'EROFS'].includes(error?.code)) return 'permission-denied';
   return REASONS.has(error?.message) ? error.message : 'install-failed';
 }
+function spawnLauncher(powershell, script, id) {
+  // Preserve the independent launch boundary. A process creation success is
+  // insufficient: some Windows hosts silently exit before executing -File.
+  // Never offer the quit prompt unless the worker acknowledges on the OS pipe.
+  return spawn(powershell, ['-NoProfile', '-NonInteractive', '-File', script, '-RequestId', id],
+    { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], detached: true });
+}
+// Only the OS pipe from our fixed independent launcher can acknowledge takeover.
+// Writable request markers are never evidence that an executor is alive.
+async function observeLauncher(child, { id, onState, installing, inspect,
+  now = Date.now, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  startupMs = 120000, timeoutMs = 30 * 60 * 1000 } = {}) {
+  let exited = false; let launchError = null; let ready = false; let invalid = false; let output = ''; let notified = false;
+  child.once('error', (error) => { launchError = error; exited = true; });
+  child.once('exit', () => { exited = true; });
+  child.stdout.on('data', (bytes) => {
+    if (ready || invalid) return;
+    if (Buffer.byteLength(output) + bytes.length > 4096) { invalid = true; return; }
+    output += bytes.toString('utf8');
+    const end = output.indexOf('\n');
+    if (end < 0) return;
+    try {
+      const value = JSON.parse(output.slice(0, end));
+      ready = value.id === id && value.event === 'ready' && value.pid === child.pid;
+      if (!ready) invalid = true;
+    } catch { invalid = true; }
+  });
+  child.unref();
+  const started = now();
+  let acknowledged = false;
+  try {
+    while (now() - started < timeoutMs) {
+      if (launchError || invalid) throw new Error('recovery-required');
+      // Launcher waits for its actual worker. Its exit is still mandatory
+      // before Inspect may reconcile a terminal result and actual trees.
+      if (exited) return await inspect();
+      if (ready && !acknowledged && !notified) { acknowledged = true; onState({ status: 'waiting-for-exit', reason: null }); }
+      if (installing() && !notified) { notified = true; onState({ status: 'installing', reason: null }); }
+      if (!acknowledged && !notified && now() - started >= startupMs) throw new Error('recovery-required');
+      await pause(150);
+    }
+    throw new Error('recovery-required');
+  } catch { return { status: 'failed', reason: 'recovery-required' }; }
+  finally {
+    // Do not kill or abort a handed-off worker. There are no subsequent writes
+    // to this pipe; launcher/worker lifetime must not depend on this host.
+    child.stdout.destroy();
+  }
+}
 function createWorkflowInstaller({ appRoot, cacheRoot, host } = {}) {
   let active = null;
   function locations() {
@@ -126,24 +175,10 @@ function createWorkflowInstaller({ appRoot, cacheRoot, host } = {}) {
       const pointerPath = path.join(cacheRoot, 'installation.json');
       writeExclusive(pointerPath + '.next', pointer); normalPath(pointerPath, { missing: true }); fs.renameSync(pointerPath + '.next', pointerPath);
       if (signal?.aborted || operation.cancelRequested) writeExclusive(path.join(operation.root, 'cancel.request'), { id: operation.id });
-      const child = spawn(known.powershell, ['-NoProfile', '-NonInteractive', '-File', path.join(known.scripts, 'launch.ps1'),
-        '-RequestId', operation.id], { windowsHide: true, stdio: 'ignore', detached: true });
-      let exited = false; let launchError = null;
-      child.once('error', (error) => { launchError = error; exited = true; });
-      child.once('exit', () => { exited = true; });
-      child.unref(); operation.launched = true;
-      onState({ status: 'waiting-for-exit', reason: null });
-      const deadline = Date.now() + 30 * 60 * 1000;
-      while (Date.now() < deadline) {
-        if (launchError) throw launchError;
-        if (installing(operation) && !operation.notified) { operation.notified = true; onState({ status: 'installing', reason: null }); }
-        // Actual launcher exit (including its waited worker) is required before
-        // interpreting any terminal marker, then Inspect verifies actual trees.
-        if (exited) return await inspect(pointer, known);
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      }
-      return { status: 'failed', reason: 'recovery-required' };
-    } catch (error) { return { status: 'failed', reason: publicReason(error) }; }
+      const child = spawnLauncher(known.powershell, path.join(known.scripts, 'launch.ps1'), operation.id);
+      return await observeLauncher(child, { id: operation.id, onState, installing: () => installing(operation),
+        inspect: () => inspect(pointer, known) });
+    } catch (error) { return { status: 'failed', reason: operation.root ? 'recovery-required' : publicReason(error) }; }
   }
   async function start(candidate, options = {}) {
     if (active) return { status: 'failed', reason: 'concurrent-install' };
@@ -175,4 +210,4 @@ function createWorkflowInstaller({ appRoot, cacheRoot, host } = {}) {
   }
   return { qualify, start, cancel, readState };
 }
-module.exports = { createWorkflowInstaller };
+module.exports = { createWorkflowInstaller, observeLauncher, spawnLauncher };

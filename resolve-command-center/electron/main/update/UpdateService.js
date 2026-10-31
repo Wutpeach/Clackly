@@ -248,7 +248,8 @@ class UpdateService {
   }
   discardUpdate() {
     return this.run('discard', async () => {
-      if (!this.downloadedName || this.installation.isRunning()) return;
+      if (!this.downloadedName || this.installation.isRunning() ||
+          this.installation.state.status === 'failed' && this.installation.state.reason === 'recovery-required') return;
       const name = this.downloadedName;
       // Persist the tombstone before unlinking, so an interrupted discard cannot restore it.
       const cache = { ...this.cache, downloaded: null };

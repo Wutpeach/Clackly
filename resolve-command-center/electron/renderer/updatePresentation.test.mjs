@@ -48,6 +48,14 @@ test("update display bounds release text and byte progress without exposing raw 
   assert.equal(state({ downloadedVersion: "C:/private" }).downloadedVersion, null);
 });
 
+test("recovery-required keeps the downloaded package and disables discard", async () => {
+  const api = createSettingsUpdateFixture({ search: "?view=settings&settings-update=recovery-required" });
+  const snapshot = normalizeUpdateSnapshot(await api.getUpdateState());
+  assert.equal(getUpdatePresentation(snapshot).canDiscard, false);
+  assert.equal((await api.discardUpdate()).downloadedVersion, snapshot.downloadedVersion);
+  assert.equal((await api.getUpdateState()).installation.reason, "recovery-required");
+});
+
 test("local Workflow component failures retain the candidate and expose a bounded repair reason", async () => {
   for (const reason of ["native-missing", "native-invalid", "native-incompatible"]) {
     const api = createSettingsUpdateFixture({ search: "?view=settings&settings-update=" + reason });
@@ -78,13 +86,13 @@ test("retained candidates and installation qualifications control visible action
     assert.equal(getUpdatePresentation(state({ ...candidate, installation: { status: "cancelled", reason } })).canPrepareInstall, true, 'cancelled candidate can request fresh host qualification');
   }
   assert.equal(getUpdatePresentation(state({ ...candidate, installation: { status: "cancelled", reason: "recovery-required" } })).canPrepareInstall, false);
-  for (const status of ["awaiting-confirmation", "waiting-for-exit", "installing", "installed"]) {
+  for (const status of ["awaiting-confirmation", "starting", "waiting-for-exit", "installing", "installed"]) {
     const view = getUpdatePresentation(state({ ...candidate, installation: { status, reason: null } }));
     assert.equal(view.canCheck, false);
     assert.equal(view.canDiscard, false);
     assert.equal(view.canDownload, false);
     assert.equal(view.canConfirmInstall, status === "awaiting-confirmation");
-    assert.equal(view.canCancelInstall, ["awaiting-confirmation", "waiting-for-exit"].includes(status));
+    assert.equal(view.canCancelInstall, ["awaiting-confirmation", "starting", "waiting-for-exit"].includes(status));
   }
 });
 
@@ -136,7 +144,7 @@ test("only explicit simulated qualification permits confirmation, cancel and iso
     await api.prepareUpdateInstall();
     let confirmationFinished = false;
     const confirmation = api.confirmUpdateInstall().then((snapshot) => { confirmationFinished = true; return snapshot; });
-    assert.equal((await api.getUpdateState()).installation.status, "waiting-for-exit");
+    assert.equal((await api.getUpdateState()).installation.status, "starting");
     assert.equal(confirmationFinished, false, "confirmation remains pending while the host waits for exit");
     assert.equal((await api.cancelUpdateInstall()).installation.status, "cancelled");
     assert.equal((await confirmation).installation.status, "cancelled", "cancel resolves the original pending request");

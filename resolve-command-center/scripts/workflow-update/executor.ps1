@@ -59,7 +59,12 @@ try {
         # Re-resolve official metadata in THIS process, including after UAC.
         Assert-OfficialRelease $request
         $oldHash = Get-TreeHash $locations.Target
-        if (!(Wait-UpdateHostExit $context $cancelled)) { $result = @{status='cancelled';reason=$null;oldHash=$oldHash} }
+        if (!(Wait-UpdateHostExit $context $cancelled -Ready {
+            # Live inherited pipe, after request/source/host qualification. The
+            # launcher binds this receipt to the process it actually started.
+            [Console]::Out.WriteLine((@{id=$RequestId;event='ready';pid=$PID;created=[Diagnostics.Process]::GetCurrentProcess().StartTime.ToUniversalTime().ToString('o')} | ConvertTo-Json -Compress))
+            [Console]::Out.Flush()
+        })) { $result = @{status='cancelled';reason=$null;oldHash=$oldHash} }
         else {
             Assert-UpdateWriteAccess $locations.Target $locations.Scan
             Assert-NormalPath $locations.Transactions -AllowMissing | Out-Null

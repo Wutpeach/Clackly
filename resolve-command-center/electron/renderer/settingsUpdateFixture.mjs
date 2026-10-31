@@ -2,7 +2,7 @@
 export const SETTINGS_UPDATE_SCENARIOS = Object.freeze([
   "idle", "no-release", "up-to-date", "available", "checking", "rate-limit", "offline", "timeout",
   "downloading", "verifying", "cancelled", "failure", "corrupt", "space", "version", "downloaded", "unavailable",
-  "install-ready", "confirmation", "waiting-exit", "installing", "installed", "rolled-back", "install-failed",
+  "install-ready", "confirmation", "starting", "waiting-exit", "installing", "installed", "rolled-back", "install-failed",
   "install-cancelled", "permission-denied", "permission-cancelled", "recovery-required", "publisher-unverified",
   "native-missing", "native-invalid", "native-incompatible"
 ]);
@@ -38,7 +38,7 @@ export function createSettingsUpdateFixture({ search = "", schedule = setTimeout
     }
     if (scenario === "unavailable") Object.assign(state, { currentVersion: null, error: { code: "invalid-version" } });
     const installation = {
-      "install-ready": ["ready", null], confirmation: ["awaiting-confirmation", null],
+      "install-ready": ["ready", null], confirmation: ["awaiting-confirmation", null], starting: ["starting", null],
       "waiting-exit": ["waiting-for-exit", "host-running"], installing: ["installing", null], installed: ["installed", null],
       "rolled-back": ["rolled-back", "install-failed"], "install-failed": ["failed", "install-failed"],
       "install-cancelled": ["cancelled", null], "permission-denied": ["unavailable", "permission-denied"],
@@ -56,7 +56,7 @@ export function createSettingsUpdateFixture({ search = "", schedule = setTimeout
   function publish(patch) {
     state = { ...state, ...patch };
     listeners.forEach((callback) => callback(clone(state)));
-    if (finishInstallation && !["awaiting-confirmation", "waiting-for-exit", "installing"].includes(state.installation.status)) {
+    if (finishInstallation && !["awaiting-confirmation", "starting", "waiting-for-exit", "installing"].includes(state.installation.status)) {
       const finish = finishInstallation;
       finishInstallation = null;
       finish(clone(state));
@@ -76,7 +76,7 @@ export function createSettingsUpdateFixture({ search = "", schedule = setTimeout
     getUpdateState: async () => clone(state),
     checkForUpdates: async () => {
       if (!explicit || ["checking", "downloading", "verifying"].includes(state.status) ||
-        ["awaiting-confirmation", "waiting-for-exit", "installing", "installed"].includes(state.installation.status) || state.retryAt > Date.now()) return clone(state);
+        ["awaiting-confirmation", "starting", "waiting-for-exit", "installing", "installed"].includes(state.installation.status) || state.retryAt > Date.now()) return clone(state);
       clearPending();
       publish({ status: "checking", error: null });
       const token = generation;
@@ -108,7 +108,8 @@ export function createSettingsUpdateFixture({ search = "", schedule = setTimeout
     },
     discardUpdate: async () => {
       if (!explicit || !state.downloadedVersion || ["checking", "downloading", "verifying"].includes(state.status) ||
-        ["awaiting-confirmation", "waiting-for-exit", "installing", "installed"].includes(state.installation.status)) return clone(state);
+        ["awaiting-confirmation", "starting", "waiting-for-exit", "installing", "installed"].includes(state.installation.status) ||
+        (state.installation.status === "failed" && state.installation.reason === "recovery-required")) return clone(state);
       clearPending();
       return publish({ status: state.latestVersion && state.latestVersion !== state.currentVersion ? "available" : "idle",
         downloadedVersion: null, receivedBytes: 0, totalBytes: 0, error: null, installation: { status: "unavailable", reason: "no-candidate" } });
@@ -123,7 +124,8 @@ export function createSettingsUpdateFixture({ search = "", schedule = setTimeout
       const token = generation;
       // Match the host IPC lifetime: confirm stays pending until cancellation or a terminal result.
       const completion = new Promise((resolve) => { finishInstallation = resolve; });
-      publish({ installation: { status: "waiting-for-exit", reason: "host-running" } });
+      publish({ installation: { status: "starting", reason: null } });
+      later(300, { installation: { status: "waiting-for-exit", reason: "host-running" } }, token);
       later(800, { installation: { status: "installing", reason: null } }, token);
       const outcome = params.get("install-outcome");
       later(1400, { installation: outcome === "rollback" ? { status: "rolled-back", reason: "install-failed" }
@@ -131,7 +133,7 @@ export function createSettingsUpdateFixture({ search = "", schedule = setTimeout
       return completion;
     },
     cancelUpdateInstall: async () => {
-      if (!explicit || !["awaiting-confirmation", "waiting-for-exit"].includes(state.installation.status)) return clone(state);
+      if (!explicit || !["awaiting-confirmation", "starting", "waiting-for-exit"].includes(state.installation.status)) return clone(state);
       clearPending();
       return publish({ installation: { status: "cancelled", reason: null } });
     },

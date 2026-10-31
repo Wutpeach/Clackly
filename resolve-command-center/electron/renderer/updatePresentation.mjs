@@ -15,7 +15,7 @@ export const UPDATE_ERROR_KEYS = Object.freeze({
 });
 
 export const INSTALLATION_STATUSES = Object.freeze([
-  "unavailable", "ready", "awaiting-confirmation", "waiting-for-exit", "installing",
+  "unavailable", "ready", "awaiting-confirmation", "starting", "waiting-for-exit", "installing",
   "installed", "rolled-back", "failed", "cancelled"
 ]);
 export const INSTALLATION_REASONS = Object.freeze([
@@ -55,7 +55,7 @@ export function normalizeUpdateSnapshot(value) {
 export function getUpdatePresentation(state, now = Date.now()) {
   const active = ["checking", "downloading", "verifying"].includes(state.status);
   const installationStatus = state.installation?.status || "unavailable";
-  const installationActive = ["awaiting-confirmation", "waiting-for-exit", "installing"].includes(installationStatus);
+  const installationActive = ["awaiting-confirmation", "starting", "waiting-for-exit", "installing"].includes(installationStatus);
   const installed = installationStatus === "installed";
   const candidate = Boolean(state.downloadedVersion);
   const coolingDown = Boolean(state.retryAt && state.retryAt > now);
@@ -67,12 +67,13 @@ export function getUpdatePresentation(state, now = Date.now()) {
       (state.status !== "unavailable" || ["invalid-asset", "invalid-source", "missing-digest", "invalid-package", "invalid-response", "invalid-version"].includes(state.error?.code)),
     canDownload: !candidate && !installationActive && !installed && !coolingDown && Boolean(state.currentVersion && state.latestVersion) && (state.status === "available" || retryableDownload),
     canCancel: state.status === "downloading" || state.status === "verifying",
-    canDiscard: candidate && !active && !installationActive && !installed,
+    canDiscard: candidate && !active && !installationActive && !installed &&
+      !(installationStatus === "failed" && state.installation.reason === "recovery-required"),
     canPrepareInstall: candidate && Boolean(state.currentVersion) && !active &&
       (installationStatus === "ready" && state.installation.reason === null ||
         installationStatus === "cancelled" && [null, "permission-cancelled"].includes(state.installation.reason)),
     canConfirmInstall: candidate && Boolean(state.currentVersion) && !active && installationStatus === "awaiting-confirmation" && state.installation.reason === null,
-    canCancelInstall: ["awaiting-confirmation", "waiting-for-exit"].includes(installationStatus),
+    canCancelInstall: ["awaiting-confirmation", "starting", "waiting-for-exit"].includes(installationStatus),
     installationKey: "settings.update.install.status." + installationStatus,
     installationReasonKey: state.installation?.reason ? "settings.update.install.reason." + state.installation.reason : null,
     retryableDownload,

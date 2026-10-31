@@ -11,11 +11,35 @@ $request = Read-UpdateJson (Join-Path $locations.Request 'request.json') 65536
 $key = Get-UpdateRequestKey $request
 $arguments = '-NoProfile -NonInteractive -File "' + $executor + '" -RequestId ' + $RequestId + ' -CandidateKey ' + $key
 $resultPath = Join-Path $locations.Request 'result.json'
-Write-ExecutorJson (Join-Path $locations.Request 'launcher.json') @{id=$RequestId;pid=$PID;created=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o')}
+Write-ExecutorJson (Join-Path $locations.Request 'launcher.json') @{id=$RequestId;pid=$PID;created=[Diagnostics.Process]::GetCurrentProcess().StartTime.ToUniversalTime().ToString('o')}
 try {
-    # Detached by main before Settings completes; no shutdown IPC is needed.
-    $child = Start-Process -FilePath $powerShell -ArgumentList $arguments -WindowStyle Hidden -PassThru
-    $handle = $child.Handle; $child.WaitForExit()
+    # Both OS pipes are inherited from fixed-code processes, never cache JSON.
+    # Redirect only the ordinary worker. It acknowledges AFTER validation and
+    # canonical host observation; RunAs remains the existing protected path.
+    $start = [Diagnostics.ProcessStartInfo]::new()
+    $start.FileName=$powerShell; $start.Arguments=$arguments
+    $start.UseShellExecute=$false; $start.CreateNoWindow=$true
+    $start.RedirectStandardOutput=$true
+    $child = [Diagnostics.Process]::Start($start)
+    $handle = $child.Handle
+    $acknowledged = $false
+    while (($line = $child.StandardOutput.ReadLine()) -ne $null) {
+        if ($acknowledged -or $line.Length -gt 4096) { continue }
+        try { $receipt = $line | ConvertFrom-Json } catch { continue }
+        if (@('id','event','pid','created' | Where-Object { !$receipt.PSObject.Properties[$_] }).Count -gt 0) { continue }
+        if ($receipt.id -ceq $RequestId -and $receipt.event -ceq 'ready' -and $receipt.pid -eq $child.Id -and
+            $receipt.created -ceq $child.StartTime.ToUniversalTime().ToString('o') -and !$child.HasExited) {
+            $acknowledged = $true
+            # Only this write targets the host pipe. Host exit afterwards cannot
+            # cause a later broken-pipe write to end the independent launcher.
+            try {
+                [Console]::Out.WriteLine((@{id=$RequestId;event='ready';pid=$PID} | ConvertTo-Json -Compress))
+                [Console]::Out.Flush()
+            } catch { # An already closed host pipe must not end worker supervision.
+            }
+        }
+    }
+    $child.WaitForExit()
     if (Test-Path -LiteralPath $resultPath) {
         $result = Read-UpdateJson $resultPath 65536
         if ($result.id -ceq $RequestId -and $result.status -ceq 'failed' -and $result.reason -ceq 'permission-denied') {

@@ -153,12 +153,15 @@ function Get-UpdatePermissionOutcome($Failure, [string]$OldHash) {
 }
 
 function Wait-UpdateHostExit($Context, [scriptblock]$Cancelled, [scriptblock]$Observe = {param($c) Get-CanonicalHostState $c.ResolveExecutable $c.WorkflowExecutable},
-    [int]$TimeoutSeconds = 1200) {
+    [int]$TimeoutSeconds = 1200, [scriptblock]$Ready = {}) {
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $acknowledged = $false
     do {
         if (& $Cancelled) { return $false }
         $state = & $Observe $Context
         if ($state -ceq 'process-unknown') { throw 'process-unknown' }
+        if ($state -cnotin @('closed','host-running')) { throw 'process-unknown' }
+        if (!$acknowledged) { & $Ready; $acknowledged = $true }
         if ($state -ceq 'closed') { return $true }
         if ($state -cne 'host-running') { throw 'process-unknown' }
         if ([DateTime]::UtcNow -ge $deadline) { throw 'host-running' }

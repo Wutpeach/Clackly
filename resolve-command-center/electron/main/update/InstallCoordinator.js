@@ -85,8 +85,8 @@ class InstallCoordinator {
       const qualified = await this.qualify(candidate);
       if (operation.controller.signal.aborted || this.disposed || candidate !== this.candidate) return;
       if (!qualified.ready) { this.emit('unavailable', qualified.reason); return; }
-      operation.phase = 'waiting-for-exit';
-      this.emit('waiting-for-exit');
+      operation.phase = 'starting';
+      this.emit('starting');
       const result = await this.installer.start(structuredClone(candidate), { signal: operation.controller.signal,
         onState: (state) => this.acceptResult(operation, state) });
       this.acceptResult(operation, RESULTS.has(result?.status) ? result : { status: 'failed', reason: 'install-failed' });
@@ -111,11 +111,11 @@ class InstallCoordinator {
     if (operation?.phase === 'qualifying') {
       operation.controller.abort();
       this.emit('cancelled');
-    } else if (this.state.status === 'waiting-for-exit') {
+    } else if (['starting', 'waiting-for-exit'].includes(this.state.status)) {
       // The independent executor arbitrates cancellation against its backup/replace boundary.
       // A rejected or missing acknowledgment leaves waiting intact so the user can retry.
       if (operation?.cancellation) return operation.cancellation;
-      const stillWaiting = () => !this.disposed && this.operation === operation && this.state.status === 'waiting-for-exit';
+      const stillWaiting = () => !this.disposed && this.operation === operation && ['starting', 'waiting-for-exit'].includes(this.state.status);
       const cancellation = (async () => {
         try {
           const result = await this.installer.cancel?.();

@@ -2,6 +2,23 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { InstallCoordinator } = require('./InstallCoordinator');
 const candidate = { name: 'a'.repeat(32) + '.zip', version: '0.2.0', digest: 'b'.repeat(64), size: 100 };
+
+test('confirmation keeps host open until adapter acknowledges and serializes startup cancellation', async () => {
+  let finish; let report; let launches = 0; let cancellations = 0; let signal;
+  const states = [];
+  const coordinator = new InstallCoordinator({ publish: (value) => states.push(value.status), installer: {
+    qualify: async () => ({ ready: true }),
+    start: (_candidate, options) => { launches++; report = options.onState; signal = options.signal; return new Promise((resolve) => { finish = resolve; }); },
+    cancel: async () => { cancellations++; return { status: 'cancelled', reason: null }; } } });
+  await coordinator.setCandidate(candidate); await coordinator.prepare();
+  const confirmation = coordinator.confirm(); await new Promise(setImmediate);
+  assert.equal(coordinator.state.status, 'starting');
+  assert.equal(states.includes('waiting-for-exit'), false);
+  await coordinator.prepare(); await coordinator.confirm(); assert.equal(launches, 1);
+  await coordinator.cancel(); assert.equal(cancellations, 1); assert.equal(signal.aborted, false);
+  report({ status: 'waiting-for-exit' }); finish({ status: 'cancelled' }); await confirmation;
+  assert.equal(coordinator.state.status, 'cancelled');
+});
 test('local component failures survive the installer handoff and validated restart outcome', async () => {
   for (const reason of ['native-missing', 'native-invalid', 'native-incompatible']) {
     const outcome = { status: 'failed', reason };
@@ -28,7 +45,7 @@ test('confirmation requires the same retained candidate and repeats qualificatio
   ready = false; await coordinator.confirm(); assert.equal(started.length, 0);
   assert.deepEqual(coordinator.state, { status: 'unavailable', reason: 'publisher-unverified' });
   ready = true; await coordinator.prepare(); await coordinator.confirm(); assert.deepEqual(started, [candidate]);
-  assert.deepEqual(states.slice(-3).map((state) => state.status), ['waiting-for-exit', 'installing', 'installed']);
+  assert.deepEqual(states.slice(-3).map((state) => state.status), ['starting', 'installing', 'installed']);
   await coordinator.confirm(); assert.equal(started.length, 1);
   await coordinator.cancel(); assert.equal(coordinator.state.status, 'installed');
 });
@@ -56,7 +73,7 @@ test('in-flight qualification cancellation prevents executor launch and host dis
 });
 test('executor rollback is projected and cancellation is not claimed without executor acknowledgment', async () => {
   let finish; const coordinator = new InstallCoordinator({ installer: { qualify: async () => ({ ready: true }),
-    start: () => new Promise((resolve) => { finish = resolve; }), cancel: async () => ({ status: 'installing' }) } });
+    start: (_value, { onState }) => { onState({ status: 'waiting-for-exit' }); return new Promise((resolve) => { finish = resolve; }); }, cancel: async () => ({ status: 'installing' }) } });
   await coordinator.setCandidate(candidate); await coordinator.prepare(); const running = coordinator.confirm();
   await new Promise((resolve) => setImmediate(resolve)); await coordinator.cancel();
   assert.equal(coordinator.state.status, 'installing'); assert.equal(coordinator.isRunning(), true);
@@ -97,7 +114,7 @@ test('backup boundary removes cancellation and stale wait/cancel cannot overwrit
 test('cancellation transport failure retains the true waiting state and allows retry', async () => {
   let finish; let reject = true;
   const coordinator = new InstallCoordinator({ installer: { qualify: async () => ({ ready: true }),
-    start: () => new Promise((resolve) => { finish = resolve; }),
+    start: (_value, { onState }) => { onState({ status: 'waiting-for-exit' }); return new Promise((resolve) => { finish = resolve; }); },
     cancel: async () => { if (reject) throw new Error('C:/private'); return { status: 'cancelled' }; } } });
   await coordinator.setCandidate(candidate); await coordinator.prepare();
   const running = coordinator.confirm(); await new Promise((resolve) => setImmediate(resolve));

@@ -3,7 +3,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { createWorkflowInstaller } = require('./WorkflowInstaller');
+const { createWorkflowInstaller, observeLauncher } = require('./WorkflowInstaller');
+const { EventEmitter } = require('node:events');
+const { PassThrough } = require('node:stream');
 const { readPointer, projectOutcome } = require('./outcome');
 const evidence = path.resolve(__dirname, '../../../..', 'build/test-evidence/installer-node');
 function fixture() {
@@ -66,4 +68,39 @@ test('restart bounds malformed/oversized identity and public projection', async 
   assert.deepEqual(projectOutcome({ id: 'id', status: 'rolled-back', reason: null, path: 'private' }, 'id'), { status: 'rolled-back', reason: null });
   for (const value of [{ id: 'other', status: 'installed', reason: null }, { id: 'id', status: 'waiting-for-exit', reason: null },
     { id: 'id', status: 'failed', reason: 'C:/private/error' }]) assert.throws(() => projectOutcome(value, 'id'), /recovery-required/);
+});
+
+test('handoff never asks for host exit on launch errors, silence, forged pipe data or timeout', async () => {
+  for (const failure of ['error', 'exit', 'silent', 'wrong-id', 'wrong-process', 'oversized']) {
+    const child = new EventEmitter(); child.pid = 42; child.stdout = new PassThrough(); child.unref = () => {};
+    const states = []; let time = 0;
+    const outcome = await observeLauncher(child, { id: 'a'.repeat(32), onState: (value) => states.push(value),
+      installing: () => false, inspect: async () => { throw new Error('recovery-required'); },
+      now: () => time, startupMs: 300, timeoutMs: 600, pause: async (ms) => {
+        time += ms;
+        if (failure === 'error') child.emit('error', new Error('spawn failed'));
+        if (failure === 'exit') child.emit('exit', 1);
+        if (failure === 'wrong-id' || failure === 'wrong-process') child.stdout.write(JSON.stringify({
+          id: failure === 'wrong-id' ? 'b'.repeat(32) : 'a'.repeat(32), event: 'ready', pid: failure === 'wrong-process' ? 43 : 42 }) + '\n');
+        if (failure === 'oversized') child.stdout.write('x'.repeat(4097));
+      } });
+    assert.deepEqual(outcome, { status: 'failed', reason: 'recovery-required' }, failure);
+    assert.deepEqual(states, [], failure);
+  }
+});
+
+test('live pipe readiness precedes exit prompt and terminal result still requires launcher exit and inspection', async () => {
+  const child = new EventEmitter(); child.pid = 42; child.stdout = new PassThrough(); child.unref = () => {};
+  const states = []; let time = 0; let inspected = false;
+  const outcome = await observeLauncher(child, { id: 'a'.repeat(32), onState: (value) => states.push(value.status),
+    installing: () => time >= 300, inspect: async () => { inspected = true; return { status: 'installed', reason: null }; },
+    now: () => time, pause: async (ms) => {
+      time += ms;
+      if (time === 150) child.stdout.write(JSON.stringify({ id: 'a'.repeat(32), event: 'ready', pid: 42 }) + '\n');
+      assert.equal(inspected, false);
+      if (time === 450) child.emit('exit', 0);
+    } });
+  assert.deepEqual(states, ['waiting-for-exit', 'installing']);
+  assert.deepEqual(outcome, { status: 'installed', reason: null });
+  assert.equal(inspected, true);
 });

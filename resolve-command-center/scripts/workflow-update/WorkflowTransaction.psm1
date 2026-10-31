@@ -1,4 +1,4 @@
-Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'LocalNative.psm1') -Force -DisableNameChecking
 
@@ -46,24 +46,106 @@ function Get-UpdateHash([string]$Path) {
     finally { $hash.Dispose(); $stream.Dispose() }
 }
 
-function Get-TreeFiles([string]$Root) {
+# R24: one complete fresh observation. Directory handles bind ancestry only
+# for this call; leaves are validated and hashed from their own actual handle.
+# Assert-NormalPath and every later transaction/Inspector pass remain independent.
+function Get-VerifiedTreeObservation([string]$Root, [bool]$HashFiles) {
     Assert-NormalPath $Root | Out-Null
-    $pending = [Collections.Generic.Stack[string]]::new()
-    $pending.Push($Root)
-    $files = [Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
-    while ($pending.Count) {
-        foreach ($item in @(Get-ChildItem -LiteralPath $pending.Pop() -Force)) {
-            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { Stop-Update 'target-unverified' }
-            if ($item.PSIsContainer) { $pending.Push($item.FullName) }
-            else {
-                $relative = $item.FullName.Substring($Root.Length + 1).Replace('\', '/')
-                $files.Add($relative,[pscustomobject]@{path=$relative; size=$item.Length; sha256=(Get-UpdateHash $item.FullName)})
-            }
-        }
+    if (!('Clackly.VerifiedTreeR24.TreeObservation' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
+namespace Clackly.VerifiedTreeR24 {
+ public sealed class TreeFile {public string path;public long size;public string sha256;}
+ public sealed class TreeResult {public TreeFile[] Files;public string[] Names;}
+ public static class TreeObservation {
+  [StructLayout(LayoutKind.Sequential)] struct Info {
+   public FileAttributes Attributes;public System.Runtime.InteropServices.ComTypes.FILETIME Created,Accessed,Written;
+   public uint Volume,SizeHigh,SizeLow,Links,IndexHigh,IndexLow;
+  }
+  [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]
+  static extern SafeFileHandle CreateFile(string path,uint access,uint share,IntPtr security,uint creation,uint flags,IntPtr template);
+  [DllImport("kernel32.dll",SetLastError=true)]static extern bool GetFileInformationByHandle(SafeFileHandle handle,out Info info);
+  [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]
+  static extern uint GetFinalPathNameByHandle(SafeFileHandle handle,StringBuilder path,uint length,uint flags);
+  static Info Validate(SafeFileHandle handle,string path,bool directory) {
+   Info info;if(!GetFileInformationByHandle(handle,out info))throw new Win32Exception(Marshal.GetLastWin32Error());
+   if((info.Attributes&FileAttributes.ReparsePoint)!=0||((info.Attributes&FileAttributes.Directory)!=0)!=directory||info.Links==0)throw new InvalidOperationException("target-unverified");
+   var final=new StringBuilder(32768);uint length=GetFinalPathNameByHandle(handle,final,(uint)final.Capacity,0);
+   if(length==0)throw new Win32Exception(Marshal.GetLastWin32Error());
+   string expected=path.Length==Path.GetPathRoot(path).Length?path:path.TrimEnd((char)92);
+   if(length>=final.Capacity||!String.Equals(final.ToString(),@"\\?\"+expected,StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("target-unverified");
+   return info;
+  }
+  static SafeFileHandle OpenDirectory(string path) {
+   var handle=CreateFile(path,0x80000000,1,IntPtr.Zero,3,0x02200000,IntPtr.Zero);
+   if(handle.IsInvalid){int error=Marshal.GetLastWin32Error();handle.Dispose();throw new Win32Exception(error);}
+   try{Validate(handle,path,true);return handle;}catch{handle.Dispose();throw;}
+  }
+  public static TreeResult Read(string root,bool hashFiles) {
+   string full=Path.GetFullPath(root);
+   if(!String.Equals(full,root,StringComparison.InvariantCultureIgnoreCase)||full.StartsWith(@"\\")||full.IndexOf(':',2)>=0)throw new InvalidOperationException("target-unverified");
+   var ancestors=new List<SafeFileHandle>();var files=new List<TreeFile>();var names=new List<string>();var seen=new HashSet<string>(StringComparer.Ordinal);
+   try{
+    string current=Path.GetPathRoot(full);ancestors.Add(OpenDirectory(current));
+    foreach(string part in full.Substring(current.Length).Split((char)92)){
+     if(part.Length==0)continue;if(part.IndexOfAny(new[]{'*','?'})>=0)throw new InvalidOperationException("target-unverified");
+     current=Path.Combine(current,part);ancestors.Add(OpenDirectory(current));
     }
-    $sorted = [string[]]@($files.Keys)
-    [Array]::Sort($sorted, [StringComparer]::Ordinal)
-    foreach ($name in $sorted) { $files[$name] }
+    names.Add("present");Walk(full,full,hashFiles,files,names,seen);
+    files.Sort((a,b)=>StringComparer.Ordinal.Compare(a.path,b.path));
+    return new TreeResult{Files=files.ToArray(),Names=names.ToArray()};
+   }finally{for(int i=ancestors.Count-1;i>=0;i--)ancestors[i].Dispose();}
+  }
+  static void Walk(string root,string directory,bool hashFiles,List<TreeFile> files,List<string> names,HashSet<string> seen) {
+   foreach(var entry in new DirectoryInfo(directory).GetFileSystemInfos()){
+    if((entry.Attributes&FileAttributes.ReparsePoint)!=0)throw new InvalidOperationException("target-unverified");
+    string relative=entry.FullName.Substring(root.Length+1);
+    if(!seen.Add(relative))throw new InvalidOperationException("target-unverified");
+    if((entry.Attributes&FileAttributes.Directory)!=0){
+     using(var held=OpenDirectory(entry.FullName)){names.Add("directory:"+relative);Walk(root,entry.FullName,hashFiles,files,names,seen);}
+    }else{
+     uint access=0x80000000u;
+     var held=CreateFile(entry.FullName,access,1,IntPtr.Zero,3,0x00200000,IntPtr.Zero);
+     if(held.IsInvalid){int error=Marshal.GetLastWin32Error();held.Dispose();throw new Win32Exception(error);}
+     using(held){
+      Validate(held,entry.FullName,false);names.Add("file:"+relative);
+      if(hashFiles){
+       using(var stream=new FileStream(held,FileAccess.Read))using(var sha=SHA256.Create()){
+        files.Add(new TreeFile{path=relative.Replace((char)92,'/'),size=stream.Length,sha256=BitConverter.ToString(sha.ComputeHash(stream)).Replace("-","").ToLowerInvariant()});
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}
+'@
+    }
+    try {return [Clackly.VerifiedTreeR24.TreeObservation]::Read($Root,$HashFiles)}
+    catch {
+        # PowerShell wraps static method failures. Preserve the established
+        # refusal token while retaining Win32 permission causes as inner errors.
+        $cause=$_.Exception
+        while ($cause) {
+            if ($cause -is [InvalidOperationException] -and $cause.Message -ceq 'target-unverified') {Stop-Update 'target-unverified'}
+            $cause=$cause.InnerException
+        }
+        throw
+    }
+}
+function Get-TreeFiles([string]$Root) {
+    (Get-VerifiedTreeObservation $Root $true).Files
+}
+function Get-TreeNamespace([string]$Root) {
+    (Get-VerifiedTreeObservation $Root $false).Names
 }
 
 function Get-TreeHash([string]$Root) {
@@ -525,4 +607,4 @@ function Invoke-UpdateTransaction($Context, [scriptblock]$Observe = { param($c) 
     } finally { $lock.Dispose() }
 }
 
-Export-ModuleMember -Function Assert-NormalPath, Get-UpdateHash, Get-TreeFiles, Get-TreeHash, Read-UpdateJson, Assert-UpdatePackage, Expand-UpdateArchive, Get-CanonicalHostState, Get-TransactionPaths, Invoke-UpdateTransaction, Invoke-UpdateRecovery, Get-UpdateTransactionState, Restore-PreviousUpdate, Get-UpdateFailureReason
+Export-ModuleMember -Function Assert-NormalPath, Get-UpdateHash, Get-TreeFiles, Get-TreeNamespace, Get-TreeHash, Read-UpdateJson, Assert-UpdatePackage, Expand-UpdateArchive, Get-CanonicalHostState, Get-TransactionPaths, Invoke-UpdateTransaction, Invoke-UpdateRecovery, Get-UpdateTransactionState, Restore-PreviousUpdate, Get-UpdateFailureReason

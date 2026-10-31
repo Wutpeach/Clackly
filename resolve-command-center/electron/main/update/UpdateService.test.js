@@ -296,10 +296,27 @@ test('manual recheck and discard invalidate host confirmation; production defaul
   assert.equal((await unqualified.prepareUpdateInstall()).installation.status, 'unavailable');
   assert.equal((await unqualified.confirmUpdateInstall()).installation.status, 'unavailable');
 });
+test('recovery-required preserves the downloaded candidate against discard and restart', async (t) => {
+  const installer = { qualify: async () => ({ ready: true }),
+    start: async () => ({ status: 'failed', reason: 'recovery-required' }),
+    readState: async () => ({ status: 'failed', reason: 'recovery-required' }) };
+  const { updater, appRoot, cacheRoot, bytes } = await service(t, { installer: { ...installer, readState: async () => null } });
+  await updater.checkForUpdates(); await updater.downloadUpdate(); await updater.prepareUpdateInstall();
+  await updater.confirmUpdateInstall();
+  assert.equal((await updater.discardUpdate()).downloadedVersion, '0.2.0');
+  const name = (await fs.readdir(cacheRoot)).find((file) => file.endsWith('.zip'));
+  assert.deepEqual(await fs.readFile(path.join(cacheRoot, name)), bytes);
+  await updater.dispose();
+  const restarted = createService({ appRoot, cacheRoot, platform: 'win32', installer });
+  t.after(() => restarted.dispose()); await restarted.ready;
+  assert.equal((await restarted.discardUpdate()).installation.reason, 'recovery-required');
+  assert.equal(restarted.getState().downloadedVersion, '0.2.0');
+  assert.deepEqual(await fs.readFile(path.join(cacheRoot, name)), bytes);
+});
 test('host shutdown completes while the independent executor waits for host exit', async (t) => {
   let finish; let signal;
   const { updater } = await service(t, { installer: { qualify: async () => ({ ready: true }),
-    start: (_candidate, options) => { signal = options.signal; return new Promise((resolve) => { finish = resolve; }); } } });
+    start: (_candidate, options) => { signal = options.signal; options.onState({ status: 'waiting-for-exit', reason: null }); return new Promise((resolve) => { finish = resolve; }); } } });
   await updater.checkForUpdates(); await updater.downloadUpdate(); await updater.prepareUpdateInstall();
   const waiting = new Promise((resolve) => { const off = updater.subscribe((state) => {
     if (state.installation.status === 'waiting-for-exit') { off(); resolve(); }
@@ -313,7 +330,7 @@ test('host shutdown completes while the independent executor waits for host exit
 test('independent install waiting has no discovery deadline and acknowledges cancellation through the public service', async (t) => {
   let finish; let signal;
   const { updater } = await service(t, { installer: { qualify: async () => ({ ready: true }),
-    start: (_candidate, options) => { signal = options.signal; return new Promise((resolve) => { finish = resolve; }); },
+    start: (_candidate, options) => { signal = options.signal; options.onState({ status: 'waiting-for-exit', reason: null }); return new Promise((resolve) => { finish = resolve; }); },
     cancel: async () => { const result = { status: 'cancelled', reason: null }; finish(result); return result; } } });
   await updater.checkForUpdates(); await updater.downloadUpdate(); await updater.prepareUpdateInstall();
   updater.checkTimeout = 10;
