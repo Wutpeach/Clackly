@@ -1,10 +1,12 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$Archive,
-    [string]$Output=(Join-Path $PSScriptRoot '../../release/setup'),
+    [string]$Output,
     [string]$Compiler='C:/Program Files (x86)/Inno Setup 6/ISCC.exe'
 )
 $ErrorActionPreference='Stop'
+Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1') -Force
+if(!$Output){$Output=Join-Path $PSScriptRoot '../../release/setup'}
 $output=[IO.Path]::GetFullPath($Output)
 $archive=[IO.Path]::GetFullPath($Archive)
 $metadata=& node (Join-Path $PSScriptRoot 'verify-input.js') $archive

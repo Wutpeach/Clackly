@@ -9,7 +9,7 @@ npm ci
 npm run package:win
 npm run package:verify
 node scripts/workflow-release/package.js --nonpublishable
-npm run setup:build -- -Archive release/workflow/Clackly-Workflow-<version>-win-x64.zip
+npm run setup:build -- release/workflow/Clackly-Workflow-<version>-win-x64.zip
 ```
 
 Build requires Node, Windows PowerShell 5.1 and Inno Setup **6.7.1** (`C:/Program Files (x86)/Inno Setup 6/ISCC.exe`). `Build.ps1` also accepts `-Compiler` and a fresh `-Output` directory. The default output is `release/setup`; existing outputs are refused to preserve evidence.

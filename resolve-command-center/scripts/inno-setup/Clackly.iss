@@ -8,6 +8,8 @@
 AppId={{22BD637C-3208-4D0C-ABDE-D8A497D8C6C8}
 AppName=Clackly
 AppVersion={#AppVersion}
+VersionInfoVersion={#AppVersion}
+VersionInfoTextVersion={#AppVersion}
 AppPublisher=Wutpeach
 DefaultDirName={commonappdata}\Blackmagic Design\DaVinci Resolve\Support\Workflow Integration Plugins\com.wutpeach.clackly
 DisableDirPage=yes
