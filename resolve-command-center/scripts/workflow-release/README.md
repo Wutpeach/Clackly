@@ -1,59 +1,25 @@
-# Complete Windows Workflow ZIP
+# Windows Inno EXE release
 
-The single release asset is `Clackly-Workflow-<version>-win-x64.zip` with one top-level `plugin/` tree. It contains the application, built renderer and hash-locked managed Python Runtime. It excludes `WorkflowIntegration.node`, standalone Electron and the legacy Beta wrapper. A local ignored native file must never enter a staged application or archive.
+The primary release asset is **`Clackly-Setup-<version>-win-x64.exe`**. It contains the complete Clackly application, built renderer and hash-locked managed Python Runtime. `WorkflowIntegration.node` is excluded and provisioned only from the user's verified official local Resolve installation. No standalone Electron or local SDK/evidence is distributed.
 
-Application packaging selects production source roots and the fixed installer/module closure. Staged application and final ZIP verification refuse tests, fixtures, synthetic OTIO/AE outputs, diagnostics, private/task evidence and SDK/native material, even when their bytes appear in a complete hash inventory. There is no small-file or historical fixture exemption. Production dependencies, Runtime notices/provenance and complete inventory/runtime/source-staleness checks remain required.
+## Build and provenance
 
-`clackly-release.json` uses schema version 2. Its exact sorted file inventory describes the downloadable bytes; its native policy is:
+Use the [Inno build entry](../inno-setup/README.md). The existing Workflow ZIP builder remains an intermediate packaging/verification step; it is not the new user-facing release format. It validates production-only contents, dependency locks, current Settings/Inno source bytes, Runtime provenance and exact file inventory/size/SHA-256. Schema-v2 `clackly-release.json` retains the source repository, commit, tag intent, workflow/run identity, publication qualification and local-native policy.
 
-~~~json
-{"path":"workflow-plugin/WorkflowIntegration.node","provisioning":"local-resolve","source":"programdata-sampleplugin","platform":"win32","arch":"x64"}
-~~~
+Local preparation requires a clean committed checkout and uses `--nonpublishable`. These EXEs are unsigned review candidates. Canonical release payloads require a clean exact `v<package.json version>` tag and `.github/workflows/workflow-release.yml` at that tag; a local or main/PR build does not qualify. Never reuse or rename the R31 dirty/local onsite overlay builds as formal assets.
 
-Initial installation and updates independently validate the official local Resolve SamplePlugin component under Windows ProgramData and add its actual size/hash to the complete staged installation tree. The release manifest contains no native bytes, native hash pin or redistribution qualification. Missing, unsafe, corrupt or incompatible local components fail before an existing installation is backed up or switched. A previous plugin's native component is not a fallback. Resolve may be installed on a different drive from ProgramData.
+## Existing users
 
-## Local build
+**v0.1.3 and earlier:** download the new EXE manually from the official GitHub Release and run it once. Close Resolve yourself when prompted, finish installation, then reopen Resolve. Your settings remain in AppData. The old ZIP-based Settings updater is not guaranteed to install an EXE-only release. After this one-time installation, use the new Settings updater for later EXE releases.
 
-Run from the application root on Windows:
+New Settings accepts only the exact complete EXE from `Wutpeach/Clackly`, a stable newer version, the official GitHub URL, uploaded asset identity/size and GitHub API `sha256:` digest. It verifies downloaded bytes and asks the user to start installation. Windows owns the independent installer/UAC lifetime; “handed off” does not claim installation completed. There is no ZIP fallback or missing-digest bypass.
 
-~~~powershell
-npm ci
-npm run package:win
-npm run package:verify
-node scripts/workflow-release/package.js --nonpublishable --output <new-output-directory>
-node scripts/workflow-release/package.js --verify <Clackly-Workflow-X.Y.Z-win-x64.zip>
-~~~
+## CI and approval
 
-No Resolve SDK, native module, vendor artifact, SDK download or native pin is required to build or verify this ZIP. Managed Python Runtime staging still downloads its hash-locked upstream assets. A development ZIP records the actual source commit and dirty state with `publishable:false`; it is not a tagged release. Its `source.workflowPath` is `null` for a local build or the canonical workflow path identified by `GITHUB_WORKFLOW_REF` in CI. Main/PR artifacts identify `.github/workflows/main.yml`. Publishable generation requires the canonical Release workflow in addition to the existing clean exact-tag checks; main/local development provenance cannot qualify as a production release.
+The existing tag workflow builds and verifies the application/Runtime ZIP, compiles with pinned Inno 6.7.1, and uploads one complete EXE plus a separate build-evidence artifact. Its default-disabled `CLACKLY_ENABLE_DRAFT_RELEASE` gate is retained: when separately authorized it creates an unpublished draft, never an automatic public release. Main/PR ZIP artifacts remain development intermediates.
 
-The builder checks package/Workflow identities, production dependency locks, current installer/source bytes, managed Runtime provenance, complete inventory, ZIP paths/types/collisions/expansion and every file's bytes. The same lightweight release contract runs when Electron downloads or restores a retained candidate. Schema-v1/native-inclusive release assets are rejected.
+Public publication requires explicit approval of the version, source/tag, unsigned publisher/SmartScreen risk (or a separate signing plan), and onsite acceptance arrangements. The report SHA-256 describes the unsigned bytes; signing would change those bytes and requires a fresh final digest.
 
-## Initial installation
+After approved publication, check the real GitHub API tag, exact EXE name/size/URL and `sha256:` digest against the final asset, then perform one real discovery/download/hash check. Do not substitute local metadata/cache simulations for this evidence. Onsite UAC/overwrite/uninstall or changes to a test machine require separate confirmation. Actual offline install, standard-user UAC and real uninstall remain unverified unless performed.
 
-Keep the original official Release ZIP and run the reviewed checkout's fixed entry from the application root:
-
-~~~powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1 -Archive "<downloaded-Workflow-ZIP>"
-~~~
-
-The entry independently refetches official Release metadata and verifies the exact original asset identity, size, SHA-256 and strict complete ZIP before local-native provisioning. An extracted directory cannot prove that asset digest and is not accepted for production installation. Development ZIPs are exercised with isolated test engines; no production bypass flag is provided.
-
-The equivalent npm command is `npm run workflow:install:package -- "<downloaded-Workflow-ZIP>"`. In-app updates use fixed installed code; the candidate ZIP cannot select executable installer code. Restart Resolve yourself after activation. The initial entry and updates use the same local-native validation and transaction safeguards.
-
-The same fixed Archive installer also upgrades a recognized older Clackly installation and retains every old file. A legacy schema-v1 updater cannot install schema-v2 ZIPs; use the reviewed checkout's Archive route after publication and installation are separately authorized.
-
-The console bootstrap prints a recovery transaction ID. From that same reviewed checkout, inspect or recover an interrupted transaction, or explicitly restore the retained previous version after a successful upgrade:
-
-~~~powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workflow-update/bootstrap.ps1 -Operation Inspect -TransactionId <recorded-id>
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workflow-update/bootstrap.ps1 -Operation Recover -TransactionId <recorded-id>
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workflow-update/bootstrap.ps1 -Operation RestorePrevious -TransactionId <recorded-id>
-~~~
-
-RestorePrevious uses the fixed bootstrap pointer, journal, target and current paired host. It requires a verified successful upgrade and matching complete active/backup trees, retains the replaced new version, and refuses a running or unknown host and changed evidence. A first install with no prior version has nothing to restore. Bootstrap TransactionId and the in-app updater's RequestId are separate records; do not pass a bootstrap ID to recover.ps1. The console bootstrap does not elevate or close/restart Resolve.
-
-## CI and publication
-
-Main and PR verification independently report Node logic, serial real-subprocess/Windows integration, focused PowerShell transactions, each Python test directory, the renderer source build and the complete native-free application/Runtime ZIP. A failed test job does not prevent the packaging job from attempting its own build and verification. Packaging has no SDK readiness or owner-artifact prerequisite. The development artifact contains only the verified ZIP and a JSON record of its SHA-256, size, source/run identity and complete release manifest with Runtime/inventory evidence; upload requires `publishable:false`. Tag builds require the exact clean `v<package.json version>` commit and use the same schema-v2 ZIP with `publishable:true`.
-
-The tag job uploads the single verified build artifact. The existing `CLACKLY_ENABLE_DRAFT_RELEASE` authorization gate remains default-disabled. When separately activated, it creates only an unpublished draft with exact tag, commit and SHA-256. Manual publication and real-host acceptance remain separate decisions. V1 relies on the fixed official repository and HTTPS, exact Release asset identity/digest and full content verification; a digest or inventory does not independently authenticate a publisher. Protect repository, tag and workflow access.
+The R31 test machine currently has unpublished local **0.1.4**. The proposed next public version is **0.1.5**, skipping public 0.1.4 so this machine can discover a genuinely newer approved release without rollback. This is a proposal until publication approval; do not change the installed test machine to manufacture an update.

@@ -1,4 +1,4 @@
-name: Windows Workflow draft release
+name: Windows Inno draft release
 on:
   push:
     tags: ['v*']
@@ -33,12 +33,12 @@ jobs:
         run: |
           node -e "const p=require('./package.json');require('./scripts/workflow-release/package').sourceIdentity(p.version,{tag:process.env.GITHUB_REF_NAME})"
       - run: npm test
-      - name: Verify isolated native-free installation transactions
-        run: powershell -NoProfile -NonInteractive -File scripts/workflow-update/WorkflowTransaction.test.ps1 -Mode Focused
       - run: npm run workflow:release:test
+      - name: Verify Inno source input and Settings EXE handoff
+        run: node --test scripts/inno-setup/verify-input.test.js electron/main/update/identity.test.js electron/main/update/InstallCoordinator.test.js electron/main/update/install/InnoInstaller.test.js
       - run: npm run package:win
       - run: npm run package:verify
-      - name: Build complete Workflow ZIP
+      - name: Build complete intermediate Workflow ZIP
         run: node scripts/workflow-release/package.js --tag $env:GITHUB_REF_NAME
       - name: Verify exact artifact bytes and record SHA-256
         run: |
@@ -46,10 +46,25 @@ jobs:
           node scripts/workflow-release/package.js --verify "release/workflow/Clackly-Workflow-$version-win-x64.zip"
           if ($LASTEXITCODE -ne 0) { throw 'Workflow ZIP verification failed' }
           Get-FileHash -Algorithm SHA256 -LiteralPath "release/workflow/Clackly-Workflow-$version-win-x64.zip"
+      - name: Install pinned Inno compiler
+        run: |
+          choco upgrade innosetup --version=6.7.1 --allow-downgrade --no-progress -y
+          if ($LASTEXITCODE -ne 0) { throw 'Inno compiler installation failed' }
+      - name: Build complete offline Inno EXE
+        run: |
+          $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
+          npm run setup:build -- -Archive "release/workflow/Clackly-Workflow-$version-win-x64.zip"
+          if ($LASTEXITCODE -ne 0) { throw 'Inno build failed' }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: verified-workflow-release
-          path: resolve-command-center/release/workflow/Clackly-Workflow-*-win-x64.zip
+          name: verified-inno-release
+          path: resolve-command-center/release/setup/Clackly-Setup-*-win-x64.exe
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: inno-build-evidence
+          path: resolve-command-center/release/setup/build-report.json
           if-no-files-found: error
           retention-days: 14
   draft:
@@ -62,7 +77,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: verified-workflow-release
+          name: verified-inno-release
           path: artifact
       - name: Retain verified build identity and create an unpublished draft
         shell: pwsh
@@ -72,8 +87,8 @@ jobs:
         run: |
           if ($env:GH_REPO -cne 'Wutpeach/Clackly') { throw 'Unexpected publisher repository' }
           $files = @(Get-ChildItem -LiteralPath artifact -File)
-          if ($files.Count -ne 1) { throw 'Expected exactly one complete Workflow ZIP' }
-          if ($files[0].Name -cne "Clackly-Workflow-$($env:GITHUB_REF_NAME.Substring(1))-win-x64.zip") { throw 'Artifact name differs from exact release tag' }
+          if ($files.Count -ne 1) { throw 'Expected exactly one complete Inno EXE' }
+          if ($files[0].Name -cne "Clackly-Setup-$($env:GITHUB_REF_NAME.Substring(1))-win-x64.exe") { throw 'Artifact name differs from exact release tag' }
           $digest = (Get-FileHash -Algorithm SHA256 -LiteralPath $files[0].FullName).Hash.ToLowerInvariant()
-          gh release create $env:GITHUB_REF_NAME $files[0].FullName --repo Wutpeach/Clackly --verify-tag --target $env:GITHUB_SHA --draft --title "Clackly $env:GITHUB_REF_NAME" --notes "Draft only. ZIP SHA-256: $digest. Source commit: $env:GITHUB_SHA. Review complete inventory, local-native policy and real-host evidence before manual publication. V1 relies on the fixed official repository and HTTPS; detached provenance is optional."
+          gh release create $env:GITHUB_REF_NAME $files[0].FullName --repo Wutpeach/Clackly --verify-tag --target $env:GITHUB_SHA --draft --title "Clackly $env:GITHUB_REF_NAME" --notes "Draft only. Unsigned Inno EXE SHA-256: $digest. Source commit: $env:GITHUB_SHA. Includes application and managed Runtime; official Native is validated locally during installation. Users on v0.1.3 or earlier: download and run this EXE manually once, then use the new Settings updater. Close Resolve yourself when prompted. Review unsigned publisher/SmartScreen risk before manual publication; verify the actual GitHub API asset digest and download after publication."
           if ($LASTEXITCODE -ne 0) { throw 'Draft creation failed' }

@@ -6,7 +6,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const childProcess = require('node:child_process');
-const { zipBuffer, release, response, workspace } = require('./fixtures');
+const { zipBuffer, exeBuffer, release, response, workspace } = require('./fixtures');
 
 // Observe the real guard children without replacing their execution or result.
 // Storage captures execFile at import; restore the shared module immediately.
@@ -79,11 +79,12 @@ test('real storage refuses unsafe cache ancestry, junctions and hardlinked cache
   });
 });
 
-test('production host factory connects the bundled installer and refuses a synthetic noninstalled target', { skip: process.platform !== 'win32' }, async (t) => {
+test('production host factory downloads EXE and requires user confirmation before shell handoff', { skip: process.platform !== 'win32' }, async (t) => {
   await withStorageDiagnostics(t, async () => {
-    const { root, appRoot } = await workspace(t); const bytes = zipBuffer();
+    const { root, appRoot } = await workspace(t); const bytes = exeBuffer();
+    let opened = 0;
     const updater = createHostUpdateService({ app: { getPath: () => root }, appRoot,
-      host: { kind: 'workflow', execPath: process.execPath } });
+      openPath: async () => { opened++; return ''; } });
     t.after(() => updater.dispose());
     updater.discover = async () => [release(bytes)];
     updater.open = async (_url, { signal }) => response(bytes, signal);
@@ -92,10 +93,14 @@ test('production host factory connects the bundled installer and refuses a synth
     assert.equal(checked.status, 'available', JSON.stringify(checked));
     const downloaded = await updater.downloadUpdate();
     assert.equal(downloaded.status, 'downloaded', JSON.stringify(downloaded));
-    const expected = { status: 'unavailable', reason: 'target-unverified' };
+    const expected = { status: 'ready', reason: null };
     assert.deepEqual(updater.getState().installation, expected);
-    assert.deepEqual((await updater.prepareUpdateInstall()).installation, expected);
+    assert.equal(opened, 0);
     assert.deepEqual((await updater.confirmUpdateInstall()).installation, expected);
+    assert.equal(opened, 0);
+    assert.equal((await updater.prepareUpdateInstall()).installation.status, 'awaiting-confirmation');
+    assert.equal((await updater.confirmUpdateInstall()).installation.status, 'handed-off');
+    assert.equal(opened, 1);
     assert.deepEqual((await fs.readdir(root)).sort(), ['app', 'workflow-updates']);
   });
 });

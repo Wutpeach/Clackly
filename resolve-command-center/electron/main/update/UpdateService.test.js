@@ -6,12 +6,12 @@ const { PassThrough } = require('node:stream');
 const { UpdateService } = require('./UpdateService');
 const { failure } = require('./identity');
 const { fileStorage } = require('./file-storage-fixture');
-const { zipBuffer, payload, release, response, workspace } = require('./fixtures');
+const { zipBuffer, exeBuffer, release, response, workspace } = require('./fixtures');
 function createService(options) {
   return new UpdateService({ storage: fileStorage(options.cacheRoot), ...options });
 }
 async function service(t, options = {}) {
-  const roots = await workspace(t); const bytes = zipBuffer();
+  const roots = await workspace(t); const bytes = exeBuffer();
   const updater = createService({ ...roots, platform: 'win32', discover: async () => [release(bytes)],
     open: async (_url, { signal }) => response(bytes, signal), ...options });
   t.after(() => updater.dispose()); await updater.ready;
@@ -28,7 +28,7 @@ async function beginWithProgress(updater) {
   } finally { off(); }
   return { download };
 }
-test('check/download verifies actual streamed ZIP/hash and snapshots carry no path authority', async (t) => {
+test('check/download verifies actual streamed EXE/hash and snapshots carry no path authority', async (t) => {
   const { updater, cacheRoot, bytes } = await service(t); const states = [];
   updater.subscribe((state) => { states.push(state.status); state.status = 'tampered'; });
   const available = await updater.checkForUpdates();
@@ -40,7 +40,7 @@ test('check/download verifies actual streamed ZIP/hash and snapshots carry no pa
   assert.equal(state.downloadedVersion, '0.2.0');
   assert.deepEqual(state.installation, { status: 'unavailable', reason: 'qualification-required' });
   assert.ok(states.includes('verifying'));
-  const downloads = (await fs.readdir(cacheRoot)).filter((file) => file.endsWith('.zip'));
+  const downloads = (await fs.readdir(cacheRoot)).filter((file) => file.endsWith('.exe'));
   assert.equal(downloads.length, 1);
   assert.deepEqual(await fs.readFile(path.join(cacheRoot, downloads[0])), bytes);
   assert.equal((await updater.checkForUpdates()).status, 'downloaded');
@@ -64,47 +64,35 @@ test('verified completed download survives restart after rehash; changed cache b
   const restarted = createService({ appRoot, cacheRoot, platform: 'win32' });
   await restarted.ready; assert.equal(restarted.getState().status, 'downloaded');
   await restarted.dispose();
-  const zip = (await fs.readdir(cacheRoot)).find((name) => name.endsWith('.zip'));
+  const zip = (await fs.readdir(cacheRoot)).find((name) => name.endsWith('.exe'));
   const data = await fs.readFile(path.join(cacheRoot, zip)); data[0] ^= 1; await fs.writeFile(path.join(cacheRoot, zip), data);
   const corrupted = createService({ appRoot, cacheRoot, platform: 'win32' }); t.after(() => corrupted.dispose());
   await corrupted.ready; assert.equal(corrupted.getState().error.code, 'checksum');
-  assert.equal((await fs.readdir(cacheRoot)).some((name) => name.endsWith('.zip')), false);
+  assert.equal((await fs.readdir(cacheRoot)).some((name) => name.endsWith('.exe')), false);
 });
-test('download and restart reject nonpublishable or dirty ZIPs even with matching official asset digests', async (t) => {
-  for (const [publishable, dirty] of [[false, false], [false, true], [true, true]]) {
-    const bytes = zipBuffer(payload().map(([name, data]) => {
-      if (name !== 'plugin/clackly-release.json') return [name, data];
-      const manifest = JSON.parse(data);
-      manifest.build.publishable = publishable; manifest.source.dirty = dirty;
-      return [name, JSON.stringify(manifest)];
-    }));
-    const releases = [release(bytes)];
-    const { updater, appRoot, cacheRoot } = await service(t, { discover: async () => releases,
-      open: async (_url, { signal }) => response(bytes, signal) });
-    assert.equal((await updater.checkForUpdates()).status, 'available');
-    const refused = await updater.downloadUpdate();
-    assert.equal(refused.error.code, 'invalid-zip');
-    assert.equal(refused.downloadedVersion, null);
-    assert.equal((await fs.readdir(cacheRoot)).some((name) => /\.(part|zip)$/.test(name)), false);
-    await updater.dispose();
+test('ZIP bytes cannot be retained as an EXE; old ZIP cache cannot become an install candidate', async (t) => {
+  const { updater, appRoot, cacheRoot } = await service(t, { discover: async () => [release(zipBuffer())],
+    open: async (_url, { signal }) => response(zipBuffer(), signal) });
+  await updater.checkForUpdates();
+  assert.equal((await updater.downloadUpdate()).error.code, 'invalid-exe');
+  assert.equal(updater.getState().downloadedVersion, null);
+  await updater.dispose();
+  const bytes = exeBuffer();
+  const oldName = 'd'.repeat(32) + '.zip';
+  await fs.writeFile(path.join(cacheRoot, oldName), bytes);
+  const cachePath = path.join(cacheRoot, 'cache.json');
+  const cache = JSON.parse(await fs.readFile(cachePath, 'utf8'));
+  cache.releases = [release(bytes)];
+  cache.downloaded = { name: oldName, version: '0.2.0', digest: release(bytes).assets[0].digest.slice(7),
+    size: bytes.length, releases: cache.releases };
+  await fs.writeFile(cachePath, JSON.stringify(cache));
+  const restarted = createService({ appRoot, cacheRoot, platform: 'win32' });
+  t.after(() => restarted.dispose()); await restarted.ready;
+  assert.equal(restarted.getState().downloadedVersion, null);
+  assert.equal(restarted.getState().installation.status, 'unavailable');
+  assert.equal((await fs.readdir(cacheRoot)).includes(oldName), false);
+});
 
-    // Simulate a retained candidate from an older verifier. Its bytes, size and
-    // official asset digest agree, so restart must reach the publication gate.
-    const cacheFile = path.join(cacheRoot, 'cache.json');
-    const cache = JSON.parse(await fs.readFile(cacheFile, 'utf8'));
-    const name = 'd'.repeat(32) + '.zip';
-    cache.downloaded = { name, version: '0.2.0', digest: releases[0].assets[0].digest.slice(7),
-      size: bytes.length, releases };
-    await fs.writeFile(path.join(cacheRoot, name), bytes);
-    await fs.writeFile(cacheFile, JSON.stringify(cache));
-    const restarted = createService({ appRoot, cacheRoot, platform: 'win32' });
-    t.after(() => restarted.dispose()); await restarted.ready;
-    assert.equal(restarted.getState().error.code, 'invalid-zip');
-    assert.equal(restarted.getState().downloadedVersion, null);
-    assert.equal((await fs.readdir(cacheRoot)).includes(name), false);
-    await restarted.dispose();
-  }
-});
 test('rate-limit/timeout/offline backoff persists and suppresses manual retries until allowed', async (t) => {
   let time = 1000000; let calls = 0;
   const { updater, appRoot, cacheRoot } = await service(t, { now: () => time, discover: async () => { calls++; throw failure('rate-limit', time + 120000); } });
@@ -143,7 +131,7 @@ test('automatic check recovers immediately after failure backoff, including a re
 });
 test('invalid release metadata cache cleans generated orphans without blocking a fresh check', async (t) => {
   const roots = await workspace(t); await fs.mkdir(roots.cacheRoot);
-  await fs.writeFile(path.join(roots.cacheRoot, 'b'.repeat(32) + '.zip'), 'unverified');
+  await fs.writeFile(path.join(roots.cacheRoot, 'b'.repeat(32) + '.exe'), 'unverified');
   await fs.writeFile(path.join(roots.cacheRoot, 'unrelated.txt'), 'preserve');
   await fs.writeFile(path.join(roots.cacheRoot, 'cache.json'), JSON.stringify({ schemaVersion: 1,
     currentVersion: '0.1.0', checkedAt: 1000, failures: 0, retryAt: null, releases: {} }));
@@ -198,7 +186,7 @@ test('insufficient space fails closed without a download', async (t) => {
 test('restart removes only task-generated orphan ZIP/partials; corrupt cache does not invent availability', async (t) => {
   const roots = await workspace(t); await fs.mkdir(roots.cacheRoot);
   await fs.writeFile(path.join(roots.cacheRoot, 'a'.repeat(32) + '.part'), 'partial');
-  await fs.writeFile(path.join(roots.cacheRoot, 'b'.repeat(32) + '.zip'), 'unverified');
+  await fs.writeFile(path.join(roots.cacheRoot, 'b'.repeat(32) + '.exe'), 'unverified');
   await fs.writeFile(path.join(roots.cacheRoot, 'unrelated.txt'), 'preserve');
   await fs.writeFile(path.join(roots.cacheRoot, 'cache.json'), '{malformed');
   const updater = createService({ ...roots, platform: 'win32', discover: async () => [] }); t.after(() => updater.dispose());
@@ -223,7 +211,7 @@ test('dispose aborts in-flight download without emitting stale states after host
 });
 test('manual recheck preserves exact candidate across newer discovery/restart; explicit discard downloads new bytes', async (t) => {
   let calls = 0; let downloads = 0; let current = '0.2.0';
-  const versions = { '0.2.0': zipBuffer(), '0.3.0': zipBuffer(payload('0.3.0')) };
+  const versions = { '0.2.0': exeBuffer(), '0.3.0': exeBuffer('0.3.0') };
   const { updater, appRoot, cacheRoot } = await service(t, { discover: async () => { calls++; return [release(versions[current], current)]; },
     open: async (_url, { signal }) => { downloads++; return response(versions[current], signal); } });
   await updater.checkForUpdates(); const downloaded = await updater.downloadUpdate();
@@ -296,64 +284,40 @@ test('manual recheck and discard invalidate host confirmation; production defaul
   assert.equal((await unqualified.prepareUpdateInstall()).installation.status, 'unavailable');
   assert.equal((await unqualified.confirmUpdateInstall()).installation.status, 'unavailable');
 });
-test('recovery-required preserves the downloaded candidate against discard and restart', async (t) => {
-  const installer = { qualify: async () => ({ ready: true }),
-    start: async () => ({ status: 'failed', reason: 'recovery-required' }),
-    readState: async () => ({ status: 'failed', reason: 'recovery-required' }) };
-  const { updater, appRoot, cacheRoot, bytes } = await service(t, { installer: { ...installer, readState: async () => null } });
-  await updater.checkForUpdates(); await updater.downloadUpdate(); await updater.prepareUpdateInstall();
+test('explicit confirmation hands off once; Settings cannot cancel or discard after handoff', async (t) => {
+  let starts = 0;
+  const { updater } = await service(t, { installer: { qualify: async () => ({ ready: true }),
+    start: async () => { starts++; return { status: 'handed-off', reason: null }; } } });
+  await updater.checkForUpdates(); await updater.downloadUpdate();
+  assert.equal(starts, 0);
+  await updater.prepareUpdateInstall(); assert.equal(starts, 0);
+  assert.equal((await updater.confirmUpdateInstall()).installation.status, 'handed-off');
   await updater.confirmUpdateInstall();
+  assert.equal(starts, 1);
+  assert.equal((await updater.cancelUpdateInstall()).installation.status, 'handed-off');
   assert.equal((await updater.discardUpdate()).downloadedVersion, '0.2.0');
-  const name = (await fs.readdir(cacheRoot)).find((file) => file.endsWith('.zip'));
-  assert.deepEqual(await fs.readFile(path.join(cacheRoot, name)), bytes);
+  assert.equal(updater.getState().currentVersion, '0.1.0');
+});
+
+test('host shutdown does not wait for or publish a delayed Windows launch', async (t) => {
+  let finish; let started;
+  const launching = new Promise((resolve) => { started = resolve; });
+  const { updater } = await service(t, { installer: { qualify: async () => ({ ready: true }),
+    start: () => { started(); return new Promise((resolve) => { finish = resolve; }); } } });
+  await updater.checkForUpdates(); await updater.downloadUpdate(); await updater.prepareUpdateInstall();
+  const confirmation = updater.confirmUpdateInstall(); await launching;
   await updater.dispose();
-  const restarted = createService({ appRoot, cacheRoot, platform: 'win32', installer });
-  t.after(() => restarted.dispose()); await restarted.ready;
-  assert.equal((await restarted.discardUpdate()).installation.reason, 'recovery-required');
-  assert.equal(restarted.getState().downloadedVersion, '0.2.0');
-  assert.deepEqual(await fs.readFile(path.join(cacheRoot, name)), bytes);
+  finish({ status: 'handed-off', reason: null }); await confirmation;
+  assert.equal(updater.getState().installation.status, 'starting');
 });
-test('host shutdown completes while the independent executor waits for host exit', async (t) => {
-  let finish; let signal;
-  const { updater } = await service(t, { installer: { qualify: async () => ({ ready: true }),
-    start: (_candidate, options) => { signal = options.signal; options.onState({ status: 'waiting-for-exit', reason: null }); return new Promise((resolve) => { finish = resolve; }); } } });
-  await updater.checkForUpdates(); await updater.downloadUpdate(); await updater.prepareUpdateInstall();
-  const waiting = new Promise((resolve) => { const off = updater.subscribe((state) => {
-    if (state.installation.status === 'waiting-for-exit') { off(); resolve(); }
-  }); });
-  const installing = updater.confirmUpdateInstall(); await waiting;
-  await updater.dispose(); assert.equal(signal.aborted, false);
-  finish({ status: 'installed' }); await installing;
-  // No stale success is published from a host that has already shut down.
-  assert.equal(updater.getState().installation.status, 'waiting-for-exit');
-});
-test('independent install waiting has no discovery deadline and acknowledges cancellation through the public service', async (t) => {
-  let finish; let signal;
-  const { updater } = await service(t, { installer: { qualify: async () => ({ ready: true }),
-    start: (_candidate, options) => { signal = options.signal; options.onState({ status: 'waiting-for-exit', reason: null }); return new Promise((resolve) => { finish = resolve; }); },
-    cancel: async () => { const result = { status: 'cancelled', reason: null }; finish(result); return result; } } });
-  await updater.checkForUpdates(); await updater.downloadUpdate(); await updater.prepareUpdateInstall();
-  updater.checkTimeout = 10;
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  const waiting = new Promise((resolve) => { const off = updater.subscribe((state) => {
-    if (state.installation.status === 'waiting-for-exit') { off(); resolve(); }
-  }); });
-  const confirmation = updater.confirmUpdateInstall(); await waiting;
-  t.mock.timers.tick(updater.checkTimeout + 1);
-  assert.equal(signal.aborted, false, 'waiting for user exit is not a network timeout');
-  assert.equal(updater.getState().installation.status, 'waiting-for-exit');
-  assert.equal((await updater.cancelUpdateInstall()).installation.status, 'cancelled');
-  assert.equal((await confirmation).installation.status, 'cancelled');
-  assert.equal(updater.getState().downloadedVersion, '0.2.0');
-  assert.equal((await updater.prepareUpdateInstall()).installation.status, 'awaiting-confirmation');
-});
+
 test('R1 candidate cache migration preserves original identity after newer recheck and another restart', async (t) => {
   const { updater, appRoot, cacheRoot } = await service(t);
   await updater.checkForUpdates(); await updater.downloadUpdate(); const name = updater.downloadedName; await updater.dispose();
   const cacheFile = path.join(cacheRoot, 'cache.json');
   const r1 = JSON.parse(await fs.readFile(cacheFile, 'utf8')); delete r1.downloaded.releases;
   await fs.writeFile(cacheFile, JSON.stringify(r1));
-  const newer = zipBuffer(payload('0.3.0'));
+  const newer = exeBuffer('0.3.0');
   const migrated = createService({ appRoot, cacheRoot, platform: 'win32', discover: async () => [release(newer, '0.3.0')] });
   await migrated.ready; assert.equal(migrated.getState().downloadedVersion, '0.2.0');
   await migrated.checkForUpdates(); await migrated.dispose();
@@ -361,16 +325,6 @@ test('R1 candidate cache migration preserves original identity after newer reche
   t.after(() => restarted.dispose()); await restarted.ready;
   assert.equal(restarted.getState().latestVersion, '0.3.0');
   assert.equal(restarted.getState().downloadedVersion, '0.2.0'); assert.equal(restarted.downloadedName, name);
-});
-test('ready restores validated adapter outcomes even when candidate cache belongs to the previous installed version', async (t) => {
-  for (const state of [{ status: 'installed', reason: null }, { status: 'rolled-back', reason: 'install-failed' },
-    { status: 'failed', reason: 'recovery-required' }, { status: 'cancelled', reason: null }]) {
-    const { updater } = await service(t, { storage: { readCache: async () => ({ schemaVersion: 1, currentVersion: '0.0.1' }),
-      cleanupDownloads: async () => {} }, installer: { readState: async () => ({ ...state, target: 'C:/private' }) } });
-    assert.deepEqual(updater.getState().installation, state);
-    assert.equal(JSON.stringify(updater.getState()).includes('C:/private'), false);
-    await updater.dispose();
-  }
 });
 test('writable cached installation claims cannot become a restored successful install', async (t) => {
   const { updater } = await service(t, { storage: { readCache: async () => ({ schemaVersion: 1, currentVersion: '0.1.0',

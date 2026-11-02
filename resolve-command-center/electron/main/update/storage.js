@@ -56,7 +56,7 @@ class UpdateStorage {
     }
   }
   file(name) {
-    if (!/^(cache\.json|cache-[a-f0-9]{32}\.tmp|[a-f0-9]{32}\.(part|zip))$/.test(name)) throw failure('unsafe-path');
+    if (!/^(cache\.json|cache-[a-f0-9]{32}\.tmp|[a-f0-9]{32}\.(part|exe|zip))$/.test(name)) throw failure('unsafe-path');
     return path.join(this.root, name);
   }
   async safeFile(name, { missing = false } = {}) {
@@ -85,7 +85,7 @@ class UpdateStorage {
     await this.prepare();
     await normalDirectory(this.root);
     for (const name of await fs.readdir(this.root)) {
-      if (/^[a-f0-9]{32}\.zip$/.test(name) && name !== keep) await this.remove(name);
+      if (/^[a-f0-9]{32}\.(exe|zip)$/.test(name) && name !== keep) await this.remove(name);
     }
   }
   async saveCache(cache) {
@@ -109,7 +109,7 @@ class UpdateStorage {
     const token = crypto.randomBytes(16).toString('hex');
     const name = `${token}.part`;
     const handle = await fs.open(this.file(name), 'wx', 0o600);
-    return { name, finalName: `${token}.zip`, handle };
+    return { name, finalName: `${token}.exe`, handle };
   }
   async retain(name, finalName) {
     await this.safeFile(name);

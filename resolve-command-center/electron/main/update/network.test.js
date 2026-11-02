@@ -21,7 +21,7 @@ function fakeRequest(responses, observed = []) {
 }
 test('HTTPS and repository boundaries reject foreign origins, credentials and metadata redirects', async () => {
   for (const bad of [url.replace('https:', 'http:'), url.replace('github.com', 'github.com.evil'),
-    url.replace('Wutpeach', 'foreign'), url.replace('github.com', 'name:pass@github.com'), `${url}?path=evil`,
+    url.replace('Wutpeach', 'foreign'), url.replace('Clackly-Setup-', 'Clackly-Workflow-').replace('.exe', '.zip'), url.replace('github.com', 'name:pass@github.com'), `${url}?path=evil`,
     'https://release-assets.githubusercontent.com/github-production-release-asset/a']) assert.throws(() => validateUrl(bad, 'asset'));
   await assert.rejects(openResponse(RELEASES_URL, { kind: 'releases',
     request: fakeRequest([{ status: 302, headers: { location: 'https://evil.test/' } }]) }), { code: 'invalid-source' });

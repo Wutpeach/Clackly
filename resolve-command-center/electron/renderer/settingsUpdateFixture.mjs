@@ -2,9 +2,7 @@
 export const SETTINGS_UPDATE_SCENARIOS = Object.freeze([
   "idle", "no-release", "up-to-date", "available", "checking", "rate-limit", "offline", "timeout",
   "downloading", "verifying", "cancelled", "failure", "corrupt", "space", "version", "downloaded", "unavailable",
-  "install-ready", "confirmation", "starting", "waiting-exit", "installing", "installed", "rolled-back", "install-failed",
-  "install-cancelled", "permission-denied", "permission-cancelled", "recovery-required", "publisher-unverified",
-  "native-missing", "native-invalid", "native-incompatible"
+  "install-ready", "confirmation", "starting", "handed-off", "launch-failed", "install-cancelled", "missing-installer"
 ]);
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const FIXTURE_TIME = 1_791_958_800_000;
@@ -28,7 +26,7 @@ export function createSettingsUpdateFixture({ search = "", schedule = setTimeout
   const withRelease = !["idle", "no-release", "checking", "rate-limit", "offline", "timeout", "unavailable"].includes(scenario);
   if (explicit) {
     if (withRelease) Object.assign(state, { latestVersion: scenario === "up-to-date" ? "0.1.0" : "0.2.0", releaseNotes: note, checkedAt: FIXTURE_TIME });
-    const errorCode = { "rate-limit": "rate-limit", offline: "network", timeout: "timeout", failure: "storage", corrupt: "checksum", space: "disk-space", version: "invalid-version" }[scenario];
+    const errorCode = { "rate-limit": "rate-limit", offline: "network", timeout: "timeout", failure: "storage", corrupt: "checksum", space: "disk-space", version: "invalid-version", "missing-installer": "invalid-asset" }[scenario];
     state.status = errorCode ? "error" : scenario;
     state.error = errorCode ? { code: errorCode } : null;
     if (scenario === "rate-limit") state.retryAt = Date.now() + 60_000;
@@ -39,24 +37,19 @@ export function createSettingsUpdateFixture({ search = "", schedule = setTimeout
     if (scenario === "unavailable") Object.assign(state, { currentVersion: null, error: { code: "invalid-version" } });
     const installation = {
       "install-ready": ["ready", null], confirmation: ["awaiting-confirmation", null], starting: ["starting", null],
-      "waiting-exit": ["waiting-for-exit", "host-running"], installing: ["installing", null], installed: ["installed", null],
-      "rolled-back": ["rolled-back", "install-failed"], "install-failed": ["failed", "install-failed"],
-      "install-cancelled": ["cancelled", null], "permission-denied": ["unavailable", "permission-denied"],
-      "permission-cancelled": ["cancelled", "permission-cancelled"], "recovery-required": ["failed", "recovery-required"],
-      "publisher-unverified": ["unavailable", "publisher-unverified"],
-    "native-missing": ["failed", "native-missing"], "native-invalid": ["failed", "native-invalid"],
-    "native-incompatible": ["failed", "native-incompatible"]
+      "handed-off": ["handed-off", null], "launch-failed": ["failed", "launch-failed"],
+      "install-cancelled": ["cancelled", null]
     }[scenario];
     if (scenario === "downloaded" || installation) {
       state.status = "downloaded";
       state.downloadedVersion = "0.2.0";
-      if (installation) state.installation = { status: installation[0], reason: installation[1] };
+      state.installation = installation ? { status: installation[0], reason: installation[1] } : { status: "ready", reason: null };
     }
   }
   function publish(patch) {
     state = { ...state, ...patch };
     listeners.forEach((callback) => callback(clone(state)));
-    if (finishInstallation && !["awaiting-confirmation", "starting", "waiting-for-exit", "installing"].includes(state.installation.status)) {
+    if (finishInstallation && state.installation.status !== "starting") {
       const finish = finishInstallation;
       finishInstallation = null;
       finish(clone(state));
@@ -76,7 +69,7 @@ export function createSettingsUpdateFixture({ search = "", schedule = setTimeout
     getUpdateState: async () => clone(state),
     checkForUpdates: async () => {
       if (!explicit || ["checking", "downloading", "verifying"].includes(state.status) ||
-        ["awaiting-confirmation", "starting", "waiting-for-exit", "installing", "installed"].includes(state.installation.status) || state.retryAt > Date.now()) return clone(state);
+        ["awaiting-confirmation", "starting", "handed-off"].includes(state.installation.status) || state.retryAt > Date.now()) return clone(state);
       clearPending();
       publish({ status: "checking", error: null });
       const token = generation;
@@ -97,7 +90,7 @@ export function createSettingsUpdateFixture({ search = "", schedule = setTimeout
       } else {
         later(600, { status: "verifying", receivedBytes: 50 * 1_048_576 }, token);
         later(850, { status: "downloaded", downloadedVersion: state.latestVersion,
-          installation: { status: params.get("update-install") === "qualified" ? "ready" : "unavailable", reason: params.get("update-install") === "qualified" ? null : "qualification-required" } }, token);
+          installation: { status: "ready", reason: null } }, token);
       }
       return clone(state);
     },
@@ -108,32 +101,28 @@ export function createSettingsUpdateFixture({ search = "", schedule = setTimeout
     },
     discardUpdate: async () => {
       if (!explicit || !state.downloadedVersion || ["checking", "downloading", "verifying"].includes(state.status) ||
-        ["awaiting-confirmation", "starting", "waiting-for-exit", "installing", "installed"].includes(state.installation.status) ||
-        (state.installation.status === "failed" && state.installation.reason === "recovery-required")) return clone(state);
+        ["awaiting-confirmation", "starting", "handed-off"].includes(state.installation.status)) return clone(state);
       clearPending();
       return publish({ status: state.latestVersion && state.latestVersion !== state.currentVersion ? "available" : "idle",
         downloadedVersion: null, receivedBytes: 0, totalBytes: 0, error: null, installation: { status: "unavailable", reason: "no-candidate" } });
     },
     prepareUpdateInstall: async () => {
-      if (!explicit || !state.downloadedVersion || !["ready", "cancelled"].includes(state.installation.status)) return clone(state);
+      if (!explicit || !state.downloadedVersion || !["ready", "cancelled", "failed"].includes(state.installation.status)) return clone(state);
       return publish({ installation: { status: "awaiting-confirmation", reason: null } });
     },
     confirmUpdateInstall: async () => {
       if (!explicit || !state.downloadedVersion || state.installation.status !== "awaiting-confirmation") return clone(state);
       clearPending();
       const token = generation;
-      // Match the host IPC lifetime: confirm stays pending until cancellation or a terminal result.
+      // Simulate only the shell handoff, never an installation result.
       const completion = new Promise((resolve) => { finishInstallation = resolve; });
       publish({ installation: { status: "starting", reason: null } });
-      later(300, { installation: { status: "waiting-for-exit", reason: "host-running" } }, token);
-      later(800, { installation: { status: "installing", reason: null } }, token);
-      const outcome = params.get("install-outcome");
-      later(1400, { installation: outcome === "rollback" ? { status: "rolled-back", reason: "install-failed" }
-        : outcome === "recovery" ? { status: "failed", reason: "recovery-required" } : { status: "installed", reason: null } }, token);
+      later(300, { installation: params.get("install-outcome") === "launch-failed"
+        ? { status: "failed", reason: "launch-failed" } : { status: "handed-off", reason: null } }, token);
       return completion;
     },
     cancelUpdateInstall: async () => {
-      if (!explicit || !["awaiting-confirmation", "starting", "waiting-for-exit"].includes(state.installation.status)) return clone(state);
+      if (!explicit || state.installation.status !== "awaiting-confirmation") return clone(state);
       clearPending();
       return publish({ installation: { status: "cancelled", reason: null } });
     },

@@ -65,6 +65,5 @@ test('both production hosts create updater after single-instance startup and tar
     assert.match(source, /registerUpdateIpc\(\{ ipcMain, updateService, getSettingsWindow: \(\) => settingsWindow \}\)/);
     assert.match(source, /registerUpdateLifecycle\(\{ app, updateService \}\)/);
     assert.match(source, /updateService\.start\(\)/);
-    assert.match(source, /host: \{ kind: '(standalone|workflow)', execPath: process\.execPath \}/);
   }
 });

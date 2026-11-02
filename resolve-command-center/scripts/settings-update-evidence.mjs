@@ -5,7 +5,7 @@ import { translate } from "../localization/resources.mjs";
 
 export const SETTINGS_UPDATE_EVIDENCE_SCENARIOS = Object.freeze([
   ...["en", "zh"].flatMap((locale) => SETTINGS_UPDATE_SCENARIOS.map((state) => 'settings-update-' + state + '-' + locale)),
-  ...["en", "zh"].flatMap((locale) => ["keyboard", "candidate-flow", "install-flow", "rollback-flow", "recovery-flow"].map((flow) => 'settings-update-' + flow + '-' + locale))
+  ...["en", "zh"].flatMap((locale) => ["keyboard", "candidate-flow", "install-flow", "launch-failure-flow"].map((flow) => 'settings-update-' + flow + '-' + locale))
 ]);
 
 export async function runSettingsUpdateEvidence(name, { browser, serverUrl, output, evidence, checks, captureScreenshots = true }) {
@@ -21,16 +21,12 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
   const url = new URL(serverUrl);
   url.searchParams.set("view", "settings");
   url.searchParams.set("settings-preview", "application-empty");
-  const installationStates = { "install-ready": "ready", confirmation: "awaiting-confirmation", starting: "starting", "waiting-exit": "waiting-for-exit",
-    installing: "installing", installed: "installed", "rolled-back": "rolled-back", "install-failed": "failed",
-    "install-cancelled": "cancelled", "permission-denied": "unavailable", "permission-cancelled": "cancelled",
-    "recovery-required": "failed", "publisher-unverified": "unavailable",
-    "native-missing": "failed", "native-invalid": "failed", "native-incompatible": "failed" };
-  const workflow = state.endsWith("-flow");
+  const installationStates = { "install-ready": "ready", confirmation: "awaiting-confirmation", starting: "starting",
+    "handed-off": "handed-off", "launch-failed": "failed", "install-cancelled": "cancelled" };
+  const workflow = state.endsWith("-flow") && state !== "candidate-flow";
   url.searchParams.set("settings-update", state === "keyboard" ? "idle" : state === "candidate-flow" ? "downloaded" : workflow ? "install-ready" : state);
   if (state === "candidate-flow") url.searchParams.set("update-check", "newer");
-  if (state === "rollback-flow") url.searchParams.set("install-outcome", "rollback");
-  if (state === "recovery-flow") url.searchParams.set("install-outcome", "recovery");
+  if (state === "launch-failure-flow") url.searchParams.set("install-outcome", "launch-failed");
   url.searchParams.set("locale", locale);
   const screenshot = async (suffix = "") => {
     if (!captureScreenshots) return;
@@ -57,7 +53,7 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
     const download = page.getByRole("button", { name: t("download"), exact: true });
     if (state === "candidate-flow") {
       await waitStatus("downloaded");
-      assert.equal(await section.getByRole("button", { name: t("install.prepare"), exact: true }).count(), 0, "unqualified candidate has no usable install control");
+      assert.equal(await section.getByRole("button", { name: t("install.prepare"), exact: true }).count(), 1);
       await check.focus(); await page.keyboard.press("Enter");
       await waitStatus("checking"); await waitStatus("available");
       assert.deepEqual(await section.locator(".update-versions dd").allTextContents(), ["0.1.0", "0.3.0", "0.2.0"], "real fixture recheck discovers newer while retaining old candidate");
@@ -95,26 +91,23 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
       await page.keyboard.press("Space"); await waitInstallation("starting");
       assert.equal(await section.locator(".update-install-status").innerText(), t("install.status.starting"));
       assert.equal(await confirm.count(), 0, "confirmation is removed while independent handoff is pending");
-      await waitInstallation("waiting-for-exit");
-      await focused(check, "confirmation completion leaves focus on a stable control");
-      const cancelWait = section.getByRole("button", { name: t("install.cancelWait"), exact: true });
-      assert.equal(await cancelWait.getAttribute("aria-disabled"), "false", "cancel remains available while confirmation IPC is pending");
-      await cancelWait.focus(); await page.keyboard.press("Enter"); await waitInstallation("cancelled");
-      await page.waitForTimeout(900); await waitInstallation("cancelled");
-      await prepare.focus(); await page.keyboard.press("Enter"); await waitInstallation("awaiting-confirmation");
-      await confirm.focus(); await page.keyboard.press("Enter"); await waitInstallation("waiting-for-exit");
-      await screenshot("-waiting");
-      await waitInstallation("installing");
-      assert.equal(await section.getByRole("button", { name: t("install.cancelWait"), exact: true }).count(), 0, "cannot cancel a directory switch");
-      assert.equal(await section.locator(".update-install-status").innerText(), t("install.status.installing"));
-      assert.equal(await check.getAttribute("aria-disabled"), "true");
-      await screenshot("-installing");
-      const expected = state === "rollback-flow" ? "rolled-back" : state === "recovery-flow" ? "failed" : "installed";
+      const expected = state === "launch-failure-flow" ? "failed" : "handed-off";
       await waitInstallation(expected);
       assert.equal(await section.locator(".update-install-status").innerText(), t('install.status.' + expected));
-      if (state === "recovery-flow") assert.equal(await section.locator(".update-install-reason").innerText(), t("install.reason.recovery-required"));
-      assert.equal(await section.locator(".update-versions dd").first().innerText(), "0.1.0", "activation simulation cannot verify host startup");
-      checks.push(name + ': keyboard confirmation, Escape/Not Now and wait cancellation retain candidate; simulated waiting/installing/' + expected + ' states remain explicitly non-executable.');
+      assert.equal(await section.getByRole("button", { name: t("install.cancel"), exact: true }).count(), 0);
+      if (expected === "failed") {
+        assert.equal(await section.locator(".update-install-reason").innerText(), t("install.reason.launch-failed"));
+        await prepare.click();
+        await waitInstallation("awaiting-confirmation");
+        await cancelConfirm.click();
+        await waitInstallation("cancelled");
+      } else {
+        assert.equal(await check.getAttribute("aria-disabled"), "true");
+        assert.equal(await section.getByRole("button", { name: t("install.prepare"), exact: true }).count(), 0);
+        assert.equal(await section.getByRole("button", { name: t("discard"), exact: true }).getAttribute("aria-disabled"), "true");
+      }
+      assert.equal(await section.locator(".update-versions dd").first().innerText(), "0.1.0", "handoff cannot change installed identity");
+      checks.push(name + ': explicit keyboard confirmation, Escape/Not Now, ' + expected + ' and no post-handoff cancellation; installed identity unchanged.');
     } else if (state === "keyboard") {
       await check.focus();
       await page.keyboard.press("Enter");
@@ -152,31 +145,21 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
       await focused(download, "Verified completion preserves the original Download element");
       assert.equal(await download.getAttribute("aria-disabled"), "true");
       assert.equal(await section.locator(".update-versions dd").first().innerText(), "0.1.0", "downloading does not change installed version");
-      assert.equal(await section.getByRole("button").count(), 3, "only check, unavailable download and explicit discard exist for an unqualified candidate");
+      assert.equal(await section.getByRole("button").count(), 4, "download completion exposes an explicit install action without auto-start");
       const notes = section.locator(".update-release-notes");
       await notes.focus(); await page.keyboard.press("Control+a");
       assert.ok((await page.evaluate(() => window.getSelection().toString())).length > 0, "release notes remain selectable");
       checks.push(name + ': check/download/cancel/corruption/retry/downloaded keyboard transitions retain focus and leave installed version unchanged; all outcomes are labeled simulations.');
     } else {
-      const expected = installationStates[state] ? "downloaded" : ["rate-limit", "offline", "timeout", "failure", "corrupt", "space", "version"].includes(state) ? "error" : state;
+      const expected = installationStates[state] ? "downloaded" : ["rate-limit", "offline", "timeout", "failure", "corrupt", "space", "version", "missing-installer"].includes(state) ? "error" : state;
       await waitStatus(expected);
-      const errors = { "rate-limit": "rateLimit", offline: "offline", timeout: "timeout", failure: "path", corrupt: "corrupt", space: "space", version: "version", unavailable: "installedVersion" };
+      const errors = { "rate-limit": "rateLimit", offline: "offline", timeout: "timeout", failure: "path", corrupt: "corrupt", space: "space", version: "version", unavailable: "installedVersion", "missing-installer": "package" };
       assert.equal(await section.locator(".update-status").first().innerText(), t(errors[state] ? 'error.' + errors[state] : 'status.' + expected));
       if (installationStates[state]) {
         await waitInstallation(installationStates[state]);
         assert.equal(await section.locator(".update-install-status").innerText(), t('install.status.' + installationStates[state]));
         assert.equal(await download.getAttribute("aria-disabled"), "true");
-        if (["native-missing", "native-invalid", "native-incompatible"].includes(state)) {
-          assert.equal(await section.locator(".update-install-reason").innerText(), t("install.reason." + state));
-          assert.equal(await section.getByRole("button", { name: t("install.prepare"), exact: true }).count(), 0);
-          assert.deepEqual(await section.locator(".update-versions dd").allTextContents(), ["0.1.0", "0.2.0", "0.2.0"]);
-        }
-if (state === "recovery-required") {
-  assert.equal(await section.locator(".update-install-reason").innerText(), t("install.reason.recovery-required"));
-  assert.equal(await section.getByRole("button", { name: t("discard"), exact: true }).getAttribute("aria-disabled"), "true");
-          assert.equal(await section.getByRole("button", { name: t("install.prepare"), exact: true }).count(), 0, "ambiguous request never offers unsafe retry");
-          assert.equal(await section.getByRole("button", { name: t("install.confirm"), exact: true }).count(), 0);
-        }
+        if (state === "launch-failed") assert.equal(await section.locator(".update-install-reason").innerText(), t("install.reason.launch-failed"));
       }
       if (["checking", "downloading", "verifying", "rate-limit", "unavailable"].includes(state)) assert.equal(await check.getAttribute("aria-disabled"), "true");
       if (state === "rate-limit") assert.equal(await section.locator(".update-retry").count(), 1);

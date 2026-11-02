@@ -10,19 +10,15 @@ export const UPDATE_ERROR_KEYS = Object.freeze({
   unsupported: "unsupported", "download-failed": "download", "check-failed": "check",
   "unsafe-path": "path", "missing-digest": "package",
   "unsupported-platform": "unsupported", "invalid-version": "version", "invalid-source": "source",
-  "invalid-response": "check", "invalid-asset": "package", "invalid-zip": "package",
+  "invalid-response": "check", "invalid-asset": "package", "invalid-exe": "package",
   "disk-space": "space", checksum: "corrupt", "size-limit": "package", network: "offline", storage: "path"
 });
 
 export const INSTALLATION_STATUSES = Object.freeze([
-  "unavailable", "ready", "awaiting-confirmation", "starting", "waiting-for-exit", "installing",
-  "installed", "rolled-back", "failed", "cancelled"
+  "unavailable", "ready", "awaiting-confirmation", "starting", "handed-off", "failed", "cancelled"
 ]);
 export const INSTALLATION_REASONS = Object.freeze([
-  "qualification-required", "publisher-unverified", "host-unqualified", "target-unverified",
-  "permission-denied", "permission-cancelled", "process-unknown", "host-running",
-  "concurrent-install", "recovery-required", "invalid-package", "install-failed", "no-candidate", "unsupported-host",
-  "native-missing", "native-invalid", "native-incompatible"
+  "qualification-required", "invalid-package", "launch-failed", "no-candidate", "unsupported-host"
 ]);
 
 export function unavailableUpdateSnapshot() {
@@ -55,25 +51,25 @@ export function normalizeUpdateSnapshot(value) {
 export function getUpdatePresentation(state, now = Date.now()) {
   const active = ["checking", "downloading", "verifying"].includes(state.status);
   const installationStatus = state.installation?.status || "unavailable";
-  const installationActive = ["awaiting-confirmation", "starting", "waiting-for-exit", "installing"].includes(installationStatus);
-  const installed = installationStatus === "installed";
+  const installationActive = ["awaiting-confirmation", "starting"].includes(installationStatus);
+  const handedOff = installationStatus === "handed-off";
   const candidate = Boolean(state.downloadedVersion);
   const coolingDown = Boolean(state.retryAt && state.retryAt > now);
   const retryableDownload = state.status === "cancelled" || (state.status === "error" &&
-    ["download-failed", "hash-mismatch", "invalid-package", "version-mismatch", "insufficient-space", "unsafe-path", "timeout", "offline", "invalid-version", "invalid-zip", "disk-space", "checksum", "network", "storage", "size-limit"].includes(state.error?.code));
+    ["download-failed", "hash-mismatch", "invalid-package", "version-mismatch", "insufficient-space", "unsafe-path", "timeout", "offline", "invalid-version", "invalid-exe", "disk-space", "checksum", "network", "storage", "size-limit"].includes(state.error?.code));
   return {
     statusKey: state.error ? "settings.update.error." + (state.error.code === "invalid-version" && !state.currentVersion ? "installedVersion" : UPDATE_ERROR_KEYS[state.error.code] || "generic") : "settings.update.status." + state.status,
-    canCheck: !active && !installationActive && !installed && !coolingDown && Boolean(state.currentVersion) &&
+    canCheck: !active && !installationActive && !handedOff && !coolingDown && Boolean(state.currentVersion) &&
       (state.status !== "unavailable" || ["invalid-asset", "invalid-source", "missing-digest", "invalid-package", "invalid-response", "invalid-version"].includes(state.error?.code)),
-    canDownload: !candidate && !installationActive && !installed && !coolingDown && Boolean(state.currentVersion && state.latestVersion) && (state.status === "available" || retryableDownload),
+    canDownload: !candidate && !installationActive && !handedOff && !coolingDown && Boolean(state.currentVersion && state.latestVersion) && (state.status === "available" || retryableDownload),
     canCancel: state.status === "downloading" || state.status === "verifying",
-    canDiscard: candidate && !active && !installationActive && !installed &&
-      !(installationStatus === "failed" && state.installation.reason === "recovery-required"),
+    canDiscard: candidate && !active && !installationActive && !handedOff,
     canPrepareInstall: candidate && Boolean(state.currentVersion) && !active &&
       (installationStatus === "ready" && state.installation.reason === null ||
-        installationStatus === "cancelled" && [null, "permission-cancelled"].includes(state.installation.reason)),
+        installationStatus === "cancelled" && state.installation.reason === null ||
+        installationStatus === "failed" && state.installation.reason === "launch-failed"),
     canConfirmInstall: candidate && Boolean(state.currentVersion) && !active && installationStatus === "awaiting-confirmation" && state.installation.reason === null,
-    canCancelInstall: ["awaiting-confirmation", "starting", "waiting-for-exit"].includes(installationStatus),
+    canCancelInstall: installationStatus === "awaiting-confirmation",
     installationKey: "settings.update.install.status." + installationStatus,
     installationReasonKey: state.installation?.reason ? "settings.update.install.reason." + state.installation.reason : null,
     retryableDownload,

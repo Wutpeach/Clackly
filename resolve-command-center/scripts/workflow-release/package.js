@@ -59,9 +59,13 @@ function validateDependencies(plugin, lock) {
   }
 }
 
+const PACKAGED_SOURCE_FILES = ['dist/renderer/index.html', 'workflow-plugin/main.js', 'electron/main/main.js',
+  'localization/resources.mjs', 'electron/main/update/UpdateService.js', 'electron/main/update/InstallCoordinator.js',
+  'electron/main/update/identity.js', 'electron/main/update/network.js', 'electron/main/update/storage.js',
+  'electron/main/update/install/InnoInstaller.js',
+  'electron/main/update/release-manifest.js', 'electron/main/update/zip.js', ...PRODUCTION_INSTALLER_FILES];
 function validatePackagedSources(appRoot, plugin) {
-  for (const file of ['dist/renderer/index.html', 'workflow-plugin/main.js',
-    'electron/main/update/release-manifest.js', 'electron/main/update/zip.js', ...PRODUCTION_INSTALLER_FILES]) {
+  for (const file of PACKAGED_SOURCE_FILES) {
     if (digest(fs.readFileSync(path.join(appRoot, file))) !== digest(fs.readFileSync(path.join(plugin, file)))) {
       throw new Error('Packaged source is stale: ' + file);
     }
@@ -152,4 +156,4 @@ if (require.main === module) {
       publishable: !args.includes('--nonpublishable'), tag: value('--tag') }), null, 2));
   })().catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
-module.exports = { VERSION, RELEASE_MANIFEST, inventory, sourceIdentity, validateManifest, validateInventory, validatePlugin, validateDependencies, validatePackagedSources, verifyArchive, buildWorkflow, powershell, quote };
+module.exports = { VERSION, RELEASE_MANIFEST, inventory, sourceIdentity, validateManifest, validateInventory, validatePlugin, validateDependencies, PACKAGED_SOURCE_FILES, validatePackagedSources, verifyArchive, buildWorkflow, powershell, quote };

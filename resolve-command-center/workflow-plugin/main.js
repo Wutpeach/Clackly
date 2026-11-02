@@ -223,7 +223,7 @@ function togglePalette() {
 }
 
 function registerIpcHandlers() {
-  updateService = createHostUpdateService({ app, appRoot, host: { kind: 'workflow', execPath: process.execPath } });
+  updateService = createHostUpdateService({ app, appRoot });
   registerUpdateLifecycle({ app, updateService });
   registerUpdateIpc({ ipcMain, updateService, getSettingsWindow: () => settingsWindow });
   updateService.start();

@@ -8,7 +8,7 @@ function validateUrl(value, kind, redirect = false) {
   if (kind === 'releases') {
     if (url.href !== RELEASES_URL) throw failure('invalid-source');
   } else if (url.hostname === 'github.com') {
-    if (!/^\/Wutpeach\/Clackly\/releases\/download\/v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)\/Clackly-Workflow-\d+\.\d+\.\d+-win-x64\.zip$/.test(url.pathname) || url.search) throw failure('invalid-source');
+    if (!/^\/Wutpeach\/Clackly\/releases\/download\/v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)\/Clackly-Setup-\d+\.\d+\.\d+-win-x64\.exe$/.test(url.pathname) || url.search) throw failure('invalid-source');
   } else if (!redirect || !['release-assets.githubusercontent.com', 'objects.githubusercontent.com'].includes(url.hostname)
     || !/^\/github-production-release-asset(?:-[a-z0-9]+)?\//.test(url.pathname)) throw failure('invalid-source');
   return url;
@@ -24,7 +24,7 @@ function openResponse(value, { kind, signal, request = https.get, now = Date.now
   return new Promise((resolve, reject) => {
     let url;
     try { url = validateUrl(value, kind, redirects > 0); } catch (error) { reject(error); return; }
-    const req = request(url, { signal, headers: { 'User-Agent': 'Clackly-Workflow-Updater',
+    const req = request(url, { signal, headers: { 'User-Agent': 'Clackly-Setup-Updater',
       Accept: kind === 'releases' ? 'application/vnd.github+json' : 'application/octet-stream',
       'Accept-Encoding': 'identity', 'X-GitHub-Api-Version': '2022-11-28' } }, (response) => {
       const status = response.statusCode;

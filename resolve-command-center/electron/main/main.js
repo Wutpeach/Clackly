@@ -142,7 +142,7 @@ function togglePalette() {
 }
 
 function registerIpcHandlers() {
-  updateService = createHostUpdateService({ app, appRoot, host: { kind: 'standalone', execPath: process.execPath } });
+  updateService = createHostUpdateService({ app, appRoot });
   registerUpdateLifecycle({ app, updateService });
   registerUpdateIpc({ ipcMain, updateService, getSettingsWindow: () => settingsWindow });
   updateService.start();

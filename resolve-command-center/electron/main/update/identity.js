@@ -56,14 +56,14 @@ function selectRelease(releases, currentVersion) {
   const version = candidate.tag_name.replace(/^v/, '');
   const notes = typeof candidate.body === 'string' ? candidate.body.slice(0, 20000) : '';
   if (!semver.gt(version, currentVersion)) return { status: 'up-to-date', release: { version, notes } };
-  const name = `Clackly-Workflow-${version}-win-x64.zip`;
+  const name = `Clackly-Setup-${version}-win-x64.exe`;
   const assets = Array.isArray(candidate.assets) ? candidate.assets.filter((asset) => asset?.name === name) : [];
   const unavailable = () => ({ status: 'unavailable', release: { version, notes }, error: { code: 'invalid-asset' } });
   if (assets.length !== 1) return unavailable();
   const asset = assets[0];
   if (!Number.isSafeInteger(candidate.id) || candidate.id <= 0 || !Number.isSafeInteger(asset.id) || asset.id <= 0
     || !Number.isSafeInteger(asset.size) || asset.size <= 0 || asset.size > MAX_ASSET_BYTES
-    || !['application/zip', 'application/x-zip-compressed', 'application/octet-stream'].includes(asset.content_type)
+    || !['application/vnd.microsoft.portable-executable', 'application/x-msdownload', 'application/x-msdos-program', 'application/octet-stream'].includes(asset.content_type)
     || asset.state !== 'uploaded' || !/^sha256:[a-fA-F0-9]{64}$/.test(asset.digest || '')) return unavailable();
   let url;
   try { url = assetUrl(asset.browser_download_url, version, name); } catch { return unavailable(); }

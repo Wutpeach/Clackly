@@ -4,10 +4,10 @@ const fs = require('node:fs');
 const { failure, installedVersion, selectRelease } = require('./identity');
 const { readReleases, openResponse } = require('./network');
 const { UpdateStorage } = require('./storage');
-const { verifyZip } = require('./zip');
+const { verifyExecutable } = require('./install/InnoInstaller');
 const { InstallCoordinator } = require('./InstallCoordinator');
 const DAY = 86400000;
-const ERROR_CODES = new Set(['invalid-version', 'invalid-source', 'invalid-response', 'invalid-asset', 'invalid-zip',
+const ERROR_CODES = new Set(['invalid-version', 'invalid-source', 'invalid-response', 'invalid-asset', 'invalid-exe',
   'unsafe-path', 'disk-space', 'checksum', 'size-limit', 'timeout', 'rate-limit', 'network', 'storage', 'cancelled']);
 function publicError(error) {
   if (ERROR_CODES.has(error?.code)) return error.code;
@@ -16,7 +16,7 @@ function publicError(error) {
 }
 class UpdateService {
   constructor({ appRoot, cacheRoot, platform = process.platform, now = Date.now,
-    discover = readReleases, open = openResponse, storage, space, verify = verifyZip,
+    discover = readReleases, open = openResponse, storage, space, verify = verifyExecutable,
     checkTimeout = 30000, downloadTimeout = 10 * 60000, installer } = {}) {
     this.now = now;
     this.discover = discover;
@@ -43,7 +43,7 @@ class UpdateService {
     this.snapshot.installation = { status: 'unavailable', reason: 'no-candidate' };
     this.installation = new InstallCoordinator({ installer, publish: (installation) => this.publish({ installation }) });
     this.supported = this.snapshot.status === 'idle';
-    this.ready = this.initialize().then(() => this.installation.restore());
+    this.ready = this.initialize();
   }
   getState() { return structuredClone(this.snapshot); }
   subscribe(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
@@ -79,7 +79,7 @@ class UpdateService {
       if (downloaded) {
         try { retainedRelease = selectRelease(downloaded.releases || cache.releases, this.snapshot.currentVersion).release; } catch { /* Invalid candidate metadata is never restored. */ }
       }
-      if (retainedRelease && downloaded && /^[a-f0-9]{32}\.zip$/.test(downloaded.name || '')
+      if (retainedRelease && downloaded && /^[a-f0-9]{32}\.exe$/.test(downloaded.name || '')
         && downloaded.version === retainedRelease.version && downloaded.digest === retainedRelease.digest && downloaded.size === retainedRelease.size) {
         try {
           const { file, stat } = await this.storage.safeFile(downloaded.name);
@@ -248,8 +248,7 @@ class UpdateService {
   }
   discardUpdate() {
     return this.run('discard', async () => {
-      if (!this.downloadedName || this.installation.isRunning() ||
-          this.installation.state.status === 'failed' && this.installation.state.reason === 'recovery-required') return;
+      if (!this.downloadedName || this.installation.isRunning()) return;
       const name = this.downloadedName;
       // Persist the tombstone before unlinking, so an interrupted discard cannot restore it.
       const cache = { ...this.cache, downloaded: null };
@@ -267,7 +266,7 @@ class UpdateService {
     return this.run('prepare-install', () => this.installation.prepare(), this.checkTimeout);
   }
   confirmUpdateInstall() {
-    // User-owned host exit has no network deadline; the independent adapter owns its lifetime.
+    // Windows owns UAC and the independent installer; this is not installation progress.
     return this.run('confirm-install', () => this.installation.confirm(), null);
   }
   async cancelUpdateInstall() {
@@ -295,16 +294,16 @@ class UpdateService {
     this.installation.dispose();
     clearTimeout(this.active?.timer);
     this.active?.controller.abort(failure('cancelled'));
-    // The independent executor may be waiting for this very host to exit.
-    // Await transfer cleanup, but never keep the host alive waiting for installation.
+    // Await transfer cleanup, never the Windows EXE launch or its installation.
     if (this.active?.kind === 'confirm-install') return Promise.resolve();
     return this.active?.promise || this.ready;
   }
 }
-function createHostUpdateService({ app, appRoot, host }) {
-  const { createWorkflowInstaller } = require('./install/WorkflowInstaller');
+function createHostUpdateService({ app, appRoot, openPath = (file) => require('electron').shell.openPath(file) }) {
+  const { createInnoInstaller } = require('./install/InnoInstaller');
   const cacheRoot = path.join(app.getPath('userData'), 'workflow-updates');
-  return new UpdateService({ appRoot, cacheRoot,
-    installer: createWorkflowInstaller({ appRoot, cacheRoot, host }) });
+  const storage = new UpdateStorage(cacheRoot, appRoot);
+  return new UpdateService({ appRoot, cacheRoot, storage,
+    installer: createInnoInstaller({ storage, openPath }) });
 }
 module.exports = { UpdateService, createHostUpdateService, publicError };

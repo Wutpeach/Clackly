@@ -17,6 +17,7 @@ test('strict stable SemVer and newest official asset selection', () => {
 test('missing/doubled/source archives, absent hashes and foreign URLs are unavailable', () => {
   const candidate = release();
   for (const assets of [[], [candidate.assets[0], candidate.assets[0]], [{ ...candidate.assets[0], name: 'source.zip' }],
+    [{ ...candidate.assets[0], name: 'Clackly-0.2.0-Workflow.zip', content_type: 'application/zip' }],
     [{ ...candidate.assets[0], digest: null }], [{ ...candidate.assets[0], size: 2 ** 40 }],
     [{ ...candidate.assets[0], browser_download_url: candidate.assets[0].browser_download_url.replace('Wutpeach', 'attacker') }]]) {
     assert.equal(selectRelease([{ ...candidate, assets }], '0.1.0').status, 'unavailable');

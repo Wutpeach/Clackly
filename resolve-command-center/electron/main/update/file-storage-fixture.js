@@ -21,7 +21,7 @@ function fileStorage(root) {
     async cleanupDownloads(keep = null) {
       await prepare();
       for (const name of await fs.readdir(root)) {
-        if (/^[a-f0-9]{32}\.(part|zip)$/.test(name) && name !== keep) await fs.unlink(file(name));
+        if (/^[a-f0-9]{32}\.(part|exe|zip)$/.test(name) && name !== keep) await fs.unlink(file(name));
       }
     },
     async allocate(size, space = fs.statfs) {
@@ -30,7 +30,7 @@ function fileStorage(root) {
       if (Number(stats.bavail) * Number(stats.bsize) < size + 64 * 1024 * 1024) throw failure('disk-space');
       const token = crypto.randomBytes(16).toString('hex');
       const name = `${token}.part`;
-      return { name, finalName: `${token}.zip`, handle: await fs.open(file(name), 'wx') };
+      return { name, finalName: `${token}.exe`, handle: await fs.open(file(name), 'wx') };
     },
     async retain(name, finalName) { await fs.rename(file(name), file(finalName)); }
   };

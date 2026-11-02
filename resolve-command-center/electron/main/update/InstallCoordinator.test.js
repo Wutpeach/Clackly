@@ -1,168 +1,45 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { InstallCoordinator } = require('./InstallCoordinator');
-const candidate = { name: 'a'.repeat(32) + '.zip', version: '0.2.0', digest: 'b'.repeat(64), size: 100 };
+const candidate = { name: 'a'.repeat(32) + '.exe', version: '0.2.0' };
 
-test('confirmation keeps host open until adapter acknowledges and serializes startup cancellation', async () => {
-  let finish; let report; let launches = 0; let cancellations = 0; let signal;
-  const states = [];
-  const coordinator = new InstallCoordinator({ publish: (value) => states.push(value.status), installer: {
-    qualify: async () => ({ ready: true }),
-    start: (_candidate, options) => { launches++; report = options.onState; signal = options.signal; return new Promise((resolve) => { finish = resolve; }); },
-    cancel: async () => { cancellations++; return { status: 'cancelled', reason: null }; } } });
+test('only a fresh explicit confirmation starts an installer, and handoff is never installed', async () => {
+  let starts = 0; const states = [];
+  const coordinator = new InstallCoordinator({ publish: (state) => states.push(state.status), installer: {
+    qualify: async () => ({ ready: true }), start: async () => { starts++; return { status: 'handed-off' }; }
+  } });
+  await coordinator.setCandidate(candidate); await coordinator.confirm(); assert.equal(starts, 0);
+  await coordinator.prepare(); coordinator.invalidateConfirmation(); await coordinator.confirm(); assert.equal(starts, 0);
+  await coordinator.prepare(); await coordinator.cancel(); await coordinator.confirm(); assert.equal(starts, 0);
+  await coordinator.prepare(); await coordinator.confirm();
+  assert.equal(starts, 1); assert.equal(coordinator.state.status, 'handed-off');
+  await coordinator.cancel(); await coordinator.prepare(); await coordinator.confirm();
+  assert.equal(starts, 1); assert.equal(coordinator.state.status, 'handed-off');
+  assert.equal(states.includes('installed'), false);
+});
+
+test('a Windows launch error retains the candidate for explicit retry', async () => {
+  let fail = true;
+  const coordinator = new InstallCoordinator({ installer: { qualify: async () => ({ ready: true }),
+    start: async () => fail ? { status: 'failed', reason: 'launch-failed' } : { status: 'handed-off' } } });
+  await coordinator.setCandidate(candidate); await coordinator.prepare(); await coordinator.confirm();
+  assert.deepEqual(coordinator.state, { status: 'failed', reason: 'launch-failed' });
+  assert.equal(coordinator.candidate, candidate);
+  fail = false; await coordinator.confirm(); assert.equal(coordinator.state.status, 'failed');
+  await coordinator.prepare(); await coordinator.confirm(); assert.equal(coordinator.state.status, 'handed-off');
+});
+
+test('cancelling confirmation invalidates delayed preparation; launching has no fake cancel', async () => {
+  let ready; let finish;
+  const installer = { qualify: async () => ({ ready: true }), start: () => new Promise((resolve) => { finish = resolve; }) };
+  const coordinator = new InstallCoordinator({ installer });
   await coordinator.setCandidate(candidate); await coordinator.prepare();
-  const confirmation = coordinator.confirm(); await new Promise(setImmediate);
-  assert.equal(coordinator.state.status, 'starting');
-  assert.equal(states.includes('waiting-for-exit'), false);
-  await coordinator.prepare(); await coordinator.confirm(); assert.equal(launches, 1);
-  await coordinator.cancel(); assert.equal(cancellations, 1); assert.equal(signal.aborted, false);
-  report({ status: 'waiting-for-exit' }); finish({ status: 'cancelled' }); await confirmation;
+  installer.qualify = () => new Promise((resolve) => { ready = resolve; });
+  const delayed = coordinator.prepare(); await coordinator.cancel(); ready({ ready: true }); await delayed;
   assert.equal(coordinator.state.status, 'cancelled');
-});
-test('local component failures survive the installer handoff and validated restart outcome', async () => {
-  for (const reason of ['native-missing', 'native-invalid', 'native-incompatible']) {
-    const outcome = { status: 'failed', reason };
-    const states = [];
-    const installer = { qualify: async () => ({ ready: true }), start: async () => outcome, readState: async () => outcome };
-    const coordinator = new InstallCoordinator({ installer, publish: (state) => states.push(state) });
-    await coordinator.setCandidate(candidate);
-    await coordinator.prepare();
-    await coordinator.confirm();
-    assert.deepEqual(states.at(-1), outcome);
-    const restored = new InstallCoordinator({ installer, publish: (state) => states.push(state) });
-    await restored.restore();
-    assert.deepEqual(states.at(-1), outcome);
-  }
-});
-
-test('confirmation requires the same retained candidate and repeats qualification before handoff', async () => {
-  let ready = true; const started = []; const states = [];
-  const coordinator = new InstallCoordinator({ publish: (state) => states.push(state), installer: {
-    qualify: async () => ({ ready, reason: 'publisher-unverified' }),
-    start: async (value, { onState }) => { started.push(value); onState({ status: 'installing' }); return { status: 'installed' }; } } });
-  await coordinator.setCandidate(candidate); await coordinator.confirm(); assert.equal(started.length, 0);
-  await coordinator.prepare(); assert.equal(coordinator.state.status, 'awaiting-confirmation');
-  ready = false; await coordinator.confirm(); assert.equal(started.length, 0);
-  assert.deepEqual(coordinator.state, { status: 'unavailable', reason: 'publisher-unverified' });
-  ready = true; await coordinator.prepare(); await coordinator.confirm(); assert.deepEqual(started, [candidate]);
-  assert.deepEqual(states.slice(-3).map((state) => state.status), ['starting', 'installing', 'installed']);
-  await coordinator.confirm(); assert.equal(started.length, 1);
-  await coordinator.cancel(); assert.equal(coordinator.state.status, 'installed');
-});
-test('cancel and changed candidate invalidate prepared confirmation; qualification errors never leak paths', async () => {
-  let started = 0;
-  const coordinator = new InstallCoordinator({ installer: { qualify: async () => ({ ready: true }),
-    start: async () => { started++; return { status: 'installed' }; } } });
-  await coordinator.setCandidate(candidate); await coordinator.prepare(); await coordinator.cancel(); await coordinator.confirm();
-  assert.equal(coordinator.state.status, 'cancelled'); assert.equal(started, 0);
-  await coordinator.prepare(); await coordinator.setCandidate({ ...candidate, version: '0.3.0' });
-  await coordinator.confirm(); assert.equal(started, 0);
-  coordinator.installer.qualify = async () => { throw Object.assign(new Error('C:/private/path'), { code: 'EACCES' }); };
-  await coordinator.prepare(); assert.deepEqual(coordinator.state, { status: 'unavailable', reason: 'qualification-required' });
-});
-test('in-flight qualification cancellation prevents executor launch and host disposal suppresses stale state', async () => {
-  let qualify; let started = 0;
-  const coordinator = new InstallCoordinator({ installer: { qualify: async () => ({ ready: true }),
-    start: async () => { started++; return { status: 'installed' }; }, cancel: async () => ({ status: 'cancelled' }) } });
-  await coordinator.setCandidate(candidate); await coordinator.prepare();
-  coordinator.installer.qualify = () => new Promise((resolve) => { qualify = resolve; });
-  const confirmation = coordinator.confirm(); await coordinator.cancel(); qualify({ ready: true }); await confirmation;
-  assert.equal(started, 0); assert.equal(coordinator.state.status, 'cancelled');
-  const states = []; coordinator.publish = (value) => states.push(value); coordinator.dispose();
-  await coordinator.prepare(); assert.deepEqual(states, []);
-});
-test('executor rollback is projected and cancellation is not claimed without executor acknowledgment', async () => {
-  let finish; const coordinator = new InstallCoordinator({ installer: { qualify: async () => ({ ready: true }),
-    start: (_value, { onState }) => { onState({ status: 'waiting-for-exit' }); return new Promise((resolve) => { finish = resolve; }); }, cancel: async () => ({ status: 'installing' }) } });
-  await coordinator.setCandidate(candidate); await coordinator.prepare(); const running = coordinator.confirm();
-  await new Promise((resolve) => setImmediate(resolve)); await coordinator.cancel();
-  assert.equal(coordinator.state.status, 'installing'); assert.equal(coordinator.isRunning(), true);
-  finish({ status: 'rolled-back', reason: 'install-failed' }); await running;
-  assert.deepEqual(coordinator.state, { status: 'rolled-back', reason: 'install-failed' });
-});
-test('acknowledged wait cancellation settles once without aborting the independent handoff', async () => {
-  let finish; let report; let signal;
-  const coordinator = new InstallCoordinator({ installer: { qualify: async () => ({ ready: true }),
-    start: (_value, options) => { report = options.onState; signal = options.signal; return new Promise((resolve) => { finish = resolve; }); },
-    cancel: async () => ({ status: 'cancelled', reason: null }) } });
-  await coordinator.setCandidate(candidate); await coordinator.prepare();
-  const running = coordinator.confirm(); await new Promise((resolve) => setImmediate(resolve));
-  await coordinator.cancel();
-  assert.deepEqual(coordinator.state, { status: 'cancelled', reason: null });
-  assert.equal(signal.aborted, false);
-  report({ status: 'waiting-for-exit' }); report({ status: 'installed' });
-  finish({ status: 'cancelled' }); await running;
-  assert.deepEqual(coordinator.state, { status: 'cancelled', reason: null });
-  await coordinator.prepare(); assert.equal(coordinator.state.status, 'awaiting-confirmation');
-});
-test('backup boundary removes cancellation and stale wait/cancel cannot overwrite installation', async () => {
-  let report; let finish; let finishCancel; let cancellations = 0;
-  const coordinator = new InstallCoordinator({ installer: { qualify: async () => ({ ready: true }),
-    start: (_value, { onState }) => { report = onState; return new Promise((resolve) => { finish = resolve; }); },
-    cancel: () => { cancellations++; return new Promise((resolve) => { finishCancel = resolve; }); } } });
-  await coordinator.setCandidate(candidate); await coordinator.prepare();
-  const running = coordinator.confirm(); await new Promise((resolve) => setImmediate(resolve));
-  const cancelling = coordinator.cancel();
-  report({ status: 'installing' }); finishCancel({ status: 'cancelled' }); await cancelling;
-  await coordinator.cancel(); report({ status: 'waiting-for-exit' });
-  assert.equal(cancellations, 1, 'no executor cancellation request after backup starts');
-  assert.equal(coordinator.state.status, 'installing');
-  report({ status: 'installed' }); report({ status: 'waiting-for-exit' });
-  finish({ status: 'installed' }); await running;
-  assert.equal(coordinator.state.status, 'installed');
-});
-test('cancellation transport failure retains the true waiting state and allows retry', async () => {
-  let finish; let reject = true;
-  const coordinator = new InstallCoordinator({ installer: { qualify: async () => ({ ready: true }),
-    start: (_value, { onState }) => { onState({ status: 'waiting-for-exit' }); return new Promise((resolve) => { finish = resolve; }); },
-    cancel: async () => { if (reject) throw new Error('C:/private'); return { status: 'cancelled' }; } } });
-  await coordinator.setCandidate(candidate); await coordinator.prepare();
-  const running = coordinator.confirm(); await new Promise((resolve) => setImmediate(resolve));
-  await coordinator.cancel(); assert.equal(coordinator.state.status, 'waiting-for-exit');
-  reject = false; await coordinator.cancel(); assert.equal(coordinator.state.status, 'cancelled');
-  finish({ status: 'cancelled' }); await running;
-});
-test('cancel during prepare prevents late qualification from reopening confirmation', async () => {
-  let qualify;
-  const coordinator = new InstallCoordinator({ installer: { qualify: async () => ({ ready: true }), start: async () => ({ status: 'installed' }) } });
-  await coordinator.setCandidate(candidate);
-  coordinator.installer.qualify = () => new Promise((resolve) => { qualify = resolve; });
-  const preparing = coordinator.prepare(); await coordinator.cancel(); qualify({ ready: true }); await preparing;
-  assert.equal(coordinator.state.status, 'cancelled'); assert.equal(coordinator.confirmation, null);
-});
-test('late cancellation responses cannot overwrite a completed installation outcome', async () => {
-  for (const rejectCancel of [false, true]) {
-    let finish; let finishCancel;
-    const coordinator = new InstallCoordinator({ installer: { qualify: async () => ({ ready: true }),
-      start: () => new Promise((resolve) => { finish = resolve; }),
-      cancel: () => new Promise((resolve, reject) => {
-        finishCancel = () => rejectCancel ? reject(new Error('late failure')) : resolve({ status: 'cancelled' });
-      }) } });
-    await coordinator.setCandidate(candidate); await coordinator.prepare();
-    const running = coordinator.confirm(); await new Promise((resolve) => setImmediate(resolve));
-    const cancelling = coordinator.cancel();
-    finish({ status: 'installed' }); await running;
-    finishCancel(); await cancelling;
-    assert.deepEqual(coordinator.state, { status: 'installed', reason: null });
-  }
-});
-test('restart restores only bounded adapter results and never restores a confirmation', async () => {
-  for (const state of [{ status: 'installed', reason: null }, { status: 'rolled-back', reason: 'install-failed' },
-    { status: 'failed', reason: 'recovery-required' }, { status: 'cancelled', reason: null }]) {
-    const coordinator = new InstallCoordinator({ installer: { readState: async () => ({ ...state, path: 'C:/private' }) } });
-    await coordinator.restore(); assert.deepEqual(coordinator.state, state); assert.equal(coordinator.confirmation, null);
-  }
-  for (const value of [undefined, {}, { status: 'installed', reason: 'C:/private' }, { status: 'ready', reason: null }]) {
-    const coordinator = new InstallCoordinator({ installer: { readState: async () => value } });
-    await coordinator.restore(); assert.deepEqual(coordinator.state, { status: 'failed', reason: 'recovery-required' });
-  }
-});
-test('unverified restart outcome blocks fresh confirmation until recovery and survives candidate changes', async () => {
-  let result = { status: 'failed', reason: 'recovery-required' };
-  const coordinator = new InstallCoordinator({ installer: { readState: async () => result,
-    qualify: async () => ({ ready: true }), start: async () => ({ status: 'installed' }) } });
-  await coordinator.restore(); await coordinator.setCandidate(candidate); await coordinator.prepare(); await coordinator.confirm();
-  assert.deepEqual(coordinator.state, result); await coordinator.setCandidate(null); assert.deepEqual(coordinator.state, result);
-  result = { status: 'rolled-back', reason: 'install-failed' }; await coordinator.restore();
-  assert.deepEqual(coordinator.state, result);
+  installer.qualify = async () => ({ ready: true });
+  await coordinator.prepare(); const launch = coordinator.confirm();
+  await new Promise(setImmediate);
+  await coordinator.cancel(); assert.equal(coordinator.state.status, 'starting');
+  finish({ status: 'handed-off' }); await launch; assert.equal(coordinator.state.status, 'handed-off');
 });

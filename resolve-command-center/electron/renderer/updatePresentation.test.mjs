@@ -48,27 +48,14 @@ test("update display bounds release text and byte progress without exposing raw 
   assert.equal(state({ downloadedVersion: "C:/private" }).downloadedVersion, null);
 });
 
-test("recovery-required keeps the downloaded package and disables discard", async () => {
-  const api = createSettingsUpdateFixture({ search: "?view=settings&settings-update=recovery-required" });
+test("handoff retains the candidate without claiming installation or allowing cancellation", async () => {
+  const api = createSettingsUpdateFixture({ search: "?view=settings&settings-update=handed-off" });
   const snapshot = normalizeUpdateSnapshot(await api.getUpdateState());
-  assert.equal(getUpdatePresentation(snapshot).canDiscard, false);
+  const view = getUpdatePresentation(snapshot);
+  for (const key of ["canCheck", "canDownload", "canDiscard", "canPrepareInstall", "canConfirmInstall", "canCancelInstall"]) assert.equal(view[key], false);
   assert.equal((await api.discardUpdate()).downloadedVersion, snapshot.downloadedVersion);
-  assert.equal((await api.getUpdateState()).installation.reason, "recovery-required");
-});
-
-test("local Workflow component failures retain the candidate and expose a bounded repair reason", async () => {
-  for (const reason of ["native-missing", "native-invalid", "native-incompatible"]) {
-    const api = createSettingsUpdateFixture({ search: "?view=settings&settings-update=" + reason });
-    const snapshot = normalizeUpdateSnapshot(await api.getUpdateState());
-    const view = getUpdatePresentation(snapshot);
-    assert.deepEqual(snapshot.installation, { status: "failed", reason });
-    assert.equal(snapshot.currentVersion, "0.1.0");
-    assert.equal(snapshot.downloadedVersion, "0.2.0");
-    assert.equal(view.installationReasonKey, "settings.update.install.reason." + reason);
-    assert.equal(view.canPrepareInstall, false);
-    assert.equal(view.canConfirmInstall, false);
-    assert.equal(view.canDiscard, true);
-  }
+  assert.equal((await api.cancelUpdateInstall()).installation.status, "handed-off");
+  assert.equal(snapshot.currentVersion, "0.1.0");
 });
 
 test("retained candidates and installation qualifications control visible actions independently of discovery", () => {
@@ -82,17 +69,16 @@ test("retained candidates and installation qualifications control visible action
   assert.equal(getUpdatePresentation(state({ installation: { status: "ready", reason: null } })).canPrepareInstall, false);
   assert.equal(getUpdatePresentation(state({ ...candidate, installation: { status: "ready", reason: "unknown" } })).canPrepareInstall, false);
   assert.equal(getUpdatePresentation(state({ ...candidate, currentVersion: null, installation: { status: "ready", reason: null } })).canPrepareInstall, false);
-  for (const reason of [null, "permission-cancelled"]) {
-    assert.equal(getUpdatePresentation(state({ ...candidate, installation: { status: "cancelled", reason } })).canPrepareInstall, true, 'cancelled candidate can request fresh host qualification');
-  }
-  assert.equal(getUpdatePresentation(state({ ...candidate, installation: { status: "cancelled", reason: "recovery-required" } })).canPrepareInstall, false);
-  for (const status of ["awaiting-confirmation", "starting", "waiting-for-exit", "installing", "installed"]) {
+  assert.equal(getUpdatePresentation(state({ ...candidate, installation: { status: "cancelled", reason: null } })).canPrepareInstall, true);
+  assert.equal(getUpdatePresentation(state({ ...candidate, installation: { status: "failed", reason: "launch-failed" } })).canPrepareInstall, true);
+  assert.equal(getUpdatePresentation(state({ ...candidate, installation: { status: "failed", reason: "invalid-package" } })).canPrepareInstall, false);
+  for (const status of ["awaiting-confirmation", "starting", "handed-off"]) {
     const view = getUpdatePresentation(state({ ...candidate, installation: { status, reason: null } }));
     assert.equal(view.canCheck, false);
     assert.equal(view.canDiscard, false);
     assert.equal(view.canDownload, false);
     assert.equal(view.canConfirmInstall, status === "awaiting-confirmation");
-    assert.equal(view.canCancelInstall, ["awaiting-confirmation", "starting", "waiting-for-exit"].includes(status));
+    assert.equal(view.canCancelInstall, status === "awaiting-confirmation");
   }
 });
 
@@ -132,32 +118,21 @@ test("candidate recheck preserves download until explicit discard permits the ne
   assert.equal((await api.getUpdateState()).currentVersion, "0.1.0");
 });
 
-test("only explicit simulated qualification permits confirmation, cancel and isolated install outcomes", async () => {
-  const blocked = controlledFixture("?view=settings&settings-update=downloaded");
-  assert.equal((await blocked.api.prepareUpdateInstall()).installation.status, "unavailable");
-  for (const [outcome, expected] of [["success", "installed"], ["rollback", "rolled-back"], ["recovery", "failed"]]) {
-    const { api, flush } = controlledFixture("?view=settings&settings-update=install-ready&install-outcome=" + outcome);
+test("explicit confirmation is required for simulated handoff and launch failure", async () => {
+  for (const [outcome, expected] of [["success", "handed-off"], ["launch-failed", "failed"]]) {
+    const { api, flush } = controlledFixture("?view=settings&settings-update=downloaded&install-outcome=" + outcome);
     assert.equal((await api.confirmUpdateInstall()).installation.status, "ready");
     assert.equal((await api.prepareUpdateInstall()).installation.status, "awaiting-confirmation");
-    assert.equal((await api.discardUpdate()).downloadedVersion, "0.2.0");
     assert.equal((await api.cancelUpdateInstall()).installation.status, "cancelled");
-    await api.prepareUpdateInstall();
-    let confirmationFinished = false;
-    const confirmation = api.confirmUpdateInstall().then((snapshot) => { confirmationFinished = true; return snapshot; });
-    assert.equal((await api.getUpdateState()).installation.status, "starting");
-    assert.equal(confirmationFinished, false, "confirmation remains pending while the host waits for exit");
-    assert.equal((await api.cancelUpdateInstall()).installation.status, "cancelled");
-    assert.equal((await confirmation).installation.status, "cancelled", "cancel resolves the original pending request");
     flush();
-    assert.equal((await api.getUpdateState()).installation.status, "cancelled", "cancel clears queued simulation transitions");
+    assert.equal((await api.getUpdateState()).installation.status, "cancelled");
     await api.prepareUpdateInstall();
     const execution = api.confirmUpdateInstall();
+    assert.equal((await api.cancelUpdateInstall()).installation.status, "starting");
     flush();
     assert.equal((await execution).installation.status, expected);
-    const result = await api.getUpdateState();
-    assert.equal(result.installation.status, expected);
-    assert.equal(result.fixture, true);
-    assert.equal(result.currentVersion, "0.1.0", "file activation is not verified host startup");
+    assert.equal((await api.getUpdateState()).currentVersion, "0.1.0");
+    if (expected === "failed") assert.equal((await api.prepareUpdateInstall()).installation.status, "awaiting-confirmation");
   }
 });
 

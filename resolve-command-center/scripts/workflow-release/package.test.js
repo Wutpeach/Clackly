@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 const cp = require('node:child_process');
 const { payload, zipBuffer } = require('../../electron/main/update/fixtures');
 const { verifyZip } = require('../../electron/main/update/zip');
-const { sourceIdentity, validateManifest, validateInventory, validatePlugin, verifyArchive, validateDependencies, validatePackagedSources, powershell, quote } = require('./package');
+const { sourceIdentity, validateManifest, validateInventory, validatePlugin, verifyArchive, validateDependencies, PACKAGED_SOURCE_FILES, validatePackagedSources, powershell, quote } = require('./package');
 const { assertProductPayload, PRODUCTION_INSTALLER_FILES, verifyPackage } = require('../verify-package');
 const hash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 function fixture() {
@@ -144,8 +144,7 @@ test('release identity agrees across package, lock roots and Workflow XML', () =
 
 test('excluding installer tests preserves exact production executor source verification', (t) => {
   const root = workspace(t); const appRoot = path.join(root, 'source'); const plugin = path.join(root, 'plugin');
-  const files = ['dist/renderer/index.html', 'workflow-plugin/main.js',
-    'electron/main/update/release-manifest.js', 'electron/main/update/zip.js', ...PRODUCTION_INSTALLER_FILES];
+  const files = PACKAGED_SOURCE_FILES;
   for (const tree of [appRoot, plugin]) {
     for (const file of files) {
       fs.mkdirSync(path.dirname(path.join(tree, file)), { recursive: true }); fs.writeFileSync(path.join(tree, file), 'current product');

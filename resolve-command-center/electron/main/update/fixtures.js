@@ -66,10 +66,16 @@ function zipBuffer(entries = payload()) {
   end.writeUInt32LE(directory.length, 12); end.writeUInt32LE(offset, 16);
   return Buffer.concat([...locals, directory, end]);
 }
-function release(bytes = zipBuffer(), version = '0.2.0') {
-  const name = `Clackly-Workflow-${version}-win-x64.zip`;
+function exeBuffer(version = '0.2.0') {
+  const bytes = Buffer.alloc(256);
+  bytes.write('MZ'); bytes.writeUInt32LE(128, 60); bytes.writeUInt32LE(0x4550, 128); bytes.writeUInt16LE(0x14c, 132);
+  bytes.write('INERT TEST DATA ' + version, 160);
+  return bytes;
+}
+function release(bytes = exeBuffer(), version = '0.2.0') {
+  const name = `Clackly-Setup-${version}-win-x64.exe`;
   return { id: 12, tag_name: `v${version}`, draft: false, prerelease: false, body: 'Offline fixture release',
-    assets: [{ id: 25, name, state: 'uploaded', size: bytes.length, content_type: 'application/zip',
+    assets: [{ id: 25, name, state: 'uploaded', size: bytes.length, content_type: 'application/octet-stream',
       digest: `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`,
       browser_download_url: `https://github.com/Wutpeach/Clackly/releases/download/v${version}/${name}` }] };
 }
@@ -90,4 +96,4 @@ async function workspace(t) {
   t.after(async () => { await fs.rm(root, { recursive: true, force: true }); });
   return { root, appRoot, cacheRoot };
 }
-module.exports = { manifest, payload, zipBuffer, release, response, workspace };
+module.exports = { manifest, payload, zipBuffer, exeBuffer, release, response, workspace };

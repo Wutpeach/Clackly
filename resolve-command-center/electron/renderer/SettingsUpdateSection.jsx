@@ -13,7 +13,6 @@ export default function SettingsUpdateSection({ api }) {
   const cancelButton = useRef(null);
   const installButton = useRef(null);
   const confirmationCancel = useRef(null);
-  const waitCancel = useRef(null);
   const section = useRef(null);
   const returnAfterConfirmation = useRef(false);
   const previousInstallationStatus = useRef(null);
@@ -27,8 +26,7 @@ export default function SettingsUpdateSection({ api }) {
     let eventReceived = false;
     const apply = (snapshot) => {
       if (!mounted.current) return;
-      if ((document.activeElement === cancelButton.current && !["downloading", "verifying"].includes(snapshot?.status))
-        || (document.activeElement === waitCancel.current && snapshot?.installation?.status !== "waiting-for-exit")) {
+      if (document.activeElement === cancelButton.current && !["downloading", "verifying"].includes(snapshot?.status)) {
         focusAfterCancel.current = true;
       }
       setState(normalizeUpdateSnapshot(snapshot));
@@ -134,10 +132,6 @@ export default function SettingsUpdateSection({ api }) {
             <button type="button" className="secondary-button" aria-disabled={busy}
               onClick={() => { returnAfterConfirmation.current = true; invoke("confirmUpdateInstall", presentation.canConfirmInstall); }}>{t("settings.update.install.confirm")}</button>
           </div>
-        </div>}
-        {presentation.canCancelInstall && !presentation.canConfirmInstall && <div className="inspector-actions update-actions">
-          <button ref={waitCancel} type="button" className="secondary-button" aria-disabled={cancellationPending}
-            onClick={() => { checkButton.current?.focus(); invoke("cancelUpdateInstall", presentation.canCancelInstall); }}>{t("settings.update.install.cancelWait")}</button>
         </div>}
       </div>}
       {state.checkedAt && <p className="settings-empty-copy update-checked">{t("settings.update.checkedAt", { time: date(state.checkedAt) })}</p>}
