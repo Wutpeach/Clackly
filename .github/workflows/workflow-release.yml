@@ -2,6 +2,7 @@ name: Windows Inno draft release
 on:
   push:
     tags: ['v*']
+    branches: ['preflight/**']
 permissions:
   contents: read
 concurrency:
@@ -29,17 +30,22 @@ jobs:
         with:
           python-version: '3.13'
       - run: npm ci
-      - name: Check exact tag and clean source
+      - name: Check clean source and exact tag for releases
         run: |
-          node -e "const p=require('./package.json');require('./scripts/workflow-release/package').sourceIdentity(p.version,{tag:process.env.GITHUB_REF_NAME})"
-      - run: npm test
+          node -e "const p=require('./package.json');const publishable=process.env.GITHUB_REF_TYPE==='tag';const s=require('./scripts/workflow-release/package').sourceIdentity(p.version,{publishable,tag:publishable?process.env.GITHUB_REF_NAME:undefined});if(s.dirty)throw Error('Build requires clean committed source')"
       - run: npm run workflow:release:test
       - name: Verify Inno source input and Settings EXE handoff
-        run: node --test scripts/inno-setup/verify-input.test.js electron/main/update/identity.test.js electron/main/update/InstallCoordinator.test.js electron/main/update/install/InnoInstaller.test.js
+        run: node --test scripts/inno-setup/verify-input.test.js electron/main/update/identity.test.js electron/main/update/InstallCoordinator.test.js electron/main/update/install/InnoInstaller.test.js electron/main/update/UpdateService.test.js electron/main/update/network.test.js electron/main/update/registerIpc.test.js electron/renderer/updatePresentation.test.mjs
       - run: npm run package:win
       - run: npm run package:verify
       - name: Build complete intermediate Workflow ZIP
-        run: node scripts/workflow-release/package.js --tag $env:GITHUB_REF_NAME
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            node scripts/workflow-release/package.js --tag $env:GITHUB_REF_NAME
+          } else {
+            node scripts/workflow-release/package.js --nonpublishable
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Workflow ZIP build failed' }
       - name: Verify exact artifact bytes and record SHA-256
         run: |
           $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
@@ -70,7 +76,7 @@ jobs:
   draft:
     needs: build
     # Remains disabled until separately authorized repository activation. Never publish automatically.
-    if: vars.CLACKLY_ENABLE_DRAFT_RELEASE == 'true'
+    if: startsWith(github.ref, 'refs/tags/') && vars.CLACKLY_ENABLE_DRAFT_RELEASE == 'true'
     runs-on: windows-latest
     permissions:
       contents: write
