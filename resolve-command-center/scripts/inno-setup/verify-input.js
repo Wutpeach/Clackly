@@ -7,8 +7,8 @@ async function verifyInput(archive, { appRoot = path.resolve(__dirname, '../..')
   const verified = await verifyArchive(archive, version);
   const { source, build } = verified.manifest;
   const current = sourceIdentity(version, { appRoot, publishable: build.publishable });
-  if (current.dirty || source.dirty || source.commit !== current.commit) {
-    throw new Error('Setup requires an archive from this exact clean source commit');
+  if (source.commit !== current.commit || build.publishable && (current.dirty || source.dirty)) {
+    throw new Error('Setup requires this source commit; publishable builds also require clean source');
   }
   return { version, source, publishable: build.publishable, sha256: verified.sha256 };
 }

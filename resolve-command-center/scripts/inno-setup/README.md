@@ -2,7 +2,7 @@
 
 The user-facing Windows asset is `Clackly-Setup-<version>-win-x64.exe`. It embeds the complete application, built renderer and managed Python Runtime. It contains no Blackmagic Native binary and needs no application download during installation. Native is copied from the user's official local Resolve SamplePlugin after cache-only signature/publisher/x64 checks.
 
-From the application root, build from a clean committed checkout:
+From the application root, build a nonpublishable local acceptance package (a dirty development checkout is allowed):
 
 ```powershell
 npm ci
@@ -14,7 +14,7 @@ npm run setup:build -- release/workflow/Clackly-Workflow-<version>-win-x64.zip
 
 Build requires Node, Windows PowerShell 5.1 and Inno Setup **6.7.1** (`C:/Program Files (x86)/Inno Setup 6/ISCC.exe`). `Build.ps1` also accepts `-Compiler` and a fresh `-Output` directory. The default output is `release/setup`; existing outputs are refused to preserve evidence.
 
-Package/lock/XML version, exact ZIP filename, complete inventory/hash/Runtime/native exclusion and source commit are checked before compilation. Input must come from the same clean source commit. Local untagged builds retain `publishable=false`, actual commit and `source.workflowPath=null`; they are review candidates, not canonical Release artifacts. The canonical tag workflow builds publishable payloads using the existing exact-tag/source gates. Do not rename a dirty/local artifact into a formal release.
+Package/lock/XML version, exact ZIP filename, complete inventory/hash/Runtime/native exclusion and source commit are checked before compilation. Input must come from the same source commit. Explicitly nonpublishable local acceptance packages may include verified uncommitted development changes; provenance retains the actual commit, dirty state and `source.workflowPath=null`. They are local test packages, not canonical Release artifacts. Publishable builds still require clean source and the canonical tag workflow with the existing exact-tag/source gates. Do not rename a dirty/local artifact into a formal release.
 
 The version is passed to Inno metadata, asset filename and the installed helper from package.json. `build-report.json` records source identity, input ZIP SHA-256, final EXE size/SHA-256, compiler version and unsigned status. The ZIP and extracted payload are build intermediates; only the complete EXE is the primary download.
 

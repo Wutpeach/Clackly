@@ -8,7 +8,7 @@ const crypto = require('node:crypto');
 const { payload, zipBuffer } = require('../../electron/main/update/fixtures');
 const { verifyInput } = require('./verify-input');
 
-test('Setup accepts a clean same-commit archive and rejects stale, dirty, wrong-version or corrupt input', async (t) => {
+test('Setup accepts same-commit nonpublishable development input while retaining release and integrity gates', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'clackly-inno-input-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const appRoot = path.join(root, 'source'); fs.mkdirSync(appRoot);
@@ -35,12 +35,16 @@ test('Setup accepts a clean same-commit archive and rejects stale, dirty, wrong-
   assert.equal(accepted.version, '0.2.0'); assert.equal(accepted.publishable, false);
   assert.equal(accepted.source.commit, manifest.source.commit);
   manifest.source.commit = '0'.repeat(40); write();
-  await assert.rejects(verifyInput(archive, { appRoot }), /exact clean source/);
+  await assert.rejects(verifyInput(archive, { appRoot }), /this source commit/);
   manifest.source.commit = accepted.source.commit; manifest.source.dirty = true; write();
-  await assert.rejects(verifyInput(archive, { appRoot }), /exact clean source/);
+  assert.equal((await verifyInput(archive, { appRoot })).source.dirty, true);
   manifest.source.dirty = false; write();
   fs.writeFileSync(path.join(appRoot, 'uncommitted.txt'), 'dirty');
-  await assert.rejects(verifyInput(archive, { appRoot }), /exact clean source/);
+  assert.equal((await verifyInput(archive, { appRoot })).publishable, false);
+  manifest.source.dirty = false; manifest.source.workflowPath = '.github/workflows/workflow-release.yml';
+  manifest.build.publishable = true; write();
+  await assert.rejects(verifyInput(archive, { appRoot }), /clean committed/);
+  manifest.build.publishable = false; manifest.source.workflowPath = null; write();
   fs.unlinkSync(path.join(appRoot, 'uncommitted.txt'));
   fs.writeFileSync(path.join(appRoot, 'package.json'), JSON.stringify({ version: '0.3.0' }));
   await assert.rejects(verifyInput(archive, { appRoot }), /filename/);
