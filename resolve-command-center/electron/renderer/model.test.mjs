@@ -95,7 +95,7 @@ test("presentation catalog preserves registered command metadata only", () => {
   assert.equal(Object.hasOwn(catalog[0], "shortcut"), false);
 });
 
-test("ordinary scripts stay executable Search rows without Feature, Pin, or Recent ownership", () => {
+test("ordinary scripts enter Launcher only through Pin or Recent without Feature ownership", () => {
   const script = {
     id: "resolve-workspace-script:c:/scripts/utility/example.py",
     name: "Example",
@@ -111,7 +111,9 @@ test("ordinary scripts stay executable Search rows without Feature, Pin, or Rece
   assert.equal(isOrdinaryScript(projected), true);
   assert.equal(projected.featureStatus, null);
   assert.equal(canExecuteCommand(projected), true);
-  assert.deepEqual(projectLauncherSections([projected], new Set([script.id]), new Set([script.id])), []);
+  assert.deepEqual(projectLauncherSections([projected]), []);
+  assert.equal(projectLauncherSections([projected], new Set([script.id]), new Set([script.id]))[0][0], "pinned");
+  assert.equal(projectLauncherSections([projected], new Set(), new Set([script.id]))[0][0], "recent");
   assert.equal(shouldExecuteDirectly(projected, { type: "click", detail: 1 }), true);
   assert.equal(shouldExecuteDirectly(projected, { type: "contextmenu", detail: 0 }), false);
   assert.equal(shouldExecuteDirectly({ kind: "command" }, { type: "click", detail: 0 }), true);

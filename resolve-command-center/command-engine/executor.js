@@ -34,14 +34,13 @@ function createCommandExecutor({
     featureStatusManager?.assertEnabled(command.capability);
     configManager.assertConfigured(command.capability);
     const config = configManager.forCapability(command.capability);
+    const result = await capability.execute(command, { config });
     try {
       usageHistory?.record?.(command.id);
     } catch (_usageError) {
       // Recommendation history is strictly subordinate to command execution.
     }
-    return capability.execute(command, {
-      config
-    });
+    return result;
   };
 }
 

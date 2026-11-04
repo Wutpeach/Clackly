@@ -135,7 +135,7 @@ test("command executor requires configuration composition", () => {
   );
 });
 
-test("usage records only accepted starts, immediately before Capability execution, including failures", async () => {
+test("failed Capability execution never enters Recent", async () => {
   const events = [];
   const command = { id: "timeline.addMarker", capability: "marker.add" };
   const executeCommand = createCommandExecutor({
@@ -164,7 +164,6 @@ test("usage records only accepted starts, immediately before Capability executio
     "enabled",
     "configured",
     "scoped-config",
-    "usage:timeline.addMarker",
     "execute"
   ]);
 });

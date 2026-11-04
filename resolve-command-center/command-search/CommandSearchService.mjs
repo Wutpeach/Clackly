@@ -43,8 +43,8 @@ function createProjectionEntry(command, sourceIndex, effectiveLocale) {
 
   return {
     sourceIndex,
-    builtIn: true,
-    command: localized,
+    command: { ...localized, subtitle: command.kind === "extension"
+      ? `Extension · ${localized.category}` : "Clackly" },
     fields: {
       localizedName,
       englishName: [createSearchField(localized.englishName)].filter(Boolean),
@@ -84,16 +84,15 @@ function createOrdinaryScriptProjection(scripts, sourceIndex) {
     if (!script || typeof script.id !== "string" || typeof script.name !== "string"
       || !Array.isArray(script.nesting)) return [];
     const terms = scriptSearchTerms(script);
-    const detail = [...terms, script.source, script.language]
+    const detail = [script.source, script.language, terms.join("/")]
       .filter((term) => typeof term === "string" && term.trim())
       .map(scriptLabel)
       .join(" · ");
-    const subtitle = ["Resolve Script", detail].filter(Boolean).join(" · ");
+    const subtitle = ["Script", detail].filter(Boolean).join(" · ");
     const namePinyin = transliterateName(script.name);
     const termPinyin = terms.map(transliterate);
     return [{
       sourceIndex: sourceIndex + index,
-      builtIn: false,
       command: {
         id: script.id,
         name: script.name,
@@ -273,6 +272,7 @@ export class CommandSearchService {
     this.scriptEntries = [];
     this.scriptIds = new Set();
     this.refreshPromise = null;
+    this.scriptDiscoveryWarning = null;
   }
 
   invalidate() { this.projection = null; }
@@ -298,10 +298,12 @@ export class CommandSearchService {
         const scripts = Array.isArray(snapshot?.scripts) ? snapshot.scripts : [];
         const builtInEntries = this.getProjection().entries;
         this.scriptEntries = createOrdinaryScriptProjection(scripts, builtInEntries.length);
+        this.scriptDiscoveryWarning = snapshot?.diagnostics?.length ? "resolve-scripts-discovery-failed" : null;
         for (const entry of this.scriptEntries) this.scriptIds.add(entry.command.id);
       })
       .catch(() => {
         this.scriptEntries = [];
+        this.scriptDiscoveryWarning = "resolve-scripts-discovery-failed";
       })
       .finally(() => {
         this.refreshPromise = null;
@@ -320,17 +322,18 @@ export class CommandSearchService {
     const safeNow = Number.isSafeInteger(now) && now >= 0 ? now : Date.now();
     const usage = this.usageHistory.getSnapshot();
     const { entries: builtInEntries } = this.getProjection();
-    const entries = normalizedQuery ? [...builtInEntries, ...this.scriptEntries] : builtInEntries;
+    const entries = [...builtInEntries, ...this.scriptEntries.filter(({ command }) =>
+      normalizedQuery || pins.has(command.id) || usageFact(usage, command.id).usageCount > 0)];
 
     const results = entries
       .map((entry) => {
         const text = normalizedQuery ? textRelevance(entry, normalizedQuery) : null;
         if (normalizedQuery && !text) return null;
-        const fact = entry.builtIn ? usageFact(usage, entry.command.id) : { usageCount: 0, lastUsedAt: 0 };
+        const fact = usageFact(usage, entry.command.id);
         return {
           entry,
           text,
-          pinned: entry.builtIn && pins.has(entry.command.id),
+          pinned: pins.has(entry.command.id),
           fact,
           score: decayedUsageScore(fact, safeNow)
         };
@@ -340,8 +343,6 @@ export class CommandSearchService {
         if (normalizedQuery) {
           const textOrder = compareTextRelevance(left.text, right.text);
           if (textOrder) return textOrder;
-          const builtInOrder = Number(right.entry.builtIn) - Number(left.entry.builtIn);
-          if (builtInOrder) return builtInOrder;
         }
         return Number(right.pinned) - Number(left.pinned)
           || right.score - left.score
@@ -353,8 +354,9 @@ export class CommandSearchService {
     return {
       commands: results.map(({ entry }) => cloneCommand(entry.command)),
       usedCommandIds: results
-        .filter(({ entry, fact }) => entry.builtIn && fact.usageCount > 0)
-        .map(({ entry }) => entry.command.id)
+        .filter(({ fact }) => fact.usageCount > 0)
+        .map(({ entry }) => entry.command.id),
+      scriptDiscoveryWarning: this.scriptDiscoveryWarning
     };
   }
 }

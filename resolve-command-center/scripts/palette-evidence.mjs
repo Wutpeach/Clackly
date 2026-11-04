@@ -337,6 +337,13 @@ async function createScenario(browser, serverUrl, host, { reducedMotion = "no-pr
     const emitShown = () => requestAnimationFrame(() => state.onShown?.());
     window.__clacklyPaletteEvidence = state;
     window.resolveCommandCenter = {
+      getPinnedCommandIds: async () => state.pinnedIds || [],
+      setCommandPinned: async (id, pinned) => {
+        const ids = new Set(state.pinnedIds || []);
+        if (pinned) ids.add(id); else ids.delete(id);
+        state.pinnedIds = [...ids];
+        return state.pinnedIds;
+      },
       listCommands: async () => clone(seed.commands),
       searchCommands: async (query, pinnedIds) => {
         const request = {

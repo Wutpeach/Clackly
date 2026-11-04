@@ -54,7 +54,7 @@ function ids(response) {
   return response.commands.map(({ id }) => id);
 }
 
-test("ordinary scripts refresh once, match without paths, and keep built-ins first on equal text", async () => {
+test("ordinary scripts refresh once, match without paths, and share Pin/usage ties", async () => {
   let discovers = 0;
   const ordinaryScript = {
     id: "resolve-workspace-script:c:/scripts/utility/example.py",
@@ -91,22 +91,23 @@ test("ordinary scripts refresh once, match without paths, and keep built-ins fir
   assert.equal(discovers, 1, "concurrent palette refreshes share one discovery");
 
   const results = service.search("example", [ordinaryScript.id]);
-  assert.deepEqual(ids(results), ["built-in-example", ordinaryScript.id, duplicateName.id]);
-  assert.deepEqual(results.usedCommandIds, [], "scripts cannot enter Recent from stray usage facts");
+  assert.deepEqual(ids(results), [ordinaryScript.id, "built-in-example", duplicateName.id]);
+  assert.deepEqual(results.usedCommandIds, [ordinaryScript.id]);
+  assert.deepEqual(ids(service.search("", [])), [ordinaryScript.id, "built-in-example"], "only used or pinned scripts join Launcher");
   const script = results.commands.find(({ id }) => id === ordinaryScript.id);
   assert.deepEqual(
     { name: script.name, subtitle: script.subtitle, category: script.category, description: script.description, kind: script.kind },
     {
       name: "Example",
-      subtitle: "Resolve Script · Utility · Nested · System · Python",
+      subtitle: "Script · System · Python · Utility/Nested",
       category: "Utility",
-      description: "Utility · Nested · System · Python",
+      description: "System · Python · Utility/Nested",
       kind: "ordinary-script"
     }
   );
   assert.equal(
     results.commands.find(({ id }) => id === duplicateName.id).subtitle,
-    "Resolve Script · Edit · User · Lua",
+    "Script · User · Lua · Edit",
     "same-name scripts have useful visible disambiguation"
   );
   assert.equal(JSON.stringify(script).includes(ordinaryScript.absolutePath), false, "absolute paths never cross the UI boundary");
@@ -124,6 +125,7 @@ test("ordinary discovery failure never removes built-in Search", async () => {
   });
 
   await service.refresh();
+  assert.equal(service.search("example", []).scriptDiscoveryWarning, "resolve-scripts-discovery-failed");
   assert.deepEqual(ids(service.search("example", [])), ["built-in-example"]);
   assert.deepEqual(ids(service.search("", [])), ["built-in-example"]);
 });
@@ -330,4 +332,24 @@ test("Search validates Pin request facts and exposes explicit relevance tuples",
   const projection = service.getProjection().entries[0];
   const match = textRelevance(projection, "导出");
   assert.equal(match.wholeQuery, RELEVANCE.LOCALIZED_NAME_PREFIX);
+});
+
+test("three sources share Chinese/pinyin ties, relevance priority and stable fallback", async () => {
+  const registered = [
+    command({ id: "builtin", name: "导出片段", keywords: [], localizations: {} }),
+    command({ id: "extension:tools/export", kind: "extension", category: "Tools", name: "导出片段", keywords: ["export"], localizations: {} })
+  ];
+  const script = { id: "resolve-workspace-script:c:/user/export.py", name: "导出片段", nesting: [], source: "user", language: "python" };
+  const service = new CommandSearchService({ getCommands: () => registered,
+    localizationService: { getSnapshot: () => ({ effectiveLocale: "zh-CN" }) },
+    usageHistory: { getSnapshot: () => ({}) }, ordinaryScripts: { discover: async () => ({ scripts: [script] }) } });
+  await service.refresh();
+  for (const query of ["导出", "daochu", "dcpd"]) {
+    assert.deepEqual(ids(service.search(query)), ["builtin", "extension:tools/export", script.id], query);
+    assert.equal(ids(service.search(query, [script.id]))[0], script.id, query);
+    assert.equal(ids(service.search(query, ["extension:tools/export"]))[0], "extension:tools/export", query);
+  }
+  script.name = "导出片段更多";
+  await service.refresh();
+  assert.equal(ids(service.search("导出片段", [script.id]))[0], "builtin", "a pinned script cannot outrank an exact name with its prefix");
 });

@@ -113,7 +113,7 @@ function getCommandAriaLabel(command, t) {
 function getCommandAccessibleDescription(command, commands, bindings, t) {
   const interactionHelp = canExecuteCommand(command) ? getInteractionHelp(command, commands, bindings, t) : [];
   const interactionText = interactionHelp.map(({ label, description }) => `${label}: ${description}`).join(". ");
-  return interactionText || getCommandHint(command, t) || command.description;
+  return [command.subtitle, interactionText || getCommandHint(command, t) || command.description].filter(Boolean).join(". ");
 }
 
 function useOverflowTooltip(labelRef) {
@@ -163,9 +163,11 @@ function CommandMeta({ command, pinned, labelRef, t }) {
         <Icon name={command.icon} size={22} />
         {pinned && <span className="pin-indicator" aria-label={t("palette.pinnedStatus")} />}
       </span>
-      <span ref={labelRef} className="command-name" title={command.name}>{command.name}</span>
+      <span ref={labelRef} className="command-name" title={[command.name, command.subtitle].filter(Boolean).join(" · ")}>
+        <span className="command-title">{command.name}</span>
+        {command.subtitle && <span className="command-source">{command.subtitle}</span>}
+      </span>
       <span className="command-detail">
-        <span className="command-category">{command.subtitle || command.category}</span>
         {!canExecuteCommand(command) && (
           <span className="status-label">{t(`status.label.${getFeatureWarning(command.featureStatus, t)?.kind}`)}</span>
         )}
@@ -227,7 +229,7 @@ function CommandRow({
       <CommandMeta command={command} pinned={pinned} labelRef={labelRef} t={t} />
       {keycap && <kbd aria-hidden="true">{keycap}</kbd>}
       {accessibleDescription && <span id={descriptionId} className="screen-reader-only">{accessibleDescription}</span>}
-      <OverflowTooltip placement={placement} text={command.name} />
+      <OverflowTooltip placement={placement} text={[command.name, command.subtitle].filter(Boolean).join(" · ")} />
     </button>
   );
 }
@@ -361,6 +363,8 @@ function PaletteApp() {
   const [hoveredCommandId, setHoveredCommandId] = useState(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [pinnedIds, setPinnedIds] = useState(() => new Set());
+  const [pinsReady, setPinsReady] = useState(false);
+  const [pinSaving, setPinSaving] = useState(false);
   const [interactionPanelOpen, setInteractionPanelOpen] = useState(false);
   const [interactionPanelGeometry, setInteractionPanelGeometry] = useState(null);
   const [shortcutTestOpen, setShortcutTestOpen] = useState(false);
@@ -417,7 +421,9 @@ function PaletteApp() {
     ? { visible: status, accessible: status, error: true }
     : isExecuting
       ? { visible: t("palette.running"), accessible: t("palette.running"), error: false }
-      : null;
+      : mode === "search" && searchResponse.scriptDiscoveryWarning
+        ? { visible: t("palette.scriptDiscoveryFailed"), accessible: t("palette.scriptDiscoveryFailed"), error: false }
+        : null;
 
   useEffect(() => {
     featureStatusesRef.current = featureStatuses;
@@ -425,6 +431,13 @@ function PaletteApp() {
 
   useEffect(() => {
     let mounted = true;
+    Promise.resolve(api.getPinnedCommandIds?.() || [])
+      .then((ids) => {
+        if (!mounted) return;
+        setPinnedIds(new Set(ids));
+        setPinsReady(true);
+      })
+      .catch(() => { if (mounted) setStatus(t("palette.pinLoadFailed")); });
     const refreshScriptSearch = () => {
       Promise.resolve(api.searchCommands("", [], { refresh: true }))
         .then(() => {
@@ -637,17 +650,21 @@ function PaletteApp() {
     setMode("launcher");
   }
 
-  function toggleSelectedPin() {
-    if (!selectedCommand || isOrdinaryScript(selectedCommand)) return;
+  async function toggleSelectedPin() {
+    if (!selectedCommand || !pinsReady || pinSaving) return;
     const commandId = selectedCommand.id;
-    pendingPinSelectionRef.current = commandId;
-    // Immediately invalidate an in-flight request for the previous Pin set.
-    // The next effect owns the replacement request and consumes this intent.
-    searchRequestGate.begin();
-    const next = new Set(pinnedIds);
-    if (next.has(commandId)) next.delete(commandId);
-    else next.add(commandId);
-    setPinnedIds(next);
+    setPinSaving(true);
+    try {
+      const ids = await api.setCommandPinned(commandId, !pinnedIds.has(commandId));
+      pendingPinSelectionRef.current = commandId;
+      searchRequestGate.begin();
+      setPinnedIds(new Set(ids));
+      setStatus("");
+    } catch {
+      setStatus(t("palette.pinSaveFailed"));
+    } finally {
+      setPinSaving(false);
+    }
   }
 
   async function executeCommand(command) {
@@ -879,7 +896,7 @@ function PaletteApp() {
     }
   }
 
-  const selectedPinned = Boolean(selectedCommand && !isOrdinaryScript(selectedCommand) && pinnedIds.has(selectedCommand.id));
+  const selectedPinned = Boolean(selectedCommand && pinnedIds.has(selectedCommand.id));
   const handleCommandHover = (command) => {
     setHoveredCommandId(command.id);
   };
@@ -994,7 +1011,7 @@ function PaletteApp() {
                   key={command.id}
                   command={command}
                   index={index}
-                  pinned={!isOrdinaryScript(command) && pinnedIds.has(command.id)}
+                  pinned={pinnedIds.has(command.id)}
                   selected={index === selectedIndex}
                   hovered={hoveredCommandId === command.id}
                   accessibleDescription={getCommandAccessibleDescription(command, localizedCommands, bindings, t)}
@@ -1027,19 +1044,17 @@ function PaletteApp() {
                 {t("experiment.shortcut.open")}
               </button>
             )}
-            {!isOrdinaryScript(selectedCommand) && (
-              <button
-                className={selectedPinned ? "footer-control footer-icon active" : "footer-control footer-icon"}
-                type="button"
-                onClick={toggleSelectedPin}
-                aria-label={selectedCommand ? t(selectedPinned ? "palette.unpin" : "palette.pin", { name: selectedCommand.name }) : t("palette.pinSelected")}
-                aria-pressed={selectedPinned}
-                disabled={!selectedCommand}
-                title={selectedCommand ? t(selectedPinned ? "palette.unpin" : "palette.pin", { name: selectedCommand.name }) : t("palette.pinSelected")}
-              >
-                <Icon name="pin" size={15} />
-              </button>
-            )}
+            <button
+              className={selectedPinned ? "footer-control footer-icon active" : "footer-control footer-icon"}
+              type="button"
+              onClick={toggleSelectedPin}
+              aria-label={selectedCommand ? t(selectedPinned ? "palette.unpin" : "palette.pin", { name: selectedCommand.name }) : t("palette.pinSelected")}
+              aria-pressed={selectedPinned}
+              disabled={!selectedCommand || !pinsReady || pinSaving}
+              title={selectedCommand ? t(selectedPinned ? "palette.unpin" : "palette.pin", { name: selectedCommand.name }) : t("palette.pinSelected")}
+            >
+              <Icon name="pin" size={15} />
+            </button>
             <span className="footer-spacer" aria-hidden="true" />
             {hasSelectedCommand && (
               <button

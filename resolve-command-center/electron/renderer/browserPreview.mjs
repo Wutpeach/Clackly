@@ -427,6 +427,7 @@ export function createBrowserPreviewApi({ search } = {}) {
     ? requestedLocale
     : fixture?.locale || "en";
   const listeners = new Set();
+  const previewPins = new Set();
   let fixtureStatuses = fixture ? clone(fixture.statuses) : null;
   let fixtureConfigs = fixture ? clone(fixture.configs) : null;
   const resolveEffectiveLocale = () => {
@@ -454,6 +455,12 @@ export function createBrowserPreviewApi({ search } = {}) {
     },
     listCommands: async () => clone(fixture?.commands || BROWSER_PREVIEW_COMMANDS),
     searchCommands: async (query, pinnedIds) => previewSearch.search(query, pinnedIds),
+    getPinnedCommandIds: async () => [...previewPins],
+    setCommandPinned: async (id, pinned) => {
+      if (pinned) previewPins.add(id);
+      else previewPins.delete(id);
+      return [...previewPins];
+    },
     listInteractionBindings: async () => clone(fixture?.bindings || BROWSER_PREVIEW_BINDINGS),
     executeCommand: async () => { throw new Error(PREVIEW_EXECUTION_ERROR); },
     executeInteraction: async () => { throw new Error(PREVIEW_EXECUTION_ERROR); },

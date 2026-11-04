@@ -8,6 +8,32 @@ const { ConfigManager } = require("../config/ConfigManager");
 const { ConfigStorage } = require("../config/ConfigStorage");
 const { Preferences } = require("./Preferences");
 
+test("Pin/Unpin survives restart, retains missing identities, and preserves locale and unrelated settings", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "clackly-pins-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const storage = new ConfigStorage(path.join(root, "Clackly", "preferences.json"));
+  storage.save({ locale: "zh-CN", futureSetting: { keep: true } });
+  const first = new Preferences({ appDataPath: root });
+  const ids = ["timeline.addMarker", "extension:test.tools/inspect", "resolve-workspace-script:c:/scripts/example.py"];
+  for (const id of ids) first.setCommandPinned(id, true);
+  first.setCommandPinned(ids[0], true);
+  const restarted = new Preferences({ appDataPath: root });
+  assert.deepEqual(restarted.getPinnedIds(), ids);
+  restarted.setLocale("en");
+  first.setCommandPinned(ids[1], false);
+  assert.deepEqual(restarted.getPinnedIds(), [ids[0], ids[2]]);
+  assert.deepEqual(storage.load(), { locale: "en", futureSetting: { keep: true }, pinnedCommandIds: [ids[0], ids[2]] });
+  assert.throws(() => first.setCommandPinned("", true), /non-empty/);
+  assert.throws(() => first.setCommandPinned(ids[0], "true"), /boolean/);
+});
+
+test("a failed Pin write preserves the last saved state", () => {
+  const preferences = new Preferences({ storage: { load: () => ({ locale: "en", pinnedCommandIds: ["kept"] }),
+    save: () => { throw new Error("disk full"); } } });
+  assert.throws(() => preferences.setCommandPinned("new", true), /disk full/);
+  assert.deepEqual(preferences.getPinnedIds(), ["kept"]);
+});
+
 function createConfigManager(appDataPath) {
   return new ConfigManager({
     capabilityRegistry: {

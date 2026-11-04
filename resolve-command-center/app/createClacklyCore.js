@@ -209,7 +209,10 @@ function createClacklyCore({
     if (!commandSearch.isOrdinaryScriptId(commandId)) return executeCommand(commandId);
 
     const receipt = await ordinaryScripts.invoke(commandId);
-    if (receipt?.status === "api_returned") return receipt;
+    if (receipt?.status === "api_returned" && receipt.apiReturn !== false) {
+      usageHistory.record(commandId);
+      return receipt;
+    }
     const code = receipt?.status === "submission_unknown"
       ? "resolve-script-submission-unknown"
       : "resolve-script-not-submitted";

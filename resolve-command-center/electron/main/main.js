@@ -147,6 +147,8 @@ function registerIpcHandlers() {
   registerUpdateIpc({ ipcMain, updateService, getSettingsWindow: () => settingsWindow });
   updateService.start();
   ipcMain.handle("commands:list", () => core.listCommands());
+  ipcMain.handle("commands:get-pins", () => core.preferences.getPinnedIds());
+  ipcMain.handle("commands:set-pin", (_event, commandId, pinned) => core.preferences.setCommandPinned(commandId, pinned));
   registerExtensionIpc({ ipcMain, dialog, extensions: core.extensions,
     getSettingsWindow: () => settingsWindow, getWindows: () => BrowserWindow.getAllWindows() });
   ipcMain.handle("commands:search", (_event, query, pinnedIds, options) => core.searchCommands(query, pinnedIds, options));

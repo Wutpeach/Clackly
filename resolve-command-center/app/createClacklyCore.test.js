@@ -127,7 +127,7 @@ test("Core refreshes ordinary-script Search separately and invokes a selected sc
   const scriptId = "resolve-workspace-script:c:/scripts/utility/example.py";
   const calls = [];
   let receipt = { status: "api_returned", apiReturn: null };
-  const { core, cleanup } = createCore({
+  const { core, appDataPath, cleanup } = createCore({
     ordinaryScriptsFactory: () => ({
       discover: async () => ({
         scripts: [{
@@ -153,9 +153,10 @@ test("Core refreshes ordinary-script Search separately and invokes a selected sc
   assert.equal(core.searchCommands("", []).commands.some(({ id }) => id === scriptId), false);
   assert.equal(
     core.searchCommands("example", []).commands.find(({ id }) => id === scriptId).subtitle,
-    "Resolve Script · Utility · System · Python"
+    "Script · System · Python · Utility"
   );
   assert.deepEqual(await core.executeSearchResult(scriptId), receipt);
+  assert.deepEqual(core.searchCommands("", []).usedCommandIds, [scriptId]);
   assert.deepEqual(calls, [scriptId]);
 
   receipt = { status: "not_submitted", reason: "selection_unknown" };
@@ -168,7 +169,11 @@ test("Core refreshes ordinary-script Search separately and invokes a selected sc
     () => core.executeSearchResult(scriptId),
     (error) => error.code === "resolve-script-submission-unknown"
   );
-  assert.deepEqual(calls, [scriptId, scriptId, scriptId], "each selection has exactly one adapter invocation");
+  receipt = { status: "api_returned", apiReturn: false };
+  await assert.rejects(() => core.executeSearchResult(scriptId), { code: "resolve-script-not-submitted" });
+  const usage = JSON.parse(fs.readFileSync(path.join(appDataPath, "Clackly", "command-usage.json"), "utf8"));
+  assert.equal(usage[scriptId].usageCount, 1);
+  assert.deepEqual(calls, [scriptId, scriptId, scriptId, scriptId], "each selection has exactly one adapter invocation");
 });
 
 test("Core silently removes only the retired AE Prefix from persisted capability configuration", (t) => {

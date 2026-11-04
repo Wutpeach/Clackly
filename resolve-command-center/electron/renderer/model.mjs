@@ -146,12 +146,11 @@ export function projectLauncherSections(commands, pinnedIds = new Set(), usedCom
   };
 
   for (const command of commands) {
-    if (isOrdinaryScript(command)) continue;
     if (pinnedIds.has(command.id)) {
       sections.pinned.push(command);
     } else if (usedCommandIds.has(command.id)) {
       sections.recent.push(command);
-    } else {
+    } else if (!isOrdinaryScript(command)) {
       sections.commands.push(command);
     }
   }

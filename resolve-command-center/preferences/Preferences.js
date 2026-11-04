@@ -31,7 +31,7 @@ class Preferences {
     if (!isLocalePreference(locale)) {
       throw new TypeError("Locale preference must be system, en, or zh-CN");
     }
-    this.storage.save({ locale });
+    this.storage.save({ ...this.storage.load(), locale });
     this.listeners.forEach((listener) => listener(locale));
     return locale;
   }
@@ -42,6 +42,22 @@ class Preferences {
     }
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  getPinnedIds() {
+    const ids = this.storage.load().pinnedCommandIds;
+    return Array.isArray(ids) ? [...new Set(ids.filter((id) => typeof id === "string" && id.trim()))] : [];
+  }
+
+  setCommandPinned(commandId, pinned) {
+    if (typeof commandId !== "string" || !commandId.trim() || typeof pinned !== "boolean") {
+      throw new TypeError("Command Pin requires a non-empty id and boolean");
+    }
+    const ids = new Set(this.getPinnedIds());
+    if (pinned) ids.add(commandId);
+    else ids.delete(commandId);
+    this.storage.save({ ...this.storage.load(), pinnedCommandIds: [...ids] });
+    return [...ids];
   }
 }
 

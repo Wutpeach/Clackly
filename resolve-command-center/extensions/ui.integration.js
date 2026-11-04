@@ -30,6 +30,8 @@ test('running Settings and Palette complete the local package lifecycle using re
   let nextPackage = pack();
   let lastExecution;
   const methods = {
+    getPinnedCommandIds: () => core.preferences.getPinnedIds(),
+    setCommandPinned: (...args) => core.preferences.setCommandPinned(...args),
     getLocalizationSnapshot: () => core.localizationService.getSnapshot(),
     listCommands: () => core.listCommands(), searchCommands: (...args) => core.searchCommands(...args),
     listInteractionBindings: () => [], listFeatures: () => core.featureCatalog.getAllFeatures(),
