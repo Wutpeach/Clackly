@@ -10,6 +10,8 @@ export default function SettingsUpdateSection({ api }) {
   const mounted = useRef(false);
   const pendingIntents = useRef(new Set());
   const checkButton = useRef(null);
+  const downloadButton = useRef(null);
+  const focusAfterDownload = useRef(false);
   const cancelButton = useRef(null);
   const installButton = useRef(null);
   const confirmationCancel = useRef(null);
@@ -20,6 +22,12 @@ export default function SettingsUpdateSection({ api }) {
   const presentation = getUpdatePresentation(state, now);
   const busy = pending.length > 0;
   const cancellationPending = pending.includes('cancelUpdateInstall');
+  const showDownload = Boolean(state.latestVersion && !state.downloadedVersion);
+  const installationFeedback = Boolean(state.downloadedVersion &&
+    !["ready", "awaiting-confirmation"].includes(state.installation.status) && !state.error && state.status !== "checking");
+  const statusKey = installationFeedback
+    ? presentation.installationReasonKey || presentation.installationKey
+    : state.status === "idle" || state.installation.status === "awaiting-confirmation" ? null : presentation.statusKey;
 
   useEffect(() => {
     mounted.current = true;
@@ -29,6 +37,7 @@ export default function SettingsUpdateSection({ api }) {
       if (document.activeElement === cancelButton.current && !["downloading", "verifying"].includes(snapshot?.status)) {
         focusAfterCancel.current = true;
       }
+      if (snapshot?.downloadedVersion && document.activeElement === downloadButton.current) focusAfterDownload.current = true;
       setState(normalizeUpdateSnapshot(snapshot));
       setNow(Date.now());
     };
@@ -64,6 +73,13 @@ export default function SettingsUpdateSection({ api }) {
     return () => clearTimeout(timer);
   }, [state.retryAt, now]);
 
+  useEffect(() => {
+    if (!showDownload && focusAfterDownload.current) {
+      focusAfterDownload.current = false;
+      (installButton.current || checkButton.current)?.focus();
+    }
+  }, [showDownload]);
+
   async function invoke(intent, enabled) {
     const cancelling = ["cancelUpdate", "cancelUpdateInstall"].includes(intent);
     if (!enabled || pendingIntents.current.has(intent) || (pendingIntents.current.size > 0 && !cancelling) || typeof api[intent] !== "function") return;
@@ -71,6 +87,7 @@ export default function SettingsUpdateSection({ api }) {
     setPending([...pendingIntents.current]);
     try {
       const snapshot = await api[intent]();
+      if (snapshot?.downloadedVersion && document.activeElement === downloadButton.current) focusAfterDownload.current = true;
       if (mounted.current && snapshot) setState(normalizeUpdateSnapshot(snapshot));
     } catch {
       // Main may already have published the useful state. Refresh rather than expose IPC errors.
@@ -91,19 +108,21 @@ export default function SettingsUpdateSection({ api }) {
   const amount = (value) => new Intl.NumberFormat(effectiveLocale, { maximumFractionDigits: 1 }).format(value / 1_048_576);
   return (
     <section ref={section} className="settings-section settings-update" aria-labelledby="update-heading" data-update-status={state.status} data-installation-status={state.installation.status}>
-      <h2 id="update-heading">{t("settings.update.title")}</h2>
-      {state.fixture && <p className="settings-empty-copy update-fixture-label">{t("settings.update.fixture")}</p>}
-      <dl className="inspector-metadata update-versions">
-        <div><dt>{t("settings.update.currentVersion")}</dt><dd>{state.currentVersion || t("settings.update.unknownVersion")}</dd></div>
-        <div><dt>{t("settings.update.latestVersion")}</dt><dd>{state.latestVersion || t("settings.update.notChecked")}</dd></div>
+      <div className="update-heading">
+        <h2 id="update-heading">{t("settings.update.title")}</h2>
+        {state.fixture && <span className="update-fixture-label" title={t("settings.update.fixture")}>{t("settings.update.preview")}</span>}
+      </div>
+      {(state.currentVersion || state.latestVersion || state.downloadedVersion) && <dl className="update-versions" title={state.checkedAt ? t("settings.update.checkedAt", { time: date(state.checkedAt) }) : undefined}>
+        {state.currentVersion && <div><dt>{t("settings.update.currentVersion")}</dt><dd>{state.currentVersion}</dd></div>}
+        {state.latestVersion && <div><dt>{t("settings.update.latestVersion")}</dt><dd>{state.latestVersion}</dd></div>}
         {state.downloadedVersion && <div><dt>{t("settings.update.downloadedVersion")}</dt><dd>{state.downloadedVersion}</dd></div>}
-      </dl>
-      <p className="update-status" role="status" aria-live="polite" aria-atomic="true">{t(presentation.statusKey)}</p>
+      </dl>}
+      <p className={"update-status" + (installationFeedback ? " update-install-status" : "")} role="status" aria-live="polite" aria-atomic="true">{statusKey ? t(statusKey) : ""}</p>
       {state.retryAt && state.retryAt > now && <p className="settings-empty-copy update-retry">{t("settings.update.retryAt", { time: date(state.retryAt) })}</p>}
-      <div className="inspector-actions update-actions">
+      {(state.currentVersion || state.downloadedVersion) && <div className="inspector-actions update-actions">
         <button ref={checkButton} type="button" className="secondary-button" aria-disabled={!presentation.canCheck || busy}
           onClick={() => invoke("checkForUpdates", presentation.canCheck)}>{t("settings.update.check")}</button>
-        <button type="button" className="secondary-button" aria-disabled={!presentation.canDownload || busy}
+        <button ref={downloadButton} type="button" className="secondary-button update-download" hidden={!showDownload} aria-disabled={!presentation.canDownload || busy}
           onClick={() => invoke("downloadUpdate", presentation.canDownload)}>{t(presentation.retryableDownload ? "settings.update.retryDownload" : "settings.update.download")}</button>
         {presentation.canCancel && <button ref={cancelButton} type="button" className="secondary-button" aria-disabled={pending.includes("cancelUpdate")}
           onClick={() => { focusAfterCancel.current = document.activeElement === cancelButton.current; invoke("cancelUpdate", presentation.canCancel); }}>{t("settings.update.cancel")}</button>}
@@ -111,15 +130,13 @@ export default function SettingsUpdateSection({ api }) {
           onClick={() => { checkButton.current?.focus(); invoke("discardUpdate", presentation.canDiscard); }}>{t("settings.update.discard")}</button>}
         {presentation.canPrepareInstall && <button ref={installButton} type="button" className="secondary-button" aria-disabled={busy}
           onClick={() => invoke("prepareUpdateInstall", presentation.canPrepareInstall)}>{t("settings.update.install.prepare")}</button>}
-      </div>
+      </div>}
       {presentation.canCancel && <div className="update-progress">
         <progress aria-label={t("settings.update.progress")} max="100" value={presentation.progress ?? undefined} />
         <span aria-hidden="true">{presentation.progress === null ? t("settings.update.received", { received: amount(state.receivedBytes) }) : t("settings.update.transferred", { percent: presentation.progress, received: amount(state.receivedBytes), total: amount(state.totalBytes) })}</span>
       </div>}
-      {(state.downloadedVersion || state.installation.status !== "unavailable") && <div className="update-installation">
-        <p className="update-status update-install-status" role="status" aria-live="polite" aria-atomic="true">{t(presentation.installationKey)}</p>
-        {presentation.installationReasonKey && <p className="settings-empty-copy update-install-reason">{t(presentation.installationReasonKey)}</p>}
-        {state.downloadedVersion && presentation.canDiscard && <p className="settings-empty-copy update-candidate-help">{t("settings.update.candidateHelp")}</p>}
+      {(presentation.canConfirmInstall || (state.downloadedVersion && state.latestVersion !== state.downloadedVersion && presentation.canDiscard)) && <div className="update-installation">
+        {state.downloadedVersion && state.latestVersion && state.latestVersion !== state.downloadedVersion && presentation.canDiscard && <p className="settings-empty-copy update-candidate-help">{t("settings.update.candidateHelp")}</p>}
         {presentation.canConfirmInstall && <div className="update-confirmation" role="group" aria-labelledby="update-confirm-title" aria-describedby="update-confirm-facts"
           onKeyDown={(event) => {
             if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); returnAfterConfirmation.current = true; invoke("cancelUpdateInstall", presentation.canCancelInstall); }
@@ -134,11 +151,10 @@ export default function SettingsUpdateSection({ api }) {
           </div>
         </div>}
       </div>}
-      {state.checkedAt && <p className="settings-empty-copy update-checked">{t("settings.update.checkedAt", { time: date(state.checkedAt) })}</p>}
-      {state.releaseNotes && <div className="update-release">
-        <h3 id="update-notes-heading">{t("settings.update.releaseNotes")}</h3>
+      {state.releaseNotes && <details className="update-release">
+        <summary id="update-notes-heading">{t("settings.update.releaseNotes")}</summary>
         <pre tabIndex="0" className="update-release-notes" aria-labelledby="update-notes-heading">{state.releaseNotes}</pre>
-      </div>}
+      </details>}
     </section>
   );
 }

@@ -17,9 +17,9 @@ test("lifecycle warning sentences and compact labels remain distinct in both loc
 });
 
 test("Settings inspector copy is localized for application, search, and effective status", () => {
-  assert.equal(translate("en", "settings.application"), "Clackly Settings");
+  assert.equal(translate("en", "settings.application"), "General Settings");
   assert.equal(translate("en", "settings.contextInspector"), "Context Inspector");
-  assert.equal(translate("en", "settings.error.save"), "Could not save settings. Review the fields and try again.");
+  assert.equal(translate("en", "settings.error.save"), "Could not save changes. Your edits are kept; try again.");
   assert.equal(translate("en", "settings.status.needsSetup"), "Needs Setup");
   assert.equal(translate("zh-CN", "settings.searchFeatures"), "搜索功能");
   assert.equal(translate("zh-CN", "settings.current"), "当前功能");

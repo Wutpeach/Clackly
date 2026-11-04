@@ -47,10 +47,11 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
     await section.waitFor();
     await page.waitForFunction((language) => document.documentElement.lang === language, locale);
     assert.equal(await page.evaluate(() => Boolean(window.resolveCommandCenter)), false, "hostless simulations have no Electron bridge");
-    assert.equal(await page.locator(".update-fixture-label").innerText(), t("fixture"));
+    assert.equal(await page.locator(".update-fixture-label").innerText(), t("preview"));
+    assert.equal(await page.locator(".update-fixture-label").getAttribute("title"), t("fixture"));
     assert.equal(await page.getByRole("heading", { name: t("title"), exact: true }).count(), 1);
-    const check = page.getByRole("button", { name: t("check"), exact: true });
-    const download = page.getByRole("button", { name: t("download"), exact: true });
+    const check = section.getByRole("button", { name: t("check"), exact: true });
+    const download = section.locator(".update-download");
     if (state === "candidate-flow") {
       await waitStatus("downloaded");
       assert.equal(await section.getByRole("button", { name: t("install.prepare"), exact: true }).count(), 1);
@@ -58,7 +59,7 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
       await waitStatus("checking"); await waitStatus("available");
       assert.deepEqual(await section.locator(".update-versions dd").allTextContents(), ["0.1.0", "0.3.0", "0.2.0"], "real fixture recheck discovers newer while retaining old candidate");
       assert.equal(await download.getAttribute("aria-disabled"), "true");
-      await download.click({ force: true });
+      assert.equal(await download.isVisible(), false, "A retained candidate hides the replacement download action");
       assert.equal(await section.locator(".update-versions dd").last().innerText(), "0.2.0", "disabled download cannot replace candidate");
       await screenshot("-retained");
       const discard = section.getByRole("button", { name: t("discard"), exact: true });
@@ -93,10 +94,10 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
       assert.equal(await confirm.count(), 0, "confirmation is removed while independent handoff is pending");
       const expected = state === "launch-failure-flow" ? "failed" : "handed-off";
       await waitInstallation(expected);
-      assert.equal(await section.locator(".update-install-status").innerText(), t('install.status.' + expected));
+      assert.equal(await section.locator(".update-install-status").innerText(), t(expected === "failed" ? "install.reason.launch-failed" : 'install.status.' + expected));
       assert.equal(await section.getByRole("button", { name: t("install.cancel"), exact: true }).count(), 0);
       if (expected === "failed") {
-        assert.equal(await section.locator(".update-install-reason").innerText(), t("install.reason.launch-failed"));
+        assert.equal(await section.locator(".update-status").innerText(), t("install.reason.launch-failed"));
         await prepare.click();
         await waitInstallation("awaiting-confirmation");
         await cancelConfirm.click();
@@ -142,10 +143,13 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
       await page.keyboard.press("Enter");
       await waitStatus("downloaded");
       assert.equal(await section.locator(".update-status").first().innerText(), t("status.downloaded"));
-      await focused(download, "Verified completion preserves the original Download element");
+      await focused(section.getByRole("button", { name: t("install.prepare"), exact: true }), "Download completion moves focus to the available install action");
+      assert.equal(await download.isVisible(), false, "A retained download does not show another download action");
       assert.equal(await download.getAttribute("aria-disabled"), "true");
       assert.equal(await section.locator(".update-versions dd").first().innerText(), "0.1.0", "downloading does not change installed version");
-      assert.equal(await section.getByRole("button").count(), 4, "download completion exposes an explicit install action without auto-start");
+      assert.equal(await section.getByRole("button").count(), 3, "download completion exposes an explicit install action without auto-start");
+      assert.equal(await section.locator(".update-release-notes").isVisible(), false, "Release notes start collapsed");
+      await section.locator(".update-release summary").focus(); await page.keyboard.press("Enter");
       const notes = section.locator(".update-release-notes");
       await notes.focus(); await page.keyboard.press("Control+a");
       assert.ok((await page.evaluate(() => window.getSelection().toString())).length > 0, "release notes remain selectable");
@@ -154,16 +158,21 @@ export async function runSettingsUpdateEvidence(name, { browser, serverUrl, outp
       const expected = installationStates[state] ? "downloaded" : ["rate-limit", "offline", "timeout", "failure", "corrupt", "space", "version", "missing-installer"].includes(state) ? "error" : state;
       await waitStatus(expected);
       const errors = { "rate-limit": "rateLimit", offline: "offline", timeout: "timeout", failure: "path", corrupt: "corrupt", space: "space", version: "version", unavailable: "installedVersion", "missing-installer": "package" };
-      assert.equal(await section.locator(".update-status").first().innerText(), t(errors[state] ? 'error.' + errors[state] : 'status.' + expected));
+      const expectedStatus = state === "idle" || state === "confirmation" ? "" : t(state === "launch-failed" ? "install.reason.launch-failed" : ["starting", "handed-off", "install-cancelled"].includes(state) ? "install.status." + installationStates[state] : errors[state] ? "error." + errors[state] : "status." + expected);
+      assert.equal(await section.locator(".update-status").innerText(), expectedStatus);
       if (installationStates[state]) {
         await waitInstallation(installationStates[state]);
-        assert.equal(await section.locator(".update-install-status").innerText(), t('install.status.' + installationStates[state]));
+        assert.equal(await section.locator(".update-status").count(), 1, "Installation and discovery share one status message");
         assert.equal(await download.getAttribute("aria-disabled"), "true");
-        if (state === "launch-failed") assert.equal(await section.locator(".update-install-reason").innerText(), t("install.reason.launch-failed"));
+        if (state === "launch-failed") assert.equal(await section.locator(".update-status").innerText(), t("install.reason.launch-failed"));
       }
-      if (["checking", "downloading", "verifying", "rate-limit", "unavailable"].includes(state)) assert.equal(await check.getAttribute("aria-disabled"), "true");
+      if (["checking", "downloading", "verifying", "rate-limit"].includes(state)) assert.equal(await check.getAttribute("aria-disabled"), "true");
+      if (state === "unavailable") {
+        assert.equal(await section.locator(".update-versions").count(), 0, "Unknown installed identity does not render empty version labels");
+        assert.equal(await section.getByRole("button").count(), 0, "Unavailable updates do not offer inert controls");
+      }
       if (state === "rate-limit") assert.equal(await section.locator(".update-retry").count(), 1);
-      if (state === "no-release") assert.equal(await section.locator(".update-versions dd").last().innerText(), t("notChecked"));
+      if (state === "no-release") assert.deepEqual(await section.locator(".update-versions dd").allTextContents(), ["0.1.0"], "Unknown latest versions do not render a placeholder row");
       if (state === "available") assert.equal(await download.getAttribute("aria-disabled"), "false");
       if (state === "downloading") {
         assert.equal(await section.getByRole("progressbar").getAttribute("value"), "40");

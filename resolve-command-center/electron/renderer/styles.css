@@ -856,7 +856,7 @@ kbd {
   --settings-detail-inline: 18px;
   --settings-detail-top: 14px;
   --settings-detail-bottom: 16px;
-  --settings-footer-height: 40px;
+  --settings-footer-height: 36px;
   --settings-titlebar-height: 36px;
   --settings-control-height: 30px;
   --settings-field-gap: 20px;
@@ -881,7 +881,7 @@ kbd {
   height: 100vh;
   border-color: var(--settings-hairline);
   background: var(--color-palette-surface);
-  grid-template-rows: var(--settings-titlebar-height) minmax(0, 1fr);
+  grid-template-rows: var(--settings-titlebar-height) minmax(0, 1fr) var(--settings-footer-height);
   min-width: 0;
   min-height: 0;
   color-scheme: dark;
@@ -980,7 +980,7 @@ kbd {
 
 .feature-sidebar {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -1028,12 +1028,8 @@ kbd {
   color: var(--color-text-muted);
 }
 
-.feature-navigation-footer {
-  display: flex;
-  align-items: center;
-  height: var(--settings-footer-height);
-  padding: 4px 8px;
-  border-top: 1px solid var(--settings-hairline);
+.application-navigation {
+  margin-bottom: 12px;
 }
 
 .feature-search-empty {
@@ -1150,7 +1146,7 @@ kbd {
 
 .settings-configuration {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) var(--settings-footer-height);
+  grid-template-rows: minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -1502,6 +1498,73 @@ kbd {
   gap: 6px;
 }
 
+.configuration-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.configuration-heading h2 {
+  margin: 0;
+  font-size: var(--settings-section-size);
+  font-weight: 600;
+}
+
+.configuration-heading .configuration-more {
+  display: grid;
+  place-items: center;
+  width: var(--settings-control-height);
+  padding: 0;
+}
+
+.configuration-menu {
+  position: fixed;
+  inset: auto;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  margin: 0;
+  padding: 3px;
+  border: 1px solid var(--settings-border);
+  border-radius: var(--radius-toolbar);
+  background: var(--color-palette-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--palette-elevation);
+}
+
+.configuration-menu button {
+  width: 100%;
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: var(--radius-rail);
+  background: transparent;
+  text-align: left;
+  font-size: var(--settings-meta-size);
+}
+
+.configuration-menu button:hover { background: var(--settings-hover); }
+.configuration-menu button:focus-visible { outline: 1px solid var(--settings-focus); outline-offset: -1px; }
+
+.settings-dialog {
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 18px;
+  overflow: auto;
+  border: 1px solid var(--settings-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  background: var(--color-palette-surface);
+  box-shadow: var(--palette-elevation);
+}
+
+.settings-dialog::backdrop { background: var(--color-shadow); }
+.settings-dialog h2 { margin: 0 0 10px; font-size: var(--settings-title-size); font-weight: 600; }
+.settings-dialog p { margin: 0 0 18px; font-size: var(--settings-body-size); line-height: 1.5; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.settings-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.settings-dialog-actions .settings-feedback { flex-basis: 100%; white-space: normal; margin-top: 4px; }
+.settings-dialog .settings-dialog-actions .primary-button { min-height: var(--settings-control-height); }
+
 .settings-picker-control button,
 .secondary-button,
 .settings-actions .secondary-button {
@@ -1519,7 +1582,7 @@ kbd {
 
 .settings-picker-control button:focus-visible,
 .secondary-button:focus-visible,
-.settings-actions .primary-button:focus-visible {
+:is(.settings-actions, .settings-dialog) .primary-button:focus-visible {
   outline: 1px solid var(--settings-focus);
   outline-offset: -2px;
 }
@@ -1531,7 +1594,7 @@ kbd {
 
 .settings-picker-control button:disabled,
 .secondary-button:disabled,
-.settings-actions .primary-button:disabled {
+:is(.settings-actions, .settings-dialog) .primary-button:disabled {
   opacity: 0.42;
 }
 
@@ -1544,8 +1607,7 @@ kbd {
 }
 
 .settings-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
@@ -1555,6 +1617,7 @@ kbd {
 }
 
 .settings-feedback {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   color: var(--color-text-secondary);
@@ -1569,7 +1632,7 @@ kbd {
   color: var(--settings-status-warning);
 }
 
-.settings-actions .primary-button {
+:is(.settings-actions, .settings-dialog) .primary-button {
   min-height: 26px;
   padding: 0 10px;
   border-color: var(--color-accent);
@@ -1583,31 +1646,26 @@ kbd {
   transition: background var(--motion-fast), color var(--motion-fast);
 }
 
-.settings-actions .primary-button:hover:not(:disabled) {
+:is(.settings-actions, .settings-dialog) .primary-button:hover:not(:disabled) {
   background: var(--color-accent-hover);
 }
 
-.application-settings-actions {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.settings-update .update-versions {
-  margin: 0 0 8px;
-  padding: 0;
-  border: 0;
-}
-
-.update-versions > div { grid-template-columns: 106px minmax(0, 1fr); }
-.update-versions dt { color: var(--color-text-secondary); }
-.update-versions dd { font-variant-numeric: tabular-nums; }
-.update-fixture-label { margin-bottom: 9px; }
+.update-heading { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.update-heading h2 { margin: 0; font-size: var(--settings-section-size); font-weight: 600; line-height: 1.2; }
+.update-fixture-label { color: var(--color-text-secondary); font-size: var(--settings-meta-size); }
+.update-versions { display: flex; flex-wrap: wrap; gap: 12px 28px; margin: 0 0 10px; }
+.update-versions > div { display: grid; gap: 3px; min-width: 0; }
+.update-versions dt { color: var(--color-text-secondary); font-size: var(--settings-meta-size); }
+.update-versions dd { margin: 0; color: var(--color-text-primary); font-size: var(--settings-label-size); font-weight: 500; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .update-status { margin: 0; font-size: var(--settings-status-size); line-height: 1.45; color: var(--color-text-secondary); }
-.update-retry, .update-checked { margin-top: 6px; }
+.update-status:empty { display: none; }
+.update-retry { margin-top: 6px; }
 .update-actions { margin-top: 10px; }
 .settings-update .update-actions { flex-wrap: wrap; }
+.update-actions [hidden] { display: none; }
 .update-installation { margin-top: 12px; }
-.update-install-reason, .update-candidate-help { margin-top: 5px; overflow-wrap: anywhere; }
-.update-confirmation { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--settings-border); }
+.update-candidate-help { overflow-wrap: anywhere; }
+.update-confirmation { padding: 12px; border: 1px solid var(--settings-border); border-radius: var(--radius-toolbar); }
 .update-confirmation h3 { margin: 0 0 6px; font-size: var(--settings-label-size); font-weight: 500; color: var(--color-text-primary); }
 .update-confirmation .settings-empty-copy { margin-bottom: 0; }
 .update-actions .secondary-button[aria-disabled="true"] { opacity: 0.42; }
@@ -1618,7 +1676,10 @@ kbd {
 .update-progress progress::-webkit-progress-value { background: var(--color-text-secondary); border-radius: 2px; }
 .update-progress progress::-moz-progress-bar { background: var(--color-text-secondary); border-radius: 2px; }
 .update-release { margin-top: 14px; }
-.update-release h3 { margin: 0 0 6px; color: var(--color-text-secondary); font-size: var(--settings-label-size); font-weight: 500; }
+.update-release summary { width: fit-content; color: var(--color-text-secondary); font-size: var(--settings-status-size); cursor: pointer; }
+.update-release summary:hover { color: var(--color-text-primary); }
+.update-release summary:focus-visible { outline: 1px solid var(--settings-focus); outline-offset: 3px; }
+.update-release[open] summary { margin-bottom: 8px; }
 .update-release-notes { max-height: 104px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: var(--settings-status-size); line-height: 1.45; color: var(--color-text-secondary); user-select: text; scrollbar-width: thin; scrollbar-color: var(--color-text-muted) transparent; }
 .update-release-notes:focus-visible { outline: 1px solid var(--settings-focus); outline-offset: 3px; }
 
@@ -1627,7 +1688,7 @@ kbd {
   padding: 0 9px;
   border-color: transparent;
   border-radius: var(--radius-rail);
-  color: var(--color-palette-muted);
+  color: var(--color-text-secondary);
   background: transparent;
   font-size: var(--settings-meta-size);
 }
@@ -1651,7 +1712,7 @@ kbd {
   .settings-picker-control button,
   .secondary-button,
   .settings-actions button,
-  .settings-actions .primary-button {
+  :is(.settings-actions, .settings-dialog) .primary-button {
     transition-duration: 0ms;
   }
 

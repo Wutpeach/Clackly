@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Ellipsis } from "lucide-react";
 import SettingsUpdateSection from "./SettingsUpdateSection.jsx";
 import SettingsRenderer from "./SettingsRenderer.jsx";
 import LanguageSelect from "./LanguageSelect.jsx";
@@ -22,7 +23,7 @@ function mergeStatuses(current, next) {
   return [...byId.values()];
 }
 
-function SettingsTitlebar({ api, Icon, t }) {
+function SettingsTitlebar({ onClose, Icon, t }) {
   return (
     <header className="settings-titlebar">
       <div className="settings-titlebar-drag">
@@ -32,7 +33,7 @@ function SettingsTitlebar({ api, Icon, t }) {
         className="settings-titlebar-close"
         type="button"
         aria-label={t("settings.close")}
-        onClick={api.closeSettings}
+        onClick={onClose}
       >
         <Icon name="close" size={18} />
       </button>
@@ -54,15 +55,80 @@ function presentSettingsOperationError(error, t, operation) {
   return knownMessage === t("error.generic") ? t(`settings.error.${operation}`) : knownMessage;
 }
 
-function Feedback({ status }) {
+function Feedback({ status, t }) {
+  const message = status?.messageKey ? t(status.messageKey) : status?.message;
   return (
     <div
       className={status?.kind === "error" ? "settings-feedback error" : "settings-feedback"}
       role={status?.kind === "error" ? "alert" : "status"}
       aria-live="polite"
+      title={message || undefined}
     >
-      {status?.message}
+      {message}
     </div>
+  );
+}
+
+function SettingsConfirmation({ title, description, onCancel, children, busy, t }) {
+  const dialog = useRef(null);
+  useEffect(() => {
+    const previous = document.activeElement;
+    const element = dialog.current;
+    element.showModal();
+    element.querySelector("[data-cancel]").focus();
+    return () => {
+      element.close();
+      if (previous?.isConnected) previous.focus();
+    };
+  }, []);
+  return (
+    <dialog ref={dialog} className="settings-dialog" aria-labelledby="settings-dialog-title"
+      aria-describedby="settings-dialog-description" onCancel={(event) => { event.preventDefault(); onCancel(); }}>
+      <h2 id="settings-dialog-title">{title}</h2>
+      <p id="settings-dialog-description">{description}</p>
+      <div className="settings-dialog-actions">
+        <button type="button" className="secondary-button" data-cancel disabled={busy} onClick={onCancel}>{t("settings.cancel")}</button>
+        {children}
+      </div>
+    </dialog>
+  );
+}
+
+function ConfigurationActions({ disabled, onClear, t }) {
+  const popup = useRef(null);
+  const trigger = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({});
+  useEffect(() => {
+    const element = popup.current;
+    const sync = () => setOpen(element.matches(":popover-open"));
+    element.addEventListener("toggle", sync);
+    return () => element.removeEventListener("toggle", sync);
+  }, []);
+  return (
+    <>
+      <button ref={trigger} type="button" className="secondary-button configuration-more"
+        aria-label={t("settings.configurationActions")} title={t("settings.configurationActions")}
+        aria-expanded={open} aria-controls="configuration-actions" disabled={disabled}
+        onClick={() => {
+          if (open) { popup.current.hidePopover(); return; }
+          const rect = trigger.current.getBoundingClientRect();
+          popup.current.showPopover();
+          const { width, height } = popup.current.getBoundingClientRect();
+          setPosition({ left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
+            top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - height - 8)) });
+          popup.current.firstElementChild.focus();
+        }}>
+        <Ellipsis size={16} aria-hidden="true" />
+      </button>
+      <div ref={popup} id="configuration-actions" popover="auto" className="configuration-menu" style={position}
+        onKeyDown={(event) => { if (event.key === "Escape") { popup.current.hidePopover(); trigger.current.focus(); } }}
+        onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) popup.current.hidePopover(); }}>
+        <button type="button" onClick={() => { popup.current.hidePopover(); trigger.current.focus(); onClear(); }}>
+          {t("settings.clearSaved")}
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -78,13 +144,19 @@ function SettingsApp({ api, Icon }) {
   const [draftValues, setDraftValues] = useState({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [busyMessageKey, setBusyMessageKey] = useState("settings.working");
   const [status, setStatus] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [confirmClear, setConfirmClear] = useState(false);
   const busyOperation = useRef(0);
+  const actionGuard = useRef(null);
+  const allowClose = useRef(false);
 
-  function beginBusyOperation() {
+  function beginBusyOperation(messageKey = "settings.working") {
     const operation = busyOperation.current + 1;
     busyOperation.current = operation;
     setBusy(true);
+    setBusyMessageKey(messageKey);
     return operation;
   }
 
@@ -103,9 +175,13 @@ function SettingsApp({ api, Icon }) {
     setBusy(false);
   }
 
-  function selectApplicationContext() {
+  function completeAction(action) {
+    setPendingAction(null);
     setStatus(null);
-    setSelectedFeatureId(null);
+    if (action.type === "close") {
+      allowClose.current = true;
+      api.closeSettings();
+    } else setSelectedFeatureId(action.featureId);
   }
 
   const localizedFeatures = useMemo(
@@ -132,6 +208,40 @@ function SettingsApp({ api, Icon }) {
   const hasSchema = Boolean(selectedFeature && Object.keys(selectedFeature.configSchema).length);
   const hasSavedValues = Object.keys(savedValues).length > 0;
   const applicationSelected = selectedFeatureId === null;
+  const hasUnsavedChanges = hasSchema && [...new Set([...Object.keys(savedValues), ...Object.keys(draftValues)])]
+    .some((key) => savedValues[key] !== draftValues[key]);
+  const feedback = busy ? { messageKey: busyMessageKey }
+    : status?.kind === "error" ? status
+      : hasUnsavedChanges ? { messageKey: "settings.unsaved" } : status;
+
+  function requestAction(action) {
+    if (action.type === "navigate" && action.featureId === selectedFeatureId) return;
+    setConfirmClear(false);
+    if (hasUnsavedChanges) setPendingAction(action);
+    else completeAction(action);
+  }
+  actionGuard.current = { hasUnsavedChanges, requestAction };
+
+  function discardChanges() {
+    setDraftValues({ ...savedValues });
+    setStatus(null);
+  }
+
+  async function saveAndContinue() {
+    const action = pendingAction;
+    if (!busy && (!hasUnsavedChanges || await save())) completeAction(action);
+  }
+
+  useEffect(() => {
+    const beforeClose = (event) => {
+      if (allowClose.current || !actionGuard.current.hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = false;
+      actionGuard.current.requestAction({ type: "close" });
+    };
+    window.addEventListener("beforeunload", beforeClose);
+    return () => window.removeEventListener("beforeunload", beforeClose);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -169,7 +279,7 @@ function SettingsApp({ api, Icon }) {
   }, [t]);
 
   useEffect(() => api.onSettingsFeatureSelected((featureId) => {
-    if (typeof featureId === "string") setSelectedFeatureId(featureId);
+    if (typeof featureId === "string") actionGuard.current.requestAction({ type: "navigate", featureId });
   }), [api]);
 
   useEffect(() => {
@@ -181,7 +291,7 @@ function SettingsApp({ api, Icon }) {
   useEffect(() => {
     if (!selectedFeature) return undefined;
     let active = true;
-    const operation = beginBusyOperation();
+    const operation = beginBusyOperation("settings.loadingConfig");
     setStatus(null);
     setSavedValues({});
     setDraftValues({});
@@ -225,38 +335,49 @@ function SettingsApp({ api, Icon }) {
   }
 
   async function save() {
-    if (!selectedFeature || busy || !hasSchema) return;
-    const operation = beginBusyOperation();
+    if (!selectedFeature || busy || !hasSchema || !hasUnsavedChanges) return false;
+    const operation = beginBusyOperation("settings.saving");
     setStatus(null);
     try {
       const values = await api.saveConfig(selectedFeature.id, draftValues);
-      if (!isCurrentBusyOperation(operation)) return;
+      if (!isCurrentBusyOperation(operation)) return false;
       setSavedValues(values);
       setDraftValues(values);
-      const nextStatus = await api.refreshFeatureStatuses(selectedFeature.id);
-      if (!isCurrentBusyOperation(operation)) return;
-      setFeatureStatuses((current) => mergeStatuses(current, nextStatus));
-      setStatus({ kind: "success", message: t("settings.saved") });
+      try {
+        const nextStatus = await api.refreshFeatureStatuses(selectedFeature.id);
+        if (!isCurrentBusyOperation(operation)) return false;
+        setFeatureStatuses((current) => mergeStatuses(current, nextStatus));
+        setStatus({ kind: "success", messageKey: "settings.saved" });
+      } catch {
+        if (isCurrentBusyOperation(operation)) setStatus({ messageKey: "settings.savedStatusUnavailable" });
+      }
+      return true;
     } catch (error) {
       if (isCurrentBusyOperation(operation)) setStatus({ kind: "error", message: presentSettingsOperationError(error, t, "save") });
+      return false;
     } finally {
       finishBusyOperation(operation);
     }
   }
 
-  async function reset() {
+  async function clearSavedConfiguration() {
     if (!selectedFeature || busy || !hasSavedValues) return;
-    const operation = beginBusyOperation();
+    const operation = beginBusyOperation("settings.clearing");
     setStatus(null);
     try {
       const values = await api.resetConfig(selectedFeature.id);
       if (!isCurrentBusyOperation(operation)) return;
       setSavedValues(values);
       setDraftValues(values);
-      const nextStatus = await api.refreshFeatureStatuses(selectedFeature.id);
-      if (!isCurrentBusyOperation(operation)) return;
-      setFeatureStatuses((current) => mergeStatuses(current, nextStatus));
-      setStatus({ kind: "success", message: t("settings.reset") });
+      setConfirmClear(false);
+      try {
+        const nextStatus = await api.refreshFeatureStatuses(selectedFeature.id);
+        if (!isCurrentBusyOperation(operation)) return;
+        setFeatureStatuses((current) => mergeStatuses(current, nextStatus));
+        setStatus({ kind: "success", messageKey: "settings.cleared" });
+      } catch {
+        if (isCurrentBusyOperation(operation)) setStatus({ messageKey: "settings.clearedStatusUnavailable" });
+      }
     } catch (error) {
       if (isCurrentBusyOperation(operation)) setStatus({ kind: "error", message: presentSettingsOperationError(error, t, "reset") });
     } finally {
@@ -302,6 +423,7 @@ function SettingsApp({ api, Icon }) {
     setStatus(null);
     try {
       await setLocalePreference(value);
+      if (isCurrentBusyOperation(operation)) setStatus({ kind: "success", messageKey: "settings.saved" });
     } catch (error) {
       if (isCurrentBusyOperation(operation)) setStatus({ kind: "error", message: presentSettingsOperationError(error, t, "locale") });
     } finally {
@@ -312,7 +434,7 @@ function SettingsApp({ api, Icon }) {
   if (loading) {
     return (
       <main className="settings-shell">
-        <SettingsTitlebar api={api} Icon={Icon} t={t} />
+        <SettingsTitlebar onClose={() => requestAction({ type: "close" })} Icon={Icon} t={t} />
         <div className="settings-state" role="status">{t("settings.loading")}</div>
       </main>
     );
@@ -320,7 +442,7 @@ function SettingsApp({ api, Icon }) {
 
   return (
     <main className="settings-shell">
-      <SettingsTitlebar api={api} Icon={Icon} t={t} />
+      <SettingsTitlebar onClose={() => requestAction({ type: "close" })} Icon={Icon} t={t} />
       <div className="settings-workspace">
         <aside className="feature-sidebar" aria-label={t("settings.features")}>
           <label className="feature-search">
@@ -334,6 +456,17 @@ function SettingsApp({ api, Icon }) {
             />
           </label>
           <nav className="feature-navigation" aria-label={t("settings.features")}>
+            <div className="application-navigation">
+              <button
+                type="button"
+                className={applicationSelected ? "feature-button selected" : "feature-button"}
+                aria-current={applicationSelected ? "page" : undefined}
+                onClick={() => requestAction({ type: "navigate", featureId: null })}
+              >
+                <Icon name="settings" size={16} />
+                <span>{t("settings.application")}</span>
+              </button>
+            </div>
             {navigationGroups.map(([category, categoryFeatures], categoryIndex) => (
               <section
                 className={selectedFeatureFilteredOut && categoryIndex === 0 ? "feature-category feature-current-category" : "feature-category"}
@@ -352,7 +485,7 @@ function SettingsApp({ api, Icon }) {
                       aria-current={feature.id === selectedFeatureId ? "page" : undefined}
                       aria-describedby={warning ? descriptionId : undefined}
                       title={[feature.name, warning?.message].filter(Boolean).join(" — ")}
-                      onClick={() => setSelectedFeatureId(feature.id)}
+                      onClick={() => requestAction({ type: "navigate", featureId: feature.id })}
                     >
                       <Icon name={feature.icon} size={16} />
                       <span>{feature.name}</span>
@@ -377,17 +510,6 @@ function SettingsApp({ api, Icon }) {
               <p className="feature-search-empty" role="status">{t("settings.none.detail")}</p>
             )}
           </nav>
-          <footer className="feature-navigation-footer">
-            <button
-              type="button"
-              className={applicationSelected ? "feature-button selected" : "feature-button"}
-              aria-current={applicationSelected ? "page" : undefined}
-              onClick={selectApplicationContext}
-            >
-              <Icon name="settings" size={16} />
-              <span>{t("settings.application")}</span>
-            </button>
-          </footer>
         </aside>
 
         <section className="settings-configuration" aria-labelledby={applicationSelected ? "application-title" : "feature-title"}>
@@ -398,7 +520,6 @@ function SettingsApp({ api, Icon }) {
                   <span className="settings-configuration-icon" aria-hidden="true"><Icon name="settings" size={16} /></span>
                   <h1 id="application-title">{t("settings.application")}</h1>
                 </header>
-                <p className="inspector-description settings-introduction">{t("settings.applicationDescription")}</p>
                 <section className="settings-section general-settings" aria-labelledby="language-heading">
                   <div className="settings-fields">
                     <div className="settings-field">
@@ -409,7 +530,6 @@ function SettingsApp({ api, Icon }) {
                           { value: "en", label: t("settings.language.en") },
                           { value: "zh-CN", label: t("settings.language.zh-CN") }
                         ]} />
-                      <p className="settings-empty-copy">{t("settings.language.help")}</p>
                     </div>
                   </div>
                 </section>
@@ -445,7 +565,10 @@ function SettingsApp({ api, Icon }) {
                   {selectedEffectiveStatus.reason && <p className="feature-status-reason">{selectedEffectiveStatus.reason}</p>}
                 </section>
                 <section className="settings-section" aria-labelledby={hasSchema ? "settings-heading" : undefined}>
-                  {hasSchema && <h2 id="settings-heading">{t("settings.configuration")}</h2>}
+                  {hasSchema && <div className="configuration-heading">
+                    <h2 id="settings-heading">{t("settings.configuration")}</h2>
+                    <ConfigurationActions disabled={busy || !hasSavedValues} onClear={() => { setStatus(null); setConfirmClear(true); }} t={t} />
+                  </div>}
                   <SettingsRenderer schema={selectedFeature.configSchema} values={draftValues}
                     onChange={updateDraft} onPick={pickPath} t={t} disabled={busy} />
                 </section>
@@ -474,21 +597,35 @@ function SettingsApp({ api, Icon }) {
               </>
             )}
           </div>
-          <footer className={hasSchema ? "settings-actions" : "settings-actions application-settings-actions"}>
-            <Feedback status={status} />
-            {hasSchema && (
-              <>
-                <button type="button" className="secondary-button" disabled={busy || !hasSavedValues} onClick={reset}>
-                  {t("settings.resetButton")}
-                </button>
-                <button type="button" className="primary-button" disabled={busy} onClick={save}>
-                  {busy ? t("settings.working") : t("settings.save")}
-                </button>
-              </>
-            )}
-          </footer>
         </section>
       </div>
+      <footer className="settings-actions">
+        <Feedback status={feedback} t={t} />
+        {hasSchema && (
+          <>
+            <button type="button" className="secondary-button" disabled={busy || !hasUnsavedChanges} onClick={discardChanges}>
+              {t("settings.discard")}
+            </button>
+            <button type="button" className="primary-button" disabled={busy || !hasUnsavedChanges} onClick={save}>
+              {t("settings.saveChanges")}
+            </button>
+          </>
+        )}
+      </footer>
+      {pendingAction && <SettingsConfirmation title={t("settings.leave.title")}
+        description={t("settings.leave.description", { name: selectedFeature?.name || "" })}
+        onCancel={() => { if (!busy) setPendingAction(null); }} busy={busy} t={t}>
+        <button type="button" className="secondary-button" disabled={busy}
+          onClick={() => { discardChanges(); completeAction(pendingAction); }}>{t("settings.discard")}</button>
+        <button type="button" className="primary-button" disabled={busy} onClick={saveAndContinue}>{t("settings.saveContinue")}</button>
+        {status?.kind === "error" && <Feedback status={status} t={t} />}
+      </SettingsConfirmation>}
+      {confirmClear && <SettingsConfirmation title={t("settings.clear.title")}
+        description={t("settings.clear.description", { name: selectedFeature?.name || "" })}
+        onCancel={() => { if (!busy) setConfirmClear(false); }} busy={busy} t={t}>
+        <button type="button" className="secondary-button" disabled={busy} onClick={clearSavedConfiguration}>{t("settings.clearConfirm")}</button>
+        {status?.kind === "error" && <Feedback status={status} t={t} />}
+      </SettingsConfirmation>}
     </main>
   );
 }

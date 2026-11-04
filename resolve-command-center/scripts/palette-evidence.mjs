@@ -454,7 +454,7 @@ async function inspectSettingsLayout(page, label) {
     const sidebar = document.querySelector(".feature-sidebar");
     const configuration = document.querySelector(".settings-configuration");
     const inspector = document.querySelector(".settings-inspector");
-    const navigationFooter = document.querySelector(".feature-navigation-footer");
+    const applicationNavigation = document.querySelector(".application-navigation");
     const footer = document.querySelector(".settings-actions");
     const titlebar = document.querySelector(".settings-titlebar");
     const detailIcon = document.querySelector(".settings-configuration-icon");
@@ -481,7 +481,7 @@ async function inspectSettingsLayout(page, label) {
       sidebar: rect(sidebar),
       configuration: rect(configuration),
       inspector: rect(inspector),
-      navigationFooter: rect(navigationFooter),
+      applicationNavigation: rect(applicationNavigation),
       shellRadius: getComputedStyle(shell).borderRadius,
       footer: rect(footer),
       titlebar: titlebar ? { rect: rect(titlebar), background: getComputedStyle(titlebar).backgroundColor, borderBottom: getComputedStyle(titlebar).borderBottomWidth } : null,
@@ -489,7 +489,7 @@ async function inspectSettingsLayout(page, label) {
       selected: selectedStyle ? { background: selectedStyle.backgroundColor, text: selectedStyle.color, icon: selectedIcon ? getComputedStyle(selectedIcon).color : null, height: selectedStyle.height } : null,
       effectiveStatus: effectiveStatus ? { text: effectiveStatus.textContent.trim(), color: getComputedStyle(effectiveStatus).color } : null,
       readyDot: readyDot ? getComputedStyle(readyDot).backgroundColor : null,
-      search: search ? { height: getComputedStyle(search).height, borderRadius: getComputedStyle(search).borderRadius } : null,
+      search: search ? { rect: rect(search), height: getComputedStyle(search).height, borderRadius: getComputedStyle(search).borderRadius } : null,
       inspectorActions,
       control: control ? { height: getComputedStyle(control).height, background: getComputedStyle(control).backgroundColor, borderRadius: getComputedStyle(control).borderRadius } : null,
       footerShadow: footer ? getComputedStyle(footer).boxShadow : null,
@@ -510,10 +510,11 @@ async function inspectSettingsLayout(page, label) {
   assert.equal(layout.inspector, null, `${label}: Settings has one continuous detail column`);
   assert.ok(layout.configuration.left >= layout.sidebar.right - 0.5, `${label}: Configuration starts after Feature navigation`);
   assert.ok(Math.abs(layout.configuration.right - layout.shell.right) <= 1.5, `${label}: detail uses all remaining width`);
-  assert.ok(layout.footer.top >= layout.configuration.top && layout.footer.bottom <= layout.configuration.bottom + 0.5, `${label}: fixed Settings footer remains inside Configuration`);
-  assert.equal(Math.round(layout.footer.height), 40, `${label}: Settings action strip follows the compact 40px rhythm`);
-  assert.equal(layout.navigationFooter.top, layout.footer.top, "navigation/detail footer hairlines align");
-  assert.equal(layout.navigationFooter.height, layout.footer.height, "both fixed footers share height");
+  assert.ok(layout.footer.top >= layout.configuration.bottom - 0.5 && layout.footer.top >= layout.sidebar.bottom - 0.5, `${label}: status bar follows both content columns`);
+  assert.equal(Math.round(layout.footer.height), 36, `${label}: status bar keeps the approved compact height`);
+  assert.ok(Math.abs(layout.footer.left - layout.sidebar.left) <= 0.5 && Math.abs(layout.footer.right - layout.configuration.right) <= 0.5, `${label}: status bar spans both columns`);
+  assert.ok(Math.abs(layout.footer.bottom - layout.shell.bottom) <= 1.5, `${label}: status bar stays at the bottom of the window`);
+  assert.ok(layout.applicationNavigation.top >= layout.search.rect.bottom, `${label}: General Settings shares navigation below search`);
   assert.equal(layout.shellRadius, "8px", "Settings painted corners (not DWM proof)");
   assert.equal(layout.footerShadow, "none", `${label}: Settings footer uses a quiet hairline instead of an upward shadow`);
   assert.equal(layout.titlebar?.background, PALETTE_SURFACE, `${label}: titlebar shares the continuous Palette ink surface`);
@@ -526,8 +527,8 @@ async function inspectSettingsLayout(page, label) {
   assert.equal(layout.detailIcon.background, "rgba(0, 0, 0, 0)", `${label}: detail icon has no accent tile fill`);
   assert.equal(layout.detailIcon.border, "0px", `${label}: detail icon has no tile border`);
   if (layout.selected) {
-    assert.equal(layout.selected.background, "rgb(231, 232, 234)", `${label}: selected Settings row uses the exact Palette light-neutral anchor`);
-    assert.equal(layout.selected.text, "rgb(23, 25, 29)", `${label}: selected Settings row uses the exact Palette dark foreground`);
+    assert.match(layout.selected.background, /^rgba?\(231, 232, 234(?:, 1)?\)$/, `${label}: selected Settings row uses the exact Palette light-neutral anchor`);
+    assert.match(layout.selected.text, /^rgba?\(23, 25, 29(?:, 1)?\)$/, `${label}: selected Settings row uses the exact Palette dark foreground`);
     assert.equal(layout.selected.icon, layout.selected.text, `${label}: selected Settings icon remains monochrome with its label`);
     assert.equal(layout.selected.height, "30px", `${label}: Settings navigation follows the 30px Palette row rhythm`);
   }
@@ -1019,7 +1020,7 @@ async function closeScenario(scenario, label) {
 }
 
 async function verifyLanguageMenu(page, output, evidence) {
-  await page.getByRole("button", { name: "Clackly Settings", exact: true }).click();
+  await page.getByRole("button", { name: "General Settings", exact: true }).click();
   const control = page.locator("#locale-preference");
   await control.focus();
   await page.keyboard.press("Enter");
@@ -1067,29 +1068,93 @@ async function verifyLanguageMenu(page, output, evidence) {
   await control.click();
   await page.getByRole("option", { name: "System Default" }).click();
   assert.match(await control.innerText(), /System Default|跟随系统/);
-  await page.locator(".feature-navigation .feature-button").first().click();
-  await page.locator(".feature-navigation-footer button").click();
+  await page.locator(".feature-navigation .feature-category .feature-button").first().click();
+  await page.locator(".application-navigation button").click();
   assert.match(await control.innerText(), /System Default|跟随系统/, "preference remains selected across navigation");
 }
 
 async function verifyFeatureActions(page) {
   const previewSwitch = page.getByRole("switch", { name: "Create 1080p Preview Comp", exact: true });
   assert.equal(await previewSwitch.isChecked(), false);
+  const feedback = page.locator(".settings-feedback");
+  assert.equal(await feedback.innerText(), "", "untouched settings do not claim they were saved");
   await previewSwitch.focus();
   await page.keyboard.press("Space");
   assert.equal(await previewSwitch.isChecked(), true, "Space enables the accessible preview switch");
+  assert.equal(await feedback.innerText(), "Unsaved changes", "editing reports a real unsaved draft");
   await previewSwitch.click();
   assert.equal(await previewSwitch.isChecked(), false, "pointer disables the preview switch");
+  assert.equal(await feedback.innerText(), "", "restoring the saved value clears the unsaved indicator");
   await page.locator('label[for="setting-create1080pPreviewComp"]').click();
   assert.equal(await previewSwitch.isChecked(), true, "the full preview label toggles its associated switch");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Settings saved" }).waitFor();
-  await page.getByRole("button", { name: "Clackly Settings", exact: true }).click();
+  assert.equal(await feedback.innerText(), "Settings saved.");
+  await page.getByRole("button", { name: "General Settings", exact: true }).click();
   await page.getByRole("button", { name: "Export to After Effects", exact: true }).click();
   assert.equal(await previewSwitch.isChecked(), true, "saved draft survives Feature navigation");
+  const save = page.getByRole("button", { name: "Save changes", exact: true });
+  const discard = page.locator(".settings-actions").getByRole("button", { name: "Discard changes", exact: true });
+  assert.equal(await save.isDisabled(), true, "saved settings do not offer an unnecessary save");
   await previewSwitch.uncheck();
-  await page.getByRole("button", { name: "Reset", exact: true }).click();
-  assert.equal(await previewSwitch.isChecked(), true, "Reset consumes ConfigManager results rather than retaining the dirty draft");
+  await discard.click();
+  assert.equal(await previewSwitch.isChecked(), true, "Discard restores the last saved draft without clearing persistent configuration");
+  assert.equal(await discard.isDisabled(), true);
+  assert.equal(await feedback.innerText(), "");
+  await previewSwitch.uncheck();
+  await page.getByRole("button", { name: "General Settings", exact: true }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.waitFor();
+  assert.match(await dialog.innerText(), /Export to After Effects/, "leave confirmation names the affected feature");
+  assert.equal(await dialog.getByRole("button", { name: "Cancel", exact: true }).evaluate(el => el === document.activeElement), true);
+  await page.keyboard.press("Escape");
+  assert.equal(await page.getByRole("dialog").count(), 0);
+  assert.equal(await previewSwitch.isChecked(), false, "cancelling navigation preserves the draft");
+  await page.getByRole("button", { name: "General Settings", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Save and continue" }).click();
+  await page.getByRole("heading", { name: "General Settings", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Export to After Effects", exact: true }).click();
+  assert.equal(await previewSwitch.isChecked(), false, "save-and-continue persists before navigation");
+  await previewSwitch.check();
+  await page.getByRole("button", { name: "General Settings", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Discard changes", exact: true }).click();
+  await page.getByRole("heading", { name: "General Settings", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Export to After Effects", exact: true }).click();
+  assert.equal(await previewSwitch.isChecked(), false, "discard-and-continue leaves saved configuration intact");
+  await previewSwitch.check();
+  await page.getByRole("button", { name: "Close Settings", exact: true }).click();
+  await page.getByRole("dialog").waitFor();
+  await page.keyboard.press("Escape");
+  assert.equal(await previewSwitch.isChecked(), true, "cancelled close preserves the current draft");
+  await discard.click();
+  const pathInput = page.locator("#setting-aePath");
+  const originalPath = await pathInput.inputValue();
+  const more = page.getByRole("button", { name: "Configuration actions", exact: true });
+  await more.click();
+  await page.waitForFunction(() => document.querySelector(".configuration-more")?.getAttribute("aria-expanded") === "true");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.querySelector(".configuration-more")?.getAttribute("aria-expanded") === "false");
+  assert.equal(await more.evaluate(el => el === document.activeElement), true, "Escape closes the menu and restores trigger focus");
+  await more.click();
+  await page.getByRole("button", { name: "Clear saved configuration…", exact: true }).click();
+  await page.getByRole("dialog").waitFor();
+  assert.equal(await pathInput.inputValue(), originalPath, "opening a destructive confirmation does not clear values");
+  await page.keyboard.press("Escape");
+  assert.equal(await more.evaluate(el => el === document.activeElement), true, "confirmation returns focus to the actions trigger");
+  await more.click();
+  await page.getByRole("button", { name: "Clear saved configuration…", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Clear configuration", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "Saved configuration cleared" }).waitFor();
+  assert.equal(await pathInput.inputValue(), "", "explicit confirmation clears persisted configuration");
+  assert.equal(await save.isDisabled(), true);
+  assert.equal(await discard.isDisabled(), true);
+  await page.getByRole("button", { name: "General Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Export to After Effects", exact: true }).click();
+  assert.equal(await pathInput.inputValue(), "", "cleared configuration stays cleared after navigation");
+  await pathInput.fill(originalPath);
+  await previewSwitch.check();
+  await save.click();
+  await page.getByRole("status").filter({ hasText: "Settings saved" }).waitFor();
   await page.getByRole("button", { name: "Disable", exact: true }).click();
   await page.locator(".feature-effective-status.disabled").waitFor();
   assert.equal(await page.locator(".feature-ready-dot").count(), 0);
@@ -1145,7 +1210,7 @@ async function runScenario(name, context) {
         assert.match(await page.locator(".settings-configuration-scroll").innerText(), /Version\s*1\.0\.0/);
         await verifySettingsTextSelection(page);
         evidence.push(await screenshot(page, output, "settings-no-config-en.png"));
-        await page.getByRole("button", { name: "Clackly Settings", exact: true }).click();
+        await page.getByRole("button", { name: "General Settings", exact: true }).click();
         await page.getByRole("combobox", { name: "Language" }).click();
         await page.getByRole("option", { name: "Simplified Chinese" }).click();
         await page.getByRole("button", { name: "粘贴剪贴板图像", exact: true }).click();
@@ -1172,7 +1237,7 @@ async function runScenario(name, context) {
         assert.ok(Math.abs(switchRow.x + switchRow.width - form.x - form.width) <= 1, "switch stays within the compact form width");
         assert.ok(switchRow.y - pathField.y - pathField.height >= 19, "path and preview controls have distinct field spacing");
         evidence.push(await screenshot(page, output, "settings-actual-ae-en.png"));
-        await page.getByRole("button", { name: "Clackly Settings", exact: true }).click();
+        await page.getByRole("button", { name: "General Settings", exact: true }).click();
         await page.getByRole("combobox", { name: "Language" }).click();
         await page.getByRole("option", { name: "Simplified Chinese" }).click();
         await page.getByRole("button", { name: "导出到 After Effects", exact: true }).click();
@@ -1213,20 +1278,33 @@ async function runScenario(name, context) {
         assert.doesNotMatch((await interaction.allInnerTexts()).join("\n"), /将时间线(音频|视频)发送到 After Effects。/, "Simplified Chinese Settings Inspector rejects action Command descriptions");
         assert.equal(await page.locator("html").getAttribute("lang"), "zh-CN", "Simplified Chinese fixture applies the localized document language");
       } else if (name === "settings-busy") {
-        const save = page.getByRole("button", { name: "Working…" });
+        const save = page.getByRole("button", { name: "Save changes" });
         await save.waitFor();
         assert.equal(await save.isDisabled(), true, "busy fixture preserves disabled fixed actions");
+        assert.equal(await page.locator(".settings-feedback").innerText(), "Loading configuration…", "pending operations have truthful status-bar feedback");
       } else if (name === "settings-error") {
-        await page.getByRole("button", { name: "Save" }).click();
+        await page.locator("#setting-afterEffectsPath").fill("C:/AfterFX.exe");
+        assert.equal(await page.locator(".settings-feedback").innerText(), "Unsaved changes");
+        await page.getByRole("button", { name: "Save changes" }).click();
         await page.locator(".settings-feedback.error").waitFor();
-        assert.equal(await page.locator(".settings-feedback.error").innerText(), "Could not save settings. Review the fields and try again.", "error fixture gives Save-specific localized recovery feedback");
+        assert.equal(await page.locator("#setting-afterEffectsPath").inputValue(), "C:/AfterFX.exe", "failed saves retain the draft");
+        assert.equal(await page.locator(".settings-feedback.error").innerText(), "Could not save changes. Your edits are kept; try again.", "error fixture gives Save-specific localized recovery feedback");
+        await page.getByRole("button", { name: "General Settings", exact: true }).click();
+        await page.getByRole("dialog").getByRole("button", { name: "Save and continue" }).click();
+        await page.getByRole("dialog").getByRole("alert").waitFor();
+        assert.equal(await page.locator(".settings-configuration h1").innerText(), "Export to After Effects", "failed save-and-continue blocks navigation");
+        await page.keyboard.press("Escape");
+        assert.equal(await page.locator("#setting-afterEffectsPath").inputValue(), "C:/AfterFX.exe");
       } else if (name === "settings-search-match") {
         const search = page.getByRole("searchbox", { name: "Search Features" });
         await search.fill("clipboard");
         assert.deepEqual(await page.locator(".feature-navigation .feature-current-category .feature-button").allInnerTexts(), ["Export to After Effects"], "Feature search retains the filtered-out selected Feature in one explicit Current group");
         assert.deepEqual(await page.locator(".feature-navigation .feature-category:not(.feature-current-category) .feature-button").allInnerTexts(), ["Paste Clipboard Image"], "Feature search keeps matching Feature rows in their original category group");
         assert.equal(await page.locator(".settings-configuration h1").innerText(), "Export to After Effects", "typing in Feature search does not switch the current Configuration context");
-        assert.equal(await page.locator(".feature-navigation-footer .feature-button").count(), 1, "application Settings destination remains fixed outside filtering");
+        assert.equal(await page.locator(".application-navigation .feature-button").count(), 1, "General Settings remains visible outside Feature filtering");
+        await page.locator(".application-navigation .feature-button").click();
+        await page.getByRole("heading", { name: "General Settings", exact: true }).waitFor();
+        assert.equal(await page.locator(".settings-actions button").count(), 0, "General Settings has no ineffective save controls");
       } else if (name === "settings-search-empty") {
         const search = page.getByRole("searchbox", { name: "Search Features" });
         await search.fill("not a Feature");
@@ -1236,7 +1314,7 @@ async function runScenario(name, context) {
         assert.equal(await page.locator(".feature-search-empty").innerText(), "No matching Features.", "Feature search exposes a truthful accessible empty state");
       } else if (name === "settings-reduced-motion") {
         const motion = await page.locator(".feature-button").first().evaluate((element) => getComputedStyle(element).transitionDuration);
-        const saveMotion = await page.getByRole("button", { name: "Save" }).evaluate((element) => getComputedStyle(element).transitionDuration);
+        const saveMotion = await page.getByRole("button", { name: "Save changes" }).evaluate((element) => getComputedStyle(element).transitionDuration);
         assert.equal(motion, "0s", "reduced motion removes Settings navigation transitions");
         assert.equal(saveMotion, "0s", "reduced motion removes Settings action transitions");
       }
@@ -1244,19 +1322,19 @@ async function runScenario(name, context) {
       await inspectSettingsLayout(page, name);
       evidence.push(await screenshot(page, output, `${name}.png`));
       if (name === "settings-busy") {
-        const application = page.getByRole("button", { name: "Clackly Settings" });
+        const application = page.getByRole("button", { name: "General Settings" });
         assert.equal(await application.isDisabled(), false, "pending config keeps navigation available to cancel the selected Feature load");
         await page.getByRole("button", { name: "Add Timeline Marker" }).click();
         await page.getByRole("heading", { name: "Add Timeline Marker" }).waitFor();
         assert.equal(await page.getByRole("button", { name: "Refresh" }).isDisabled(), false, "changing Feature while its previous config request is pending does not strand busy state");
         await page.getByRole("button", { name: "Export to After Effects", exact: true }).click();
-        await page.getByRole("button", { name: "Working…" }).waitFor();
+        await page.getByRole("button", { name: "Save changes" }).waitFor();
         await application.click();
-        await page.getByRole("heading", { name: "Clackly Settings" }).waitFor();
+        await page.getByRole("heading", { name: "General Settings" }).waitFor();
         await page.waitForFunction(() => document.querySelector("#locale-preference")?.getAttribute("aria-disabled") === "false");
         assert.equal(await page.getByRole("combobox", { name: "Language" }).isDisabled(), false, "application fallback cancels the pending config request without retaining busy state");
       }
-      checks.push(`${name}: hostless local Settings fixture rendered the approved two-pane Settings UI at 760×560 with local Feature search, application footer, configuration action strip, integrated effective status and real binding rows; screenshot is renderer-paint evidence only and does not validate Electron or Resolve.`);
+      checks.push(`${name}: hostless local Settings fixture rendered the approved two-pane Settings UI at 760×560 with local Feature search, integrated General Settings navigation, shared status/action bar, integrated effective status and real binding rows; screenshot is renderer-paint evidence only and does not validate Electron or Resolve.`);
       return;
     } else if (name === "browser-preview") {
       await inspectBrowserPreviewLayout(page, name);

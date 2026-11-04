@@ -474,7 +474,10 @@ export function createBrowserPreviewApi({ search } = {}) {
       if (fixtureConfigs) fixtureConfigs[capabilityId] = clone(values);
       return clone(values);
     },
-    resetConfig: async (capabilityId) => clone(fixtureConfigs?.[capabilityId] || {}),
+    resetConfig: async (capabilityId) => {
+      if (fixtureConfigs) delete fixtureConfigs[capabilityId];
+      return {};
+    },
     pickPath: async () => null,
     openSettings: () => {},
     closeSettings: () => {},
