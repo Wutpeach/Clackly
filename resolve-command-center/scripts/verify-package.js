@@ -30,7 +30,7 @@ function assertProductPayload(files) {
       "workflow-plugin/main.js", "scripts/resolve2ae_export.py", ...PRODUCTION_INSTALLER_FILES].includes(file)
       || ["node_modules/", "resources/runtimes/", "dist/renderer/"].some((prefix) => file.startsWith(prefix))
       || (["app", "bridge", "capability", "command-engine", "command-search", "command-usage", "config", "execution-adapter",
-        "feature-status", "feature-ui", "interaction", "localization", "preferences", "resolve", "resolve2ae_core", "script-runtime", "shortcut"]
+        "extensions", "feature-status", "feature-ui", "interaction", "localization", "preferences", "resolve", "resolve2ae_core", "script-runtime", "shortcut"]
         .includes(file.split("/")[0]) || file.startsWith("electron/main/") || file.startsWith("electron/shared/"))
         && /[.](?:js|mjs|json|py)$/.test(file);
     if (nonproduct || !product) throw new Error(`Nonproduct release payload: ${file}`);

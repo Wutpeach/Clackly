@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Ellipsis } from "lucide-react";
 import SettingsUpdateSection from "./SettingsUpdateSection.jsx";
+import SettingsExtensions from "./SettingsExtensions.jsx";
 import SettingsRenderer from "./SettingsRenderer.jsx";
 import LanguageSelect from "./LanguageSelect.jsx";
 import InteractionInput from "./InteractionInput.jsx";
@@ -69,7 +70,7 @@ function Feedback({ status, t }) {
   );
 }
 
-function SettingsConfirmation({ title, description, onCancel, children, busy, t }) {
+function SettingsConfirmation({ title, description, content, onCancel, children, busy, t }) {
   const dialog = useRef(null);
   useEffect(() => {
     const previous = document.activeElement;
@@ -86,6 +87,7 @@ function SettingsConfirmation({ title, description, onCancel, children, busy, t 
       aria-describedby="settings-dialog-description" onCancel={(event) => { event.preventDefault(); onCancel(); }}>
       <h2 id="settings-dialog-title">{title}</h2>
       <p id="settings-dialog-description">{description}</p>
+      {content}
       <div className="settings-dialog-actions">
         <button type="button" className="secondary-button" data-cancel disabled={busy} onClick={onCancel}>{t("settings.cancel")}</button>
         {children}
@@ -139,11 +141,15 @@ function SettingsApp({ api, Icon }) {
   const [commands, setCommands] = useState([]);
   const [bindings, setBindings] = useState([]);
   const [selectedFeatureId, setSelectedFeatureId] = useState(null);
+  const [extensions, setExtensions] = useState([]);
+  const [selectedExtensionId, setSelectedExtensionId] = useState(null);
   const [featureQuery, setFeatureQuery] = useState("");
   const [savedValues, setSavedValues] = useState({});
   const [draftValues, setDraftValues] = useState({});
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [featureBusy, setBusy] = useState(false);
+  const [extensionWorking, setExtensionWorking] = useState(false);
+  const busy = featureBusy || extensionWorking;
   const [busyMessageKey, setBusyMessageKey] = useState("settings.working");
   const [status, setStatus] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
@@ -181,7 +187,11 @@ function SettingsApp({ api, Icon }) {
     if (action.type === "close") {
       allowClose.current = true;
       api.closeSettings();
-    } else setSelectedFeatureId(action.featureId);
+    } else if (action.type === "extension-operation") action.run();
+    else {
+      setSelectedFeatureId(action.featureId);
+      setSelectedExtensionId(action.extensionId || null);
+    }
   }
 
   const localizedFeatures = useMemo(
@@ -193,9 +203,12 @@ function SettingsApp({ api, Icon }) {
     .filter(({ featureStatus }) => isFeatureVisible(featureStatus)), [localizedFeatures, featureStatuses]);
   const filteredFeatures = useMemo(() => filterFeaturesByQuery(visibleFeatures, featureQuery), [visibleFeatures, featureQuery]);
   const groupedFeatures = useMemo(() => groupFeaturesByCategory(filteredFeatures), [filteredFeatures]);
-  const selectedFeature = visibleFeatures.find(({ id }) => id === selectedFeatureId) || null;
+  const extensionsSelected = selectedFeatureId === "extensions";
+  const selectedExtension = extensionsSelected ? extensions.find(({ id }) => id === selectedExtensionId) : null;
+  const selectedFeature = selectedExtension || visibleFeatures.find(({ id }) => id === selectedFeatureId) || null;
+  const extensionConfigKey = selectedExtension ? JSON.stringify([selectedExtension.id, selectedExtension.configSchema, selectedExtension.values]) : null;
   const selectedFeatureFilteredOut = Boolean(
-    selectedFeature && featureQuery.trim() && !filteredFeatures.some(({ id }) => id === selectedFeature.id)
+    !extensionsSelected && selectedFeature && featureQuery.trim() && !filteredFeatures.some(({ id }) => id === selectedFeature.id)
   );
   const navigationGroups = useMemo(() => selectedFeatureFilteredOut
     ? [[t("settings.current"), [selectedFeature]], ...groupedFeatures]
@@ -215,12 +228,14 @@ function SettingsApp({ api, Icon }) {
       : hasUnsavedChanges ? { messageKey: "settings.unsaved" } : status;
 
   function requestAction(action) {
-    if (action.type === "navigate" && action.featureId === selectedFeatureId) return;
+    if (busy) return;
+    if (action.type === "navigate" && action.featureId === selectedFeatureId
+      && (action.extensionId || null) === selectedExtensionId) return;
     setConfirmClear(false);
     if (hasUnsavedChanges) setPendingAction(action);
     else completeAction(action);
   }
-  actionGuard.current = { hasUnsavedChanges, requestAction };
+  actionGuard.current = { hasUnsavedChanges, busy, requestAction };
 
   function discardChanges() {
     setDraftValues({ ...savedValues });
@@ -233,10 +248,28 @@ function SettingsApp({ api, Icon }) {
   }
 
   useEffect(() => {
+    if (!api.listExtensions) return;
+    let active = true;
+    const refresh = () => api.listExtensions().then((next) => {
+      if (!active) return;
+      if (actionGuard.current.hasUnsavedChanges) setExtensions((current) => current.map((record) => {
+        const updated = next.find(({ id }) => id === record.id);
+        return updated ? { ...record, runtimeStatus: updated.runtimeStatus, runtimeError: updated.runtimeError } : record;
+      }));
+      else setExtensions(next);
+    }).catch((error) => { if (active) setStatus({ kind: "error", message: String(error.message) }); });
+    refresh();
+    const unsubscribe = api.onCommandsChanged?.(refresh);
+    return () => { active = false; unsubscribe?.(); };
+  }, [api]);
+
+  useEffect(() => {
     const beforeClose = (event) => {
-      if (allowClose.current || !actionGuard.current.hasUnsavedChanges) return;
+      if (allowClose.current) return;
+      if (!actionGuard.current.hasUnsavedChanges && !actionGuard.current.busy) return;
       event.preventDefault();
       event.returnValue = false;
+      if (actionGuard.current.busy) return;
       actionGuard.current.requestAction({ type: "close" });
     };
     window.addEventListener("beforeunload", beforeClose);
@@ -283,7 +316,7 @@ function SettingsApp({ api, Icon }) {
   }), [api]);
 
   useEffect(() => {
-    if (!loading && selectedFeatureId !== null && !visibleFeatures.some(({ id }) => id === selectedFeatureId)) {
+    if (!loading && selectedFeatureId !== null && selectedFeatureId !== "extensions" && !visibleFeatures.some(({ id }) => id === selectedFeatureId)) {
       setSelectedFeatureId(null);
     }
   }, [loading, selectedFeatureId, visibleFeatures]);
@@ -295,7 +328,7 @@ function SettingsApp({ api, Icon }) {
     setStatus(null);
     setSavedValues({});
     setDraftValues({});
-    api.getConfig(selectedFeature.id)
+    (selectedExtension ? Promise.resolve(selectedExtension.values) : api.getConfig(selectedFeature.id))
       .then((values) => {
         if (!active || !isCurrentBusyOperation(operation)) return;
         setSavedValues(values);
@@ -311,7 +344,7 @@ function SettingsApp({ api, Icon }) {
       active = false;
       cancelBusyOperation(operation);
     };
-  }, [api, selectedFeature?.id]);
+  }, [api, selectedFeature?.id, extensionConfigKey]);
 
   function updateDraft(key, value) {
     setStatus(null);
@@ -339,11 +372,18 @@ function SettingsApp({ api, Icon }) {
     const operation = beginBusyOperation("settings.saving");
     setStatus(null);
     try {
-      const values = await api.saveConfig(selectedFeature.id, draftValues);
+      const values = selectedExtension
+        ? await api.saveExtensionConfig(selectedFeature.id, draftValues)
+        : await api.saveConfig(selectedFeature.id, draftValues);
       if (!isCurrentBusyOperation(operation)) return false;
       setSavedValues(values);
       setDraftValues(values);
       try {
+        if (selectedExtension) {
+          setExtensions(await api.listExtensions());
+          setStatus({ kind: "success", messageKey: "settings.saved" });
+          return true;
+        }
         const nextStatus = await api.refreshFeatureStatuses(selectedFeature.id);
         if (!isCurrentBusyOperation(operation)) return false;
         setFeatureStatuses((current) => mergeStatuses(current, nextStatus));
@@ -467,6 +507,13 @@ function SettingsApp({ api, Icon }) {
                 <span>{t("settings.application")}</span>
               </button>
             </div>
+            <div className="extensions-navigation">
+              <button type="button" className={extensionsSelected ? "feature-button selected" : "feature-button"}
+                aria-current={extensionsSelected ? "page" : undefined}
+                onClick={() => requestAction({ type: "navigate", featureId: "extensions" })}>
+                <Icon name="command" size={16} /><span>{t("extensions.title")}</span>
+              </button>
+            </div>
             {navigationGroups.map(([category, categoryFeatures], categoryIndex) => (
               <section
                 className={selectedFeatureFilteredOut && categoryIndex === 0 ? "feature-category feature-current-category" : "feature-category"}
@@ -512,9 +559,15 @@ function SettingsApp({ api, Icon }) {
           </nav>
         </aside>
 
-        <section className="settings-configuration" aria-labelledby={applicationSelected ? "application-title" : "feature-title"}>
+        <section className="settings-configuration" aria-labelledby={extensionsSelected ? "extensions-title" : applicationSelected ? "application-title" : "feature-title"}>
           <div className="settings-configuration-scroll" key={selectedFeatureId ?? "application"}>
-            {applicationSelected ? (
+            {extensionsSelected ? <SettingsExtensions api={api} t={t} extensions={extensions}
+              selected={selectedExtension} busy={busy} onBusyChange={setExtensionWorking} onSelect={(extensionId) => requestAction({ type: "navigate", featureId: "extensions", extensionId })}
+              onOperation={(run) => requestAction({ type: "extension-operation", run })}
+              onChanged={async () => setExtensions(await api.listExtensions())} Confirmation={SettingsConfirmation}>
+              <SettingsRenderer schema={selectedExtension?.configSchema || {}} values={draftValues}
+                onChange={updateDraft} onPick={pickPath} t={t} disabled={busy} />
+            </SettingsExtensions> : applicationSelected ? (
               <>
                 <header className="settings-configuration-header">
                   <span className="settings-configuration-icon" aria-hidden="true"><Icon name="settings" size={16} /></span>

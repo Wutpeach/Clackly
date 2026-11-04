@@ -1028,7 +1028,7 @@ kbd {
   color: var(--color-text-muted);
 }
 
-.application-navigation {
+.application-navigation, .extensions-navigation {
   margin-bottom: 12px;
 }
 
@@ -1562,6 +1562,20 @@ kbd {
 .settings-dialog h2 { margin: 0 0 10px; font-size: var(--settings-title-size); font-weight: 600; }
 .settings-dialog p { margin: 0 0 18px; font-size: var(--settings-body-size); line-height: 1.5; color: var(--color-text-secondary); overflow-wrap: anywhere; }
 .settings-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.extensions-heading { justify-content: space-between; }
+.extension-list { display: grid; }
+.extension-row { display: grid; gap: 4px; width: 100%; padding: 12px 0; text-align: left; color: var(--color-text-primary); background: transparent; border: 0; border-bottom: 1px solid var(--settings-border); cursor: pointer; font: inherit; }
+.extension-row:hover:not(:disabled) { background: var(--settings-hover); }
+.extension-row:focus-visible { outline: 1px solid var(--settings-focus); outline-offset: 2px; }
+.extension-row:disabled { opacity: .5; cursor: default; }
+.extension-row-title { display: flex; gap: 12px; justify-content: space-between; font-size: var(--settings-body-size); }
+.extension-row-description { color: var(--color-text-secondary); font-size: var(--settings-meta-size); overflow-wrap: anywhere; }
+.extension-commands { padding-left: 18px; font-size: var(--settings-body-size); }
+.extension-commands li { margin: 10px 0; overflow-wrap: anywhere; }
+.extension-confirmation-content, .extension-clear-config { flex-basis: 100%; overflow-wrap: anywhere; font-size: var(--settings-body-size); }
+.extension-confirmation-content { max-height: 150px; overflow: auto; margin-bottom: 18px; }
+.extension-confirmation-content p { margin: 0 0 8px; }
+.extension-clear-config { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
 .settings-dialog-actions .settings-feedback { flex-basis: 100%; white-space: normal; margin-top: 4px; }
 .settings-dialog .settings-dialog-actions .primary-button { min-height: var(--settings-control-height); }
 

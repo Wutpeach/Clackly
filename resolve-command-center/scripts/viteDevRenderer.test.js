@@ -63,7 +63,7 @@ test("Vite dev serves a non-empty Palette without localization module errors", a
     vite = await createServer({
       configFile: path.join(packageRoot, "vite.config.mjs"),
       logLevel: "error",
-      server: { host: "127.0.0.1", port: 0, strictPort: true }
+      server: { host: "127.0.0.1", port: 0, strictPort: false }
     });
     await vite.listen();
     const port = vite.httpServer.address().port;

@@ -19,12 +19,12 @@ const {
 const { createNativeDualWindowHost } = require("./nativeDualWindowHost");
 const { registerPaletteHotkey } = require("./hotkey");
 const { composeStartup } = require("./composeStartup");
-const { getCommands } = require("../../command-engine/registry");
 const { initializeAfterEffectsPath } = require("../../capability/afterEffectsPath");
 const { BindingStorage } = require("../../interaction/BindingStorage");
 const { InteractionManager } = require("../../interaction/InteractionManager");
 const { createBridgeExecutionAdapter } = require("../../execution-adapter/bridge");
 const { registerFeatureUiIpc } = require("../../feature-ui/registerIpc");
+const { registerExtensionIpc } = require("../../extensions/registerIpc");
 const { createClacklyCore } = require("../../app/createClacklyCore");
 const { getElectronSystemLanguages } = require("../../localization/LocalizationService");
 const { registerLocalizationIpc } = require("../../localization/registerIpc");
@@ -146,7 +146,9 @@ function registerIpcHandlers() {
   registerUpdateLifecycle({ app, updateService });
   registerUpdateIpc({ ipcMain, updateService, getSettingsWindow: () => settingsWindow });
   updateService.start();
-  ipcMain.handle("commands:list", () => getCommands());
+  ipcMain.handle("commands:list", () => core.listCommands());
+  registerExtensionIpc({ ipcMain, dialog, extensions: core.extensions,
+    getSettingsWindow: () => settingsWindow, getWindows: () => BrowserWindow.getAllWindows() });
   ipcMain.handle("commands:search", (_event, query, pinnedIds, options) => core.searchCommands(query, pinnedIds, options));
   ipcMain.handle("commands:execute", async (_event, commandId) => {
     const result = await executeStandaloneCommand(commandId);

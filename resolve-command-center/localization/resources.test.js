@@ -33,3 +33,15 @@ test("CommonJS resource entry re-exports the shared ESM authority", async () => 
   assert.equal(commonJs.resources, esm.resources);
   assert.equal(commonJs.translate, esm.translate);
 });
+
+test("extension execution failures survive Electron transport and use the selected locale", async () => {
+  const { presentError, createTranslator } = await import("./presentation.mjs");
+  const reason = "Python script exited with code 1.";
+  for (const prefix of ["", "Error invoking remote method 'commands:execute': Error: "]) {
+    const error = new Error(`${prefix}[EXTENSION_SCRIPT_FAILED] ${reason}`);
+    for (const locale of ["en", "zh-CN"]) {
+      assert.equal(presentError(error, createTranslator(locale)), translate(locale, "extensions.executionFailed", { reason }));
+    }
+  }
+  assert.equal(presentError(new Error("untrusted detail"), createTranslator("zh-CN")), translate("zh-CN", "error.generic"));
+});

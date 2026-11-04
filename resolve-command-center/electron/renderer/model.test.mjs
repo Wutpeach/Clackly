@@ -22,6 +22,18 @@ import {
   projectLauncherSections
 } from "./model.mjs";
 
+test("extension package status survives generic capability projection and blocks disabled or unavailable commands", () => {
+  const command = { id: "extension:test.tools/inspect", kind: "extension", name: "Inspect", capability: "extensions.python",
+    presentation: "visible", featureStatus: { id: "test.tools", installed: true, enabled: true, status: "ready" } };
+  const project = (featureStatus) => createPresentationCatalog([{ ...command, featureStatus }], [
+    { id: "extensions.python", installed: true, enabled: true, status: "ready" }
+  ])[0];
+  assert.equal(canExecuteCommand(project(command.featureStatus)), true);
+  assert.equal(canExecuteCommand(project({ ...command.featureStatus, enabled: false })), false);
+  assert.equal(canExecuteCommand(project({ ...command.featureStatus, status: "unavailable" })), false);
+  assert.equal(shouldExecuteDirectly(command, { type: "click", detail: 1 }), true);
+});
+
 const commands = [
   { id: "alpha", name: "Alpha", keywords: [], category: "Test" },
   { id: "beta", name: "Beta", keywords: ["alpha"], category: "Test" },

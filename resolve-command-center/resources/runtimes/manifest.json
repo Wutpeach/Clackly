@@ -9,7 +9,8 @@
       "platform": "win32",
       "architecture": "x64",
       "capabilities": [
-        "ae.export"
+        "ae.export",
+        "extensions.python"
       ],
       "host": {
         "application": "davinci-resolve",
@@ -27,7 +28,8 @@
       "platform": "win32",
       "architecture": "x64",
       "capabilities": [
-        "ae.export"
+        "ae.export",
+        "extensions.python"
       ],
       "host": {
         "application": "davinci-resolve",

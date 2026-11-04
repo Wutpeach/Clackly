@@ -26,6 +26,18 @@ if (isDetachedInteractionPanel) {
 } else {
   contextBridge.exposeInMainWorld("resolveCommandCenter", {
   listCommands: () => ipcRenderer.invoke("commands:list"),
+  listExtensions: () => ipcRenderer.invoke("extensions:list"),
+  previewExtension: () => ipcRenderer.invoke("extensions:preview"),
+  cancelExtensionPreview: (token) => ipcRenderer.invoke("extensions:cancel", token),
+  installExtension: (token, operation) => ipcRenderer.invoke("extensions:install", token, operation),
+  setExtensionEnabled: (id, enabled) => ipcRenderer.invoke("extensions:set-enabled", id, enabled),
+  uninstallExtension: (id, clearConfig) => ipcRenderer.invoke("extensions:uninstall", id, clearConfig),
+  saveExtensionConfig: (id, values) => ipcRenderer.invoke("extensions:save-config", id, values),
+  onCommandsChanged: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on("commands:changed", listener);
+    return () => ipcRenderer.removeListener("commands:changed", listener);
+  },
   getUpdateState: () => ipcRenderer.invoke("updates:get-state"),
   checkForUpdates: () => ipcRenderer.invoke("updates:check"),
   downloadUpdate: () => ipcRenderer.invoke("updates:download"),

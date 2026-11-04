@@ -452,6 +452,10 @@ function PaletteApp() {
     };
     refreshCatalog();
     refreshScriptSearch();
+    const unsubscribeCommands = api.onCommandsChanged?.(() => {
+      refreshCatalog();
+      setSearchRefreshRevision((current) => current + 1);
+    });
 
     const unsubscribe = api.onPaletteShown(() => {
       pendingPinSelectionRef.current = null;
@@ -477,6 +481,7 @@ function PaletteApp() {
 
     return () => {
       mounted = false;
+      unsubscribeCommands?.();
       unsubscribe();
     };
   }, []);
@@ -655,7 +660,7 @@ function PaletteApp() {
     if (!canExecuteCommand(command)) {
       setStatus(getFeatureWarning(command.featureStatus, t)?.message || t("status.warning.unavailable"));
       if (getRecoveryAction(command.featureStatus) === "open-settings") {
-        api.openSettings(command.capability);
+        api.openSettings(command.kind === "extension" ? "extensions" : command.capability);
       }
       return;
     }
@@ -694,7 +699,7 @@ function PaletteApp() {
     if (!canExecuteCommand(command)) {
       setStatus(getFeatureWarning(command.featureStatus, t)?.message || t("status.warning.unavailable"));
       if (getRecoveryAction(command.featureStatus) === "open-settings") {
-        api.openSettings(command.capability);
+        api.openSettings(command.kind === "extension" ? "extensions" : command.capability);
       }
       return;
     }

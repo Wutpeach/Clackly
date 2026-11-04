@@ -4,7 +4,7 @@ export function joinFeatureStatuses(items, statuses) {
   const byId = new Map((statuses || []).map((status) => [status.id, status]));
   return items.map((item) => ({
     ...item,
-    featureStatus: byId.get(item.capability || item.id) || null
+    featureStatus: item.kind === "extension" ? item.featureStatus : byId.get(item.capability || item.id) || null
   }));
 }
 
@@ -76,7 +76,7 @@ export function isOrdinaryScript(command) {
 }
 
 export function shouldExecuteDirectly(command, event) {
-  return event?.type === "click" && (event.detail === 0 || isOrdinaryScript(command));
+  return event?.type === "click" && (event.detail === 0 || isOrdinaryScript(command) || command?.kind === "extension");
 }
 
 export function canExecuteCommand(command) {

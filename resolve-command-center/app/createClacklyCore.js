@@ -24,6 +24,8 @@ const { RuntimeManager } = require("../script-runtime/runtime/manager");
 const { PersistentScriptLauncher } = require("../script-runtime/runtime/persistent");
 const { resolveRuntimeRoot } = require("../script-runtime/runtime/paths");
 const { createOrdinaryScripts } = require("../resolve/ordinaryScripts");
+const { ExtensionManager, CAPABILITY: EXTENSION_CAPABILITY } = require("../extensions/ExtensionManager");
+const { createExtensionPythonExecutor } = require("../extensions/python");
 const { ResolveInstallationPaths, RuntimeDiagnosticRecord } = require("../resolve/installationPaths");
 const packageMetadata = require("../package.json");
 
@@ -147,7 +149,10 @@ function createClacklyCore({
   }
   registerScriptCapabilities({ capabilityRegistry, appRoot, runtimeManager });
 
-  const featureCatalog = new FeatureCatalog({ capabilityRegistry });
+  // Package management has its own Settings workspace; keep the built-in Feature list unchanged.
+  const builtinRegistry = { ...capabilityRegistry, getAllCapabilities: () => capabilityRegistry.getAllCapabilities()
+    .filter(({ id }) => id !== EXTENSION_CAPABILITY) };
+  const featureCatalog = new FeatureCatalog({ capabilityRegistry: builtinRegistry });
   const configStorage = ConfigStorage.fromAppData(appDataPath);
   migrateLegacyAfterEffectsExportPrefix(configStorage);
   const configManager = new ConfigManager({
@@ -161,26 +166,42 @@ function createClacklyCore({
   const usageHistory = new CommandUsageHistory({
     storage: CommandUsageStorage.fromAppData(appDataPath)
   });
-  const commandSearch = new CommandSearchService({
-    getCommands,
+  let commandSearch;
+  const extensions = new ExtensionManager({
+    root: path.join(appDataPath, "Clackly", "extensions"),
+    executePython: createExtensionPythonExecutor(runtimeManager),
+    checkAvailability: () => runtimeManager.checkAvailability({ runtime: "python", capabilityId: EXTENSION_CAPABILITY }),
+    onChanged: () => commandSearch?.invalidate()
+  });
+  capabilityRegistry.register(EXTENSION_CAPABILITY, {
+    metadata: { id: EXTENSION_CAPABILITY, name: "Extensions", description: "Managed Python extensions",
+      category: "Extensions", icon: "command", version: "1.0.0", type: "extension", providers: ["python"], configSchema: {} },
+    execute: (command) => extensions.execute(command)
+  });
+  const listCommands = () => [...getCommands(), ...extensions.commands()];
+  commandSearch = new CommandSearchService({
+    getCommands: listCommands,
     localizationService,
     usageHistory,
     ordinaryScripts
   });
   const featureStatusManager = new FeatureStatusManager({
-    capabilityRegistry,
+    capabilityRegistry: builtinRegistry,
     configManager,
     stateStorage: FeatureStateStorage.fromAppData(appDataPath)
   });
   const executeCommand = createCommandExecutor({
     capabilityRegistry,
     configManager,
-    featureStatusManager,
-    usageHistory
+    usageHistory,
+    findCommand: (id) => listCommands().find((command) => command.id === id),
+    featureStatusManager: { assertEnabled: (id) => {
+      if (id !== EXTENSION_CAPABILITY) featureStatusManager.assertEnabled(id);
+    } }
   });
   const searchCommands = (query, pinnedIds, options = {}) => {
     if (options?.refresh) {
-      return commandSearch.refresh().then(() => commandSearch.search(query, pinnedIds));
+      return Promise.all([commandSearch.refresh(), extensions.refreshAvailability()]).then(() => commandSearch.search(query, pinnedIds));
     }
     return commandSearch.search(query, pinnedIds);
   };
@@ -204,6 +225,8 @@ function createClacklyCore({
     localizationService,
     featureStatusManager,
     featureCatalog,
+    extensions,
+    listCommands,
     searchCommands,
     executeCommand,
     executeSearchResult,

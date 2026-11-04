@@ -20,6 +20,10 @@ const ELECTRON_SCRIPT_ERROR_CODES = new Map([
 ]);
 
 export function presentError(error, t) {
+  const extensionMessage = typeof error?.message === "string" && error.message.match(
+    /^(?:Error invoking remote method 'commands:execute': Error: )?\[EXTENSION_[A-Z_]+\] ([\s\S]{1,2048})$/
+  );
+  if (extensionMessage) return t("extensions.executionFailed", { reason: extensionMessage[1] });
   const code = KNOWN_ERROR_CODES.has(error?.code)
     ? error.code
     : ELECTRON_SCRIPT_ERROR_CODES.get(error?.message);

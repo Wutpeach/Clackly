@@ -275,6 +275,8 @@ export class CommandSearchService {
     this.refreshPromise = null;
   }
 
+  invalidate() { this.projection = null; }
+
   getProjection() {
     const snapshot = this.localizationService.getSnapshot();
     const effectiveLocale = snapshot?.effectiveLocale === "zh-CN" ? "zh-CN" : "en";

@@ -39,7 +39,7 @@
     "files": [
       "package.json",
       "manifest.xml",
-      "{app,bridge,capability,command-engine,command-search,command-usage,config,execution-adapter,feature-status,feature-ui,interaction,localization,preferences,resolve,resolve2ae_core,script-runtime,shortcut}/**/*",
+      "{app,bridge,capability,command-engine,command-search,command-usage,config,execution-adapter,extensions,feature-status,feature-ui,interaction,localization,preferences,resolve,resolve2ae_core,script-runtime,shortcut}/**/*",
       "electron/{main,shared}/**/*",
       "dist/renderer/**/*",
       "workflow-plugin/main.js",

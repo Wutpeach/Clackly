@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const rendererDirectory = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(rendererDirectory, "../..");
 const motionDirectory = path.join(rendererDirectory, "motion");
-const ignoredDirectories = new Set(["node_modules", "dist", "release", ".git"]);
+const ignoredDirectories = new Set(["node_modules", "build", "dist", "release", ".git"]);
 const rawMotionImport = /(?:import|export)\s+(?:[\s\S]*?\s+from\s+)?["'](?:motion|framer-motion)(?:\/[^"']*)?["']/g;
 
 function sourceFiles(directory) {
