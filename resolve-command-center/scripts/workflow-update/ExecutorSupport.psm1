@@ -170,7 +170,7 @@ function Wait-UpdateHostExit($Context, [scriptblock]$Cancelled, [scriptblock]$Ob
 }
 
 function Assert-UpdateWriteAccess([string]$Target,[string]$Scan) {
-    # Obtain actual DELETE/create-directory rights without changing anything.
+    # Fresh install creates under scan; only an existing target needs DELETE.
     # Denial reaches UAC before staging; no partial-journal retry is needed.
     if (!('Clackly.UpdateAccess' -as [type])) {
         Add-Type -TypeDefinition @'
@@ -183,7 +183,9 @@ namespace Clackly { public static class UpdateAccess {
 }}
 '@
     }
-    foreach ($entry in @(@{path=$Target;access=65536},@{path=$Scan;access=4})) {
+    $entries=@(@{path=$Scan;access=4})
+    if ($Target -ine $Scan) {$entries+=@{path=$Target;access=65536}}
+    foreach ($entry in $entries) {
         Assert-NormalPath $entry.path | Out-Null
         $handle = [Clackly.UpdateAccess]::CreateFile($entry.path,$entry.access,7,[IntPtr]::Zero,3,33554432,[IntPtr]::Zero)
         $errorCode = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
