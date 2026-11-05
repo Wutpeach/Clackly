@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { inventory, installWithBackup, rollback, copyVerified, owned } = require('./deploy');
+const { inventory, snapshotEntry, installWithBackup, rollback, copyVerified, owned } = require('./deploy');
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'clackly-dev-deploy-'));
@@ -98,4 +98,15 @@ test('backup never follows junctions or overwrites an existing recovery director
   assert.throws(() => copyVerified(linked, path.join(f.session, 'copied')), /unsafe/);
   assert.throws(() => copyVerified(f.target, f.session), /exists/);
   assert.throws(() => owned(f.session, f.target), /escapes/);
+});
+
+test('neighbor snapshot preserves both plugin directories and installer lock files', (t) => {
+  const f = fixture(t);
+  const lock = path.join(f.root, 'scan/.clackly-setup.lock');
+  fs.writeFileSync(lock, 'installer metadata');
+  assert.equal(snapshotEntry(lock).size, 18);
+  const before = snapshotEntry(lock);
+  fs.writeFileSync(lock, 'different metadata');
+  assert.notDeepEqual(snapshotEntry(lock), before);
+  assert.deepEqual(snapshotEntry(f.neighbor), { files: inventory(f.neighbor) });
 });

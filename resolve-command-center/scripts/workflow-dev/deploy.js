@@ -29,6 +29,13 @@ function copyVerified(source, destination, expected = inventory(source)) {
   same(inventory(destination), expected, 'Full backup/restore verification failed');
   return expected;
 }
+function snapshotEntry(file) {
+  assertNormalExistingDirectory(path.dirname(file));
+  const stat = fs.lstatSync(file);
+  if (stat.isDirectory() && !stat.isSymbolicLink()) return { files: inventory(file) };
+  if (stat.isFile() && !stat.isSymbolicLink()) return { size: stat.size, sha256: hash(file) };
+  throw new Error('Unsafe neighboring entry: ' + file);
+}
 function verifyInstalled(root, { commit, nativeHash, helperHash } = {}) {
   const files = inventory(root);
   const manifest = validateManifest(read(path.join(root, RELEASE_MANIFEST)), read(path.join(root, 'package.json')).version);
@@ -205,7 +212,7 @@ async function main(args = process.argv.slice(2)) {
       const legacyRoaming = path.join(process.env.APPDATA, 'Clackly Workflow Plugin');
       const scan = path.dirname(target);
       const preserved = () => ({ data: inventory(roaming), legacyData: inventory(legacyRoaming),
-        neighbors: fs.readdirSync(scan).filter((name) => name !== path.basename(target)).sort().map((name) => ({ name, files: inventory(path.join(scan, name)) })) });
+        neighbors: fs.readdirSync(scan).filter((name) => name !== path.basename(target)).sort().map((name) => ({ name, ...snapshotEntry(path.join(scan, name)) })) });
       const setupHash = hash(setup);
       const report = { id, target, session, build, commit, branch: 'main', dirty: false, publishable: false, node: process.version,
         os: require('node:os').release(), lockSha256: hash(path.join(app, 'package-lock.json')), runtime, nativeHash,
@@ -229,4 +236,4 @@ async function main(args = process.argv.slice(2)) {
   } finally { fs.closeSync(handle); fs.unlinkSync(lock); }
 }
 if (require.main === module) main().catch((error) => { console.error(error.message); process.exitCode = 1; });
-module.exports = { inventory, copyVerified, verifyInstalled, verifyRuntimes, installWithBackup, rollback, owned };
+module.exports = { inventory, snapshotEntry, copyVerified, verifyInstalled, verifyRuntimes, installWithBackup, rollback, owned };
