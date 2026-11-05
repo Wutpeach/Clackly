@@ -82,7 +82,8 @@ test("Vite dev serves a non-empty Palette without localization module errors", a
       if (message.type() === "error") pageErrors.push(message.text());
     });
     await page.addInitScript(installRendererApi);
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded" });
+    // Cold dependency optimization on Windows can exceed Playwright's 30s default.
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.locator(".palette-shell").waitFor();
     await page.getByRole('option', { name: /Dev renderer check/ }).waitFor();
     assert.match(await page.locator("#root").innerText(), /Dev renderer check/);

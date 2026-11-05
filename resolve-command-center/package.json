@@ -24,6 +24,7 @@
     "pretest": "npm run build",
     "test": "node scripts/test-groups.js all",
     "workflow:install": "powershell -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1",
+    "workflow:deploy:dev": "node scripts/workflow-dev/deploy.js",
     "workflow:install:package": "powershell -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1 -Archive",
     "test:node": "node scripts/test-groups.js node",
     "pretest:integration": "npm run build",
