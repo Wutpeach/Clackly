@@ -30,6 +30,7 @@ import {
   X
 } from "lucide-react";
 import SettingsApp from "./SettingsApp.jsx";
+import CommandApp from './CommandApp.jsx';
 import DetachedInteractionPanelApp from "./DetachedInteractionPanelApp.jsx";
 import InteractionPanelContent from "./InteractionPanelContent.jsx";
 import MotionBoundary from "./motion/MotionBoundary.jsx";
@@ -1106,6 +1107,7 @@ function PaletteApp() {
 
 function App() {
   const view = new URLSearchParams(window.location.search).get("view");
+  if (view === 'command' || view === 'command-notification') return <CommandApp />;
   if (view === "interaction-panel") {
     return <DetachedInteractionPanelApp />;
   }

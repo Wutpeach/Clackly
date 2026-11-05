@@ -2,6 +2,7 @@ const path = require("node:path");
 const { app, BrowserWindow, clipboard, dialog, ipcMain } = require("electron");
 const {
   createPaletteWindow,
+  createCommandWindow,
   createDetachedInteractionPanelWindow,
   closeDetachedInteractionPanel,
   openDetachedInteractionPanel,
@@ -26,6 +27,7 @@ const { createResolveAdapter } = require("../resolve/adapter");
 const { registerExperimentalResolveShortcut } = require("../electron/main/experimentalResolveShortcut");
 const { registerFeatureUiIpc } = require("../feature-ui/registerIpc");
 const { registerExtensionIpc } = require("../extensions/registerIpc");
+const { createCommandUiHost } = require('../extensions/CommandUiHost');
 const { createClacklyCore } = require("../app/createClacklyCore");
 const { getElectronSystemLanguages } = require("../localization/LocalizationService");
 const { registerLocalizationIpc } = require("../localization/registerIpc");
@@ -41,6 +43,7 @@ let WorkflowIntegration = null;
 let paletteWindow = null;
 let settingsWindow = null;
 let updateService = null;
+let commandUiHost = null;
 let initPromise = null;
 let resolvePromise = null;
 let cleanupDone = false;
@@ -159,8 +162,8 @@ const core = createClacklyCore({
   }
 });
 
-async function executeWorkflowCommand(commandId) {
-  const result = await core.executeSearchResult(commandId);
+async function executeWorkflowCommand(commandId, execution) {
+  const result = await core.executeSearchResult(commandId, execution);
   if (result?.status === "api_returned") return result;
   return {
     ok: true,
@@ -171,7 +174,7 @@ async function executeWorkflowCommand(commandId) {
 
 const interactionManager = new InteractionManager({
   bindingStorage: BindingStorage.fromAppData(app.getPath("appData")),
-  executeCommand: executeWorkflowCommand
+  executeCommand: (id) => commandUiHost.start(id)
 });
 
 function showPalette() {
@@ -214,6 +217,7 @@ function closeSettings() {
 }
 
 function togglePalette() {
+  if (commandUiHost?.focus()) return;
   if (paletteWindow && isPaletteWindowShown(paletteWindow)) {
     hidePalette();
     return;
@@ -224,6 +228,9 @@ function togglePalette() {
 
 function registerIpcHandlers() {
   updateService = createHostUpdateService({ app, appRoot });
+  commandUiHost = createCommandUiHost({ extensions: core.extensions, execute: executeWorkflowCommand,
+    createWindow: createCommandWindow, hidePalette, showPalette, dialog, clipboard });
+  const executeFromPalette = commandUiHost.registerIpc(ipcMain, () => paletteWindow);
   registerUpdateLifecycle({ app, updateService });
   registerUpdateIpc({ ipcMain, updateService, getSettingsWindow: () => settingsWindow });
   updateService.start();
@@ -233,11 +240,7 @@ function registerIpcHandlers() {
   registerExtensionIpc({ ipcMain, dialog, extensions: core.extensions,
     getSettingsWindow: () => settingsWindow, getWindows: () => BrowserWindow.getAllWindows() });
   ipcMain.handle("commands:search", (_event, query, pinnedIds, options) => core.searchCommands(query, pinnedIds, options));
-  ipcMain.handle("commands:execute", async (_event, commandId) => {
-    const result = await executeWorkflowCommand(commandId);
-    hidePalette();
-    return result;
-  });
+  ipcMain.handle("commands:execute", executeFromPalette);
   ipcMain.handle("interactions:execute", async (_event, interaction) => {
     const result = await interactionManager.handle(interaction);
     if (result.matched) {
@@ -298,6 +301,7 @@ function handleHotkeyRegistrationFailure() {
 }
 
 function cleanupWorkflowIntegration() {
+  commandUiHost?.dispose();
   if (cleanupDone || !WorkflowIntegration) {
     return;
   }

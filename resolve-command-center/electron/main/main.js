@@ -2,6 +2,7 @@ const path = require("node:path");
 const { app, BrowserWindow, clipboard, dialog, ipcMain } = require("electron");
 const {
   createPaletteWindow,
+  createCommandWindow,
   createDetachedInteractionPanelWindow,
   closeDetachedInteractionPanel,
   openDetachedInteractionPanel,
@@ -25,6 +26,7 @@ const { InteractionManager } = require("../../interaction/InteractionManager");
 const { createBridgeExecutionAdapter } = require("../../execution-adapter/bridge");
 const { registerFeatureUiIpc } = require("../../feature-ui/registerIpc");
 const { registerExtensionIpc } = require("../../extensions/registerIpc");
+const { createCommandUiHost } = require('../../extensions/CommandUiHost');
 const { createClacklyCore } = require("../../app/createClacklyCore");
 const { getElectronSystemLanguages } = require("../../localization/LocalizationService");
 const { registerLocalizationIpc } = require("../../localization/registerIpc");
@@ -37,6 +39,7 @@ const { registerUpdateLifecycle } = require("./update/lifecycle");
 let paletteWindow = null;
 let settingsWindow = null;
 let updateService = null;
+let commandUiHost = null;
 const paletteHostPolicy = selectPaletteHostPolicy({
   host: PALETTE_HOST.STANDALONE,
   platform: process.platform
@@ -76,12 +79,12 @@ const core = createClacklyCore({
 });
 const interactionManager = new InteractionManager({
   bindingStorage: BindingStorage.fromAppData(app.getPath("appData")),
-  executeCommand: executeStandaloneCommand
+  executeCommand: (id) => commandUiHost.start(id)
 });
 
-async function executeStandaloneCommand(commandId) {
+async function executeStandaloneCommand(commandId, execution) {
   try {
-    return await core.executeSearchResult(commandId);
+    return await core.executeSearchResult(commandId, execution);
   } catch (error) {
     if (String(error && error.message).includes("Resolve scripting API is unavailable")) {
       throw new Error(
@@ -133,6 +136,7 @@ function closeSettings() {
 }
 
 function togglePalette() {
+  if (commandUiHost?.focus()) return;
   if (paletteWindow && isPaletteWindowShown(paletteWindow)) {
     hidePalette();
     return;
@@ -143,6 +147,9 @@ function togglePalette() {
 
 function registerIpcHandlers() {
   updateService = createHostUpdateService({ app, appRoot });
+  commandUiHost = createCommandUiHost({ extensions: core.extensions, execute: executeStandaloneCommand,
+    createWindow: createCommandWindow, hidePalette, showPalette, dialog, clipboard });
+  const executeFromPalette = commandUiHost.registerIpc(ipcMain, () => paletteWindow);
   registerUpdateLifecycle({ app, updateService });
   registerUpdateIpc({ ipcMain, updateService, getSettingsWindow: () => settingsWindow });
   updateService.start();
@@ -152,11 +159,7 @@ function registerIpcHandlers() {
   registerExtensionIpc({ ipcMain, dialog, extensions: core.extensions,
     getSettingsWindow: () => settingsWindow, getWindows: () => BrowserWindow.getAllWindows() });
   ipcMain.handle("commands:search", (_event, query, pinnedIds, options) => core.searchCommands(query, pinnedIds, options));
-  ipcMain.handle("commands:execute", async (_event, commandId) => {
-    const result = await executeStandaloneCommand(commandId);
-    hidePalette();
-    return result;
-  });
+  ipcMain.handle("commands:execute", executeFromPalette);
   ipcMain.handle("interactions:execute", async (_event, interaction) => {
     const result = await interactionManager.handle(interaction);
     if (result.matched) {
@@ -223,6 +226,7 @@ if (!hasSingleInstanceLock) {
   });
 
   app.on("will-quit", () => {
+    commandUiHost?.dispose();
     void updateService?.dispose();
     const { globalShortcut } = require("electron");
     globalShortcut.unregisterAll();

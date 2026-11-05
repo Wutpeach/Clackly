@@ -21,10 +21,12 @@
     "diagnostics:package": "node scripts/package-diagnostic-sampler.js",
     "palette:evidence": "node scripts/palette-evidence.mjs",
     "settings:evidence": "node scripts/palette-evidence.mjs --renderer built --scenario settings-application-empty,settings-typical-ready,settings-actual-ae,settings-no-config,settings-language-menu,settings-missing-config-long-path,settings-zh-cn-multi-help,settings-busy,settings-error,settings-search-match,settings-search-empty,settings-reduced-motion",
+    "pretest": "npm run build",
     "test": "node scripts/test-groups.js all",
     "workflow:install": "powershell -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1",
     "workflow:install:package": "powershell -ExecutionPolicy Bypass -File scripts/install-workflow-plugin.ps1 -Archive",
     "test:node": "node scripts/test-groups.js node",
+    "pretest:integration": "npm run build",
     "test:integration": "node scripts/test-groups.js integration",
     "test:python": "node scripts/test-groups.js python",
     "test:list": "node scripts/test-groups.js --list"

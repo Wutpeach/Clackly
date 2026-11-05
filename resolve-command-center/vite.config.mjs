@@ -7,6 +7,8 @@ export default defineConfig({
   plugins: [react()],
   root: ".",
   base: "./",
+  // Scan the app entry, not archived packages and installer fixtures under build/release.
+  optimizeDeps: { entries: ["index.html"] },
   server: {
     host: "127.0.0.1",
     port: devServerPort,

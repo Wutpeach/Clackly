@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 const { chromium } = require("playwright");
@@ -54,6 +55,7 @@ function installRendererApi() {
 }
 
 test("Vite dev serves a non-empty Palette without localization module errors", async () => {
+  const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'clackly-vite-test-'));
   const { createServer } = await import("vite");
   const previousPort = process.env.VITE_DEV_SERVER_PORT;
   process.env.VITE_DEV_SERVER_PORT = "0";
@@ -62,6 +64,7 @@ test("Vite dev serves a non-empty Palette without localization module errors", a
   try {
     vite = await createServer({
       configFile: path.join(packageRoot, "vite.config.mjs"),
+      cacheDir,
       logLevel: "error",
       server: { host: "127.0.0.1", port: 0, strictPort: false }
     });
@@ -79,13 +82,15 @@ test("Vite dev serves a non-empty Palette without localization module errors", a
       if (message.type() === "error") pageErrors.push(message.text());
     });
     await page.addInitScript(installRendererApi);
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded" });
     await page.locator(".palette-shell").waitFor();
+    await page.getByRole('option', { name: /Dev renderer check/ }).waitFor();
     assert.match(await page.locator("#root").innerText(), /Dev renderer check/);
     assert.deepEqual(pageErrors, []);
   } finally {
     await browser?.close();
     await vite?.close();
+    fs.rmSync(cacheDir, { recursive: true, force: true });
     if (previousPort === undefined) delete process.env.VITE_DEV_SERVER_PORT;
     else process.env.VITE_DEV_SERVER_PORT = previousPort;
   }

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "clackly.demo.run-summary",
+  "name": "运行摘要",
+  "version": "1.0.0",
+  "description": "整理本次输入，生成只读摘要。",
+  "source": "Clackly Developer Skill 验证示例",
+  "configSchema": {
+    "prefix": {"type": "string", "label": "摘要前缀"}
+  },
+  "commands": [
+    {
+      "id": "summary", "name": "生成运行摘要", "description": "整理本次输入，不修改 Resolve 项目。",
+      "entry": "summary.py", "keywords": ["摘要", "运行"],
+      "ui": {
+        "version": 1,
+        "inputs": {
+          "title": {"type": "string", "label": "标题", "required": true, "placeholder": "输入本次摘要标题"},
+          "notes": {"type": "text", "label": "备注", "placeholder": "可选备注"},
+          "number_one": {"type": "number", "label": "数字一", "default": 0, "required": true},
+          "number_two": {"type": "number", "label": "数字二", "default": 0, "required": true},
+          "number_three": {"type": "number", "label": "数字三", "default": 0, "required": true},
+          "include_tags": {"type": "boolean", "label": "包括标签", "default": true},
+          "format": {"type": "select", "label": "格式", "options": ["简洁", "详细"], "default": "简洁"},
+          "color": {"type": "color", "label": "颜色", "default": "#63c174"},
+          "file": {"type": "path", "label": "可选文件"},
+          "folder": {"type": "folder", "label": "可选文件夹"}
+        },
+        "confirm": {"message": "确认生成本次摘要，不修改 Resolve 项目"}
+      }
+    },
+    {"id": "notice", "name": "显示简短成功通知", "entry": "summary.py", "keywords": ["通知"]},
+    {"id": "details", "name": "显示结构化详情", "entry": "summary.py", "keywords": ["详情"]}
+  ]
+}

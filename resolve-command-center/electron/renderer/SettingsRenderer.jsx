@@ -1,34 +1,37 @@
 import React from "react";
 import { getSettingsControl } from "./model.mjs";
 
-function SettingsRenderer({ schema, values, onChange, onPick, t, disabled = false }) {
+function SettingsRenderer({ schema, values, onChange, onPick, t, disabled = false, runtime = false }) {
   const fields = Object.entries(schema);
   if (fields.length === 0) {
     return <p className="settings-empty-copy">{t("settings.noSettings")}</p>;
   }
 
   async function pickValue(key, type) {
-    const picked = await onPick(type);
+    const picked = await onPick(type, key);
     if (picked !== null) onChange(key, picked);
   }
 
   return (
     <div className="settings-fields">
       {fields.map(([key, field]) => {
-        const control = getSettingsControl(field);
+        const control = getSettingsControl(field.type === 'text' ? { ...field, type: 'string' } : field);
         const inputId = `setting-${key}`;
         const value = values[key];
 
         if (control.kind === "checkbox") {
           return (
             <div className="settings-field switch-field" key={key}>
-              <label htmlFor={inputId}>{field.label}{field.required ? " *" : ""}</label>
+              <label htmlFor={inputId}>{field.label}{field.required ? " *" : ""}
+                {field.description && <span className="command-field-description" id={`${inputId}-help`}>{field.description}</span>}
+              </label>
               <input
                 id={inputId}
                 type="checkbox"
                 role="switch"
                 checked={Boolean(value)}
-                required={field.required}
+                required={runtime ? false : field.required}
+                aria-describedby={field.description ? `${inputId}-help` : undefined}
                 disabled={disabled}
                 onChange={(event) => onChange(key, event.target.checked)}
               />
@@ -39,12 +42,18 @@ function SettingsRenderer({ schema, values, onChange, onPick, t, disabled = fals
         return (
           <div className="settings-field" key={key}>
             <label htmlFor={inputId}>{field.label}{field.required ? " *" : ""}</label>
-            {control.kind === "select" ? (
+            {field.description && <p className="command-field-description" id={`${inputId}-help`}>{field.description}</p>}
+            {field.type === 'text' ? (
+              <textarea id={inputId} value={value ?? ''} placeholder={field.placeholder} required={field.required}
+                aria-describedby={field.description ? `${inputId}-help` : undefined} maxLength={8192} disabled={disabled}
+                onChange={(event) => onChange(key, event.target.value)} />
+            ) : control.kind === "select" ? (
               <select
                 id={inputId}
                 value={value ?? ""}
                 required={field.required}
                 disabled={disabled}
+                aria-describedby={field.description ? `${inputId}-help` : undefined}
                 onChange={(event) => onChange(key, event.target.value || undefined)}
               >
                 <option value="" disabled={Boolean(field.required)}>{t("settings.selectOption")}</option>
@@ -61,6 +70,9 @@ function SettingsRenderer({ schema, values, onChange, onPick, t, disabled = fals
                   title={value || undefined}
                   required={field.required}
                   disabled={disabled}
+                  placeholder={field.placeholder}
+                  maxLength={runtime ? 8192 : undefined}
+                  aria-describedby={field.description ? `${inputId}-help` : undefined}
                   onChange={(event) => onChange(key, event.target.value)}
                 />
                 <button
@@ -75,6 +87,12 @@ function SettingsRenderer({ schema, values, onChange, onPick, t, disabled = fals
               <input
                 id={inputId}
                 type={control.inputType}
+                placeholder={field.placeholder}
+                min={field.min}
+                max={field.max}
+                step={runtime && control.inputType === 'number' ? 'any' : undefined}
+                maxLength={runtime ? 8192 : undefined}
+                aria-describedby={field.description ? `${inputId}-help` : undefined}
                 value={value ?? (control.inputType === "color" ? "#101216" : "")}
                 required={field.required}
                 disabled={disabled}

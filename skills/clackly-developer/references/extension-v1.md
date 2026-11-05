@@ -104,6 +104,7 @@ NaN or Infinity; convert to plain data. Exceptions produce failed execution.
 | --- | --- |
 | `context.command_id` | Full global command ID string. |
 | `context.config` | Dictionary of compatible saved settings. Use indexing only for known required fields. |
+| `context.input` | In the #7-A candidate: validated single-run inputs, separate from saved settings. |
 | `context.logger.info/warning/error/debug(*values)` | Joins values with spaces into captured log messages; no printf-style formatting. |
 | `context.resolve` | Lazily connects through Clackly's Resolve adapter; can raise when unavailable. |
 | `context.project`, `context.timeline` | Lazily obtains the current project/timeline pair; **both require an open project and current timeline**. |
@@ -133,8 +134,9 @@ or manual cache writes, and missing caches are rebuilt on the next execution.
 
 `print` is captured as informational logs, stderr as error logs. Use concise
 logger messages for user feedback. A return value is execution data, not an
-automatically rendered panel, table or file. There is no custom/independent UI
-or runtime interaction API in V1.
+automatically rendered panel, table or file. The #7-A development candidate adds
+explicit static input and result semantics; see [Command UI](command-ui.md).
+There is no custom/independent UI, Prepare, dynamic dropdown or mid-execution UI API.
 
 Execution uses Clackly's managed CPython, Resolve compatibility probe and a
 short-lived worker. Installed does not mean runnable: Resolve must be running

@@ -161,7 +161,7 @@ test('Palette unifies source identity, durable Pin/Recent, failures and extensio
     await page.screenshot({ path: path.join(evidence, 'same-name-search.png') });
     const geometry = await page.locator('.palette-main').boundingBox();
     assert.equal(geometry.width, 240); assert.equal(geometry.height, 320);
-    for (const height of await page.getByRole('option').evaluateAll((rows) => rows.map((r) => r.getBoundingClientRect().height))) assert.equal(height, 30);
+    for (const height of await page.getByRole('option').evaluateAll((rows) => rows.map((r) => r.getBoundingClientRect().height))) assert.ok(Math.abs(height - 30) < 0.01, 'command row remains 30 CSS pixels');
     await page.locator('.search-control input').press('Escape');
     await row('User · Python').waitFor();
     await page.screenshot({ path: path.join(evidence, 'pinned-recent-launcher.png') });

@@ -268,15 +268,29 @@ class ExtensionManager {
       return this.list();
     });
   }
-  async execute(command) {
+  describeCommand(id) {
+    const command = this.commands().find((item) => item.id === id);
+    if (!command) return null;
+    const record = this.get(command.extensionId);
+    const declared = record.manifest.commands.find((item) => commandId(command.extensionId, item.id) === id);
+    return { id, name: declared.name, description: declared.description, extensionName: record.manifest.name,
+      revision: record.revision, ui: declared.ui || null };
+  }
+  async execute(command, execution = {}) {
     const id = command.extensionId;
     if (this.mutating.has(id)) throw fail('EXTENSION_BUSY', '扩展正在更新，请稍后运行。');
     const record = this.get(id);
     if (!record.enabled) throw fail('EXTENSION_DISABLED', '扩展已禁用。');
     const config = this.values(record);
     if (validator.getMissingRequired(record.manifest.configSchema, config).length) throw fail('EXTENSION_NEEDS_SETUP', '请先配置扩展。');
-    const entry = record.manifest.commands.find((item) => commandId(id, item.id) === command.id)?.entry;
+    const declared = record.manifest.commands.find((item) => commandId(id, item.id) === command.id);
+    const entry = declared?.entry;
     if (!entry) throw fail('EXTENSION_COMMAND_MISSING', '命令已移除。');
+    if (execution.revision !== undefined && execution.revision !== record.revision) throw fail('EXTENSION_STALE_COMMAND', '扩展已更新，请重新打开命令。');
+    if (declared.ui && execution.revision !== record.revision) throw fail('EXTENSION_CONFIRMATION_REQUIRED', '请通过命令输入界面执行。');
+    if (declared.ui?.confirm && execution.confirmed !== true) throw fail('EXTENSION_CONFIRMATION_REQUIRED', '请先确认此操作。');
+    const { validateInput } = require('./commandUi');
+    const input = validateInput(declared.ui?.inputs || {}, execution.input || {});
     let root;
     try { root = this.verify(id, record); }
     catch (error) {
@@ -286,9 +300,16 @@ class ExtensionManager {
     const bytecodeCacheRoot = this.pythonCachePath(id, record);
     assertPlainPath(bytecodeCacheRoot);
     fs.mkdirSync(bytecodeCacheRoot, { recursive: true });
-    const running = Promise.resolve().then(() => this.executePython({ root, entry, commandId: command.id, config, bytecodeCacheRoot }));
+    const running = Promise.resolve().then(() => this.executePython({ root, entry, commandId: command.id, config, input, bytecodeCacheRoot }));
     const active = this.active.get(id) || new Set(); active.add(running); this.active.set(id, active);
-    try { return await running; } finally { active.delete(running); if (!active.size) this.active.delete(id); }
+    try {
+      const receipt = await running;
+      const result = require('./commandUi').parseUiResult(receipt?.result);
+      if (result?.status === 'error') {
+        const error = fail('EXTENSION_RESULT_ERROR', result.message); error.uiResult = result; throw error;
+      }
+      return receipt;
+    } finally { active.delete(running); if (!active.size) this.active.delete(id); }
   }
 }
 module.exports = { ExtensionManager, CAPABILITY, commandId, assertPlainPath, inventory };

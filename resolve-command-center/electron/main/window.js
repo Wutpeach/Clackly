@@ -604,6 +604,27 @@ function openSettingsWindow(window, featureId, options) {
   return settingsWindow;
 }
 
+function createCommandWindow({ notification = false } = {}) {
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const width = Math.min(notification ? 360 : 480, area.width);
+  const height = Math.min(notification ? 112 : 580, area.height);
+  const cursor = screen.getCursorScreenPoint();
+  const window = new BrowserWindow({
+    width, height, x: clamp(cursor.x, area.x, area.x + area.width - width),
+    y: clamp(cursor.y, area.y, area.y + area.height - height),
+    show: false, frame: false, transparent: false, backgroundColor: '#151619',
+    roundedCorners: true, thickFrame: true, resizable: false, maximizable: false,
+    minimizable: false, fullscreenable: false, autoHideMenuBar: true,
+    focusable: !notification, skipTaskbar: notification, alwaysOnTop: true,
+    title: 'Clackly', webPreferences: { preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true, nodeIntegration: false, sandbox: false }
+  });
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', (event) => event.preventDefault());
+  loadRenderer(window, notification ? 'command-notification' : 'command');
+  return window;
+}
+
 function showPaletteWindow(window, options = {}) {
   if (!window || window.isDestroyed()) {
     return;
@@ -675,6 +696,7 @@ module.exports = {
   shouldLoadDevRenderer,
   createPaletteWindow,
   createSettingsWindow,
+  createCommandWindow,
   openSettingsWindow,
   showPaletteWindow,
   hidePaletteWindow,

@@ -23,6 +23,27 @@ if (isDetachedInteractionPanel) {
       return () => presentationListeners.delete(callback);
     }
   });
+} else if (rendererView === 'command' || rendererView === 'command-notification') {
+  contextBridge.exposeInMainWorld('resolveCommandUi', {
+    get: () => ipcRenderer.invoke('command-ui:get'),
+    submit: (input, confirmed) => ipcRenderer.invoke('command-ui:submit', input, confirmed),
+    pick: (key) => ipcRenderer.invoke('command-ui:pick', key),
+    copy: () => ipcRenderer.invoke('command-ui:copy'),
+    close: () => ipcRenderer.send('command-ui:close'),
+    onChanged: (callback) => {
+      const listener = (_event, value) => callback(value);
+      ipcRenderer.on('command-ui:changed', listener);
+      return () => ipcRenderer.removeListener('command-ui:changed', listener);
+    }
+  });
+  contextBridge.exposeInMainWorld('resolveCommandCenter', {
+    getLocalizationSnapshot: () => ipcRenderer.invoke('localization:get-snapshot'),
+    onLocalizationChanged: (callback) => {
+      const listener = (_event, value) => callback(value);
+      ipcRenderer.on('localization:changed', listener);
+      return () => ipcRenderer.removeListener('localization:changed', listener);
+    }
+  });
 } else {
   contextBridge.exposeInMainWorld("resolveCommandCenter", {
   listCommands: () => ipcRenderer.invoke("commands:list"),

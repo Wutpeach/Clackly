@@ -20,7 +20,7 @@ function createCommandExecutor({
     throw new TypeError("Command executor requires a command lookup function");
   }
 
-  return async function executeCommand(commandId) {
+  return async function executeCommand(commandId, execution = {}) {
     const command = findCommand(commandId);
     if (!command) {
       throw new Error(`Unknown command: ${commandId}`);
@@ -34,7 +34,7 @@ function createCommandExecutor({
     featureStatusManager?.assertEnabled(command.capability);
     configManager.assertConfigured(command.capability);
     const config = configManager.forCapability(command.capability);
-    const result = await capability.execute(command, { config });
+    const result = await capability.execute(command, { config, ...execution });
     try {
       usageHistory?.record?.(command.id);
     } catch (_usageError) {

@@ -176,7 +176,7 @@ function createClacklyCore({
   capabilityRegistry.register(EXTENSION_CAPABILITY, {
     metadata: { id: EXTENSION_CAPABILITY, name: "Extensions", description: "Managed Python extensions",
       category: "Extensions", icon: "command", version: "1.0.0", type: "extension", providers: ["python"], configSchema: {} },
-    execute: (command) => extensions.execute(command)
+    execute: (command, execution) => extensions.execute(command, execution)
   });
   const listCommands = () => [...getCommands(), ...extensions.commands()];
   commandSearch = new CommandSearchService({
@@ -205,8 +205,8 @@ function createClacklyCore({
     }
     return commandSearch.search(query, pinnedIds);
   };
-  const executeSearchResult = async (commandId) => {
-    if (!commandSearch.isOrdinaryScriptId(commandId)) return executeCommand(commandId);
+  const executeSearchResult = async (commandId, execution) => {
+    if (!commandSearch.isOrdinaryScriptId(commandId)) return executeCommand(commandId, execution);
 
     const receipt = await ordinaryScripts.invoke(commandId);
     if (receipt?.status === "api_returned" && receipt.apiReturn !== false) {

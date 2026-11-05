@@ -43,13 +43,13 @@ test('running Settings and Palette complete the local package lifecycle using re
     saveExtensionConfig: (...args) => core.extensions.saveConfig(...args),
     executeCommand: async (id) => { lastExecution = await core.executeSearchResult(id); return lastExecution; }
   };
-  const { createServer } = await import('vite');
+  const { preview } = await import('vite');
   let vite, browser;
   const errors = [];
   try {
-    vite = await createServer({ configFile: path.join(appRoot, 'vite.config.mjs'), logLevel: 'error',
-      server: { host: '127.0.0.1', port: 0, strictPort: false } });
-    await vite.listen();
+    // Exercise the shipped renderer without racing the dev server's dependency optimizer.
+    vite = await preview({ configFile: path.join(appRoot, 'vite.config.mjs'), logLevel: 'error',
+      preview: { host: '127.0.0.1', port: 0, strictPort: false } });
     const edge = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
     browser = await chromium.launch({ headless: true, ...(fs.existsSync(edge) ? { executablePath: edge } : {}) });
     const context = await browser.newContext({ viewport: { width: 760, height: 560 } });
@@ -145,6 +145,8 @@ test('running Settings and Palette complete the local package lifecycle using re
     assert.deepEqual(errors, []);
     unsubscribe();
   } finally {
-    await browser?.close(); await vite?.close(); core.disposeAfterEffectsProcessProbe(); core.disposeExportPythonWorker();
+    await browser?.close();
+    await new Promise((resolve) => vite ? vite.httpServer.close(resolve) : resolve());
+    core.disposeAfterEffectsProcessProbe(); core.disposeExportPythonWorker();
   }
 });

@@ -15,8 +15,10 @@ commit, or application build is needed. Use Python 3 for the packaging helper.
    data. Ask only when a missing decision changes the tool's behavior or safety.
    Check feasibility against [the V1 contract](references/extension-v1.md) before
    promising features. Python commands and persistent declarative settings are
-   supported; runtime forms, custom UI, Lua extensions and dependency installers
-   are not. Ordinary Resolve Python/Lua Scripts are a separate existing feature,
+   supported. The #7-A development candidate also supports static one-run input,
+   confirmation and structured results; read [Command UI](references/command-ui.md)
+   when needed and check that the target Host includes it. Custom UI, Lua
+   extensions and dependency installers are not supported. Ordinary Resolve Python/Lua Scripts are a separate existing feature,
    not this extension format.
 2. Read that contract before authoring the manifest and `execute(context)`. Start
    from [Project Inspector](examples/inspect-project/manifest.json) and its
@@ -75,7 +77,8 @@ required settings and save, then search the command name in Palette and run.
 For an iteration import the revised package and confirm Replace/Update; never
 edit installed files. State what the command changes, checks actually run, and
 what remains for live Resolve testing. Useful feedback goes to
-`context.logger`; JSON return values do not create a result window.
+`context.logger`; ordinary JSON return values do not create a result window.
+Use the explicit Command UI result envelope when the target Host supports #7-A.
 
 Skill installation is separate from extension installation. For loading this
 Skill in a fresh Agent conversation, see [English](README.md) or

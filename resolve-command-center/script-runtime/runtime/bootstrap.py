@@ -250,7 +250,7 @@ def script_execute(request):
     return {
         "ok": True,
         "runtime": runtime,
-        "script": runner.run_script(candidate, command_id, config),
+        "script": runner.run_script(candidate, command_id, config, input_values=request.get('input', {})),
     }
 
 

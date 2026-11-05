@@ -8,6 +8,24 @@ const { createExtensionPythonExecutor } = require('./python');
 const { ExtensionManager } = require('./ExtensionManager');
 const { workspace, manifest } = require('./fixtures');
 
+test('real Python receives one-run inputs separately from saved config and returns a structured result', async (t) => {
+  const executable = execFileSync('python', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8', windowsHide: true }).trim();
+  const { manager, pack } = workspace(t);
+  manager.executePython = createExtensionPythonExecutor({
+    resolveAndProbe: async () => ({ resolution: { source: 'override', executable },
+      selectedBootstrap: path.resolve(__dirname, '../script-runtime/runtime/bootstrap.py'), readiness: {} }),
+    launcher: new RuntimeLauncher()
+  });
+  const value = manifest(); value.commands[0].ui = { version: 1, inputs: { title: { type: 'string', label: 'Title', required: true } } };
+  const preview = await manager.preview(pack(value, [], 'def execute(context):\n    return {"$clackly": "result", "version": 1, "status": "success", "message": context.input["title"], "fields": [{"label": "Saved", "value": context.config["label"]}]}\n'));
+  await manager.install(preview.token, preview.operation); manager.saveConfig(value.id, { label: 'persistent' });
+  const command = manager.commands()[0];
+  const execution = { revision: manager.describeCommand(command.id).revision, input: { title: 'temporary' } };
+  const receipt = await manager.execute(command, execution);
+  assert.equal(receipt.result.message, 'temporary'); assert.equal(receipt.result.fields[0].value, 'persistent');
+  assert.deepEqual(manager.list()[0].values, { label: 'persistent' });
+});
+
 test('a real isolated Python worker executes an installed package with filtered config and reports script failure', async (t) => {
   const executable = execFileSync('python', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8', windowsHide: true }).trim();
   const { manager, pack } = workspace(t);

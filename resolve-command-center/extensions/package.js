@@ -4,6 +4,7 @@ const yauzl = require('yauzl');
 const semver = require('semver');
 const { crc32 } = require('node:zlib');
 const { SchemaValidator } = require('../config/SchemaValidator');
+const { validateCommandUi } = require('./commandUi');
 
 const ID = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const MAX_FILE = 8 * 1024 * 1024;
@@ -45,7 +46,8 @@ function validateManifest(value) {
     if (!command.entry.endsWith('.py')) throw fail('EXTENSION_INVALID_MANIFEST', 'V1 仅支持 Python .py 入口。');
     ids.add(command.id);
     return { id: command.id, name: command.name, description: command.description || '',
-      entry: command.entry, keywords: command.keywords || [] };
+      entry: command.entry, keywords: command.keywords || [],
+      ...(command.ui === undefined ? {} : { ui: validateCommandUi(command.ui) }) };
   });
   const schema = value.configSchema === undefined ? {} : value.configSchema;
   validator.validateSchema(schema);

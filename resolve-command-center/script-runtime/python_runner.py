@@ -37,9 +37,10 @@ class ScriptLogger:
 
 
 class ScriptContext:
-    def __init__(self, command_id: str, config: dict[str, Any], logger: ScriptLogger, adapter: Any) -> None:
+    def __init__(self, command_id: str, config: dict[str, Any], logger: ScriptLogger, adapter: Any, input_values=None) -> None:
         self._command_id = command_id
         self.config = dict(config)
+        self.input = dict(input_values or {})
         self.logger = logger
         self._adapter = adapter
         self._resolve = None
@@ -94,6 +95,7 @@ def run_script(
     command_id: str,
     config: dict[str, Any],
     adapter: Any = resolve_adapter,
+    input_values=None,
 ) -> dict[str, Any]:
     logs: list[dict[str, str]] = []
     stdout = io.StringIO()
@@ -101,7 +103,9 @@ def run_script(
     try:
         if not isinstance(command_id, str) or not command_id.strip():
             raise TypeError("Script Command id must be a non-empty string")
-        context = ScriptContext(command_id, config, ScriptLogger(logs), adapter)
+        if input_values is not None and not isinstance(input_values, dict):
+            raise TypeError('input must be an object')
+        context = ScriptContext(command_id, config, ScriptLogger(logs), adapter, input_values)
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             result = _load_execute(pathlib.Path(entry_path))(context)
             if inspect.isawaitable(result):
@@ -131,7 +135,7 @@ def main() -> None:
         config = request.get("config", {})
         if not isinstance(config, dict):
             raise TypeError("Script configuration must be an object")
-        envelope = run_script(sys.argv[1], command_id, config)
+        envelope = run_script(sys.argv[1], command_id, config, input_values=request.get('input', {}))
     except Exception as error:
         envelope = {
             "ok": False,
