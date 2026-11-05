@@ -4,6 +4,8 @@ Architecture-validation MVP for a DaVinci Resolve command palette. Electron owns
 
 ## Tests
 
+For external extension authors, the standalone [Clackly Developer Skill](../skills/clackly-developer/README.md) ([简体中文](../skills/clackly-developer/README.zh-CN.md)) guides an AI Agent from a tool request to Python source and an installable .clackly, without an application source build. Its focused development check is `node --test scripts/developer-skill.integration.js`.
+
 Run commands from this application directory after `npm ci`. The full suite requires Windows PowerShell, Python and Microsoft Edge (or Playwright Chromium, installed with `npx playwright install chromium`). It uses isolated fixtures and does not require an installed Resolve SDK or native module.
 
 | Command | Coverage |

@@ -1,6 +1,6 @@
 # Extension Package V1
 
-.clackly 是 ZIP 文件，根目录必须包含 UTF-8 manifest.json。一个包对应一个 Extension，可包含多个 Python Command。最小示例见 ../examples/extensions/inspect-project/；这是包协议和示例，不是 Developer Skill 或 SDK。
+.clackly 是 ZIP 文件，根目录必须包含 UTF-8 manifest.json。一个包对应一个 Extension，可包含多个 Python Command。最小示例见 ../examples/extensions/inspect-project/；独立的 [Developer Skill](../../skills/clackly-developer/README.zh-CN.md) 提供给外部 AI Agent 的开发指导、打包工具及安装说明，本协议文档仍以实际安装器和 Runner 为准。
 
     {
       "schemaVersion": 1,

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "example.inspect-project",
+  "name": "Project Inspector",
+  "version": "1.0.0",
+  "description": "Read the connected Resolve version and check for an open project without modifying it.",
+  "source": "Clackly repository example (local)",
+  "commands": [
+    { "id": "inspect", "name": "Inspect Resolve Project", "description": "Read-only Resolve API check.", "entry": "inspect.py", "keywords": ["inspect", "project"] }
+  ],
+  "configSchema": {
+    "label": { "type": "string", "label": "Log label", "required": true }
+  }
+}
