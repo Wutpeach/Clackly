@@ -6,6 +6,7 @@ param(
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1') -Force
+[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
 $target=[IO.Path]::GetFullPath((Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'Blackmagic Design/DaVinci Resolve/Support/Workflow Integration Plugins/com.wutpeach.clackly'))
 $root=Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'Clackly Dev Deploy'
 $key='HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{22BD637C-3208-4D0C-ABDE-D8A497D8C6C8}_is1'

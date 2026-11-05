@@ -122,14 +122,16 @@ function rollback({ target, session, inspect, restoreRegistry, journal = read(pa
   return journal;
 }
 
-function run(command, args, cwd, log) {
-  const result = cp.spawnSync(command, args, { cwd, windowsHide: true, encoding: 'utf8', maxBuffer: 30 * 1024 * 1024 });
+function run(command, args, cwd, log, env = process.env) {
+  const result = cp.spawnSync(command, args, { cwd, env, windowsHide: true, encoding: 'utf8', maxBuffer: 30 * 1024 * 1024 });
   if (log) fs.writeFileSync(log, (result.stdout || '') + (result.stderr || ''));
   if (result.error || result.status !== 0) throw new Error('Command failed: ' + command + ' ' + args.join(' ') + (log ? '; log: ' + log : '\n' + result.stderr));
   return (result.stdout || '').trim();
 }
 function ps(args, cwd = APP, log) {
-  return run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', ...args], cwd, log);
+  // npm may inherit PS7's module path; Windows PowerShell must load its own modules.
+  const env = { ...process.env, PSModulePath: path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/Modules') };
+  return run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', ...args], cwd, log, env);
 }
 function npm(args, cwd, log) {
   // npm-cli runs without cmd.exe string interpolation.
