@@ -25,6 +25,8 @@ Python 入口导出同步或异步 execute(context)，结果须能序列化为 J
 
 执行复用受管 CPython、Resolve API 兼容性 Probe 和短生命周期 RuntimeLauncher；无 PATH 解释器搜索，无开始执行后的 Runtime 回退。沿用现有单次 10 秒、stdout/stderr 各 1 MiB 上限。已安装仅表示包管理状态，执行仍需 Resolve 正在运行且 Scripting API 可用。脚本报错、Probe 不通过、超时都反馈失败。
 
+Python 字节码缓存通过显式 pycache_prefix 重定向到 extensions/cache/python/<id>/<revision>/，不写入包目录、不放宽文件清单校验。同一 revision 可跨执行/重开复用，CPython 自行区分解释器缓存格式；缓存缺失会重建。Replace/Update 使用新 revision，提交后尽力清理旧缓存；卸载尽力清理当前 revision 缓存，禁用保留。缓存不进入 state 或包 Manifest，扩展无需声明或管理。
+
 包限制：最大压缩包/总解压 32 MiB、单文件 8 MiB、512 个条目、Manifest 128 KiB、100 个 Command、50 个配置字段。路径使用相对 /，拒绝穿越、绝对路径、Windows ADS/设备名、链接/特殊文件、加密、大小写碰撞和文件/目录冲突；验证解压长度和 CRC。入口区分大小写，必须精确存在并以 .py 结尾。未知的 Manifest 顶层字段不参与执行。
 
 默认目录为 %APPDATA%\Clackly\extensions\：packages/<id>/<revision>/ 存放不可变版本，state.json 保存活动版本指针、启用状态、Manifest、文件摘要和配置，staging/<token>/ 暂存确认候选。只有服务生成的路径可进入扩展执行入口；IPC 不接收脚本路径、Python 代码或自选安装位置。安装不写入应用目录或 Resolve Scripts，不创建链接。

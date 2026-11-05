@@ -122,6 +122,9 @@ test("Launcher validates resolution, files, request, and limits before spawning"
 
   await expectRuntimeError(launcher.execute({ resolution: null, request: {} }), "RUNTIME_LAUNCH_REQUEST_INVALID");
   await expectRuntimeError(launcher.execute(null), "RUNTIME_LAUNCH_REQUEST_INVALID");
+  for (const bytecodeCacheRoot of [null, 1, "", "relative-cache"]) {
+    await expectRuntimeError(launcher.execute({ resolution: resolution(), request: {}, bytecodeCacheRoot }), "RUNTIME_LAUNCH_REQUEST_INVALID");
+  }
   await expectRuntimeError(
     launcher.execute({ resolution: resolution("runtime"), request: {} }),
     "RUNTIME_EXECUTABLE_INVALID"

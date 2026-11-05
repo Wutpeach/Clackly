@@ -155,8 +155,14 @@ class RuntimeLauncher {
     let request;
     let serializedRequest;
     let bootstrapPath;
+    let bytecodeCacheRoot;
     try {
       ({ resolution, request } = input);
+      bytecodeCacheRoot = input.bytecodeCacheRoot;
+      if (bytecodeCacheRoot !== undefined && (typeof bytecodeCacheRoot !== "string"
+        || !path.isAbsolute(bytecodeCacheRoot) || bytecodeCacheRoot !== bytecodeCacheRoot.trim())) {
+        throw executionError("RUNTIME_LAUNCH_REQUEST_INVALID", "Bytecode cache root must be an absolute directory path", { field: "bytecodeCacheRoot" });
+      }
       if (!isPlainObject(resolution) || !["manifest", "override"].includes(resolution.source)) {
         throw executionError(
           "RUNTIME_LAUNCH_REQUEST_INVALID",
@@ -381,7 +387,11 @@ class RuntimeLauncher {
           "RUNTIME_EXECUTABLE_INVALID",
           "Runtime executable"
         );
-        child = this.spawnProcess(executable, ["-I", "-u", "-X", "faulthandler", bootstrapPath], {
+        // -I ignores PYTHON* environment settings, so use CPython's explicit cache option.
+        const args = ["-I", "-u", "-X", "faulthandler"];
+        if (bytecodeCacheRoot !== undefined) args.push("-X", "pycache_prefix=" + bytecodeCacheRoot);
+        args.push(bootstrapPath);
+        child = this.spawnProcess(executable, args, {
           shell: false,
           windowsHide: true,
           cwd: temporaryDirectory,

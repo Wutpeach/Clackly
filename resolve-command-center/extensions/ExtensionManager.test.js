@@ -143,6 +143,13 @@ test('managed path links are rejected and broken extension state leaves built-in
   const { manager, directory, install } = workspace(t);
   await install();
   const outside = path.join(directory, 'outside'); fs.mkdirSync(outside);
+  manager.saveConfig('test.tools', { label: 'safe' });
+  const cache = manager.pythonCachePath('test.tools', manager.get('test.tools'));
+  fs.mkdirSync(path.dirname(cache), { recursive: true });
+  fs.symlinkSync(outside, cache, 'junction');
+  await assert.rejects(manager.execute(manager.commands()[0]), { code: 'EXTENSION_UNSAFE_PATH' });
+  assert.deepEqual(fs.readdirSync(outside), []);
+  fs.unlinkSync(cache);
   const stage = path.join(manager.root, 'staging'); fs.rmSync(stage, { recursive: true });
   fs.symlinkSync(outside, stage, 'junction');
   await assert.rejects(manager.preview(path.join(directory, 'test.clackly')), { code: 'EXTENSION_UNSAFE_PATH' });

@@ -73,6 +73,15 @@ class ExtensionManager {
     if (!ID.test(id) || !/^[a-f0-9-]{36}$/.test(record.revision || '')) throw fail('EXTENSION_STATE_INVALID', '受管扩展路径无效。');
     return path.join(this.root, 'packages', id, record.revision);
   }
+  pythonCachePath(id, record) {
+    this.revisionPath(id, record);
+    return path.join(this.root, 'cache', 'python', id, record.revision);
+  }
+  removePythonCache(id, record) {
+    const target = this.pythonCachePath(id, record);
+    assertPlainPath(target);
+    fs.rmSync(target, { recursive: true, force: true });
+  }
   verify(id, record) {
     const root = this.revisionPath(id, record);
     if (inventory(root) !== record.inventory) throw fail('EXTENSION_FILES_CHANGED', '扩展文件已变化，请重新导入包。');
@@ -223,6 +232,7 @@ class ExtensionManager {
       this.previews.delete(token); this.errors.delete(manifest.id);
       // A committed pointer always wins over best-effort cleanup of an inactive revision.
       if (old?.revision) { try { this.removeDirectory(this.revisionPath(manifest.id, old)); } catch { /* Inactive files cannot register commands. */ } }
+      if (old?.revision) { try { this.removePythonCache(manifest.id, old); } catch { /* Cache cleanup cannot undo the committed update. */ } }
       return this.list();
     });
     await this.refreshAvailability();
@@ -254,6 +264,7 @@ class ExtensionManager {
       else next[id] = { ...record, revision: null };
       this.persist(next); this.errors.delete(id);
       try { this.removeDirectory(this.revisionPath(id, record)); } catch { /* Inactive files are never rediscovered. */ }
+      try { this.removePythonCache(id, record); } catch { /* A disposable cache cannot undo uninstall. */ }
       return this.list();
     });
   }
@@ -272,7 +283,10 @@ class ExtensionManager {
       this.errors.set(id, error.message); this.notify();
       throw fail('EXTENSION_FILES_CHANGED', '扩展文件已变化或不可用，请重新导入包。');
     }
-    const running = Promise.resolve().then(() => this.executePython({ root, entry, commandId: command.id, config }));
+    const bytecodeCacheRoot = this.pythonCachePath(id, record);
+    assertPlainPath(bytecodeCacheRoot);
+    fs.mkdirSync(bytecodeCacheRoot, { recursive: true });
+    const running = Promise.resolve().then(() => this.executePython({ root, entry, commandId: command.id, config, bytecodeCacheRoot }));
     const active = this.active.get(id) || new Set(); active.add(running); this.active.set(id, active);
     try { return await running; } finally { active.delete(running); if (!active.size) this.active.delete(id); }
   }
