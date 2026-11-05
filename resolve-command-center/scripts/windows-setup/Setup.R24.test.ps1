@@ -1,9 +1,11 @@
 ﻿[CmdletBinding()]
-param([string]$WorkerRoot='', [switch]$HoldAfterResult,[switch]$InspectorOnly)
+param([string]$WorkerRoot='', [switch]$HoldAfterResult,[switch]$InspectorOnly,[string]$BuildDirectory='')
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
-$build=Join-Path $repo 'resolve-command-center/build/windows-setup-r24';$closure=Join-Path $build 'fixture'
+$build=Join-Path $repo 'resolve-command-center/build/windows-setup-r24'
+if ($BuildDirectory) {$build=[IO.Path]::GetFullPath($BuildDirectory)}
+$closure=Join-Path $build 'fixture'
 foreach ($module in @('SetupPipeline','SetupBackend','SetupQualification','WorkflowTransaction','Fixture')) {Import-Module (Join-Path $closure ($module+'.psm1')) -DisableNameChecking}
 function Assert($Value,[string]$Why) {if (!$Value) {throw ('ASSERT '+$Why)}}
 function Use-SyntheticSource($f,[switch]$Existing) {
@@ -47,6 +49,7 @@ function Assert-Preserved($f) {Assert ((Get-SetupArtifact $f.Adapter.Locations.T
 function Start-TestWorker($f,[switch]$Hold) {
     $ps=Join-Path ([Environment]::GetFolderPath('System')) 'WindowsPowerShell/v1.0/powershell.exe'
     $args='-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$PSCommandPath+'" -WorkerRoot "'+$f.Root+'"';if ($Hold) {$args+=' -HoldAfterResult'}
+    if ($BuildDirectory) {$args+=' -BuildDirectory "'+$build+'"'}
     $out=Join-Path $f.Root 'worker.stdout';$err=Join-Path $f.Root 'worker.stderr'
     $p=Start-Process $ps -ArgumentList $args -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err -PassThru;$null=$p.Handle;$children.Add($p)
     return @{Process=$p;Pid=$p.Id;Created=$p.StartTime.ToUniversalTime().ToString('o');Out=$out;Err=$err}

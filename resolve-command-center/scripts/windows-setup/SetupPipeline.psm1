@@ -8,7 +8,11 @@ Import-Module (Join-Path $PSScriptRoot 'LocalNative.psm1') -DisableNameChecking
 function New-SetupProductionAdapter {
     return @{Kind='production';Locations=(Get-SetupProductionLocations);Fetch=$null;
         Pair={Get-ResolveHostPair ''};Observe={param($c) Get-CanonicalHostState $c.ResolveExecutable $c.WorkflowExecutable};
-        Provision={param($r,$w) Copy-LocalResolveNative $r $w};Access={param($target,$scan) Assert-UpdateWriteAccess $target $scan};Checkpoint={}}
+        Provision={param($r,$w) Copy-LocalResolveNative $r $w};Access={param($target,$scan)
+            # For fresh install the canonical scan exists; the target does not.
+            $existing=if (Test-Path -LiteralPath $target) {$target} else {$scan}
+            Assert-UpdateWriteAccess $existing $scan
+        };Checkpoint={}}
 }
 function New-SetupContext($Adapter,$Session,$Request) {
     $pair=& $Adapter.Pair;$locations=$Adapter.Locations
@@ -80,6 +84,13 @@ function Invoke-SetupOperation([ValidateSet('Verify','Install','Inspect')][strin
             }
         }
     } catch {
+        # Local evidence retains the original bounded cause chain, never permission.
+        $causes=@();$cause=$_.Exception
+        while ($cause -and $causes.Count -lt 12) {
+            $causes+=@{type=$cause.GetType().FullName;message=$cause.Message.Substring(0,[Math]::Min(2048,$cause.Message.Length));hresult=$cause.HResult}
+            $cause=$cause.InnerException
+        }
+        $receipt.diagnostic=$causes
         $receipt.reason=Get-UpdateFailureReason $_
         $receipt.status=if ($receipt.reason -ceq 'local-candidate-gate') {'production-blocked'} elseif ($receipt.reason -ceq 'permission-cancelled') {'cancelled'} else {'failed'}
     }

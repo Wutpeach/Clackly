@@ -17,8 +17,34 @@ using System.Windows.Forms;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
+// The controlled assembly is a DLL, with no independently launchable EXE.
+public static class TrialEntry {
+#if FIXTURE
+    public static int Probe(string root) {
+        SetupForm.Canonical(root);
+        string allowed=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),@"Temp\Clackly-R24-Fixtures")+Path.DirectorySeparatorChar;
+        string marker=Path.Combine(root,".clackly-r24-fixture");SetupForm.Canonical(marker);
+        if(!root.StartsWith(allowed,StringComparison.OrdinalIgnoreCase)||File.ReadAllText(marker)!="INERT R24 ONLY")throw new Exception("fixture-root-refused");
+        foreach(string key in new[]{"COR_ENABLE_PROFILING","COR_PROFILER","APPDOMAIN_MANAGER_ASM","APPDOMAIN_MANAGER_TYPE","PSModulePath","NODE_OPTIONS"})
+            if(Environment.GetEnvironmentVariable(key)!=null)throw new Exception("CLR-startup-environment-inherited");
+        if(String.IsNullOrEmpty(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)))throw new Exception("common-data-folder-unresolved");
+        if(!String.Equals(Environment.GetEnvironmentVariable("ProgramData"),Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),StringComparison.OrdinalIgnoreCase))throw new Exception("native-source-folder-unresolved");
+        return 29;
+    }
+#endif
+    public static int Run(string argument) {
+#if CONTROLLED_TRIAL && !FIXTURE
+        using(var launch=TrialBoundary.OpenLaunch(new string[0])) {
+            if(argument!="")throw new Exception("trial-arguments-refused");
+            return Program.Main(new string[0]);
+        }
+#else
+        throw new Exception("local-candidate-gate");
+#endif
+    }
+}
 internal static class Program {
-    [STAThread] static int Main(string[] args) {
+    [STAThread] internal static int Main(string[] args) {
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
         try {
 #if FIXTURE
@@ -27,7 +53,9 @@ internal static class Program {
             SetupForm.ValidateFixture(fixture);
             SetupForm form=new SetupForm(fixture);
 #else
+#if !CONTROLLED_TRIAL
             if(args.Length!=0) throw new Exception("此本地候选不接受命令行覆盖参数。");
+#endif
             SetupForm form=new SetupForm(null);
 #endif
             Application.Run(form);return form.OutcomeCode;
@@ -65,11 +93,11 @@ internal sealed class SetupForm:Form {
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         for(int i=5;i<9;i++) layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        var title=new Label {Text="安装 Clackly",AutoSize=true,Font=new Font(Font.FontFamily,18F,FontStyle.Bold),Margin=new Padding(0,0,0,14)};
+        var title=new Label {Text=fixture==null?"验证 Clackly 安装候选":"安装 Clackly（隔离测试）",AutoSize=true,Font=new Font(Font.FontFamily,18F,FontStyle.Bold),Margin=new Padding(0,0,0,14)};
         version.Text="当前版本：未知（尚未读取安装目录）    目标版本：0.1.3";version.AutoSize=true;version.Margin=new Padding(0,0,0,20);
         stage.Text="验证安装来源";stage.AutoSize=true;stage.Font=new Font(Font,FontStyle.Bold);stage.Margin=new Padding(0,0,0,8);
         elapsed.Text="尚未开始";elapsed.AutoSize=true;elapsed.Margin=new Padding(0,0,0,8);
-        description.Text=fixture==null?"此 EXE 是未签名的 R24 本地候选。可验证原始官方 ZIP；真实安装仍被编译保护锁定。验证需要网络访问 GitHub。":"隔离测试使用惰性插件、模拟宿主与惰性 Native。不会读取或安装真实 Resolve 插件。";
+        description.Text=fixture==null?"此 EXE 是未签名的本地候选，仅供来源核验，不能安装。验证需要网络访问 GitHub。真实安装须另行批准并取得可信、已放行的安装器。":"隔离测试使用惰性插件、模拟宿主与惰性 Native。不会读取或安装真实 Resolve 插件。";
         description.Dock=DockStyle.Fill;description.AutoSize=false;description.Margin=new Padding(0,0,0,16);
         consent.Text="我已保存工作，将自行退出 Resolve；继续后请等待文件核验。";consent.AutoSize=true;consent.Visible=fixture!=null;consent.Margin=new Padding(0,8,0,12);
         evidence.ReadOnly=true;evidence.Dock=DockStyle.Fill;evidence.AccessibleName="本地证据目录";evidence.Margin=new Padding(0,8,0,12);
@@ -78,6 +106,13 @@ internal sealed class SetupForm:Form {
         cancel.Text="关闭(&C)";cancel.AutoSize=true;cancel.MinimumSize=new Size(90,32);cancel.Click+=(s,e)=>CancelOrClose();
         buttons.Controls.Add(action);buttons.Controls.Add(cancel);
         var note=new Label {AutoSize=true,Text=fixture==null?"本地候选 · asInvoker · 未签名 · 未公开发布":"FIXTURE · 无厂商代码执行 · 结果由事务与完整树核验",Margin=new Padding(0,12,0,0)};
+#if CONTROLLED_TRIAL && !FIXTURE
+        Text="Clackly Setup 0.1.3 — R29 本机清洁试装";title.Text="安装 Clackly（本次已确认后）";
+        description.Text="请确认本次清洁重装已获批准，已保存工作并退出 Resolve。安装将核验官方来源和本机组件；旧设置需重新配置。";
+        consent.Visible=true;consent.Text="我已核对本次启动器及 DLL，已保存工作，并同意本次清洁试装。";
+        action.Text="开始受控安装(&I)";
+        note.Text="CONTROLLED-TRIAL · 未签名 · 非公开发行 · 仅同账户提权";
+#endif
         layout.Controls.Add(title);layout.Controls.Add(version);layout.Controls.Add(stage);layout.Controls.Add(elapsed);layout.Controls.Add(description);
         layout.Controls.Add(consent);layout.Controls.Add(evidence);layout.Controls.Add(buttons);layout.Controls.Add(note);Controls.Add(layout);
         AcceptButton=action;CancelButton=cancel;consent.CheckedChanged+=(s,e)=> {if(active&&!irreversible&&stage.Tag as string=="waiting")action.Enabled=consent.Checked;};
@@ -96,15 +131,15 @@ internal sealed class SetupForm:Form {
         string marker=Path.Combine(path,".clackly-r24-fixture");Canonical(marker);
         if(!path.StartsWith(allowed,StringComparison.OrdinalIgnoreCase)||File.ReadAllText(marker)!="INERT R24 ONLY")throw new Exception("fixture-root-refused");
     }
-    static SafeFileHandle HoldDirectory(string path) {
+    internal static SafeFileHandle HoldDirectory(string path) {
         Canonical(path);
         var held=CreateFile(path,0x80000000,3,IntPtr.Zero,3,0x02200000,IntPtr.Zero);
         if(held.IsInvalid){held.Dispose();throw new Exception("workspace-lock-failed");}
         var resolved=new StringBuilder(32768);uint n=GetFinalPathNameByHandle(held,resolved,(uint)resolved.Capacity,0);
-        if(n==0||n>=resolved.Capacity||!String.Equals(resolved.ToString(),@"\\?\"+path.TrimEnd((char)92),StringComparison.OrdinalIgnoreCase)){held.Dispose();throw new Exception("target-unverified");}
+        if(n==0||n>=resolved.Capacity||!String.Equals(resolved.ToString().TrimEnd((char)92),@"\\?\"+path.TrimEnd((char)92),StringComparison.OrdinalIgnoreCase)){held.Dispose();throw new Exception("target-unverified");}
         Canonical(path);return held;
     }
-    static void Canonical(string path) {
+    internal static void Canonical(string path) {
         if(path!=Path.GetFullPath(path)||path.StartsWith(@"\\")||path.IndexOf(':',2)>=0)throw new Exception("target-unverified");
         string cur=Path.GetPathRoot(path);
         foreach(string part in path.Substring(cur.Length).Split('\\')) {
@@ -115,8 +150,15 @@ internal sealed class SetupForm:Form {
         }
     }
     void Extract() {
+#if CONTROLLED_TRIAL && !FIXTURE
+        root=TrialBoundary.CreateSession(id);
+#else
         root=Path.Combine(Path.GetTempPath(),"Clackly-Setup-"+id);
-        Canonical(Path.GetDirectoryName(root));if(Directory.Exists(root)||File.Exists(root))throw new Exception("workspace-exists");
+#endif
+        Canonical(Path.GetDirectoryName(root));
+#if !(CONTROLLED_TRIAL && !FIXTURE)
+        if(Directory.Exists(root)||File.Exists(root))throw new Exception("workspace-exists");
+#endif
         Directory.CreateDirectory(root);Canonical(root);
         locks.Add(HoldDirectory(root));
         string code=Path.Combine(root,"code");Directory.CreateDirectory(code);Canonical(code);
@@ -134,25 +176,46 @@ internal sealed class SetupForm:Form {
             }
         }
         evidence.Text=root;
-        Write("supervisor.json",new {id=id,pid=Process.GetCurrentProcess().Id,created=Process.GetCurrentProcess().StartTime.ToUniversalTime().ToString("o"),fixture=fixture!=null,productionMutationEnabled=false});
+        Write("supervisor.json",new {id=id,pid=Process.GetCurrentProcess().Id,created=Process.GetCurrentProcess().StartTime.ToUniversalTime().ToString("o"),fixture=fixture!=null,productionMutationEnabled=ProductionEnabled});
 #if FIXTURE
         ValidateFixture(fixture);
         using(var output=new FileStream(Path.Combine(fixture,"session.txt"),FileMode.CreateNew,FileAccess.Write,FileShare.Read)){byte[] b=Encoding.UTF8.GetBytes(root);output.Write(b,0,b.Length);output.Flush(true);}
 #endif
     }
+    static bool ProductionEnabled {get {
+#if CONTROLLED_TRIAL && !FIXTURE
+        return true;
+#else
+        return false;
+#endif
+    }}
     void Write(string name,object value) {
         using(var output=new FileStream(Path.Combine(root,name),FileMode.CreateNew,FileAccess.Write,FileShare.Read)){byte[] b=Encoding.UTF8.GetBytes(json.Serialize(value));output.Write(b,0,b.Length);output.Flush(true);}
     }
     static string Quote(string s){if(s.IndexOf('"')>=0||s.IndexOf('\r')>=0||s.IndexOf('\n')>=0)throw new Exception("invalid-path");return "\""+s+"\"";}
     Process StartChild(string operation,bool inspecting) {
         string ps=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),@"WindowsPowerShell\v1.0\powershell.exe");Canonical(ps);
+#if CONTROLLED_TRIAL && !FIXTURE
+        var systemLease=new TrialBoundary();locks.Add(systemLease);systemLease.Protect(ps,false);
+        // Recheck/hold all embedded resources before each independent child.
+        locks.Add(TrialBoundary.OpenWorker(Path.Combine(root,"code")));
+#endif
         string args="-NoLogo -NoProfile -NonInteractive -File "+Quote(Path.Combine(root,@"code\SetupEntry.ps1"))+" -Operation "+operation+" -SessionRoot "+Quote(root)+" -Id "+id;
+#if CONTROLLED_TRIAL && !FIXTURE
+        // Only the held, hash-checked embedded script is allowed in this child.
+        // Process-scoped policy; no registry/machine/user policy is modified.
+        args="-ExecutionPolicy Bypass "+args;
+#endif
 #if FIXTURE
         args+=" -FixtureRoot "+Quote(fixture);
 #endif
         if(inspecting){foreach(string key in new[]{"baseline","context","result","journal"}){string v=workerWitness!=null&&workerWitness.ContainsKey(key)?Convert.ToString(workerWitness[key]):"absent";if(!Regex.IsMatch(v,@"^(absent|[a-f0-9]{64})$"))throw new Exception("recovery-required");args+=" -"+Char.ToUpperInvariant(key[0])+key.Substring(1)+"Digest "+v;}}
         var info=new ProcessStartInfo(ps,args){UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true,RedirectStandardInput=true,StandardOutputEncoding=Encoding.UTF8,StandardErrorEncoding=Encoding.UTF8,WorkingDirectory=Path.Combine(root,"code")};
         foreach(string k in new[]{"NODE_OPTIONS","NODE_PATH","ELECTRON_RUN_AS_NODE","ELECTRON_EXTRA_LAUNCH_ARGS","PSModulePath"})info.EnvironmentVariables.Remove(k);
+#if CONTROLLED_TRIAL && !FIXTURE
+        string privateTemp=Path.Combine(root,"tmp");Directory.CreateDirectory(privateTemp);
+        ConfigureChildEnvironment(info,privateTemp);
+#endif
         Process p=new Process{StartInfo=info};int outputLength=0;
         p.OutputDataReceived+=(s,e)=>{if(e.Data==null)return;if(Interlocked.Add(ref outputLength,e.Data.Length)>65536)return;lock(outputSync){(inspecting?inspectorLines:workerLines).Enqueue(e.Data);}};
         p.ErrorDataReceived+=(s,e)=>{};p.Start();if(inspecting)inspector=p;else worker=p;string created=p.StartTime.ToUniversalTime().ToString("o");
@@ -160,11 +223,29 @@ internal sealed class SetupForm:Form {
         Write(inspecting?"inspector-process.json":"worker-process.json",new {id=id,pid=p.Id,created=created,image=ps});
         p.StandardInput.Close();p.BeginOutputReadLine();p.BeginErrorReadLine();return p;
     }
+    static void ConfigureChildEnvironment(ProcessStartInfo info,string privateTemp) {
+        info.EnvironmentVariables.Clear();
+        string windows=Environment.GetFolderPath(Environment.SpecialFolder.Windows),system=Environment.GetFolderPath(Environment.SpecialFolder.System);
+        info.EnvironmentVariables["SystemRoot"]=windows;info.EnvironmentVariables["windir"]=windows;
+        // Windows known-folder resolution needs SystemDrive even with a loaded profile.
+        info.EnvironmentVariables["SystemDrive"]=Path.GetPathRoot(windows).TrimEnd((char)92);
+        info.EnvironmentVariables["PATH"]=system+";"+windows;
+        info.EnvironmentVariables["TEMP"]=privateTemp;info.EnvironmentVariables["TMP"]=privateTemp;
+        info.EnvironmentVariables["ProgramFiles"]=Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        info.EnvironmentVariables["ProgramData"]=Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        info.EnvironmentVariables["USERPROFILE"]=Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        info.EnvironmentVariables["APPDATA"]=Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        info.EnvironmentVariables["LOCALAPPDATA"]=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        info.EnvironmentVariables["PSModulePath"]=Path.Combine(system,@"WindowsPowerShell\v1.0\Modules");
+    }
     void Act() {
         if(terminal){Close();return;}
         if(active) {if(stage.Tag as string=="waiting"&&consent.Checked){Write("continue.request",new{id=id});action.Enabled=false;description.Text="请自行保存并退出 Resolve。安装器会持续等待并重新检查宿主状态。";}return;}
+#if CONTROLLED_TRIAL && !FIXTURE
+        if(!consent.Checked){description.Text="请先核对并明确同意本次已批准的受控试装。";return;}
+#endif
         try {Extract();active=true;started=DateTime.UtcNow;phaseStarted=started;action.Enabled=false;cancel.Text="取消(&C)";
-#if FIXTURE
+#if FIXTURE || CONTROLLED_TRIAL
             worker=StartChild("Install",false);
 #else
             worker=StartChild("Verify",false);
@@ -228,6 +309,10 @@ internal sealed class SetupForm:Form {
         stage.Tag=status;stage.Text=status=="installed"?"隔离安装完成，完整文件核验通过":status=="cancelled"?"已安全取消":status=="rolled-back"?"安装失败，已恢复完整旧版":status=="source-verified"?"官方来源验证通过；真实安装保持锁定":"安装未完成";
         if(status=="installed")version.Text="当前版本：0.1.3（隔离核验通过）    目标版本：0.1.3";
         description.Text=status=="source-verified"?"原样 0.1.3 官方 ZIP 已核验。此未签名本地候选未读取真实安装目录或 Native，也不会执行真实安装。签名、旧端对账与真实宿主验收仍待单独批准。":status=="installed"?"执行器已真实退出。独立检查进程重新核对事务和所有新旧文件；如有旧版本，其完整文件树保留在隔离备份中。这不代表真实 Resolve 安装通过。":status=="cancelled"?"执行器已退出，原安装树保持完整。惰性证据与暂存文件保留。":status=="rolled-back"?"独立检查已确认旧版所有文件恢复。证据、暂存与失败树保留，未自动重试。":"原因："+reason+"。保留全部记录；未知事务需独立对账，禁止通过删除 pointer 或备份重试。";
+#if CONTROLLED_TRIAL && !FIXTURE
+        if(status=="installed"){stage.Text="安装文件核验完成，请自行重开 Resolve 验收";version.Text="当前版本：0.1.3（文件核验通过）    目标版本：0.1.3";description.Text="执行器已退出，新的独立 Inspector 已核对事务、完整新树和旧版备份。请自行启动 Resolve，检查 Workflow 加载、常用命令和设置；文件核验不等于 Resolve 功能验收。";}
+        if(status=="cancelled")description.Text="执行器已退出并确认安全取消。原安装树保持完整；保留本地证据。";
+#endif
         action.Text="关闭(&C)";action.Enabled=true;cancel.Visible=false;consent.Enabled=false;
         if(root!=null){try{Write("supervisor-terminal.json",new{id=id,status=status,reason=reason,workerExitCode=workerExit,inspectorExitCode=inspector==null?-999:inspector.ExitCode,pid=Process.GetCurrentProcess().Id,created=Process.GetCurrentProcess().StartTime.ToUniversalTime().ToString("o"),observed=DateTime.UtcNow.ToString("o")});}catch{}}
 #if FIXTURE

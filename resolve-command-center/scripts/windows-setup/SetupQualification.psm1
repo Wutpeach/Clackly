@@ -150,6 +150,66 @@ function Get-SetupFullNamespace([string]$Root) {
     if (!(Test-Path -LiteralPath $Root)) {return @('absent')}
     return @(Get-TreeNamespace $Root | Sort-Object -CaseSensitive)
 }
+# Completion is an Inspector receipt, not publisher authority. Every retained
+# journal, complete tree and namespace is revalidated under the installer locks.
+function Get-SetupCompletedHistory($Locations,[string]$OwnId='') {
+    try {
+    $root=$Locations.Transactions;$ids=@();$entries=@()
+    if (Test-Path -LiteralPath $root) {$entries=@(Get-ChildItem -LiteralPath $root -Force)}
+    foreach ($entry in $entries) {
+        if ($entry.Name -ceq 'install.lock' -and !$entry.PSIsContainer) {continue}
+        if ($OwnId -cmatch '^[a-f0-9]{32}$' -and $entry.Name -cin @(($OwnId+'.json'),($OwnId+'.json.previous'),($OwnId+'.stage'),($OwnId+'.backup'),($OwnId+'.failed'),($OwnId+'.completed'))) {continue}
+        if ($entry.Name -cnotmatch '^([a-f0-9]{32})[.](json|json[.]previous|backup|completed)$') {throw 'recovery-required'}
+        $ids+=$Matches[1]
+    }
+    $history=@();$fingerprints=@();$names=@()
+    foreach ($id in @($ids | Sort-Object -Unique)) {
+        $journal=Join-Path $root ($id+'.json');$previous=$journal+'.previous';$completed=Join-Path $root ($id+'.completed')
+        foreach ($file in @($journal,$previous,$completed)) {if ((Get-SetupArtifact $file).kind -cne 'file') {throw 'recovery-required'}}
+        $r=Read-UpdateJson $journal 65536;$p=Read-UpdateJson $previous 65536;$c=Read-UpdateJson $completed 65536
+        if ($c.schemaVersion -ne 1 -or $c.kind -cne 'clackly-setup-verified' -or $c.id -cne $id -or $c.journalHash -cne (Get-UpdateHash $journal) -or $c.previousHash -cne (Get-UpdateHash $previous)) {throw 'recovery-required'}
+        if ($r.schemaVersion -ne 1 -or $r.id -cne $id -or $r.target -cne $Locations.Target -or $r.backup -cne (Join-Path $root ($id+'.backup')) -or $r.stage -cne (Join-Path $root ($id+'.stage')) -or
+            $r.state -cne 'verified' -or $r.outcomeStatus -cne 'installed' -or $null -ne $r.outcomeReason -or $p.state -cne 'activate-intent' -or
+            $r.candidateDigest -cnotmatch '^[a-f0-9]{64}$' -or $r.candidateSize -le 0 -or $r.candidateSize -gt 4294967296 -or $r.newHash -cnotmatch '^[a-f0-9]{64}$' -or
+            $r.oldHash -cnotmatch '^(absent|[a-f0-9]{64})$' -or $r.ownerPid -le 0 -or !$r.ownerCreated -or
+            $r.version -cnotmatch '^(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)$') {throw 'recovery-required'}
+        foreach ($key in @('schemaVersion','id','target','backup','stage','version','candidateDigest','candidateSize','oldHash','newHash','ownerPid','ownerCreated')) {if ([string]$r.$key -cne [string]$p.$key) {throw 'recovery-required'}}
+        if ((Get-SetupEvidenceHash $r.native) -cne (Get-SetupEvidenceHash $p.native)) {throw 'recovery-required'}
+        $created=[datetime]::MinValue
+        if (![datetime]::TryParseExact($r.ownerCreated,'o',[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::RoundtripKind,[ref]$created)) {throw 'recovery-required'}
+        $live=Get-Process -Id $r.ownerPid -ErrorAction SilentlyContinue
+        if ($live -and $live.StartTime.ToUniversalTime().ToString('o') -ceq $r.ownerCreated) {throw 'recovery-required'}
+        foreach ($key in @('oldNamespaceHash','newNamespaceHash')) {if ($c.$key -cnotmatch '^[a-f0-9]{64}$') {throw 'recovery-required'}}
+        if ($r.oldHash -ceq 'absent') {
+            if ((Test-Path -LiteralPath $r.backup) -or $c.oldVersion -cne '未安装' -or $c.oldNamespaceHash -cne (Get-SetupEvidenceHash @('absent'))) {throw 'recovery-required'}
+        } else {
+            if ((Get-SetupArtifact $r.backup).hash -cne $r.oldHash -or (Get-SetupEvidenceHash @(Get-SetupFullNamespace $r.backup)) -cne $c.oldNamespaceHash -or
+                (Get-SetupCurrentVersion $r.backup) -cne $c.oldVersion -or [version]$c.oldVersion -ge [version]$r.version) {throw 'recovery-required'}
+        }
+        foreach ($file in @($journal,$previous,$completed)) {$names+=[IO.Path]::GetFileName($file);$fingerprints+=([IO.Path]::GetFileName($file)+'|'+(Get-UpdateHash $file))}
+        if ($r.oldHash -cne 'absent') {$names+=($id+'.backup');$fingerprints+=($id+'.backup|'+$r.oldHash+'|'+$c.oldNamespaceHash)}
+        $history+=@{record=$r;completion=$c}
+    }
+    # Exactly one increasing chain. Earlier new trees now reside in the next
+    # transaction's complete old backup; the final tree is target or own backup.
+    $tips=@()
+    foreach ($h in $history) {
+        $r=$h.record;$next=@($history | Where-Object {$_.record.oldHash -ceq $r.newHash})
+        if ($next.Count -gt 1 -or @($history | Where-Object {$_.record.newHash -ceq $r.newHash}).Count -ne 1) {throw 'recovery-required'}
+        if ($next.Count) {
+            if ($next[0].completion.oldVersion -cne $r.version -or $next[0].completion.oldNamespaceHash -cne $h.completion.newNamespaceHash) {throw 'recovery-required'}
+            $tree=$next[0].record.backup
+        } else {
+            $tips+=$h;$tree=$Locations.Target
+            if ($OwnId -cmatch '^[a-f0-9]{32}$') {$ownBackup=Join-Path $root ($OwnId+'.backup');if (Test-Path -LiteralPath $ownBackup) {$tree=$ownBackup}}
+        }
+        if ((Get-SetupArtifact $tree).hash -cne $r.newHash -or (Get-SetupEvidenceHash @(Get-SetupFullNamespace $tree)) -cne $h.completion.newNamespaceHash) {throw 'recovery-required'}
+        Assert-UpdatePackage $tree $r.version $r.native | Out-Null
+    }
+    if ($history.Count -and ($tips.Count -ne 1 -or @($history | Where-Object {$old=$_.record.oldHash;!@($history | Where-Object {$_.record.newHash -ceq $old}).Count}).Count -ne 1)) {throw 'recovery-required'}
+    return @{hash=(Get-SetupEvidenceHash @($fingerprints | Sort-Object -CaseSensitive));names=$names;count=$history.Count}
+    } catch {throw 'recovery-required'}
+}
 function Get-SetupNormalObservation($Locations,[string]$OwnId='') {
     foreach ($root in @($Locations.Scan,$Locations.Target,$Locations.Transactions,$Locations.Inbox,$Locations.LegacyTransactions,$Locations.HistoricalBackups)+@($Locations.Pointers)+@($Locations.DataRoots)) {Assert-NormalPath $root -AllowMissing | Out-Null}
     foreach ($data in @($Locations.DataRoots)) {foreach ($write in @($Locations.Scan,$Locations.Transactions)) {
@@ -162,13 +222,11 @@ function Get-SetupNormalObservation($Locations,[string]$OwnId='') {
     }
     if (Test-Path -LiteralPath $Locations.Scan) {foreach ($entry in @(Get-ChildItem -LiteralPath $Locations.Scan -Force)) {if ($entry.Name -imatch '^\.?com\.wutpeach\.clackly[.]') {throw 'recovery-required'}}}
     $lockIdentity='absent'
-    if (Test-Path -LiteralPath $Locations.Transactions) {foreach ($entry in @(Get-ChildItem -LiteralPath $Locations.Transactions -Force)) {
-        if ($entry.Name -ceq 'install.lock' -and !$entry.PSIsContainer) {$lockIdentity=Get-SetupPathIdentity $entry.FullName;continue}
-        if ($OwnId -cmatch '^[a-f0-9]{32}$' -and $entry.Name -cin @(($OwnId+'.json'),($OwnId+'.json.previous'),($OwnId+'.stage'),($OwnId+'.backup'),($OwnId+'.failed'))) {Assert-NormalPath $entry.FullName | Out-Null;continue}
-        throw 'recovery-required'
-    }}
+    $history=Get-SetupCompletedHistory $Locations $OwnId
+    $lockPath=Join-Path $Locations.Transactions 'install.lock'
+    if (Test-Path -LiteralPath $lockPath) {$lockIdentity=Get-SetupPathIdentity $lockPath}
     $data=@();foreach ($root in @($Locations.DataRoots)) {$artifact=Get-SetupArtifact $root;if ($artifact.kind -cnotin @('absent','directory')) {throw 'target-unverified'};$data+=@{path=$root;kind=$artifact.kind;hash=$artifact.hash;namespaceHash=(Get-SetupEvidenceHash @(Get-SetupFullNamespace $root))}}
-    $retained=@($spaces | ForEach-Object {$_.path+'|'+$_.present+'|'+($_.entries -join '|')})+@($data | ForEach-Object {$_.path+'|'+$_.kind+'|'+$_.hash+'|'+$_.namespaceHash})
+    $retained=@($spaces | ForEach-Object {$_.path+'|'+$_.present+'|'+($_.entries -join '|')})+@($data | ForEach-Object {$_.path+'|'+$_.kind+'|'+$_.hash+'|'+$_.namespaceHash})+@($history.hash)
     return @{oldHash=(Get-SetupTreeHashForObservation $Locations.Target);oldNamespaceHash=(Get-SetupEvidenceHash @(Get-SetupFullNamespace $Locations.Target));current=(Get-SetupCurrentVersion $Locations.Target);retainedHash=(Get-SetupEvidenceHash $retained);namespaces=$spaces;data=$data;lockIdentity=$lockIdentity}
 }
 function Get-SetupTreeHashForObservation([string]$Path) {if (!(Test-Path -LiteralPath $Path)) {return 'absent'};return (Get-SetupArtifact $Path).hash}
@@ -177,4 +235,4 @@ function Assert-SetupNormalUnchanged($Locations,$Baseline,[string]$OwnId='',[swi
     if ($actual.retainedHash -cne $Baseline.retainedHash -or $actual.lockIdentity -cne $Baseline.lockIdentity -or (!$AfterTransaction -and ($actual.oldHash -cne $Baseline.oldHash -or $actual.oldNamespaceHash -cne $Baseline.oldNamespaceHash))) {throw 'recovery-required'}
     return $actual
 }
-Export-ModuleMember -Function Get-SetupPathIdentity,Get-SetupFullNamespace,Get-SetupNormalObservation,Assert-SetupNormalUnchanged
+Export-ModuleMember -Function Get-SetupPathIdentity,Get-SetupFullNamespace,Get-SetupNormalObservation,Assert-SetupNormalUnchanged,Get-SetupCompletedHistory

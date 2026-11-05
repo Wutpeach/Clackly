@@ -27,10 +27,11 @@ function Get-SetupProductionLocations {
             (Join-Path $local 'Clackly\workflow-updates\installation.json'))}
 }
 function Assert-SetupArchive([string]$Archive,[string]$Payload,$Pin=(Get-SetupPin),[scriptblock]$Fetch=$null) {
-    $request=if ($Fetch) {Get-OfficialArchiveRequest $Archive -Fetch $Fetch} else {Get-OfficialArchiveRequest $Archive}
-    foreach ($key in @('version','releaseId','assetId','size','digest')) {
-        if ([string]$request[$key] -cne [string]$Pin[$key]) {throw 'publisher-unverified'}
-    }
+    Assert-NormalPath $Archive | Out-Null
+    if ((Get-Item -LiteralPath $Archive).Length -ne $Pin.size -or (Get-UpdateHash $Archive) -cne $Pin.digest) {throw 'publisher-unverified'}
+    # Setup already pins the exact Release; one official GET is sufficient.
+    $request=@{};foreach ($key in @('version','releaseId','assetId','size','digest')) {$request[$key]=$Pin[$key]}
+    if ($Fetch) {Assert-OfficialRelease $request -Fetch $Fetch} else {Assert-OfficialRelease $request}
     Expand-UpdateArchive $Archive $Payload $request.digest $request.size
     $manifest=Assert-UpdatePackage $Payload $Pin.version
     Assert-PublishedUpdatePackage $manifest
@@ -41,24 +42,6 @@ function Get-SetupTreeHash([string]$Target) {
     Assert-NormalPath $Target -AllowMissing | Out-Null
     if (!(Test-Path -LiteralPath $Target)) {return 'absent'}
     return Get-TreeHash $Target
-}
-function Assert-SetupLegacyClean($Locations,[switch]$PreparedEngineLock) {
-    # Conservative: even completed historic records need independently authorized
-    # reconciliation. Never infer safety from missing launcher/ACK markers.
-    foreach ($root in @($Locations.Inbox,$Locations.Transactions)) {
-        Assert-NormalPath $root -AllowMissing | Out-Null
-        if (Test-Path -LiteralPath $root) {
-            foreach ($entry in @(Get-ChildItem -LiteralPath $root -Force)) {
-                if ($PreparedEngineLock -and $root -ceq $Locations.Transactions -and $entry.Name -ceq 'install.lock' -and !$entry.PSIsContainer) {
-                    Assert-NormalPath $entry.FullName | Out-Null
-                } else {throw 'recovery-required'}
-            }
-        }
-    }
-    foreach ($pointer in @($Locations.Pointers)) {
-        Assert-NormalPath $pointer -AllowMissing | Out-Null
-        if (Test-Path -LiteralPath $pointer) {throw 'recovery-required'}
-    }
 }
 function Write-SetupEvent($Session,[string]$State,[string]$Current='未知',[string]$Reason='') {
     $Session.Sequence++
@@ -72,12 +55,25 @@ function Write-SetupEvent($Session,[string]$State,[string]$Current='未知',[str
 }
 # The only future production compilation gate. No runtime enable input exists.
 $script:ProductionMutationEnabled=$false
+$script:TrialLease=$null
+$script:TrialNamespaceLease=$null
+function Assert-SetupTrialWorker {
+    if (!$script:ProductionMutationEnabled) {throw 'local-candidate-gate'}
+    if (!$script:TrialLease) {
+        $fixed=Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'Clackly Setup R29\Clackly-Setup-0.1.3-win-x64-CONTROLLED-TRIAL.dll'
+        # Fixed protected assembly, never a parameter, cache or JSON authority.
+        [Reflection.Assembly]::LoadFrom($fixed) | Out-Null
+        $script:TrialLease=[TrialBoundary]::OpenWorker($PSScriptRoot)
+    }
+    if (!$script:TrialNamespaceLease) {$script:TrialNamespaceLease=[TrialBoundary]::OpenInstallationNamespace()}
+}
 function Assert-SetupExecutionScope($Locations,[switch]$Inspect) {
     $production=Get-SetupProductionLocations
     if ($Locations.Scan -ceq $production.Scan) {
         foreach ($key in @('Scan','Target','Transactions','Inbox','LegacyTransactions','HistoricalBackups')) {if ($Locations[$key] -cne $production[$key]) {throw 'target-unverified'}}
         foreach ($key in @('Pointers','DataRoots')) {if ((Get-SetupEvidenceHash @($Locations[$key])) -cne (Get-SetupEvidenceHash @($production[$key]))) {throw 'target-unverified'}}
         if (!$Inspect -and !$script:ProductionMutationEnabled) {throw 'local-candidate-gate'}
+        if ($script:ProductionMutationEnabled) {Assert-SetupTrialWorker}
         return
     }
     $root=Assert-NormalPath (Split-Path -Parent $Locations.Scan)
@@ -154,11 +150,13 @@ function Invoke-SetupTransaction($Context,$Session,$Locations,
         return $outcome
     } finally {$adapterLock.Dispose()}
 }
-function Assert-SetupOwnGlobal($Context,[string]$ExpectedStatus) {
+function Assert-SetupOwnGlobal($Context,$Locations,[string]$ExpectedStatus) {
+    $history=Get-SetupCompletedHistory $Locations $Context.Id
     foreach ($entry in @(Get-ChildItem -LiteralPath $Context.TransactionRoot -Force)) {
         if ($entry.Name -ceq 'install.lock' -and !$entry.PSIsContainer) {Get-SetupPathIdentity $entry.FullName | Out-Null;continue}
+        if ($entry.Name -cin @($history.names)) {continue}
         if ($ExpectedStatus -ceq 'installed' -and $entry.Name -cin @(($Context.Id+'.stage'),($Context.Id+'.failed'))) {throw 'recovery-required'}
-        if ($entry.Name -cnotin @(($Context.Id+'.json'),($Context.Id+'.json.previous'),($Context.Id+'.stage'),($Context.Id+'.backup'),($Context.Id+'.failed'))) {throw 'recovery-required'}
+        if ($entry.Name -cnotin @(($Context.Id+'.json'),($Context.Id+'.json.previous'),($Context.Id+'.stage'),($Context.Id+'.backup'),($Context.Id+'.failed'),($Context.Id+'.completed'))) {throw 'recovery-required'}
         Get-SetupArtifact $entry.FullName | Out-Null
     }
 }
@@ -198,9 +196,10 @@ function Get-SetupReconciledOutcome($Context,[string]$SessionRoot,$Locations,$Wi
             Assert-SetupLockFile $engineLock
             Assert-SetupInspectionWitness $Context $SessionRoot $Witness
             Assert-SetupNormalUnchanged $Locations $baseline $Context.Id -AfterTransaction | Out-Null
-            Assert-SetupOwnGlobal $Context $actual.status
+            Assert-SetupOwnGlobal $Context $Locations $actual.status
             if ($Witness.journal -ceq 'absent') {
-                if ($actual.status -cnotin @('failed','cancelled') -or (Get-SetupTreeHash $Context.Target) -cne $baseline.oldHash -or (Get-SetupEvidenceHash @(Get-SetupFullNamespace $Context.Target)) -cne $baseline.oldNamespaceHash -or @(Get-ChildItem -LiteralPath $paths.Root -Force).Count -ne 1) {throw 'recovery-required'}
+                $history=Get-SetupCompletedHistory $Locations $Context.Id
+                if ($actual.status -cnotin @('failed','cancelled') -or (Get-SetupTreeHash $Context.Target) -cne $baseline.oldHash -or (Get-SetupEvidenceHash @(Get-SetupFullNamespace $Context.Target)) -cne $baseline.oldNamespaceHash -or @(Get-ChildItem -LiteralPath $paths.Root -Force).Count -ne (1+@($history.names).Count)) {throw 'recovery-required'}
             } else {
                 $record=Read-UpdateJson $paths.Journal 65536
                 if ($record.oldHash -cne $baseline.oldHash -or $record.ownerPid -ne $receipt.workerPid -or $record.ownerCreated -cne $receipt.workerCreated) {throw 'recovery-required'}
@@ -216,8 +215,26 @@ function Get-SetupReconciledOutcome($Context,[string]$SessionRoot,$Locations,$Wi
             }
             if ($actual.status -cne $receipt.status -or $actual.reason -cne $receipt.reason) {throw 'recovery-required'}
             Assert-SetupInspectionWitness $Context $SessionRoot $Witness
+            if ($actual.status -ceq 'installed') {
+                # Only the independent post-exit Inspector creates this receipt.
+                # A torn write remains evidence and blocks a later normal install.
+                $completion=@{schemaVersion=1;kind='clackly-setup-verified';id=$Context.Id;journalHash=(Get-UpdateHash $paths.Journal);previousHash=(Get-UpdateHash ($paths.Journal+'.previous'));oldVersion=$baseline.current;oldNamespaceHash=$baseline.oldNamespaceHash;newNamespaceHash=$receipt.newNamespaceHash}
+                $path=Join-Path $paths.Root ($Context.Id+'.completed')
+                if (Test-Path -LiteralPath $path) {
+                    if ((Get-SetupArtifact $path).kind -cne 'file') {throw 'recovery-required'}
+                    $savedCompletion=Read-UpdateJson $path 65536
+                    if (@($savedCompletion.PSObject.Properties).Count -ne $completion.Count) {throw 'recovery-required'}
+                    foreach ($key in $completion.Keys) {if ([string]$savedCompletion.$key -cne [string]$completion[$key]) {throw 'recovery-required'}}
+                } else {
+                    $temp=$path+'.next';Assert-NormalPath $temp -AllowMissing | Out-Null
+                    $bytes=[Text.Encoding]::UTF8.GetBytes(($completion | ConvertTo-Json -Depth 4 -Compress))
+                    $file=[IO.File]::Open($temp,'CreateNew','Write','None')
+                    try {$file.Write($bytes,0,$bytes.Length);$file.Flush($true)} finally {$file.Dispose()}
+                    [IO.File]::Move($temp,$path)
+                }
+            } elseif (Test-Path -LiteralPath (Join-Path $paths.Root ($Context.Id+'.completed'))) {throw 'recovery-required'}
             return $actual
         } finally {$engineLock.Dispose()}
     } finally {$adapterLock.Dispose()}
 }
-Export-ModuleMember -Function Get-SetupPin,Get-SetupProductionLocations,Assert-SetupArchive,Get-SetupTreeHash,Get-SetupCurrentVersion,Assert-SetupLegacyClean,Write-SetupEvent,Assert-SetupExecutionScope,Invoke-SetupTransaction,Get-SetupReconciledOutcome,Get-SetupInspectionWitness,Assert-SetupInspectionWitness
+Export-ModuleMember -Function Get-SetupPin,Get-SetupProductionLocations,Assert-SetupArchive,Get-SetupTreeHash,Get-SetupCurrentVersion,Write-SetupEvent,Assert-SetupExecutionScope,Invoke-SetupTransaction,Get-SetupReconciledOutcome,Get-SetupInspectionWitness,Assert-SetupInspectionWitness

@@ -1,9 +1,10 @@
 ﻿[CmdletBinding()]
-param([ValidateSet('All','Backend','Gui','Candidate')][string]$Mode='All',[ValidateSet('fresh','survival','native-failure','rollback','cancel')][string[]]$GuiScenarios=@('fresh','survival','native-failure','rollback','cancel'))
+param([ValidateSet('All','Backend','Gui','Candidate')][string]$Mode='All',[ValidateSet('fresh','survival','native-failure','rollback','cancel')][string[]]$GuiScenarios=@('fresh','survival','native-failure','rollback','cancel'),[string]$BuildDirectory='')
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
 $build=Join-Path $repo 'resolve-command-center/build/windows-setup-r24'
+if ($BuildDirectory) {$build=[IO.Path]::GetFullPath($BuildDirectory)}
 $closure=Join-Path $build 'fixture'
 Import-Module (Join-Path $closure 'SetupBackend.psm1') -Force -DisableNameChecking
 Import-Module (Join-Path $closure 'WorkflowTransaction.psm1') -DisableNameChecking
@@ -50,7 +51,7 @@ function Get-FixtureOfficial([string]$Archive) {
 $failure=$null
 try {
 if ($Mode -cin @('All','Backend')) {
-    $readback=Read-UpdateJson (Join-Path $repo '.trellis/tasks/10-30-tra-25-r22-setup-production-path/r24/official-source-readback.json')
+    $readback=Read-UpdateJson (Join-Path $closure 'OfficialMetadata.json')
     $official=@{id=$readback.releaseId;tag_name=$readback.tag;draft=$readback.draft;prerelease=$readback.prerelease;assets=$readback.assets}
     $archive=Join-Path $build 'candidate/Workflow.zip'
     $real=Assert-SetupArchive $archive (Join-Path $suiteRoot 'original-official-payload') -Fetch {$official}
