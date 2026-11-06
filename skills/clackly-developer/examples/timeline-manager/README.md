@@ -1,6 +1,6 @@
 # Timeline Manager — Extension Views B example
 
-Requires a Host with #8-B support (development candidate, not a published release).
+Requires a Host with the accepted #8-B implementation; this is not a published release.
 Package with:
 
 ```powershell

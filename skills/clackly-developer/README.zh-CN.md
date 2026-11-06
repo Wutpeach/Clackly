@@ -4,7 +4,25 @@
 实际使用扩展需要已支持 Extension V1 的 Clackly，以及可用的 Resolve Scripting API。
 仅开发和打包时，准备 Python 3 即可，无需运行 Clackly 源码。
 
-## 获取与加载
+## 从 Clackly Settings 安装
+
+使用包含此 Skill 的 Clackly 构建，进入 **Settings → 扩展**，找到
+**Clackly Developer Skill**，点击 **复制 Agent 安装提示词**，粘贴给本地 AI Agent。
+提示词包含随包目录的实际路径；Agent 会识别自身 Harness 的安装方式、导入完整目录
+并验证识别情况。同名副本先比较，覆盖前需要你的明确同意；按客户端要求新开会话。
+
+Clackly 不修改 Agent 配置。应用升级只更新随包源目录，已导入的副本不会自动同步；
+需要更新时重新复制提示词。云端或沙箱 Agent 可能看不到本机文件，可以点击
+**打开 Skill 文件夹**，手动提供完整目录或 ZIP。资源缺失或不可读时按钮不可用，
+请检查权限或重新安装包含 Skill 的构建，然后重新打开扩展页。
+
+此入口属于当前开发构建，不代表已有公开 Release 包含它。文档中的 #7 静态 Command UI /
+Dynamic Prepare，以及 #8 List / Detail / Form / Create / Edit / 多选 / Batch Action
+已在当前 Host 验收；交付前仍需核对目标 Host 支持。用法与完整示例见
+[Command UI](references/command-ui.md)、[Prepare](references/prepare.md) 和
+[Views](references/views.md)。
+
+## 单独获取与加载（备用）
 
 在 GitHub 仓库选择 **Code → Download ZIP**，解压后只保留
 `skills/clackly-developer/` 文件夹。不要求 Git clone 或构建整个项目。

@@ -1,4 +1,6 @@
-# Extension Views (#8-A accepted; #8-B development candidate, not a published release)
+# Extension Views — #8-A / #8-B accepted Host support
+
+Accepted in the current development Host, not a published release.
 
 Use Views for tools that remain open for browsing and actions. Use
 [Command UI](command-ui.md) for one-run input/results and [Prepare](prepare.md)

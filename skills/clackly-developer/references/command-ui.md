@@ -1,4 +1,4 @@
-# Command UI — #7-A development candidate
+# Command UI — #7-A accepted Host support
 
 Implemented in this source checkout; not a promise about the user's installed
 Host or a published release. Verify Host support before relying on it. Older

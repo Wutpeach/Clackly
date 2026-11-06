@@ -4,6 +4,7 @@ const cp = require('node:child_process');
 const crypto = require('node:crypto');
 const { listTree, assertNormalExistingDirectory, readWorkflowManifest } = require('../package-internal-beta');
 const { verifyPackage, assertProductPayload, PRODUCTION_INSTALLER_FILES } = require('../verify-package');
+const { SKILL_FILES } = require('../../electron/main/developerSkill');
 const { verifyZip } = require('../../electron/main/update/zip');
 const { VERSION, RELEASE_MANIFEST, NATIVE_POLICY, validateManifest, validateInventory, validateRuntime } = require('../../electron/main/update/release-manifest');
 
@@ -43,12 +44,21 @@ function validatePlugin(root, version) {
   const manifest = validateManifest(readJson(path.join(root, RELEASE_MANIFEST)), version);
   if (JSON.stringify(inventory(root)) !== JSON.stringify(manifest.files)) throw new Error('Plugin inventory/hash differs from release manifest');
   assertProductPayload(manifest.files.map((item) => item.path));
+  assertDeveloperSkill(manifest.files);
   const pkg = readJson(path.join(root, 'package.json'));
   const xml = readWorkflowManifest(path.join(root, 'manifest.xml'));
   if (pkg.name !== 'clackly' || pkg.version !== version || xml.version !== version
     || !/<FilePath>\s*workflow-plugin\/main\.js\s*<\/FilePath>/.test(fs.readFileSync(path.join(root, 'manifest.xml'), 'utf8'))) throw new Error('Plugin entry/version mismatch');
   validateRuntime(manifest, (name) => readJson(path.join(root, name)));
   return manifest;
+}
+
+function assertDeveloperSkill(files) {
+  for (const file of SKILL_FILES) {
+    if (!files.some((item) => item.path === 'skills/clackly-developer/' + file && item.size > 0)) {
+      throw new Error('Incomplete Developer Skill: ' + file);
+    }
+  }
 }
 
 function validateDependencies(plugin, lock) {
@@ -60,6 +70,7 @@ function validateDependencies(plugin, lock) {
 }
 
 const PACKAGED_SOURCE_FILES = ['dist/renderer/index.html', 'workflow-plugin/main.js', 'electron/main/main.js',
+  'electron/main/developerSkill.js', 'electron/main/preload.js',
   'localization/resources.mjs', 'electron/main/update/UpdateService.js', 'electron/main/update/InstallCoordinator.js',
   'electron/main/update/identity.js', 'electron/main/update/network.js', 'electron/main/update/storage.js',
   'electron/main/update/install/InnoInstaller.js',
@@ -85,6 +96,7 @@ async function verifyArchive(file, version) {
   // Download/restart callers retain verifyZip's production-only default.
   const result = await verifyZip(file, version, { allowNonpublishable: true });
   assertProductPayload(result.manifest.files.map((item) => item.path));
+  assertDeveloperSkill(result.manifest.files);
   return { manifest: result.manifest, sha256: digest(fs.readFileSync(file)), size: fs.statSync(file).size };
 }
 

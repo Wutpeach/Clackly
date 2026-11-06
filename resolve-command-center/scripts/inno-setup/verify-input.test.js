@@ -21,6 +21,10 @@ test('Setup accepts same-commit nonpublishable development input while retaining
     String(bytes).replaceAll('python/test/', 'python/cpython/')]);
   const manifestEntry = entries.find(([name]) => name === 'plugin/clackly-release.json');
   const manifest = JSON.parse(manifestEntry[1]);
+  for (const file of require('../../electron/main/developerSkill').SKILL_FILES) {
+    entries.push(['plugin/skills/clackly-developer/' + file,
+      fs.readFileSync(path.resolve(__dirname, '../../../skills/clackly-developer', file))]);
+  }
   const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
   manifest.files = entries.filter((entry) => entry !== manifestEntry).map(([name, bytes]) => ({
     path: name.slice(7), size: Buffer.byteLength(bytes), sha256: hash(bytes)

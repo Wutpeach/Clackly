@@ -1,5 +1,5 @@
 const path = require("node:path");
-const { app, BrowserWindow, clipboard, dialog, ipcMain } = require("electron");
+const { app, BrowserWindow, clipboard, dialog, ipcMain, shell } = require("electron");
 const {
   createPaletteWindow,
   createCommandWindow,
@@ -36,6 +36,7 @@ const { translate } = require("../../localization/resources");
 const { createClipboardImageReader } = require("./clipboard");
 const { createHostUpdateService } = require("./update/UpdateService");
 const { registerUpdateIpc } = require("./update/registerIpc");
+const { registerDeveloperSkillIpc } = require("./developerSkill");
 const { registerUpdateLifecycle } = require("./update/lifecycle");
 
 let paletteWindow = null;
@@ -158,6 +159,8 @@ function registerIpcHandlers() {
   const executeFromPalette = commandUiHost.registerIpc(ipcMain, () => paletteWindow);
   registerUpdateLifecycle({ app, updateService });
   registerUpdateIpc({ ipcMain, updateService, getSettingsWindow: () => settingsWindow });
+  registerDeveloperSkillIpc({ ipcMain, appRoot, clipboard, shell, getSettingsWindow: () => settingsWindow,
+    getLocale: () => core.localizationService.getSnapshot().effectiveLocale });
   updateService.start();
   ipcMain.handle("commands:list", () => core.listCommands());
   ipcMain.handle("commands:get-pins", () => core.preferences.getPinnedIds());

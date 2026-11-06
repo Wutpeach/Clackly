@@ -9,6 +9,11 @@ Turn the user's tool request into Python source, a versioned manifest, and an in
 `.clackly` ZIP. This folder is self-contained; no Clackly checkout, SDK, Node, Git
 commit, or application build is needed. Use Python 3 for the packaging helper.
 
+The #7 Command UI / Dynamic Prepare and #8 Views / Forms / Batch Actions
+contracts below are accepted in the current development Host. This does not
+mean they are available in a public Release or every installed Host. Verify
+target Host support before delivery.
+
 ## Develop
 
 1. Understand the requested outcome and whether it reads or modifies Resolve
@@ -24,7 +29,7 @@ commit, or application build is needed. Use Python 3 for the packaging helper.
    Host-rendered List/Detail/Navigation/ActionPanel in one ordinary window per
    extension, short-lived view/view_action callbacks and Manifest v2.
    Start from the [read-only Marker Browser](examples/marker-browser/manifest.json).
-   The #8-B development candidate adds same-window Create/Edit Forms using #7
+   The accepted #8-B implementation adds same-window Create/Edit Forms using #7
    fields, session-only draft guards, opt-in multiselect/batch results and refocus
    refresh. Read the same Views contract and [Timeline Manager](examples/timeline-manager/README.md)
    before authoring writes; use a disposable local project and native stable IDs.

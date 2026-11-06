@@ -60,7 +60,12 @@
       "!resolve/feasibility{,/**/*}",
       "!build{,/**/*}",
       "!release{,/**/*}",
-      "!resources/runtimes{,/**/*}"
+      "!resources/runtimes{,/**/*}",
+      {
+        "from": "../skills/clackly-developer",
+        "to": "skills/clackly-developer",
+        "filter": ["**/*", "!**/__pycache__{,/**/*}", "!**/*.{pyc,pyo}"]
+      }
     ],
     "extraResources": [
       {

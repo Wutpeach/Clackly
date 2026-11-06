@@ -5,7 +5,30 @@ Install this Skill in your **AI Agent**. Install the generated `.clackly` in
 installation and working Resolve Scripting API are needed for live use;
 Python 3 alone is enough to develop and package offline.
 
-## Get the Skill
+## Install from Clackly Settings
+
+In a Clackly build that bundles this Skill, open **Settings → Extensions**,
+find **Clackly Developer Skill**, click **Copy Agent installation prompt**, and
+paste it into your local AI Agent. The prompt contains the actual bundled
+folder path. The Agent checks its own Harness installation method, imports the
+complete folder, and verifies discovery. Existing copies are compared first;
+replacement requires your explicit approval. Start a new session if needed.
+
+Clackly does not edit Agent configuration. An application upgrade updates only
+the bundled source, not imported copies. Copy the prompt again to request an
+update. A cloud or sandboxed Agent may not see local files: use **Open Skill
+folder** and manually share the complete directory or a ZIP instead. Missing or
+unreadable resources disable the buttons; check permissions or reinstall a
+build that includes the Skill, then reopen Extensions.
+
+This route is part of the current development build, not a claim that a public
+Release already includes it. The documented #7 Command UI / Dynamic Prepare
+and #8 List / Detail / Form / Create / Edit / Batch Actions are accepted Host
+capabilities; check your target Host. See [Command UI](references/command-ui.md),
+[Prepare](references/prepare.md), and [Views](references/views.md) for the
+contracts and complete examples.
+
+## Get the Skill separately (fallback)
 
 Download the repository with GitHub's **Code → Download ZIP**, extract it, and
 keep only `skills/clackly-developer/`. No Git clone or Clackly source build is

@@ -20,6 +20,10 @@ function fixture() {
   for (const file of PRODUCTION_INSTALLER_FILES) {
     if (!data.entries.some(([name]) => name === 'plugin/' + file)) data.entries.push(['plugin/' + file, 'inert executor']);
   }
+  for (const file of require('../../electron/main/developerSkill').SKILL_FILES) {
+    data.entries.push(['plugin/skills/clackly-developer/' + file,
+      fs.readFileSync(path.resolve(__dirname, '../../../skills/clackly-developer', file))]);
+  }
   refreshInventory(data);
   return data;
 }
@@ -70,6 +74,15 @@ test('manifest rejects invalid provenance, version, runtime/native and false pub
   }
 });
 
+test('new Workflow artifacts reject a missing Skill dependency even with a refreshed hash inventory', async (t) => {
+  const root = workspace(t), data = fixture();
+  data.entries = data.entries.filter(([name]) => name !== 'plugin/skills/clackly-developer/references/views.md');
+  refreshInventory(data);
+  await assert.rejects(verifyArchive(archive(root, data), '0.2.0'), /Incomplete Developer Skill/);
+  const plugin = path.join(root, 'plugin'); writePlugin(plugin, data);
+  assert.throws(() => validatePlugin(plugin, '0.2.0'), /Incomplete Developer Skill/);
+});
+
 const contaminants = [
   'electron/main/update/UpdateService.test.js', 'electron/main/update/windows.integration.js',
   'electron/main/update/fixtures.js', 'electron/main/update/file-storage-fixture.js',
@@ -116,7 +129,7 @@ test('electron-builder selects runnable product sources and dependencies while o
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); fs.writeFileSync(path.join(root, file), 'inert');
   }
   const { FileMatcher, getNodeModuleFileMatcher } = require('app-builder-lib/out/fileMatcher');
-  const files = require('../../package.json').build.files;
+  const files = require('../../package.json').build.files.filter((item) => typeof item === 'string');
   const filter = new FileMatcher(root, root, (pattern) => pattern, files).createFilter();
   const selected = [];
   function visit(directory, select = filter) {

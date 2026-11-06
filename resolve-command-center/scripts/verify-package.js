@@ -5,6 +5,7 @@ const path = require("node:path");
 const { RuntimeLauncher } = require("../script-runtime/runtime/launcher");
 const { resolveRuntimeRoot } = require("../script-runtime/runtime/paths");
 const { listTree } = require("./package-internal-beta");
+const { SKILL_FILES } = require('../electron/main/developerSkill');
 
 // The fixed entrypoints and their adjacent module closure. Test/diagnostic tools
 // are deliberately outside the installed executor and source-staleness set.
@@ -29,6 +30,7 @@ function assertProductPayload(files) {
     const product = ["package.json", "manifest.xml", "clackly-release.json",
       "workflow-plugin/main.js", "scripts/resolve2ae_export.py", ...PRODUCTION_INSTALLER_FILES].includes(file)
       || ["node_modules/", "resources/runtimes/", "dist/renderer/"].some((prefix) => file.startsWith(prefix))
+      || file.startsWith('skills/clackly-developer/') && /[.](?:md|json|py)$/.test(file)
       || (["app", "bridge", "capability", "command-engine", "command-search", "command-usage", "config", "execution-adapter",
         "extensions", "feature-status", "feature-ui", "interaction", "localization", "preferences", "resolve", "resolve2ae_core", "script-runtime", "shortcut"]
         .includes(file.split("/")[0]) || file.startsWith("electron/main/") || file.startsWith("electron/shared/"))
@@ -39,6 +41,18 @@ function assertProductPayload(files) {
 
 function sha256(filePath) {
   return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+}
+
+function verifyDeveloperSkill(appRoot, packagedAppRoot) {
+  const source = path.resolve(appRoot, '../skills/clackly-developer');
+  const bundled = path.join(packagedAppRoot, 'skills/clackly-developer');
+  const files = listTree(source).map((item) => item.relativePath)
+    .filter((file) => !file.split('/').includes('__pycache__') && !/[.](?:pyc|pyo)$/.test(file)).sort();
+  for (const file of SKILL_FILES) assert(files.includes(file), 'Missing Developer Skill source: ' + file);
+  assert.deepEqual(listTree(bundled).map((item) => item.relativePath).sort(), files,
+    'Bundled Developer Skill inventory differs from source');
+  for (const file of files) assert.equal(sha256(path.join(bundled, file)), sha256(path.join(source, file)),
+    'Bundled Developer Skill differs from source: ' + file);
 }
 
 function inventory(directory, root = directory, result = []) {
@@ -126,6 +140,7 @@ async function verifyPackage({
   packageRoot = path.resolve(process.argv[2] || path.join(path.resolve(__dirname, ".."), "release", "win-unpacked"))
 } = {}) {
   assertProductPayload(listTree(path.join(packageRoot, "resources", "app")).map((item) => item.relativePath));
+  verifyDeveloperSkill(appRoot, path.join(packageRoot, 'resources/app'));
   assertProductPayload(listTree(path.join(packageRoot, "resources", "runtimes"))
     .map((item) => `resources/runtimes/${item.relativePath}`));
   const runtimeRoot = path.join(packageRoot, "resources", "runtimes");
@@ -215,4 +230,4 @@ if (require.main === module) {
 }
 
 module.exports = { assertApplicationSourceIdentity, productionPythonSourceInventory, verifyPackage,
-  assertProductPayload, PRODUCTION_INSTALLER_FILES };
+  assertProductPayload, PRODUCTION_INSTALLER_FILES, verifyDeveloperSkill };

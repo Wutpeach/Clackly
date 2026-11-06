@@ -1,5 +1,5 @@
 const path = require("node:path");
-const { app, BrowserWindow, clipboard, dialog, ipcMain } = require("electron");
+const { app, BrowserWindow, clipboard, dialog, ipcMain, shell } = require("electron");
 const {
   createPaletteWindow,
   createCommandWindow,
@@ -37,6 +37,7 @@ const { translate } = require("../localization/resources");
 const { createClipboardImageReader } = require("../electron/main/clipboard");
 const { createHostUpdateService } = require("../electron/main/update/UpdateService");
 const { registerUpdateIpc } = require("../electron/main/update/registerIpc");
+const { registerDeveloperSkillIpc } = require("../electron/main/developerSkill");
 const { registerUpdateLifecycle } = require("../electron/main/update/lifecycle");
 
 const PLUGIN_ID = "com.wutpeach.clackly";
@@ -239,6 +240,8 @@ function registerIpcHandlers() {
   const executeFromPalette = commandUiHost.registerIpc(ipcMain, () => paletteWindow);
   registerUpdateLifecycle({ app, updateService });
   registerUpdateIpc({ ipcMain, updateService, getSettingsWindow: () => settingsWindow });
+  registerDeveloperSkillIpc({ ipcMain, appRoot, clipboard, shell, getSettingsWindow: () => settingsWindow,
+    getLocale: () => core.localizationService.getSnapshot().effectiveLocale });
   updateService.start();
   ipcMain.handle("commands:list", () => core.listCommands());
   ipcMain.handle("commands:get-pins", () => core.preferences.getPinnedIds());

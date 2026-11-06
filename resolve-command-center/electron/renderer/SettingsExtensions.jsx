@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import SettingsDeveloperSkill from './SettingsDeveloperSkill';
 
 export default function SettingsExtensions({ api, t, extensions, selected, busy, onBusyChange, onSelect, onOperation, onChanged, Confirmation, children }) {
   const [preview, setPreview] = useState(null);
@@ -61,6 +62,7 @@ export default function SettingsExtensions({ api, t, extensions, selected, busy,
     </div> : <p className="settings-empty-copy">{t('extensions.empty')}</p>}
     {(working || feedback) && <p className={feedback?.error ? 'settings-feedback error' : 'settings-feedback'} role={feedback?.error ? 'alert' : 'status'}>
       {working ? t('extensions.working') : feedback.message}</p>}
+    {!selected && <SettingsDeveloperSkill api={api} t={t} />}
     {preview && <Confirmation title={t('extensions.operation.' + preview.operation)}
       description={t('extensions.risk')} onCancel={() => { if (!working) cancelPreview(); }} busy={working} t={t}
       content={<div className="extension-confirmation-content">

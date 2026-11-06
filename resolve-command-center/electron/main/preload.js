@@ -74,6 +74,9 @@ if (isDetachedInteractionPanel) {
   contextBridge.exposeInMainWorld("resolveCommandCenter", {
   listCommands: () => ipcRenderer.invoke("commands:list"),
   listExtensions: () => ipcRenderer.invoke("extensions:list"),
+  getDeveloperSkill: () => ipcRenderer.invoke("developer-skill:get"),
+  copyDeveloperSkillPrompt: () => ipcRenderer.invoke("developer-skill:copy"),
+  openDeveloperSkillFolder: () => ipcRenderer.invoke("developer-skill:open"),
   previewExtension: () => ipcRenderer.invoke("extensions:preview"),
   cancelExtensionPreview: (token) => ipcRenderer.invoke("extensions:cancel", token),
   installExtension: (token, operation) => ipcRenderer.invoke("extensions:install", token, operation),

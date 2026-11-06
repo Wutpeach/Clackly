@@ -1,4 +1,4 @@
-# Dynamic Prepare — #7-B development candidate
+# Dynamic Prepare — #7-B accepted Host support
 
 Implemented in this checkout, not a published release. Requires Command UI
 version 2. The accepted #7-A Host rejects version 2 at installation. Earlier
