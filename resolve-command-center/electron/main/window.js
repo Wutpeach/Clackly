@@ -1,4 +1,5 @@
 const path = require("node:path");
+const fs = require('node:fs');
 const { BrowserWindow, screen } = require("electron");
 const paletteGeometry = require("../shared/palette-geometry.json");
 const { translate } = require("../../localization/resources");
@@ -625,6 +626,40 @@ function createCommandWindow({ notification = false } = {}) {
   return window;
 }
 
+function createExtensionWindow(extensionId, title) {
+  const { app } = require('electron');
+  const preferences = path.join(app.getPath('userData'), 'extension-window-bounds.json');
+  let saved = {};
+  try { if (fs.statSync(preferences).size < 32768) saved = JSON.parse(fs.readFileSync(preferences, 'utf8')); } catch { /* Missing preferences use cursor display. */ }
+  const previous = saved?.[extensionId];
+  const valid = previous && ['x', 'y', 'width', 'height'].every((key) => Number.isFinite(previous[key]));
+  const area = (valid ? screen.getDisplayMatching(previous) : screen.getDisplayNearestPoint(screen.getCursorScreenPoint())).workArea;
+  const width = clamp(valid ? previous.width : 680, Math.min(480, area.width), area.width);
+  const height = clamp(valid ? previous.height : 520, Math.min(360, area.height), area.height);
+  const window = new BrowserWindow({
+    width, height, x: clamp(valid ? previous.x : area.x + (area.width - width) / 2, area.x, area.x + area.width - width),
+    y: clamp(valid ? previous.y : area.y + (area.height - height) / 2, area.y, area.y + area.height - height),
+    minWidth: Math.min(480, area.width), minHeight: Math.min(360, area.height), show: false, frame: false,
+    transparent: false, backgroundColor: '#151619', roundedCorners: true, thickFrame: true,
+    resizable: true, maximizable: true, minimizable: true, fullscreenable: false, autoHideMenuBar: true,
+    alwaysOnTop: false, skipTaskbar: false, title: 'Clackly — ' + title,
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false }
+  });
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', (event) => event.preventDefault());
+  window.on('close', () => {
+    try {
+      let latest = {};
+      try { latest = JSON.parse(fs.readFileSync(preferences, 'utf8')); } catch { /* First close. */ }
+      const entries = Object.entries(latest || {}).filter(([id]) => id !== extensionId).slice(-99);
+      fs.mkdirSync(path.dirname(preferences), { recursive: true });
+      fs.writeFileSync(preferences, JSON.stringify(Object.fromEntries([...entries, [extensionId, window.getNormalBounds()]])));
+    } catch { /* Preferences cannot prevent closing a view session. */ }
+  });
+  loadRenderer(window, 'extension-view');
+  return window;
+}
+
 function showPaletteWindow(window, options = {}) {
   if (!window || window.isDestroyed()) {
     return;
@@ -697,6 +732,7 @@ module.exports = {
   createPaletteWindow,
   createSettingsWindow,
   createCommandWindow,
+  createExtensionWindow,
   openSettingsWindow,
   showPaletteWindow,
   hidePaletteWindow,

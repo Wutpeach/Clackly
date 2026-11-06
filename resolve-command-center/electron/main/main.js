@@ -3,6 +3,7 @@ const { app, BrowserWindow, clipboard, dialog, ipcMain } = require("electron");
 const {
   createPaletteWindow,
   createCommandWindow,
+  createExtensionWindow,
   createDetachedInteractionPanelWindow,
   closeDetachedInteractionPanel,
   openDetachedInteractionPanel,
@@ -27,6 +28,7 @@ const { createBridgeExecutionAdapter } = require("../../execution-adapter/bridge
 const { registerFeatureUiIpc } = require("../../feature-ui/registerIpc");
 const { registerExtensionIpc } = require("../../extensions/registerIpc");
 const { createCommandUiHost } = require('../../extensions/CommandUiHost');
+const { createExtensionViewHost } = require('../../extensions/ExtensionViewHost');
 const { createClacklyCore } = require("../../app/createClacklyCore");
 const { getElectronSystemLanguages } = require("../../localization/LocalizationService");
 const { registerLocalizationIpc } = require("../../localization/registerIpc");
@@ -40,6 +42,7 @@ let paletteWindow = null;
 let settingsWindow = null;
 let updateService = null;
 let commandUiHost = null;
+let extensionViewHost = null;
 const paletteHostPolicy = selectPaletteHostPolicy({
   host: PALETTE_HOST.STANDALONE,
   platform: process.platform
@@ -147,8 +150,11 @@ function togglePalette() {
 
 function registerIpcHandlers() {
   updateService = createHostUpdateService({ app, appRoot });
+  extensionViewHost = createExtensionViewHost({ extensions: core.extensions, createWindow: createExtensionWindow,
+    hidePalette, clipboard, recordUsage: core.recordViewOpened });
+  extensionViewHost.registerIpc(ipcMain);
   commandUiHost = createCommandUiHost({ extensions: core.extensions, execute: executeStandaloneCommand,
-    createWindow: createCommandWindow, hidePalette, showPalette, dialog, clipboard });
+    createWindow: createCommandWindow, hidePalette, showPalette, dialog, clipboard, openView: extensionViewHost.start });
   const executeFromPalette = commandUiHost.registerIpc(ipcMain, () => paletteWindow);
   registerUpdateLifecycle({ app, updateService });
   registerUpdateIpc({ ipcMain, updateService, getSettingsWindow: () => settingsWindow });
@@ -227,6 +233,7 @@ if (!hasSingleInstanceLock) {
 
   app.on("will-quit", () => {
     commandUiHost?.dispose();
+    extensionViewHost?.dispose();
     void updateService?.dispose();
     const { globalShortcut } = require("electron");
     globalShortcut.unregisterAll();

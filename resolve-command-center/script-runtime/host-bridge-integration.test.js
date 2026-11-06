@@ -19,7 +19,7 @@ function fixture(t) {
   fs.writeFileSync(path.join(root, "scripts", "resolve2ae_export.py"), [
     "import os",
     "def execute(context):",
-    "    assert sorted(name for name in dir(context) if not name.startswith('_')) == ['command_id', 'config', 'input', 'logger', 'project', 'resolve', 'timeline']",
+    "    assert sorted(name for name in dir(context) if not name.startswith('_')) == ['command_id', 'config', 'input', 'logger', 'phase', 'project', 'resolve', 'timeline', 'view']",
     "    if context.config.get('lazy'): return {'lazy': True}",
     "    if context.config.get('fail'): raise ValueError('business failure')",
     "    return {'selected': context.resolve.selected, 'library': os.environ['RESOLVE_SCRIPT_LIB']}"

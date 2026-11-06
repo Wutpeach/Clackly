@@ -1,11 +1,11 @@
 ---
 name: clackly-developer
-description: Build or update DaVinci Resolve tools as Clackly Python Extension V1 packages. Use for requests to create Clackly extensions, commands, manifests, persistent settings, or installable .clackly files.
+description: Build or update DaVinci Resolve tools as Clackly Python Extension packages. Use for requests to create Clackly extensions, commands, views, manifests, persistent settings, or installable .clackly files.
 ---
 
 # Clackly Developer
 
-Turn the user's tool request into Python source, a V1 manifest, and an installable
+Turn the user's tool request into Python source, a versioned manifest, and an installable
 `.clackly` ZIP. This folder is self-contained; no Clackly checkout, SDK, Node, Git
 commit, or application build is needed. Use Python 3 for the packaging helper.
 
@@ -15,14 +15,19 @@ commit, or application build is needed. Use Python 3 for the packaging helper.
    data. Ask only when a missing decision changes the tool's behavior or safety.
    Check feasibility against [the V1 contract](references/extension-v1.md) before
    promising features. Python commands and persistent declarative settings are
-   supported. The #7-A development candidate also supports static one-run input,
+   supported. The accepted #7-A implementation also supports static one-run input,
    confirmation and structured results; read [Command UI](references/command-ui.md)
    when needed and check that the target Host includes it. For dynamic choices
-   and defaults, read [Dynamic Prepare](references/prepare.md): the #7-B candidate
-   adds one-shot prepare(context), not dynamic fields or persistent RPC. Custom UI, Lua
+   and defaults, read [Dynamic Prepare](references/prepare.md): the accepted #7-B implementation
+   adds one-shot prepare(context), not dynamic fields or persistent RPC. For a
+   continuously open tool, read [Extension Views](references/views.md): #8-A adds
+   Host-rendered List/Detail/Navigation/ActionPanel in one ordinary window per
+   extension, short-lived view/view_action callbacks and Manifest v2.
+   Start from the [read-only Marker Browser](examples/marker-browser/manifest.json).
+   Check target Host support. Custom UI, Lua
    extensions and dependency installers are not supported. Ordinary Resolve Python/Lua Scripts are a separate existing feature,
    not this extension format.
-2. Read that contract before authoring the manifest and `execute(context)`. Start
+2. Read the relevant contract before authoring the manifest and callbacks. Start
    from [Project Inspector](examples/inspect-project/manifest.json) and its
    [read-only entry](examples/inspect-project/inspect.py) when useful. Copy into a
    separate, clean package-source folder. Choose your own stable Extension ID;
@@ -33,7 +38,7 @@ commit, or application build is needed. Use Python 3 for the packaging helper.
    operations. Clackly supplies the connection; do not import Clackly internals
    or bootstrap another bridge. Verify Resolve method names against the user's
    available Blackmagic Scripting API documentation when uncertain; the Skill
-   is not a complete Resolve API reference. Keep host calls in `execute`, not
+   is not a complete Resolve API reference. Keep host calls in callbacks, not
    module import. For long-lived settings use the extension-wide `configSchema`
    and `context.config`; no React UI or separate configuration file is needed.
 4. Keep operations within one 10-second execution and the output bounds in the
@@ -58,7 +63,7 @@ commit, or application build is needed. Use Python 3 for the packaging helper.
 
   Output must be outside the source folder and must not already exist. The
   helper checks basic identity, exact entry paths, Python syntax and top-level
-  `execute`, then archives sources and resources. It never imports or executes
+  execute (or view for Open View), then archives sources and resources. It never imports or executes
   extension code. It is a preflight, not a copy of Clackly's authoritative
   installer validation; installation can still reject a package.
 - If Clackly validation is available in an authorized isolated environment,

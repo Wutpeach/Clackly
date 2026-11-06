@@ -49,7 +49,13 @@ Command 可声明 `ui: {version: 1, inputs: {...}, confirm: {message: "..."}}`�
 
 Prepare 与正式 Execute 各使用一次独立的短生命周期 worker，分别限时 10 秒；填表期间不运行 worker。Loading 可退出等待，迟到响应丢弃；Failed/Timeout 可重试，Empty 的必填无候选字段不能执行。手动刷新保留合法编辑，失效选择清空并提示，确认重置。Prepare 旨在只读查询，但不是 OS 沙箱。
 
-本次候选绑定活动 revision、命令与配置，提交校验本次选项；配置变化（含另一 Host 写盘）、Replace、禁用或卸载会拒绝旧输入。Execute 仍须重新查询 Resolve 的项目/目标稳定 ID，目标消失或项目切换时明确失败，不能改选其他对象。此能力尚待 #7-B 用户产品验收。
+本次候选绑定活动 revision、命令与配置，提交校验本次选项；配置变化（含另一 Host 写盘）、Replace、禁用或卸载会拒绝旧输入。Execute 仍须重新查询 Resolve 的项目/目标稳定 ID，目标消失或项目切换时明确失败，不能改选其他对象。#7-A/B 已于 2026-11-06 通过用户产品验收，未发布 Release。
+
+## #8-A Extension Views（开发候选，未发布）
+
+含 Open View Command 的包使用 schemaVersion:2，命令声明 view:{version:1}，不与 ui 混用；旧 Host 拒绝新版 Manifest。Host 以普通、可调整大小、不默认置顶的独立窗口管理 List/Detail/Navigation/ActionPanel。每个 Extension 每个 Host 最多一个活动窗口；再次启动只恢复聚焦，关闭清理会话，最小化保留状态。不同扩展可以并行，最多8个窗口。普通 #7 Command 继续使用原路径。
+
+Python 在 view(context)/view_action(context) 中提供有限视图数据和 Action 反馈，单次10秒，不常驻。搜索/筛选不调用 Python。revision/config/session/page version/选中身份绑定防止旧数据和重复提交。完整协议和限制见 [Extension Views](../../skills/clackly-developer/references/views.md)，示例为 [只读标记浏览器](../../skills/clackly-developer/examples/marker-browser/manifest.json)。本轮不提供编辑/草稿或其他 #8-B 能力；Python 仍无 OS 沙箱。真实 Workflow 部署和用户产品验收另行授权与记录。
 
 验证：node --test extensions/ExtensionManager.test.js extensions/registerIpc.test.js；node --test extensions/python.integration.js extensions/transaction.integration.js extensions/ui.integration.js。UI 集成使用真实 Core、文件系统与 Python，浏览器替代 Electron transport/文件选择器，不能代替真实 Workflow 菜单、native focus 和 Resolve 产品验收。未经授权不替换用户当前安装。
 

@@ -21,7 +21,7 @@ function safePath(name) {
   return name;
 }
 function validateManifest(value) {
-  if (!plain(value) || value.schemaVersion !== 1 || !ID.test(value.id || '') || value.id.length > 80
+  if (!plain(value) || ![1, 2].includes(value.schemaVersion) || !ID.test(value.id || '') || value.id.length > 80
     || ['constructor', 'prototype'].includes(value.id)
     || !semver.valid(value.version) || value.version !== semver.valid(value.version)
     || typeof value.name !== 'string' || !value.name.trim() || value.name.length > 120
@@ -45,8 +45,13 @@ function validateManifest(value) {
     safePath(command.entry);
     if (!command.entry.endsWith('.py')) throw fail('EXTENSION_INVALID_MANIFEST', 'V1 仅支持 Python .py 入口。');
     ids.add(command.id);
+    if (command.view !== undefined && (value.schemaVersion !== 2 || !plain(command.view)
+      || Object.keys(command.view).join(',') !== 'version' || command.view.version !== 1 || command.ui !== undefined)) {
+      throw fail('EXTENSION_INVALID_MANIFEST', 'Open View 需要 schemaVersion 2、view.version 1，且不能同时声明 Command UI。');
+    }
     return { id: command.id, name: command.name, description: command.description || '',
       entry: command.entry, keywords: command.keywords || [],
+      ...(command.view === undefined ? {} : { view: { version: 1 } }),
       ...(command.ui === undefined ? {} : { ui: validateCommandUi(command.ui) }) };
   });
   const schema = value.configSchema === undefined ? {} : value.configSchema;
@@ -57,7 +62,7 @@ function validateManifest(value) {
     Object.fromEntries(['type', 'label', 'required', 'options'].filter((key) => field[key] !== undefined)
       .map((key) => [key, field[key]]))]));
   for (const [key, field] of Object.entries(configSchema)) field.label ||= key;
-  return { schemaVersion: 1, id: value.id, name: value.name, version: value.version,
+  return { schemaVersion: value.schemaVersion, id: value.id, name: value.name, version: value.version,
     description: value.description || '', source: value.source || '', commands, configSchema };
 }
 

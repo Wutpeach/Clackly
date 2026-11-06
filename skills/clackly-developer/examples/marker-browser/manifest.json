@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 2,
+  "id": "clackly.demo.marker-browser",
+  "name": "标记浏览器",
+  "version": "1.0.0",
+  "description": "只读浏览当前时间线标记，搜索、筛选、查看详情并复制。",
+  "commands": [{"id": "open", "name": "打开标记浏览器", "entry": "markers.py", "view": {"version": 1}, "keywords": ["marker", "标记", "浏览"]}]
+}

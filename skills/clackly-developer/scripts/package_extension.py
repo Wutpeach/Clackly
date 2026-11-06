@@ -38,8 +38,8 @@ def package(source, output):
 
     manifest = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
     check_identity(manifest, "Extension")
-    if type(manifest.get("schemaVersion")) is not int or manifest["schemaVersion"] != 1:
-        raise ValueError("schemaVersion must be 1")
+    if type(manifest.get("schemaVersion")) is not int or manifest["schemaVersion"] not in (1, 2):
+        raise ValueError("schemaVersion must be 1 or 2")
     if not isinstance(manifest.get("version"), str) or not manifest["version"]:
         raise ValueError("version must be a canonical SemVer string, e.g. 1.0.0")
     commands = manifest.get("commands")
@@ -91,9 +91,12 @@ def package(source, output):
                 or any(part in {"", ".", ".."} for part in entry.split("/"))
                 or entry not in trees):
             raise ValueError(f"Missing or invalid exact Python entry: {entry}")
+        callback = "view" if "view" in command else "execute"
+        if "view" in command and (manifest["schemaVersion"] != 2 or command["view"] != {"version": 1} or "ui" in command):
+            raise ValueError("Open View requires schemaVersion 2 and view.version 1, without ui")
         if not any(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-                   and node.name == "execute" for node in trees[entry].body):
-            raise ValueError(f"{entry} must define top-level execute(context)")
+                   and node.name == callback for node in trees[entry].body):
+            raise ValueError(f"{entry} must define top-level {callback}(context)")
         if command.get("ui", {}).get("prepare") is True and not any(
                 isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
                 and node.name == "prepare" for node in trees[entry].body):

@@ -229,6 +229,7 @@ function createClacklyCore({
     featureStatusManager,
     featureCatalog,
     extensions,
+    recordViewOpened: (id) => { if (extensions.describeCommand(id)?.view) usageHistory.record(id); },
     listCommands,
     searchCommands,
     executeCommand,

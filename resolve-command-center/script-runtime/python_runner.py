@@ -37,11 +37,12 @@ class ScriptLogger:
 
 
 class ScriptContext:
-    def __init__(self, command_id: str, config: dict[str, Any], logger: ScriptLogger, adapter: Any, input_values=None, phase='execute') -> None:
+    def __init__(self, command_id: str, config: dict[str, Any], logger: ScriptLogger, adapter: Any, input_values=None, phase='execute', view=None) -> None:
         self._command_id = command_id
         self.config = dict(config)
         self.input = dict(input_values or {})
         self.phase = phase
+        self.view = dict(view or {})
         self.logger = logger
         self._adapter = adapter
         self._resolve = None
@@ -98,6 +99,7 @@ def run_script(
     adapter: Any = resolve_adapter,
     input_values=None,
     phase='execute',
+    view=None,
 ) -> dict[str, Any]:
     logs: list[dict[str, str]] = []
     stdout = io.StringIO()
@@ -107,9 +109,11 @@ def run_script(
             raise TypeError("Script Command id must be a non-empty string")
         if input_values is not None and not isinstance(input_values, dict):
             raise TypeError('input must be an object')
-        if phase not in ('prepare', 'execute'):
+        if phase not in ('prepare', 'execute', 'view', 'view_action'):
             raise ValueError('Unsupported script phase')
-        context = ScriptContext(command_id, config, ScriptLogger(logs), adapter, input_values, phase)
+        if view is not None and (not isinstance(view, dict) or len(json.dumps(view)) > 8192):
+            raise ValueError('Invalid view context')
+        context = ScriptContext(command_id, config, ScriptLogger(logs), adapter, input_values, phase, view)
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             result = _load_execute(pathlib.Path(entry_path), phase)(context)
             if inspect.isawaitable(result):

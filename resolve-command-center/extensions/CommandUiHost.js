@@ -1,7 +1,7 @@
 const { validateInput, parseUiResult, refreshValues } = require('./commandUi');
 
 // Both Electron hosts own the session, revision and execution; renderer sends input only.
-function createCommandUiHost({ extensions, execute, createWindow, hidePalette, showPalette, dialog, clipboard }) {
+function createCommandUiHost({ extensions, execute, createWindow, hidePalette, showPalette, dialog, clipboard, openView }) {
   let session = null;
   let notification = null;
   let notificationTimer = null;
@@ -96,6 +96,10 @@ function createCommandUiHost({ extensions, execute, createWindow, hidePalette, s
     }
   }
   async function start(id) {
+    if (extensions.describeCommand(id)?.view) {
+      if (!openView) throw new Error('Extension Views are unavailable in this Host.');
+      return openView(id);
+    }
     if (session) { if (session.window) open(); return { dialog: true }; }
     const command = extensions.describeCommand(id);
     if (!command) { const result = await execute(id); hidePalette(); return result; }

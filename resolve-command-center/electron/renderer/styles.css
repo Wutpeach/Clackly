@@ -1654,7 +1654,7 @@ kbd {
 
 .settings-picker-control button:focus-visible,
 .secondary-button:focus-visible,
-:is(.settings-actions, .settings-dialog) .primary-button:focus-visible {
+:is(.settings-actions, .settings-dialog, .view-confirmation) .primary-button:focus-visible {
   outline: 1px solid var(--settings-focus);
   outline-offset: -2px;
 }
@@ -1666,7 +1666,7 @@ kbd {
 
 .settings-picker-control button:disabled,
 .secondary-button:disabled,
-:is(.settings-actions, .settings-dialog) .primary-button:disabled {
+:is(.settings-actions, .settings-dialog, .view-confirmation) .primary-button:disabled {
   opacity: 0.42;
 }
 
@@ -1704,7 +1704,7 @@ kbd {
   color: var(--settings-status-warning);
 }
 
-:is(.settings-actions, .settings-dialog) .primary-button {
+:is(.settings-actions, .settings-dialog, .view-confirmation) .primary-button {
   min-height: 26px;
   padding: 0 10px;
   border-color: var(--color-accent);
@@ -1718,7 +1718,7 @@ kbd {
   transition: background var(--motion-fast), color var(--motion-fast);
 }
 
-:is(.settings-actions, .settings-dialog) .primary-button:hover:not(:disabled) {
+:is(.settings-actions, .settings-dialog, .view-confirmation) .primary-button:hover:not(:disabled) {
   background: var(--color-accent-hover);
 }
 
@@ -1784,7 +1784,7 @@ kbd {
   .settings-picker-control button,
   .secondary-button,
   .settings-actions button,
-  :is(.settings-actions, .settings-dialog) .primary-button {
+  :is(.settings-actions, .settings-dialog, .view-confirmation) .primary-button {
     transition-duration: 0ms;
   }
 

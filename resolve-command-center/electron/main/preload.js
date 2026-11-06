@@ -23,6 +23,27 @@ if (isDetachedInteractionPanel) {
       return () => presentationListeners.delete(callback);
     }
   });
+} else if (rendererView === 'extension-view') {
+  contextBridge.exposeInMainWorld('resolveExtensionView', {
+    get: () => ipcRenderer.invoke('extension-view:get'),
+    select: (request) => ipcRenderer.invoke('extension-view:select', request),
+    action: (request) => ipcRenderer.invoke('extension-view:action', request),
+    refresh: () => ipcRenderer.invoke('extension-view:refresh'),
+    back: () => ipcRenderer.invoke('extension-view:back'),
+    cancelConfirmation: () => ipcRenderer.invoke('extension-view:cancel-confirmation'),
+    window: (operation) => ipcRenderer.send('extension-view:window', operation),
+    onChanged: (callback) => {
+      const listener = (_event, value) => callback(value); ipcRenderer.on('extension-view:changed', listener);
+      return () => ipcRenderer.removeListener('extension-view:changed', listener);
+    }
+  });
+  contextBridge.exposeInMainWorld('resolveCommandCenter', {
+    getLocalizationSnapshot: () => ipcRenderer.invoke('localization:get-snapshot'),
+    onLocalizationChanged: (callback) => {
+      const listener = (_event, value) => callback(value); ipcRenderer.on('localization:changed', listener);
+      return () => ipcRenderer.removeListener('localization:changed', listener);
+    }
+  });
 } else if (rendererView === 'command' || rendererView === 'command-notification') {
   contextBridge.exposeInMainWorld('resolveCommandUi', {
     get: () => ipcRenderer.invoke('command-ui:get'),
