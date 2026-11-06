@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "example.timeline-report-cn",
+  "name": "时间线只读摘要",
+  "version": "1.0.0",
+  "description": "查询当前项目的时间线并生成只读摘要。",
+  "source": "独立扩展作者示例",
+  "commands": [{
+    "id": "report", "name": "生成时间线摘要", "description": "选择时间线并查看摘要，不修改项目。",
+    "entry": "report.py", "keywords": ["时间线", "摘要", "timeline"],
+    "ui": {"version": 2, "prepare": true, "inputs": {
+      "timeline": {"type": "select", "label": "时间线", "dynamic": true, "required": true},
+      "title": {"type": "string", "label": "报告标题", "placeholder": "可选"}
+    }}
+  }]
+}

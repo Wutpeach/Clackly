@@ -1,4 +1,4 @@
-const { validateInput, parseUiResult } = require('./commandUi');
+const { validateInput, parseUiResult, refreshValues } = require('./commandUi');
 
 // Both Electron hosts own the session, revision and execution; renderer sends input only.
 function createCommandUiHost({ extensions, execute, createWindow, hidePalette, showPalette, dialog, clipboard }) {
@@ -6,6 +6,7 @@ function createCommandUiHost({ extensions, execute, createWindow, hidePalette, s
   let notification = null;
   let notificationTimer = null;
   let notificationState = null;
+  let serial = 0;
   const trusted = (event, window) => window && !window.isDestroyed()
     && event?.sender === window.webContents && event.senderFrame === window.webContents.mainFrame;
   function publish() {
@@ -13,16 +14,16 @@ function createCommandUiHost({ extensions, execute, createWindow, hidePalette, s
   }
   function snapshot() {
     if (!session) return null;
-    const { command, phase, result, error } = session;
+    const { command, phase, result, error, values, inputVersion, prepareState, prepareBlocked, cleared, prepareMessage } = session;
     return { command: { name: command.name, description: command.description, extensionName: command.extensionName, ui: command.ui },
-      phase, result, error };
+      phase, result, error, values, inputVersion, prepareState, prepareBlocked, cleared, prepareMessage, serial: ++serial };
   }
   function open() {
     if (session.window && !session.window.isDestroyed()) { session.window.show(); session.window.focus(); return; }
     const current = session;
     current.window = createWindow();
     current.window.on('close', (event) => { if (current.phase === 'running') event.preventDefault(); });
-    current.window.once('closed', () => { if (session === current) session = null; });
+    current.window.once('closed', () => { extensions.discardPrepare?.(current.prepareToken); if (session === current) session = null; });
     current.window.once('ready-to-show', () => {
       if (session !== current) return;
       publish(); current.window.show(); current.window.focus();
@@ -46,7 +47,8 @@ function createCommandUiHost({ extensions, execute, createWindow, hidePalette, s
     const current = session;
     current.phase = 'running'; publish();
     try {
-      const receipt = await execute(current.command.id, { input, confirmed, revision: current.command.revision });
+      const receipt = await execute(current.command.id, { input, confirmed, revision: current.command.revision,
+        ...(current.command.ui?.prepare ? { prepareToken: current.prepareToken } : {}) });
       if (session !== current) return receipt;
       const result = parseUiResult(receipt?.result);
       const meaningful = result && (result.message.length > 60 || /[\r\n]/.test(result.message)
@@ -69,12 +71,36 @@ function createCommandUiHost({ extensions, execute, createWindow, hidePalette, s
       open(); publish();
     }
   }
+  async function prepare(values = {}, edited = []) {
+    const current = session;
+    const generation = (current.generation || 0) + 1; current.generation = generation;
+    extensions.discardPrepare?.(current.prepareToken); current.prepareToken = null;
+    current.phase = 'preparing'; current.prepareState = 'loading'; current.error = null; publish();
+    try {
+      const prepared = await extensions.prepare(current.command.id, current.command.revision);
+      if (session !== current || current.generation !== generation) { extensions.discardPrepare?.(prepared.token); return; }
+      current.prepareToken = prepared.token;
+      const merged = refreshValues(prepared.ui.inputs, values, edited);
+      current.values = merged.values; current.cleared = merged.cleared;
+      current.inputVersion = generation; current.command = { ...current.command, ui: prepared.ui };
+      current.prepareMessage = prepared.message;
+      current.prepareState = prepared.empty ? 'empty' : 'ready';
+      current.prepareBlocked = prepared.blocked;
+      current.phase = 'input'; publish();
+    } catch (error) {
+      if (session !== current || current.generation !== generation) return;
+      current.phase = 'prepare-error';
+      current.prepareState = /timeout|timed.out/i.test(error.code + ' ' + error.message) ? 'timeout' : 'failed';
+      current.error = { reason: error.userMessage || null, diagnostic: String(error.message || error).slice(0, 32768) };
+      publish();
+    }
+  }
   async function start(id) {
     if (session) { if (session.window) open(); return { dialog: true }; }
     const command = extensions.describeCommand(id);
     if (!command) { const result = await execute(id); hidePalette(); return result; }
     session = { command, phase: command.ui ? 'input' : 'running', window: null, result: null, error: null };
-    if (command.ui) { open(); return { dialog: true }; }
+    if (command.ui) { open(); if (command.ui.prepare) void prepare(); return { dialog: true }; }
     return run({}, false);
   }
   function registerIpc(ipcMain, getPaletteWindow) {
@@ -84,17 +110,26 @@ function createCommandUiHost({ extensions, execute, createWindow, hidePalette, s
     });
     ipcMain.handle('command-ui:submit', async (event, values, confirmed) => {
       if (!trusted(event, session?.window) || session.phase !== 'input') throw new Error('Command UI request rejected');
+      if (session.prepareBlocked) throw new Error('No available required options. Refresh before running.');
       const input = validateInput(session.command.ui.inputs, values);
       if (session.command.ui.confirm && confirmed !== true) throw new Error('Please confirm this operation.');
       await run(input, confirmed === true);
     });
+    ipcMain.handle('command-ui:refresh', async (event, values, edited) => {
+      if (!trusted(event, session?.window) || !session.command.ui?.prepare
+        || !['input', 'prepare-error'].includes(session.phase)) throw new Error('Command UI request rejected');
+      // Validate bounded renderer data before starting another worker.
+      refreshValues(session.command.ui.inputs, values, edited);
+      await prepare(values, edited);
+    });
     ipcMain.handle('command-ui:pick', async (event, key) => {
       if (!trusted(event, session?.window) || session.phase !== 'input') throw new Error('Command UI request rejected');
       const current = session;
+      const generation = current.generation;
       const type = current.command.ui.inputs[key]?.type;
       if (!['path', 'folder'].includes(type)) throw new Error('Invalid picker field');
       const result = await dialog.showOpenDialog(current.window, { properties: [type === 'folder' ? 'openDirectory' : 'openFile'] });
-      return session === current && current.phase === 'input' && !result.canceled ? result.filePaths[0] || null : null;
+      return session === current && current.generation === generation && current.phase === 'input' && !result.canceled ? result.filePaths[0] || null : null;
     });
     ipcMain.handle('command-ui:copy', (event) => {
       if (!trusted(event, session?.window) || !['result', 'error'].includes(session.phase)) throw new Error('Command UI request rejected');
@@ -105,7 +140,7 @@ function createCommandUiHost({ extensions, execute, createWindow, hidePalette, s
     });
     ipcMain.on('command-ui:close', (event) => {
       if (!trusted(event, session?.window) || session.phase === 'running') return;
-      const cancelled = session.phase === 'input';
+      const cancelled = ['input', 'preparing', 'prepare-error'].includes(session.phase);
       session.window.close();
       if (cancelled) showPalette();
     });
@@ -117,6 +152,7 @@ function createCommandUiHost({ extensions, execute, createWindow, hidePalette, s
   return { start, registerIpc, focus: () => { if (!session) return false; if (session.window) open(); return true; },
     dispose: () => {
       const current = session; session = null; clearTimeout(notificationTimer);
+      extensions.discardPrepare?.(current?.prepareToken);
       if (current?.window && !current.window.isDestroyed()) current.window.destroy();
       if (notification && !notification.isDestroyed()) notification.destroy();
     } };

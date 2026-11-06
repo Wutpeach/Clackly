@@ -3,11 +3,11 @@ const { CAPABILITY } = require('./ExtensionManager');
 
 // ExtensionManager supplies the verified root; renderers can execute command IDs only.
 function createExtensionPythonExecutor(runtimeManager) {
-  return async ({ root, entry, commandId, config, input = {}, bytecodeCacheRoot }) => {
+  return async ({ root, entry, commandId, config, input = {}, bytecodeCacheRoot, phase = 'execute' }) => {
     try {
       const { resolution, selectedBootstrap, readiness } = await runtimeManager.resolveAndProbe({ runtime: 'python', capabilityId: CAPABILITY });
       const launched = await runtimeManager.launcher.execute({ resolution, bootstrapPath: selectedBootstrap, bytecodeCacheRoot,
-        request: { operation: 'script-execute', scriptRoot: root, entry, commandId, config, input,
+        request: { operation: 'script-execute', scriptRoot: root, entry, commandId, config, input, phase,
           ...(readiness.bridge ? { bridge: readiness.bridge } : {}) } });
       const script = launched?.response?.script;
       if (!script || typeof script.ok !== 'boolean' || !Array.isArray(script.logs)) throw fail('EXTENSION_RUNTIME_PROTOCOL', 'Python 返回无效结果。');

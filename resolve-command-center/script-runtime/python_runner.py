@@ -37,10 +37,11 @@ class ScriptLogger:
 
 
 class ScriptContext:
-    def __init__(self, command_id: str, config: dict[str, Any], logger: ScriptLogger, adapter: Any, input_values=None) -> None:
+    def __init__(self, command_id: str, config: dict[str, Any], logger: ScriptLogger, adapter: Any, input_values=None, phase='execute') -> None:
         self._command_id = command_id
         self.config = dict(config)
         self.input = dict(input_values or {})
+        self.phase = phase
         self.logger = logger
         self._adapter = adapter
         self._resolve = None
@@ -70,15 +71,15 @@ class ScriptContext:
         return self._get_project_timeline()[1]
 
 
-def _load_execute(entry_path: pathlib.Path):
+def _load_execute(entry_path: pathlib.Path, phase='execute'):
     spec = importlib.util.spec_from_file_location("clackly_feature", entry_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"Could not load script: {entry_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    execute = getattr(module, "execute", None)
+    execute = getattr(module, phase, None)
     if not callable(execute):
-        raise TypeError("Script must export a callable execute(context)")
+        raise TypeError(f"Script must export a callable {phase}(context)")
     return execute
 
 
@@ -96,6 +97,7 @@ def run_script(
     config: dict[str, Any],
     adapter: Any = resolve_adapter,
     input_values=None,
+    phase='execute',
 ) -> dict[str, Any]:
     logs: list[dict[str, str]] = []
     stdout = io.StringIO()
@@ -105,9 +107,11 @@ def run_script(
             raise TypeError("Script Command id must be a non-empty string")
         if input_values is not None and not isinstance(input_values, dict):
             raise TypeError('input must be an object')
-        context = ScriptContext(command_id, config, ScriptLogger(logs), adapter, input_values)
+        if phase not in ('prepare', 'execute'):
+            raise ValueError('Unsupported script phase')
+        context = ScriptContext(command_id, config, ScriptLogger(logs), adapter, input_values, phase)
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            result = _load_execute(pathlib.Path(entry_path))(context)
+            result = _load_execute(pathlib.Path(entry_path), phase)(context)
             if inspect.isawaitable(result):
                 result = asyncio.run(result)
         json.dumps(result, allow_nan=False)

@@ -17,7 +17,9 @@ commit, or application build is needed. Use Python 3 for the packaging helper.
    promising features. Python commands and persistent declarative settings are
    supported. The #7-A development candidate also supports static one-run input,
    confirmation and structured results; read [Command UI](references/command-ui.md)
-   when needed and check that the target Host includes it. Custom UI, Lua
+   when needed and check that the target Host includes it. For dynamic choices
+   and defaults, read [Dynamic Prepare](references/prepare.md): the #7-B candidate
+   adds one-shot prepare(context), not dynamic fields or persistent RPC. Custom UI, Lua
    extensions and dependency installers are not supported. Ordinary Resolve Python/Lua Scripts are a separate existing feature,
    not this extension format.
 2. Read that contract before authoring the manifest and `execute(context)`. Start

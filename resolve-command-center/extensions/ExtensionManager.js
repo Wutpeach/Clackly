@@ -46,6 +46,7 @@ class ExtensionManager {
     this.listeners = new Set();
     this.previews = new Map();
     this.active = new Map();
+    this.prepared = new Map();
     this.mutating = new Set();
     this.statePath = path.join(this.root, 'state.json');
     assertPlainPath(this.statePath);
@@ -107,6 +108,8 @@ class ExtensionManager {
       try { fs.writeFileSync(fd, JSON.stringify(next, null, 2)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
       fs.renameSync(temp, this.statePath);
       this.state = next;
+      // Any changed installation/configuration invalidates its pending data immediately.
+      for (const [token, item] of this.prepared) if (this.state[item.extensionId] !== item.record) this.prepared.delete(token);
       committed = true;
     } finally {
       try {
@@ -276,6 +279,29 @@ class ExtensionManager {
     return { id, name: declared.name, description: declared.description, extensionName: record.manifest.name,
       revision: record.revision, ui: declared.ui || null };
   }
+  discardPrepare(token) { this.prepared.delete(token); }
+  assertPrepareRecord(id, record) {
+    try {
+      assertPlainPath(this.statePath);
+      const disk = JSON.parse(fs.readFileSync(this.statePath, 'utf8'));
+      if (this.get(id) !== record || JSON.stringify(disk[id]) !== JSON.stringify(record)) throw new Error('Changed state');
+    } catch { throw fail('EXTENSION_STALE_COMMAND', '扩展版本或配置已变化，请重新打开 Clackly 后运行。'); }
+  }
+  async prepare(id, revision) {
+    const command = this.commands().find((item) => item.id === id);
+    if (!command) throw fail('EXTENSION_STALE_COMMAND', '命令已变化，请重新打开。');
+    const record = this.get(command.extensionId);
+    const declared = record.manifest.commands.find((item) => commandId(command.extensionId, item.id) === id);
+    if (!declared.ui?.prepare || record.revision !== revision) throw fail('EXTENSION_STALE_COMMAND', '扩展已变化，请重新打开命令。');
+    const receipt = await this.execute(command, { revision, phase: 'prepare' });
+    this.assertPrepareRecord(command.extensionId, record);
+    if (this.mutating.has(command.extensionId)) throw fail('EXTENSION_STALE_COMMAND', '扩展配置或版本已变化，请重试准备。');
+    const prepared = require('./commandUi').applyPrepare(declared.ui, receipt.result);
+    const token = randomUUID();
+    if (this.prepared.size >= 32) this.prepared.delete(this.prepared.keys().next().value);
+    this.prepared.set(token, { record, extensionId: command.extensionId, commandId: id, ...prepared });
+    return { token, ...prepared };
+  }
   async execute(command, execution = {}) {
     const id = command.extensionId;
     if (this.mutating.has(id)) throw fail('EXTENSION_BUSY', '扩展正在更新，请稍后运行。');
@@ -288,9 +314,19 @@ class ExtensionManager {
     if (!entry) throw fail('EXTENSION_COMMAND_MISSING', '命令已移除。');
     if (execution.revision !== undefined && execution.revision !== record.revision) throw fail('EXTENSION_STALE_COMMAND', '扩展已更新，请重新打开命令。');
     if (declared.ui && execution.revision !== record.revision) throw fail('EXTENSION_CONFIRMATION_REQUIRED', '请通过命令输入界面执行。');
-    if (declared.ui?.confirm && execution.confirmed !== true) throw fail('EXTENSION_CONFIRMATION_REQUIRED', '请先确认此操作。');
+    const preparing = execution.phase === 'prepare';
+    if (declared.ui?.prepare) this.assertPrepareRecord(id, record);
+    if (preparing && !declared.ui?.prepare) throw fail('EXTENSION_PREPARE_REQUIRED', '命令未声明 Prepare。');
+    if (!preparing && declared.ui?.confirm && execution.confirmed !== true) throw fail('EXTENSION_CONFIRMATION_REQUIRED', '请先确认此操作。');
     const { validateInput } = require('./commandUi');
-    const input = validateInput(declared.ui?.inputs || {}, execution.input || {});
+    let schema = declared.ui?.inputs || {};
+    if (!preparing && declared.ui?.prepare) {
+      const prepared = this.prepared.get(execution.prepareToken);
+      if (!prepared || prepared.record !== record || prepared.commandId !== command.id) throw fail('EXTENSION_STALE_COMMAND', '准备数据已失效，请刷新或重新打开命令。');
+      if (prepared.blocked) throw fail('EXTENSION_PREPARE_EMPTY', '没有可用的必填候选项，请刷新。');
+      schema = prepared.ui.inputs;
+    }
+    const input = preparing ? {} : validateInput(schema, execution.input || {});
     let root;
     try { root = this.verify(id, record); }
     catch (error) {
@@ -300,11 +336,13 @@ class ExtensionManager {
     const bytecodeCacheRoot = this.pythonCachePath(id, record);
     assertPlainPath(bytecodeCacheRoot);
     fs.mkdirSync(bytecodeCacheRoot, { recursive: true });
-    const running = Promise.resolve().then(() => this.executePython({ root, entry, commandId: command.id, config, input, bytecodeCacheRoot }));
+    if (!preparing && declared.ui?.prepare) this.prepared.delete(execution.prepareToken);
+    const running = Promise.resolve().then(() => this.executePython({ root, entry, commandId: command.id, config, input, bytecodeCacheRoot,
+      ...(preparing ? { phase: 'prepare' } : {}) }));
     const active = this.active.get(id) || new Set(); active.add(running); this.active.set(id, active);
     try {
       const receipt = await running;
-      const result = require('./commandUi').parseUiResult(receipt?.result);
+      const result = preparing ? null : require('./commandUi').parseUiResult(receipt?.result);
       if (result?.status === 'error') {
         const error = fail('EXTENSION_RESULT_ERROR', result.message); error.uiResult = result; throw error;
       }

@@ -28,12 +28,19 @@ app.whenReady().then(async () => {
     ordinaryScriptsFactory: () => ({ discover: async () => ({ scripts: [] }), invoke: async () => ({ status: 'not_submitted' }) })
   });
   const executable = execFileSync('python', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8', windowsHide: true }).trim();
+  const prepareEnvironment = path.join(root, 'prepare-environment.json');
+  const fakeModule = path.join(root, 'fake-resolve.py');
+  if (process.env.CLACKLY_PREPARE_TEST_PACKAGE) {
+    fs.copyFileSync(path.join(__dirname, 'fixtures/prepare-resolve.py'), fakeModule);
+    fs.writeFileSync(prepareEnvironment, JSON.stringify({ project: 'p1', current: 't2', timelines: ['t1', 't2'], mode: 'ready' }));
+  }
   const executor = createExtensionPythonExecutor({
-    resolveAndProbe: async () => ({ resolution: { source: 'override', executable }, selectedBootstrap: path.join(appRoot, 'script-runtime/runtime/bootstrap.py'), readiness: {} }),
+    resolveAndProbe: async () => ({ resolution: { source: 'override', executable }, selectedBootstrap: path.join(appRoot, 'script-runtime/runtime/bootstrap.py'),
+      readiness: process.env.CLACKLY_PREPARE_TEST_PACKAGE ? { bridge: { modulePath: fakeModule, libraryPath: fakeModule } } : {} }),
     launcher: new RuntimeLauncher()
   });
   const requests = [];
-  core.extensions.executePython = (request) => { requests.push({ input: request.input, config: request.config }); return executor(request); };
+  core.extensions.executePython = (request) => { requests.push({ input: request.input, config: request.config, phase: request.phase || 'execute' }); return executor(request); };
   core.extensions.checkAvailability = async () => ({ ok: true });
   const install = async (file) => { const preview = await core.extensions.preview(file); await core.extensions.install(preview.token, preview.operation); await core.extensions.refreshAvailability(); };
   await install(process.env.CLACKLY_UI_TEST_PACKAGE);
@@ -67,6 +74,7 @@ app.whenReady().then(async () => {
   const fixture = path.join(root, 'fixture.clackly');
   fs.writeFileSync(fixture, zipBuffer([['manifest.json', JSON.stringify(fixtureManifest)], ['main.py', source]]));
   await install(fixture);
+  if (process.env.CLACKLY_PREPARE_TEST_PACKAGE) await install(process.env.CLACKLY_PREPARE_TEST_PACKAGE);
   core.localizationService.setLocalePreference('en');
   const palette = createPaletteWindow(selectPaletteHostPolicy({ host: 'standalone', platform: process.platform }));
   const windows = [];
@@ -84,7 +92,8 @@ app.whenReady().then(async () => {
   registerExtensionIpc({ ipcMain, dialog, extensions: core.extensions, getSettingsWindow: () => null, getWindows: () => [palette] });
   registerLocalizationIpc({ ipcMain, localizationService: core.localizationService, getWindows: () => BrowserWindow.getAllWindows() });
   ipcMain.on('palette:hide', () => hidePaletteWindow(palette));
-  global.commandUiTest = { core, requests, windows, palette, host, clipboard, install };
+  global.commandUiTest = { core, requests, windows, palette, host, clipboard, install,
+    setEnvironment: (value) => fs.writeFileSync(prepareEnvironment, JSON.stringify(value)) };
   palette.once('ready-to-show', () => showPaletteWindow(palette));
 }).catch((error) => { console.error(error); app.exit(1); });
 app.on('window-all-closed', () => {});

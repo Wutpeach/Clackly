@@ -58,7 +58,7 @@ function SettingsRenderer({ schema, values, onChange, onPick, t, disabled = fals
               >
                 <option value="" disabled={Boolean(field.required)}>{t("settings.selectOption")}</option>
                 {control.options.map((option, index) => (
-                  <option key={`${option}-${index}`} value={option}>{field.optionLabels?.[option] || option}</option>
+                  <option key={index} value={typeof option === 'string' ? option : option.value}>{typeof option === 'string' ? field.optionLabels?.[option] || option : option.label}</option>
                 ))}
               </select>
             ) : control.kind === "picker" ? (

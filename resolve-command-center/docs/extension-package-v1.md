@@ -41,7 +41,15 @@ Command 可声明 `ui: {version: 1, inputs: {...}, confirm: {message: "..."}}`�
 
 结果显式声明 `$clackly: "result", version: 1, status: "success" | "error", message`，可附纯文本、键值或列表；普通 JSON/日志不自动变为 UI。短成功消息关闭临时窗并轻通知；实质结果保留滚动与复制；失败/超时保留可诊断界面。完整字段、类型、边界及示例以自包含公开参考 [Command UI](../../skills/clackly-developer/references/command-ui.md) 为准；字段与结果只作为数据，无 DOM/HTML/JS 注入。
 
-同一 Host 管理一个 Command 会话，重复触发只聚焦当前窗口；Running 不提供假取消，关闭不会中断或重复启动脚本。取消输入返回 Palette；结果关闭将焦点交回原生窗口系统。确认不代表代码隔离或权限授权。#7-B Prepare、动态选项、运行中 RPC、Lua/JS Runtime 本轮均未实现。旧 Host 不识别新字段，扩展作者必须确认目标 Host 支持，不能依赖旧版忽略字段来执行风险命令。
+同一 Host 管理一个 Command 会话，重复触发只聚焦当前窗口；Running 不提供假取消，关闭不会中断或重复启动脚本。取消输入返回 Palette；结果关闭将焦点交回原生窗口系统。确认不代表代码隔离或权限授权。运行中 RPC、Lua/JS Runtime 均未实现。旧 Host 不识别新字段，扩展作者必须确认目标 Host 支持，不能依赖旧版忽略字段来执行风险命令。
+
+## #7-B Dynamic Prepare（本工作区开发候选，未发布）
+
+在现有 Command UI 中使用 ui.version:2、prepare:true；固定字段内的 select 可声明 dynamic:true，省略静态 options/default。相同 Python 入口另导出 prepare(context)，返回带 $clackly:prepare、version:1 的 options/defaults/message 数据。Host 只补全已声明字段，不接受新字段、控件或验证规则。完整公开协议、限额与旧 Host 防护见 [Dynamic Prepare](../../skills/clackly-developer/references/prepare.md)，只读当前项目时间线示例见 [timeline-summary](../../skills/clackly-developer/examples/timeline-summary/manifest.json)。
+
+Prepare 与正式 Execute 各使用一次独立的短生命周期 worker，分别限时 10 秒；填表期间不运行 worker。Loading 可退出等待，迟到响应丢弃；Failed/Timeout 可重试，Empty 的必填无候选字段不能执行。手动刷新保留合法编辑，失效选择清空并提示，确认重置。Prepare 旨在只读查询，但不是 OS 沙箱。
+
+本次候选绑定活动 revision、命令与配置，提交校验本次选项；配置变化（含另一 Host 写盘）、Replace、禁用或卸载会拒绝旧输入。Execute 仍须重新查询 Resolve 的项目/目标稳定 ID，目标消失或项目切换时明确失败，不能改选其他对象。此能力尚待 #7-B 用户产品验收。
 
 验证：node --test extensions/ExtensionManager.test.js extensions/registerIpc.test.js；node --test extensions/python.integration.js extensions/transaction.integration.js extensions/ui.integration.js。UI 集成使用真实 Core、文件系统与 Python，浏览器替代 Electron transport/文件选择器，不能代替真实 Workflow 菜单、native focus 和 Resolve 产品验收。未经授权不替换用户当前安装。
 

@@ -62,7 +62,7 @@ class PythonRunnerTests(unittest.TestCase):
             "value": 3,
             "command_id": "feature.command",
             "readonly": True,
-            "context": ["command_id", "config", "input", "logger", "project", "resolve", "timeline"],
+            "context": ["command_id", "config", "input", "logger", "phase", "project", "resolve", "timeline"],
         })
         self.assertEqual(envelope["logs"], [
             {"level": "debug", "message": "debug 3"},

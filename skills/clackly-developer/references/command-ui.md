@@ -47,8 +47,9 @@ Up to 20 fields; keys `^[a-zA-Z][a-zA-Z0-9_]{0,79}$` excluding `constructor`
 and `prototype`. Labels 120 characters; descriptions/placeholders/confirmation
 2,000; select options 100 entries of up to 200 characters. Input values 8,192
 characters each and serialized input object 32,768 characters. Unknown UI,
-field and result keys are rejected. Do not invent Prepare, dynamic values,
-RPC, cancellation or another schema version.
+field and result keys are rejected. Optional version 2 Prepare is documented
+in [Dynamic Prepare](prepare.md); do not mix dynamic declarations into version 1.
+No RPC or execution cancellation.
 
 Host validates types, required fields and numeric bounds before starting
 Python. Cancel/close starts no script. Defaults initialize a new session;

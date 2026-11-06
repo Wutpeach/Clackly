@@ -1469,6 +1469,16 @@ kbd {
 .command-actions { grid-column: 1; gap: 8px; padding: 8px 12px; }
 .command-actions > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--color-text-secondary); }
 .command-actions button { display: inline-flex; align-items: center; gap: 6px; }
+.command-prepare { margin-bottom: 20px; font-size: 12px; line-height: 1.5; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.command-prepare h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; color: var(--color-text-primary); font-size: 14px; font-weight: 600; }
+.command-prepare svg { flex-shrink: 0; }
+.command-prepare p { margin: 6px 0; white-space: pre-wrap; }
+.command-prepare pre { white-space: pre-wrap; font: inherit; user-select: text; }
+@media (max-width: 380px) {
+  .command-shell:has(.command-actions button:nth-of-type(3)) { --settings-footer-height: 76px; }
+  .command-actions:has(button:nth-of-type(3)) { flex-wrap: wrap; }
+  .command-actions:has(button:nth-of-type(3)) > span { flex-basis: 100%; }
+}
 .command-running { margin-top: 32px; color: var(--color-text-secondary); font-size: 12px; line-height: 1.5; }
 .command-running h2, .command-result h2 { margin: 10px 0; font-size: 14px; font-weight: 600; line-height: 1.5; }
 .command-result h2 { white-space: pre-wrap; }

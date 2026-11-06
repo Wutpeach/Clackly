@@ -136,7 +136,8 @@ or manual cache writes, and missing caches are rebuilt on the next execution.
 logger messages for user feedback. A return value is execution data, not an
 automatically rendered panel, table or file. The #7-A development candidate adds
 explicit static input and result semantics; see [Command UI](command-ui.md).
-There is no custom/independent UI, Prepare, dynamic dropdown or mid-execution UI API.
+The #7-B development candidate adds bounded options/defaults for fixed inputs;
+see [Dynamic Prepare](prepare.md). No custom/independent UI or mid-execution RPC.
 
 Execution uses Clackly's managed CPython, Resolve compatibility probe and a
 short-lived worker. Installed does not mean runnable: Resolve must be running

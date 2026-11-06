@@ -27,6 +27,7 @@ if (isDetachedInteractionPanel) {
   contextBridge.exposeInMainWorld('resolveCommandUi', {
     get: () => ipcRenderer.invoke('command-ui:get'),
     submit: (input, confirmed) => ipcRenderer.invoke('command-ui:submit', input, confirmed),
+    refresh: (input, edited) => ipcRenderer.invoke('command-ui:refresh', input, edited),
     pick: (key) => ipcRenderer.invoke('command-ui:pick', key),
     copy: () => ipcRenderer.invoke('command-ui:copy'),
     close: () => ipcRenderer.send('command-ui:close'),

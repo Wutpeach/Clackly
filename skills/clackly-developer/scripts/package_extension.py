@@ -94,6 +94,10 @@ def package(source, output):
         if not any(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
                    and node.name == "execute" for node in trees[entry].body):
             raise ValueError(f"{entry} must define top-level execute(context)")
+        if command.get("ui", {}).get("prepare") is True and not any(
+                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.name == "prepare" for node in trees[entry].body):
+            raise ValueError(f"{entry} must define top-level prepare(context)")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     # Exclusive creation protects existing user artifacts, including concurrent writers.
