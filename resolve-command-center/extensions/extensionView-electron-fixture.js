@@ -24,7 +24,7 @@ app.whenReady().then(async () => {
     afterEffectsProcessProbeFactory: () => ({ prewarm: async () => false, query: async () => ({}), getForegroundProcessName: async () => '', dispose() {} }),
     ordinaryScriptsFactory: () => ({ discover: async () => ({ scripts: [] }), invoke: async () => ({ status: 'not_submitted' }) }) });
   const executable = execFileSync('python', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8', windowsHide: true }).trim();
-  const fakeModule = path.join(root, 'fake-resolve.py'); fs.copyFileSync(path.join(__dirname, 'fixtures/view-resolve.py'), fakeModule);
+  const fakeModule = path.join(root, 'fake-resolve.py'); fs.copyFileSync(process.env.CLACKLY_VIEW_TEST_MODULE || path.join(__dirname, 'fixtures/view-resolve.py'), fakeModule);
   const environmentFile = path.join(root, 'view-environment.json');
   const setEnvironment = (value) => fs.writeFileSync(environmentFile, JSON.stringify(value));
   setEnvironment({ project: 'p1', timeline: 't1', markers: {} });
@@ -47,18 +47,21 @@ app.whenReady().then(async () => {
   await install(commandPackage);
   const palette = createPaletteWindow(); const windows = [];
   const hidePalette = () => hidePaletteWindow(palette), showPalette = () => showPaletteWindow(palette);
-  const viewHost = createExtensionViewHost({ extensions: core.extensions, clipboard, hidePalette, recordUsage: core.recordViewOpened,
+  const viewHost = createExtensionViewHost({ extensions: core.extensions, clipboard, dialog, hidePalette, recordUsage: core.recordViewOpened,
     createWindow: (id, title) => { const w = createExtensionWindow(id, title); windows.push(w); return w; } });
   viewHost.registerIpc(ipcMain);
   const commands = createCommandUiHost({ extensions: core.extensions, execute: core.executeSearchResult, createWindow: createCommandWindow,
     hidePalette, showPalette, dialog, clipboard, openView: viewHost.start });
   ipcMain.handle('commands:execute', commands.registerIpc(ipcMain, () => palette));
   ipcMain.handle('commands:search', (_event, ...args) => core.searchCommands(...args));
+  ipcMain.handle('commands:list', () => core.listCommands());
+  ipcMain.handle('interactions:list', () => []);
+  ipcMain.handle('feature-status:list', () => core.featureStatusManager.list());
   ipcMain.handle('commands:get-pins', () => core.preferences.getPinnedIds());
   ipcMain.handle('commands:set-pin', (_event, id, pinned) => core.preferences.setCommandPinned(id, pinned));
   ipcMain.on('palette:hide', hidePalette);
   registerLocalizationIpc({ ipcMain, localizationService: core.localizationService, getWindows: () => BrowserWindow.getAllWindows() });
-  global.viewTest = { core, windows, palette, requests, setEnvironment, install, secondPackage, clipboard, viewHost };
+  global.viewTest = { core, windows, palette, requests, setEnvironment, readEnvironment: () => JSON.parse(fs.readFileSync(environmentFile, 'utf8')), install, secondPackage, clipboard, viewHost };
   app.on('will-quit', () => { viewHost.dispose(); commands.dispose(); core.disposeExportPythonWorker(); core.disposeAfterEffectsProcessProbe(); });
 }).catch((error) => { console.error(error); app.exit(1); });
 app.on('window-all-closed', () => {});

@@ -1458,9 +1458,9 @@ kbd {
 .command-content .settings-fields { width: 100%; }
 .command-field-description { display: block; margin: 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 .command-content > .command-field-description { margin-top: 20px; }
-.command-content textarea { width: 100%; min-height: 84px; resize: vertical; padding: 8px; border: 1px solid var(--settings-border); border-radius: var(--radius-toolbar); color: var(--color-text-primary); background: var(--settings-control-surface); font: inherit; font-size: 13px; line-height: 1.5; }
-.command-content textarea:focus-visible { outline: 1px solid var(--settings-focus); outline-offset: 1px; }
-.command-content input::placeholder, .command-content textarea::placeholder { color: var(--color-text-secondary); }
+.command-content textarea, .view-form textarea { width: 100%; min-height: 84px; resize: vertical; padding: 8px; border: 1px solid var(--settings-border); border-radius: var(--radius-toolbar); color: var(--color-text-primary); background: var(--settings-control-surface); font: inherit; font-size: 13px; line-height: 1.5; }
+.command-content textarea:focus-visible, .view-form textarea:focus-visible { outline: 1px solid var(--settings-focus); outline-offset: 1px; }
+.command-content input::placeholder, .command-content textarea::placeholder, .view-form input::placeholder, .view-form textarea::placeholder { color: var(--color-text-secondary); }
 .command-confirm { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--settings-hairline); font-size: 13px; line-height: 1.5; }
 .command-confirm p { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .command-confirm svg { flex-shrink: 0; margin-top: 2px; color: var(--color-warning); }

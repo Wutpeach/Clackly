@@ -24,6 +24,10 @@ commit, or application build is needed. Use Python 3 for the packaging helper.
    Host-rendered List/Detail/Navigation/ActionPanel in one ordinary window per
    extension, short-lived view/view_action callbacks and Manifest v2.
    Start from the [read-only Marker Browser](examples/marker-browser/manifest.json).
+   The #8-B development candidate adds same-window Create/Edit Forms using #7
+   fields, session-only draft guards, opt-in multiselect/batch results and refocus
+   refresh. Read the same Views contract and [Timeline Manager](examples/timeline-manager/README.md)
+   before authoring writes; use a disposable local project and native stable IDs.
    Check target Host support. Custom UI, Lua
    extensions and dependency installers are not supported. Ordinary Resolve Python/Lua Scripts are a separate existing feature,
    not this extension format.

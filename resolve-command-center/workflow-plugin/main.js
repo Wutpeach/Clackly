@@ -232,7 +232,7 @@ function togglePalette() {
 function registerIpcHandlers() {
   updateService = createHostUpdateService({ app, appRoot });
   extensionViewHost = createExtensionViewHost({ extensions: core.extensions, createWindow: createExtensionWindow,
-    hidePalette, clipboard, recordUsage: core.recordViewOpened });
+    hidePalette, clipboard, dialog, recordUsage: core.recordViewOpened });
   extensionViewHost.registerIpc(ipcMain);
   commandUiHost = createCommandUiHost({ extensions: core.extensions, execute: executeWorkflowCommand,
     createWindow: createCommandWindow, hidePalette, showPalette, dialog, clipboard, openView: extensionViewHost.start });

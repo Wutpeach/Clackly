@@ -111,7 +111,7 @@ def run_script(
             raise TypeError('input must be an object')
         if phase not in ('prepare', 'execute', 'view', 'view_action'):
             raise ValueError('Unsupported script phase')
-        if view is not None and (not isinstance(view, dict) or len(json.dumps(view)) > 8192):
+        if view is not None and (not isinstance(view, dict) or len(json.dumps(view, ensure_ascii=False)) > 65536):
             raise ValueError('Invalid view context')
         context = ScriptContext(command_id, config, ScriptLogger(logs), adapter, input_values, phase, view)
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):

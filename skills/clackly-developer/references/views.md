@@ -1,4 +1,4 @@
-# Extension Views (#8-A development candidate, not a published release)
+# Extension Views (#8-A accepted; #8-B development candidate, not a published release)
 
 Use Views for tools that remain open for browsing and actions. Use
 [Command UI](command-ui.md) for one-run input/results and [Prepare](prepare.md)
@@ -16,9 +16,10 @@ still export execute(context). Keep Resolve calls inside callbacks, never import
 The packaging helper checks view; view_action is required when Extension Actions
 are used. ConfigSchema and existing public context remain available.
 
-context.phase is view or view_action. context.input is empty. context.view has
-sessionId, revision, version, viewId, type (list/detail), itemId (or null).
-Extension Actions add actionId and scope (item/view). Reread live Resolve targets
+context.phase is view or view_action. context.input is empty except for validated
+Form submissions. context.view has sessionId, revision, version, viewId, type
+(list/detail/form), itemId (or null), and itemIds (an array, normally empty).
+Extension Actions add actionId and scope (item/view/form/batch). Reread live Resolve targets
 using stable IDs before business work. Host context does not prove a target
 still exists; never silently substitute a changed/deleted object.
 
@@ -63,6 +64,8 @@ Types: copy (optional text, else copy item's embedded detail/current Detail),
 detail (item with embedded detail only), refresh, back, extension. Only extension
 starts Python. It may declare confirm:{message:"Consequence"}; confirmation
 happens in the same window and is not a sandbox/permission grant.
+Extension actions may declare dangerous:true, which requires confirm. Host cannot
+infer business risk from arbitrary Python: authors must mark destructive work.
 
     def view_action(context):
         # Verify context.view['itemId'] against current Resolve data first.
@@ -77,6 +80,97 @@ and selected stable ID; busy windows reject duplicates. Replace/disable/uninstal
 config changes close affected windows in this Host. Cross-Host state changes
 reject the next request; reopen Clackly if stale. Failed/timed-out Actions must
 be checked before retry; refresh never repeats the business Action automatically.
+
+## Create/Edit Forms (#8-B)
+
+Return an ordinary push result from a List or Detail Extension Action:
+
+```python
+return {
+    "$clackly": "view-action", "version": 1, "effect": "push",
+    "view": {
+        "$clackly": "view", "version": 1, "id": "edit-object",
+        "type": "form", "title": "Edit object",
+        "inputs": {"name": {"type": "string", "label": "Name",
+                            "required": True, "default": current_name}},
+        "submit": {"id": "save", "title": "Save",
+                   "confirm": {"message": "Save this object's new name?"}}
+    }
+}
+```
+
+Form uses the same static `inputs` contract and controls as [Command UI](command-ui.md):
+1–20 fields, string/text/number/boolean/select/color/path/folder, defaults,
+required, range, descriptions and placeholders. Callback data may supply current
+options/defaults; Form does not run #7 Prepare or accept dynamic:true. There are
+no hidden fields or arbitrary state: bind project/target identity in view.id
+and/or the originating itemId. Form has optional normal actions, but no
+items/text/fields/batchActions/refreshOnFocus. submit has id/title and optional
+confirm/dangerous, no type.
+
+Only explicit Save calls view_action with scope:form, actionId from submit,
+context.input validated against these inputs, and the originating itemId/itemIds.
+The extension must revalidate project and target before writing. A failed callback
+keeps the Form, values and error. While saving, controls and repeated submission/
+close are blocked. There is no automatic retry, auto-save or rollback. After a
+timeout/failure, check source data before retry: Python may already have written.
+
+For successful Form submissions, `back`/`refresh` finish the Form, return to its
+source page and call view again. `push` finishes the Form and **replaces its source
+page** with the returned freshly read view; use this to return a current List or
+Detail when the old source identity has changed. It does not append another Form
+or require reloading a now-stale parent first. `close` ends the session. `keep`
+stays in the Form with its draft; use an exception for validation/save errors.
+With a root Form, back/refresh reload it; Cancel closes it.
+
+Host holds only current-session values and compares them to initial values. Clean
+Back/Close/actions proceed directly. Dirty Back, manual refresh, another action
+or native Close shows **Keep editing / Discard changes**; continuing is the safe
+default, Escape continues editing. Discard restores initial values and performs
+the pending navigation/action, without submitting. Other explicitly chosen
+Extension Actions may themselves write; Discard is not an authorization layer.
+No draft persists after leaving/closing. Host shutdown, process loss, or explicit
+extension config/Replace/disable/uninstall invalidation still destroys the
+session as in #8-A; this is not recoverable draft storage.
+
+## Optional multiselect and batch results (#8-B)
+
+Add `batchActions` to a List to expose Select multiple, Select visible and Clear.
+It uses the same action schema (up to8), extension type only. Ordinary lists
+remain single-select. In multi mode, batch actions replace item actions; global
+view actions remain available. Space toggles a focused row; checkboxes also work.
+
+The Host sends scope:batch and context.view.itemIds, at most100 unique IDs from
+the current visible List. Confirmation binds that exact selection. Search/tag
+changes and refresh remove selections no longer visible/present, with a notice;
+the Host never substitutes targets. Use native stable identities, not positions.
+
+Batch callbacks must return a summary matching the submitted total. Supply one
+concrete error per failed submitted ID; success, failure and partial success all
+use the same contract:
+
+```python
+return {"$clackly": "view-action", "version": 1, "effect": "refresh",
+        "summary": {"succeeded": 1, "failed": 1,
+                    "errors": [{"id": failed_id,
+                                "message": "Timeline B: Resolve rejected rename"}]}}
+```
+
+Counts are nonnegative integers, total at most100; failed IDs must be unique
+and belong to the submitted selection. The Host shows counts and plain-text
+errors, then uses the selected effect. Put identifiable target names/IDs in
+messages. A summary can also accompany other action results. `refresh` rereads
+without repeating writes; failure to reread keeps the result/error visible.
+Host does not implement transactions, automatic rollback or Undo.
+
+## Optional refocus refresh (#8-B)
+
+List/Detail envelopes may declare `refreshOnFocus:true`. After the native window
+loses and regains focus, Host reloads the current ready page, unless it is busy
+or confirming. Forms never refresh on focus, even when their source opts in.
+There is no background polling/subscription. Detail refresh still uses its
+originating itemId; reject a disappeared/stale target rather than showing another.
+Manual refresh remains available.
 
 ## Windows, runtime and limits
 
@@ -93,6 +187,11 @@ the byte limit sooner). List500 unique items; IDs view120/item512/action80;
 title200/action-title120; subtitle list500/view2000; emptyMessage2000; tag80;
 text32768; Detail50 fields (label120/value2000); copy text8192; result message2000.
 Unknown fields/types, duplicates and excess values fail closed.
+Form input:32,768 serialized characters; each string8192. View callback context:
+65,536 serialized characters (Unicode-safe Python encoding), enough for100
+bounded IDs. Summary error IDs512, messages2000; overall action response524,288
+characters. These additions keep View version1/Manifest schema2; a #8-A-only Host
+rejects new Form/batch/refocus fields safely. Test target Host support before delivery.
 
 ## Read-only example
 
@@ -104,5 +203,15 @@ marker ID: the example combines project/timeline IDs, frame and content fingerpr
 Identical delete/recreate at the same frame cannot be distinguished; do not use
 this identity for writes. Over500 markers, excessive output or missing stable IDs
 fail explicitly. Project/timeline switch or changed marker rejects old Actions.
-No Form/edit/delete/drafts (#8-B), two-column layout, custom UI, Lua/JS Runtime
-or real-time/background work is implemented.
+
+## Write example (#8-B)
+
+[Timeline Manager](../examples/timeline-manager/README.md) demonstrates Create
+empty timeline, Edit name from List/Detail, confirmed batch prefixing, partial
+results and refocus refresh. Use only a disposable local test project. It binds
+native project/timeline IDs and a name snapshot, revalidates before each write
+and refuses changed/deleted targets. It never uses the read-only Marker identity
+for writes. Tests use a file-backed fake Resolve plus real Python/Electron;
+these do not establish native Resolve write acceptance. Read-check-write is not
+atomic against concurrent Resolve edits. No deletion, two-column/custom UI,
+Lua/JS Runtime, background process, transaction framework or Undo is included.

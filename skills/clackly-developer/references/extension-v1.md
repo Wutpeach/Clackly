@@ -139,6 +139,8 @@ explicit static input and result semantics; see [Command UI](command-ui.md).
 The #7-B development candidate adds bounded options/defaults for fixed inputs;
 see [Dynamic Prepare](prepare.md). The #8-A candidate adds a Host-owned independent
 tool window through [Extension Views](views.md), requiring Manifest schemaVersion2.
+The #8-B candidate adds same-window Forms, transient draft protection, optional
+multiselect/batch Actions and refocus refresh through that same contract.
 No custom frontend UI or mid-execution RPC.
 
 Execution uses Clackly's managed CPython, Resolve compatibility probe and a

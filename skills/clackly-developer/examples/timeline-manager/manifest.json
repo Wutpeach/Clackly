@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 2,
+  "id": "clackly.demo.timeline-manager",
+  "name": "时间线管理示例",
+  "version": "1.0.0",
+  "description": "Extension Views B 示例：创建空时间线、重命名和批量加前缀。仅在可丢弃测试项目使用。",
+  "commands": [{"id": "open", "name": "打开时间线管理示例", "entry": "timelines.py", "view": {"version": 1}, "keywords": ["timeline", "时间线", "示例"]}]
+}

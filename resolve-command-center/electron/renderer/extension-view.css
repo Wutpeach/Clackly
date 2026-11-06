@@ -15,6 +15,16 @@
 .view-search input { height: 34px; flex: 1; min-width: 0; background: none; color: var(--color-text-primary); border: 0; font: inherit; font-size: 13px; }
 .view-search select { max-width: 120px; min-width: 0; height: 28px; background: var(--settings-control-fill); color: var(--color-text-primary); border: 0; font: inherit; font-size: 12px; }
 .view-content { flex: 1; min-height: 0; overflow: auto; padding: 0 10px 12px; }
+.view-form { padding: 4px 8px 12px; }
+.view-form .settings-fields { width: 100%; }
+.view-draft-state { display: block; margin-top: 6px; font-size: 12px; color: var(--color-text-secondary); }
+.view-selection-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 0 18px 10px; font-size: 12px; }
+.view-selection-toolbar button { min-height: 28px; font-size: 12px; }
+.view-result { flex: 0 0 auto; max-height: 120px; overflow: auto; padding: 8px 18px; border-block: 1px solid var(--settings-hairline); font-size: 12px; line-height: 1.5; user-select: text; }
+.view-result p { margin: 0; font-weight: 500; }
+.view-result ul { margin: 6px 0 0; padding-left: 18px; overflow-wrap: anywhere; }
+.view-list-row input[type="checkbox"] { flex: 0 0 auto; width: 16px; height: 16px; accent-color: var(--settings-selected); }
+.view-list-row[data-active="true"][aria-selected="false"] { outline: 1px solid var(--settings-border); outline-offset: -1px; }
 .view-list-row { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px; margin-bottom: 2px; border-radius: 3px; cursor: default; color: var(--color-text-primary); }
 .view-list-row:hover { background: var(--settings-hover); }
 .view-list-row[aria-selected="true"] { color: var(--settings-selected-foreground); background: var(--settings-selected); }

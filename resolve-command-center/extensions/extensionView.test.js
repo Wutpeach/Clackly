@@ -12,16 +12,27 @@ const view = () => ({ $clackly: 'view', version: 1, id: 'markers', type: 'list',
       { id: 'detail', title: 'Detail', type: 'detail' }, { id: 'check', title: 'Check', type: 'extension', confirm: { message: 'Check?' } }] })) });
 const declaration = (id = 'test.views') => manifest({ schemaVersion: 2, id, configSchema: {}, commands: [
   { id: 'open', name: 'Open markers', entry: 'inspect.py', view: { version: 1 } }] });
+const form = () => ({ $clackly: 'view', version: 1, id: 'edit', type: 'form', title: 'Edit',
+  inputs: { name: { type: 'string', label: 'Name', required: true, default: 'Original' } }, submit: { id: 'save', title: 'Save' } });
+async function edit(f) {
+  const list = view(); list.actions.unshift({ id: 'edit', title: 'Edit', type: 'extension' });
+  f.setData(list); await f.open(); f.setResponse({ $clackly: 'view-action', version: 1, effect: 'push', view: form() }); await f.act('edit', 'view');
+}
+const draft = (f, name) => f.invoke('draft', { version: f.get().version, values: { name } });
+const save = (f, extra = {}) => f.invoke('submit', { version: f.get().version, ...extra });
 class Window extends EventEmitter {
   constructor() { super(); this.dead = false; this.minimized = false; this.webContents = { mainFrame: {}, send() {} }; }
   isDestroyed() { return this.dead; } isMinimized() { return this.minimized; }
-  restore() { this.minimized = false; } show() {} focus() {} close() { this.emit('close'); this.destroy(); }
+  restore() { this.minimized = false; } show() {} focus() {} close() {
+    let prevented = false; this.emit('close', { preventDefault() { prevented = true; } }); if (!prevented) this.destroy();
+  }
   destroy() { this.dead = true; this.emit('closed'); }
 }
 const tick = () => new Promise(setImmediate);
 async function fixture(t) {
   let data = view(), response = { $clackly: 'view-action', version: 1, effect: 'keep', message: 'Checked' }, gate = null;
-  const f = workspace(t, { executePython: async ({ phase }) => ({ result: gate ? await gate : phase === 'view_action' ? response : data }) });
+  const requests = [];
+  const f = workspace(t, { executePython: async (request) => { requests.push(request); return { result: gate ? await gate : request.phase === 'view_action' ? response : data }; } });
   await f.install(declaration());
   const windows = [], handlers = new Map(), events = new Map(), copied = [];
   const host = createExtensionViewHost({ extensions: f.manager, createWindow: () => { const w = new Window(); windows.push(w); return w; },
@@ -33,7 +44,7 @@ async function fixture(t) {
   const get = (w) => invoke('get', undefined, w);
   const act = (id, scope = 'item', extra = {}, w) => { const s = get(w); return invoke('action', { id, scope, itemId: scope === 'item' ? s.selectedId : null, version: s.version, ...extra }, w); };
   const open = async (id = 'extension:test.views/open') => { await host.start(id); await tick(); };
-  return { ...f, host, windows, handlers, event, invoke, get, act, open, copied, setData: (v) => { data = v; }, setResponse: (v) => { response = v; }, setGate: (v) => { gate = v; } };
+  return { ...f, host, windows, handlers, event, invoke, get, act, open, copied, requests, setData: (v) => { data = v; }, setResponse: (v) => { response = v; }, setGate: (v) => { gate = v; } };
 }
 test('Views require a new manifest and remain distinct from Command UI', () => {
   assert.equal(validateManifest(declaration()).commands[0].view.version, 1);
@@ -137,4 +148,86 @@ test('Extension Actions may push/back/refresh/close; a failed refresh remains an
   f.setData(data); await f.invoke('refresh'); assert.equal(f.get().phase, 'ready');
   f.setResponse({ $clackly: 'view-action', version: 1, effect: 'close' });
   const window = f.windows[0]; await f.act('run', 'view'); assert.equal(window.isDestroyed(), true);
+});
+
+test('Form/batch schemas reuse Command fields and require bounded results and dangerous confirmations', () => {
+  assert.equal(parseView(form()).inputs.name.default, 'Original');
+  for (const mutate of [v => v.submit.dangerous = true, v => v.inputs.name.type = 'html', v => v.refreshOnFocus = true,
+    v => v.items = [], v => v.batchActions = []]) { const v = form(); mutate(v); assert.throws(() => parseView(v)); }
+  const v = view(); v.batchActions = [{ id: 'batch', title: 'Batch', type: 'extension', dangerous: true, confirm: { message: 'Write?' } }];
+  assert.equal(parseView(v).batchActions.length, 1);
+  for (const summary of [{ succeeded: 1, failed: 1, errors: [] }, { succeeded: 101, failed: 0, errors: [] },
+    { succeeded: 0, failed: 2, errors: [{ id: 'a', message: 'Failed' }, { id: 'a', message: 'Again' }] }]) {
+    assert.throws(() => parseActionResult({ $clackly: 'view-action', version: 1, effect: 'refresh', summary }));
+  }
+});
+
+test('clean navigation is quiet; dirty back, close, refresh and switching require discard without writing', async (t) => {
+  const f = await fixture(t); await edit(f); assert.deepEqual(f.get().values, { name: 'Original' });
+  f.invoke('back'); assert.equal(f.get().depth, 1); assert.equal(f.get().confirmation, null);
+  await f.act('edit', 'view'); draft(f, 'Draft'); assert.equal(f.get().dirty, true);
+  f.invoke('back'); assert.equal(f.get().confirmation.kind, 'discard');
+  f.invoke('cancel-confirmation'); assert.equal(f.get().values.name, 'Draft');
+  f.windows[0].close(); assert.equal(f.windows[0].isDestroyed(), false); assert.equal(f.get().confirmation.kind, 'discard');
+  f.invoke('cancel-confirmation');
+  await f.invoke('refresh'); assert.equal(f.get().values.name, 'Draft'); f.invoke('cancel-confirmation');
+  const before = f.requests.length; f.invoke('back'); await f.invoke('discard'); assert.equal(f.get().depth, 1); assert.equal(f.requests.length, before);
+  const switching = form(); switching.actions = [{ id: 'other', title: 'Other', type: 'extension' }];
+  f.setResponse({ $clackly: 'view-action', version: 1, effect: 'push', view: switching }); await f.act('edit', 'view'); draft(f, 'Unsaved');
+  f.setResponse({ $clackly: 'view-action', version: 1, effect: 'keep' }); await f.act('other', 'view');
+  assert.equal(f.get().confirmation.kind, 'discard'); await f.invoke('discard'); assert.equal(f.get().dirty, false);
+  assert.equal(f.get().values.name, 'Original');
+  draft(f, 'Close'); f.windows[0].close(); await f.invoke('discard'); assert.equal(f.windows[0].isDestroyed(), true);
+});
+
+test('explicit validated save keeps failed input, blocks duplicate writes and refreshes its source once complete', async (t) => {
+  const f = await fixture(t); await edit(f); draft(f, ''); await assert.rejects(save(f), /Name|必填/);
+  draft(f, 'New name'); f.setResponse({ invalid: true }); await save(f);
+  assert.equal(f.get().phase, 'ready'); assert.equal(f.get().values.name, 'New name'); assert.ok(f.get().error);
+  const submission = f.requests.at(-1); assert.deepEqual(submission.input, { name: 'New name' }); assert.equal(submission.view.scope, 'form');
+  let finish; f.setGate(new Promise(resolve => { finish = resolve; })); const running = save(f); await tick();
+  await assert.rejects(save(f), /正在保存/); f.windows[0].close(); assert.equal(f.windows[0].isDestroyed(), false);
+  f.setGate(null); finish({ $clackly: 'view-action', version: 1, effect: 'back', message: 'Saved' }); await running;
+  assert.equal(f.get().depth, 1); assert.equal(f.get().message, 'Saved'); assert.equal(f.requests.at(-1).phase, 'view');
+  await assert.rejects(f.invoke('submit', { version: 0 }), /过期/);
+});
+
+test('save confirmation cannot be bypassed; completed writes are not offered again after source refresh fails', async (t) => {
+  const f = await fixture(t); const confirmed = form(); confirmed.submit.confirm = { message: 'Save?' };
+  f.setData(confirmed); await f.open(); draft(f, 'Changed'); await assert.rejects(save(f, { confirmed: true }), /确认/);
+  await save(f); assert.equal(f.get().confirmation.kind, 'submit');
+  assert.throws(() => draft(f, 'Other'), /过期/);
+  f.setResponse({ $clackly: 'view-action', version: 1, effect: 'close' }); await save(f, { confirmed: true }); assert.equal(f.windows[0].isDestroyed(), true);
+  const g = await fixture(t); await edit(g); draft(g, 'Changed'); g.setData({ wrong: true });
+  g.setResponse({ $clackly: 'view-action', version: 1, effect: 'back', summary: { succeeded: 1, failed: 0, errors: [] } });
+  await save(g); assert.equal(g.get().depth, 1); assert.equal(g.get().phase, 'error'); assert.equal(g.get().summary.succeeded, 1);
+  await assert.rejects(save(g), /过期/);
+});
+
+test('batch selection is bounded, confirmed and exact; partial results survive refresh and removed IDs clear', async (t) => {
+  const f = await fixture(t), data = view(); data.batchActions = [{ id: 'batch', title: 'Batch', type: 'extension', dangerous: true, confirm: { message: 'Batch?' } }];
+  f.setData(data); await f.open();
+  const select = (extra) => f.invoke('select', { query: '', filter: '', selectedId: 'a', version: f.get().version, multiSelect: true, selectedIds: ['a', 'b'], ...extra });
+  select(); assert.throws(() => select({ selectedIds: ['a', 'a'] }), /有效对象/);
+  await assert.rejects(f.act('batch', 'batch', { itemIds: ['b'] }), /已变化/);
+  await assert.rejects(f.act('check'), /已变化/);
+  const batch = (extra = {}) => f.act('batch', 'batch', { itemIds: f.get().selectedIds, ...extra });
+  await batch(); assert.equal(f.get().confirmation.kind, 'action');
+  const summary = { succeeded: 1, failed: 1, errors: [{ id: 'b', message: 'b: no longer writable' }] };
+  f.setResponse({ $clackly: 'view-action', version: 1, effect: 'refresh', summary });
+  f.setData({ ...data, items: data.items.slice(1) }); await batch({ confirmed: true });
+  assert.deepEqual(f.get().summary, summary); assert.deepEqual(f.get().selectedIds, ['b']); assert.equal(f.get().message, 'selectionCleared');
+  const request = f.requests.findLast(r => r.phase === 'view_action'); assert.deepEqual(request.view.itemIds, ['a', 'b']);
+  f.setResponse({ $clackly: 'view-action', version: 1, effect: 'refresh', summary });
+  await batch(); await batch({ confirmed: true }); assert.equal(f.get().phase, 'error'); assert.match(f.get().error.message, /不一致/);
+});
+
+test('refocus refresh is opt-in and never overwrites a Form draft', async (t) => {
+  const f = await fixture(t); const data = view(); data.refreshOnFocus = true; data.actions.unshift({ id: 'edit', title: 'Edit', type: 'extension' });
+  f.setData(data); await f.open(); const w = f.windows[0];
+  f.setData({ ...data, items: data.items.slice(1) }); w.emit('blur'); w.emit('focus'); await tick();
+  assert.equal(f.get().view.items.length, 1); assert.equal(f.get().selectedId, null);
+  f.setResponse({ $clackly: 'view-action', version: 1, effect: 'push', view: form() }); await f.act('edit', 'view'); draft(f, 'Keep me');
+  const before = f.requests.length; w.emit('blur'); w.emit('focus'); await tick();
+  assert.equal(f.requests.length, before); assert.equal(f.get().values.name, 'Keep me');
 });

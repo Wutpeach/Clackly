@@ -27,6 +27,10 @@ if (isDetachedInteractionPanel) {
   contextBridge.exposeInMainWorld('resolveExtensionView', {
     get: () => ipcRenderer.invoke('extension-view:get'),
     select: (request) => ipcRenderer.invoke('extension-view:select', request),
+    draft: (request) => ipcRenderer.invoke('extension-view:draft', request),
+    submit: (request) => ipcRenderer.invoke('extension-view:submit', request),
+    pick: (request) => ipcRenderer.invoke('extension-view:pick', request),
+    discard: () => ipcRenderer.invoke('extension-view:discard'),
     action: (request) => ipcRenderer.invoke('extension-view:action', request),
     refresh: () => ipcRenderer.invoke('extension-view:refresh'),
     back: () => ipcRenderer.invoke('extension-view:back'),

@@ -279,11 +279,11 @@ class ExtensionManager {
     return { id, name: declared.name, description: declared.description, extensionName: record.manifest.name,
       revision: record.revision, ui: declared.ui || null, ...(declared.view ? { view: declared.view, extensionId: command.extensionId } : {}) };
   }
-  async requestView(id, revision, record, request) {
+  async requestView(id, revision, record, request, input = {}) {
     const command = this.commands().find((item) => item.id === id);
     if (!command || this.get(command.extensionId) !== record || record.revision !== revision) throw fail('EXTENSION_STALE_COMMAND', '视图版本或配置已变化，请重新打开。');
     this.assertPrepareRecord(command.extensionId, record);
-    const receipt = await this.execute(command, { revision, viewRequest: request, phase: request.actionId ? 'view_action' : 'view', viewAuthority: this });
+    const receipt = await this.execute(command, { revision, viewRequest: request, input, phase: request.actionId ? 'view_action' : 'view', viewAuthority: this });
     this.assertPrepareRecord(command.extensionId, record);
     if (this.mutating.has(command.extensionId)) throw fail('EXTENSION_STALE_COMMAND', '扩展正在更新，请重新打开。');
     return receipt.result;
@@ -337,7 +337,7 @@ class ExtensionManager {
       if (prepared.blocked) throw fail('EXTENSION_PREPARE_EMPTY', '没有可用的必填候选项，请刷新。');
       schema = prepared.ui.inputs;
     }
-    const input = preparing ? {} : validateInput(schema, execution.input || {});
+    const input = preparing ? {} : viewing ? execution.input || {} : validateInput(schema, execution.input || {});
     let root;
     try { root = this.verify(id, record); }
     catch (error) {
