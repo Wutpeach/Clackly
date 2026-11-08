@@ -29,7 +29,13 @@ test('real Electron Prepare: public extension, loading, refresh, empty, retry, s
       await palette.evaluate(() => window.resolveCommandCenter.executeCommand('extension:example.timeline-report-cn/report'));
       const page = await next; page.on('pageerror', (error) => errors.push(error.message)); return page;
     };
-    const close = async (page) => { const closed = page.waitForEvent('close'); await page.keyboard.press('Escape').catch((e) => { if (!page.isClosed()) throw e; }); await closed; };
+    const close = async (page) => {
+      // Result/error rendering removes the focused input before deferred focus returns.
+      await page.waitForFunction(() => !!document.activeElement?.closest('.command-shell'));
+      const closed = page.waitForEvent('close');
+      await page.keyboard.press('Escape').catch((e) => { if (!page.isClosed()) throw e; });
+      await closed;
+    };
     await set(environment);
     let page = await open();
     await page.getByRole('heading', { name: 'Preparing options…' }).waitFor();
