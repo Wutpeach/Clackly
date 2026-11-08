@@ -155,6 +155,15 @@ export function projectLauncherSections(commands, pinnedIds = new Set(), usedCom
     }
   }
 
+  // Interleave sources only in Launcher; keep Core search ranking and each source's order.
+  const builtins = sections.commands.filter((command) => command.kind !== "extension");
+  const extensions = sections.commands.filter((command) => command.kind === "extension");
+  sections.commands = [];
+  for (let index = 0; index < Math.max(builtins.length, extensions.length); index += 1) {
+    if (builtins[index]) sections.commands.push(builtins[index]);
+    if (extensions[index]) sections.commands.push(extensions[index]);
+  }
+
   return [
     ["pinned", t("palette.pinned"), sections.pinned],
     ["recent", t("palette.recent"), sections.recent],

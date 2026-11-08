@@ -56,6 +56,34 @@ test("launcher sections preserve ranked order while projecting pinned and recent
   assert.deepEqual(projectLauncherSections([], new Set(["alpha"]), new Set(["recent"])), []);
 });
 
+test("Launcher interleaves all builtins and extensions after Pin/Recent without admitting unused scripts", () => {
+  const builtins = Array.from({ length: 12 }, (_, index) => ({ id: `builtin-${index}` }));
+  const extensions = Array.from({ length: 3 }, (_, index) => ({ id: `extension-${index}`, kind: "extension" }));
+  const scripts = Array.from({ length: 3 }, (_, index) => ({ id: `script-${index}`, kind: "ordinary-script" }));
+  const ranked = [...builtins, ...extensions, ...scripts];
+  const original = [...ranked];
+  const sections = projectLauncherSections(ranked, new Set(["extension-1", "script-0"]),
+    new Set(["builtin-0", "extension-1", "script-0", "script-1"]));
+  assert.deepEqual(sections.map(([id]) => id), ["pinned", "recent", "commands"]);
+  const ids = sections.map(([, , items]) => items.map(({ id }) => id));
+  assert.deepEqual(ids[0], ["extension-1", "script-0"]);
+  assert.deepEqual(ids[1], ["builtin-0", "script-1"]);
+  assert.deepEqual(ids[2], ["builtin-1", "extension-0", "builtin-2", "extension-2",
+    ...builtins.slice(3).map(({ id }) => id)]);
+  assert.equal(ids.flat().length, 17);
+  assert.equal(new Set(ids.flat()).size, 17);
+  assert.deepEqual(ranked, original, "Launcher does not mutate the search result");
+});
+
+test("Launcher keeps the remaining source order with no builtins, no extensions, or more extensions", () => {
+  const builtin = { id: "builtin" };
+  const extensions = [{ id: "e1", kind: "extension" }, { id: "e2", kind: "extension" }];
+  for (const source of [[builtin], extensions, [...extensions, builtin]]) {
+    assert.deepEqual(projectLauncherSections(source)[0][2],
+      source.includes(builtin) ? [builtin, ...source.filter((command) => command !== builtin)] : extensions);
+  }
+});
+
 test("grouping sorts commands and collects non-letter initials under #", () => {
   const grouped = groupCommands([
     { name: "Zulu" },

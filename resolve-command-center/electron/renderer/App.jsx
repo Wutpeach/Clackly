@@ -76,7 +76,6 @@ const showBrowserPreviewAgentation = shouldRenderBrowserPreviewAgentation({
   search: window.location.search
 });
 const BrowserPreviewAgentation = lazy(() => import("./BrowserPreviewAgentation.jsx"));
-const LAUNCHER_ROW_LIMIT = 9;
 
 const ICONS = {
   marker: Bookmark,
@@ -389,24 +388,24 @@ function PaletteApp() {
   const usedCommandIds = useMemo(() => new Set(searchResponse.usedCommandIds), [searchResponse.usedCommandIds]);
   const activeSearchQuery = mode === "search" ? query : "";
 
-  const launcherCommands = useMemo(
-    () => searchCatalog.slice(0, LAUNCHER_ROW_LIMIT),
-    [searchCatalog]
-  );
   const searchCommands = useMemo(
     () => searchCatalog,
     [searchCatalog]
   );
   const launcherSections = useMemo(
-    () => projectLauncherSections(launcherCommands, pinnedIds, usedCommandIds, t).map(([id, label, sectionCommands]) => ({
-      id,
-      label,
-      entries: sectionCommands.map((command) => ({
-        command,
-        index: launcherCommands.indexOf(command)
-      }))
-    })),
-    [launcherCommands, pinnedIds, usedCommandIds, t]
+    () => {
+      let index = 0;
+      return projectLauncherSections(searchCatalog, pinnedIds, usedCommandIds, t).map(([id, label, sectionCommands]) => ({
+        id,
+        label,
+        entries: sectionCommands.map((command) => ({ command, index: index++ }))
+      }));
+    },
+    [searchCatalog, pinnedIds, usedCommandIds, t]
+  );
+  const launcherCommands = useMemo(
+    () => launcherSections.flatMap(({ entries }) => entries.map(({ command }) => command)),
+    [launcherSections]
   );
   const activeCommands = mode === "search" ? searchCommands : launcherCommands;
   const selectedCommand = activeCommands[selectedIndex] || null;
@@ -513,11 +512,14 @@ function PaletteApp() {
         setSearchResponse(response);
         const toggledCommandId = pendingPinSelectionRef.current;
         if (toggledCommandId) {
-          const orderedVisibleCommands = createPresentationCatalog(response.commands, featureStatusesRef.current);
+          const catalog = createPresentationCatalog(response.commands, featureStatusesRef.current);
+          const orderedVisibleCommands = mode === "launcher"
+            ? projectLauncherSections(catalog, pinnedIds, new Set(response.usedCommandIds), t)
+              .flatMap(([, , sectionCommands]) => sectionCommands)
+            : catalog;
           setSelectedIndex(findSelectedCommandIndex(
             orderedVisibleCommands,
-            toggledCommandId,
-            mode === "launcher" ? LAUNCHER_ROW_LIMIT : Infinity
+            toggledCommandId
           ));
           pendingPinSelectionRef.current = null;
         }
@@ -551,6 +553,17 @@ function PaletteApp() {
     setSelectedIndex(0);
     setHoveredCommandId(null);
   }, [query, effectiveLocale]);
+
+  useLayoutEffect(() => {
+    setSelectedIndex((current) => Math.min(current, Math.max(0, activeCommands.length - 1)));
+  }, [activeCommands.length]);
+
+  useLayoutEffect(() => {
+    if (mode !== "launcher") return;
+    const row = mainSurfaceRef.current?.querySelector(`[data-command-index="${selectedIndex}"]`);
+    if (selectedIndex === 0) row?.closest(".launcher-content")?.scrollTo({ top: 0 });
+    else row?.scrollIntoView({ block: "nearest" });
+  }, [mode, selectedIndex, launcherCommands]);
 
   useLayoutEffect(() => {
     closeInteractionPanel(false);
@@ -968,7 +981,7 @@ function PaletteApp() {
                           selected={index === selectedIndex}
                           hovered={hoveredCommandId === command.id}
                           accessibleDescription={getCommandAccessibleDescription(command, localizedCommands, bindings, t)}
-                          keycap={index + 1}
+                          keycap={index < 9 ? index + 1 : null}
                           onHover={handleCommandHover}
                           onLeave={handleCommandLeave}
                           onFocus={handleCommandFocus}
