@@ -22,4 +22,4 @@ Public publication requires explicit approval of the version, source/tag, unsign
 
 After approved publication, check the real GitHub API tag, exact EXE name/size/URL and `sha256:` digest against the final asset, then perform one real discovery/download/hash check. Do not substitute local metadata/cache simulations for this evidence. Onsite UAC/overwrite/uninstall or changes to a test machine require separate confirmation. Actual offline install, standard-user UAC and real uninstall remain unverified unless performed.
 
-The R31 test machine currently has unpublished local **0.1.4**. The proposed next public version is **0.1.5**, skipping public 0.1.4 so this machine can discover a genuinely newer approved release without rollback. This is a proposal until publication approval; do not change the installed test machine to manufacture an update.
+Public **0.1.5** introduced the complete Inno EXE and Settings updater. Later stable versions retain this format; v0.1.3 and earlier still require the one-time manual EXE transition described above. A release does not authorize changing an installed test machine to manufacture update or installation evidence.
