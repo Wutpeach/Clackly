@@ -41,4 +41,4 @@ public/images/palette.png is an actual Clackly renderer capture with determinist
 
 Review screenshots and validation receipts are linked from Issue #11 and the PR. The site inherits the existing application's neutral surface, typography, logo, controlled corners and keyboard emphasis; the tracked [renderer styles](../resolve-command-center/electron/renderer/styles.css) provide the visual source. This work does not depend on untracked local design notes.
 
-The website uses HarmonyOS Sans © 2021 Huawei Device Co., Ltd. Its [complete license notice and agreement](public/fonts/HARMONYOS_SANS_LICENSE.txt) accompany the unmodified font and are linked from the homepages and documentation entry pages.
+The product home uses HarmonyOS Sans © 2021 Huawei Device Co., Ltd. Its [complete license notice and agreement](public/fonts/HARMONYOS_SANS_LICENSE.txt) accompany the unmodified font and are linked from the homepages and documentation entry pages. Documentation uses Black Theme's native Geist Sans/Geist Mono, reading width and light/dark tokens, matching Ameow's theme setup.

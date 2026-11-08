@@ -1,8 +1,4 @@
-:root { --sl-font: 'HarmonyOS Sans', 'Segoe UI', system-ui, sans-serif; --sl-content-width: 48rem; }
-@font-face { font-family: 'HarmonyOS Sans'; src: url('/Clackly/fonts/HarmonyOS_Sans.ttf') format('truetype'); font-display: swap; }
-:root[data-theme='dark'] { --sl-color-bg: #151619; --sl-color-bg-nav: #151619; --sl-color-bg-sidebar: #151619; --sl-color-accent-low: #303238; --sl-color-accent: #bfc2ca; --sl-color-accent-high: #edeef0; }
-:root[data-theme='light'] { --sl-color-accent-low: #e7e8ea; --sl-color-accent: #454950; --sl-color-accent-high: #202226; }
-::selection { background: #bfc2ca; color: #151619; }
+/* Keep Black Theme's Geist type, reading measure and paired light/dark tokens. */
 :focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
 .sl-markdown-content { overflow-wrap: anywhere; }
 .sl-markdown-content a { text-underline-offset: .2em; }
@@ -10,7 +6,7 @@
 .sidebar-content .entry-link { height: auto; min-height: 30px; line-height: 1.65; }
 .sl-markdown-content table { display: block; max-width: 100%; overflow-x: auto; }
 .sl-markdown-content :is(th, td) { min-width: 8rem; overflow-wrap: normal; }
-html { scrollbar-color: #7d8088 transparent; }
+html { scrollbar-color: var(--muted-foreground) var(--background); }
 
 /* Reuse Ameow’s mobile pagination fix for long translated labels. */
 @media (max-width: 40rem) {

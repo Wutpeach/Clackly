@@ -74,7 +74,7 @@ test('mobile navigation works with keyboard and opens a real docs page', async (
   await button.focus();
   await page.keyboard.press('Enter');
   await expect(button).toHaveAttribute('aria-expanded', 'true');
-  await page.locator('.mobile-nav').getByRole('link', { name: '下载与 Windows 安装', exact: true }).click();
+  await page.locator('.mobile-nav').getByRole('link', { name: '下载与安装', exact: true }).click();
   await expect(page).toHaveURL(/\/docs\/install\/$/);
 });
 
@@ -85,6 +85,8 @@ test('responsive pages load assets without overflow or browser errors', async ({
   for (const [name, route, width] of [
     ['desktop', '', 1440], ['mobile', '', 390], ['small', '', 320],
     ['desktop-en', 'en/', 1440], ['mobile-en', 'en/', 390],
+    ['overview', 'docs/', 1440], ['overview-mobile', 'docs/', 320],
+    ['overview-en', 'en/docs/', 1440], ['overview-en-mobile', 'en/docs/', 320],
     ['docs-zh', 'docs/install/', 1440], ['docs-mobile', 'docs/install/', 390],
     ['docs-en', 'en/docs/developer/', 1440], ['docs-en-mobile', 'en/docs/developer/', 320],
     ['prompts', 'docs/developer/prompts/', 1440], ['reference-mobile', 'docs/developer/reference/views/', 390],
@@ -99,12 +101,29 @@ test('responsive pages load assets without overflow or browser errors', async ({
   expect(errors).toEqual([]);
 });
 
-test('theme switch changes the reading surface and remains usable', async ({ page }) => {
-  await page.goto('./docs/');
-  const before = await page.locator('html').getAttribute('data-theme');
-  await page.locator('starlight-theme-black-select button').click();
-  await expect(page.locator('html')).not.toHaveAttribute('data-theme', before!);
-  await expect(page.locator('h1')).toBeVisible();
+test('theme switch persists across the overview to AI guide and remains usable', async ({ page }, testInfo) => {
+  for (const locale of ['', 'en/']) {
+    await page.goto('./' + locale + 'docs/');
+    for (const theme of ['light', 'dark']) {
+      if (await page.locator('html').getAttribute('data-theme') !== theme) {
+        const toggle = page.locator('starlight-theme-black-select button');
+        await toggle.focus();
+        await page.keyboard.press('Enter');
+      }
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      for (const width of [1440, 320]) {
+        await page.setViewportSize({ width, height: 960 });
+        await page.evaluate(() => document.fonts.ready);
+        await expect(page.locator('h1')).toBeVisible();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+        await page.screenshot({ path: testInfo.outputPath(`overview-${locale ? 'en' : 'zh'}-${theme}-${width}.png`), fullPage: true, animations: 'disabled' });
+      }
+      await page.locator('.sl-link-card').filter({ hasText: 'Build with AI' }).getByRole('link').click();
+      await expect(page).toHaveURL(new RegExp('/Clackly/' + locale + 'docs/developer/$'));
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      await page.goto('./' + locale + 'docs/');
+    }
+  }
 });
 
 test('long translated navigation labels and mobile reference tables remain readable', async ({ page }) => {

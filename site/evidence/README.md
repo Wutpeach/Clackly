@@ -17,6 +17,17 @@ Source branch: docs/issue-11-site. Website baseline: public v0.1.6. Original che
 
 All screenshots are from the actual built website at the local /Clackly/ base. Files are full-page captures; open their original size to inspect text.
 
+The 2026-11-08 documentation refinement follows the same starlight-theme-black 0.7.1 setup as Ameow. Both sites already had the theme installed; this pass removes the documentation's application-font/palette overrides, restores native Geist Sans/Geist Mono and theme colors, shortens bilingual navigation labels and uses native LinkCards on the overview. Copy for Agent follows the theme tokens. The product home retains its own visual system.
+
+The 12-test browser suite passed after these changes. The theme test now uses the keyboard control, checks persistence from the overview into the AI guide, and captures both locales at 1440px/320px in both light and dark mode. A focused rerun passed after making captures finish CSS transitions, so the evidence shows settled theme colors.
+
+| Documentation overview | Desktop | 320px phone |
+| --- | --- | --- |
+| Chinese · dark | [View](overview-zh-dark.png) | [View](overview-zh-dark-mobile.png) |
+| Chinese · light | [View](overview-zh-light.png) | [View](overview-zh-light-mobile.png) |
+| English · dark | [View](overview-en-dark.png) | [View](overview-en-dark-mobile.png) |
+| English · light | [View](overview-en-light.png) | [View](overview-en-light-mobile.png) |
+
 | Surface | Desktop | Phone |
 | --- | --- | --- |
 | Chinese home | [1440px](desktop.png) | [390px](mobile.png), [320px](small.png) |

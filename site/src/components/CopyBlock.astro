@@ -28,11 +28,11 @@ const en = lang === 'en';
   });
 </script>
 <style>
-.copy-block { margin-block: 1.5rem; border: 1px solid var(--sl-color-gray-5, #3a3c42); border-radius: 6px; overflow: hidden; }
-.copy-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .7rem; padding: .85rem 1rem; border-bottom: 1px solid var(--sl-color-gray-5, #3a3c42); font-size: .85rem; }
-button { cursor: pointer; font: inherit; padding: .55rem .75rem; color: var(--sl-color-black, #151619); background: var(--sl-color-white, #e7e8ea); border: 1px solid transparent; border-radius: 4px; min-height: 40px; }
+.copy-block { margin-block: 1.5rem; border: 1px solid var(--border, #3a3c42); border-radius: var(--radius, 6px); background: var(--code-background, transparent); overflow: hidden; }
+.copy-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .7rem; padding: .85rem 1rem; border-bottom: 1px solid var(--border, #3a3c42); font-size: .85rem; }
+button { cursor: pointer; font: inherit; padding: .55rem .75rem; color: var(--primary-foreground, #151619); background: var(--primary, #e7e8ea); border: 1px solid transparent; border-radius: 4px; min-height: 40px; }
 button:hover { opacity: .85; }
-textarea { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 12rem; padding: 1rem; font: .875rem/1.7 ui-monospace, monospace; color: inherit; background: transparent; border: 0; border-radius: 0; }
+textarea { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 12rem; padding: 1rem; font: .875rem/1.7 var(--sl-font-mono, ui-monospace), monospace; color: inherit; background: transparent; border: 0; border-radius: 0; }
 .copy-status { margin: 0; padding: 0 1rem; font-size: .85rem; }
 .copy-status:not(:empty) { padding-bottom: .8rem; }
 </style>

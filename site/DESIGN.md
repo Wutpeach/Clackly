@@ -44,11 +44,11 @@ The dark homepage continues the application's #151619 neutral surface. Light neu
 
 ## Typography
 
-Reuse the application's HarmonyOS Sans asset with platform fallbacks for Chinese. Large two-line home copy has a maximum of 6rem. Documentation keeps a conventional reading column. Monospace is reserved for code and copyable Agent source.
+The product home reuses the application's HarmonyOS Sans asset with platform fallbacks for Chinese. Large two-line home copy has a maximum of 6rem. Documentation follows Black Theme's native Geist Sans/Geist Mono fonts, neutral light/dark palette and reading width, as in Ameow; do not override them with application font or palette tokens. Monospace is reserved for code and copyable Agent source.
 
 ## Layout
 
-The desktop home has a 1120px maximum width, clear navigation, a large value statement and download action, then a full-width command demonstration with the actual compact palette at its native screenshot size. Workflow explanations use divided rows; AI authoring has one copyable prompt and a direct guide link. At 600px, content stacks with 18px gutters. Documentation keeps Starlight's sidebar, contents, search, language and mobile menu; long pagination labels wrap.
+The desktop home has a 1120px maximum width, clear navigation, a large value statement and download action, then a full-width command demonstration with the actual compact palette at its native screenshot size. Workflow explanations use divided rows; AI authoring has one copyable prompt and a direct guide link. At 600px, content stacks with 18px gutters. Documentation keeps Starlight's sidebar, contents, search, language and mobile menu. Use concise localized sidebar labels and the theme's LinkCards for the documentation overview; long pagination labels wrap.
 
 ## Elevation & Depth
 
