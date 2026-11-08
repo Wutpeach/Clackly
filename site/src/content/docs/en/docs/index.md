@@ -21,3 +21,5 @@ Public distribution targets **Windows x64 + DaVinci Resolve Studio Workflow Inte
 Clackly runs on your computer. This website is for learning and reference.
 
 [Product home](/Clackly/en/) · [Release history](/Clackly/en/docs/releases/)
+
+This website uses HarmonyOS Sans, © 2021 Huawei Device Co., Ltd. Read the [font license and notice](/Clackly/fonts/HARMONYOS_SANS_LICENSE.txt).

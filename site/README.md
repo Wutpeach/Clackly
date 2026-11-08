@@ -39,4 +39,6 @@ Adapted from Wutpeach/Ameow site/: Astro 7, Starlight 0.41, Black Theme, root/En
 
 public/images/palette.png is an actual Clackly renderer capture with deterministic test data. It was produced headlessly with the existing palette-evidence utility (built renderer, pinned-recent scenario) and is labelled as demo data on both homepages. It does not prove native Resolve execution, Windows compositor behavior or production installation. Product wordmark, mark and HarmonyOS font come from the existing application assets. No stock or AI-generated product screenshot is used. public/images/palette.png.json records the source.
 
-Review screenshots and validation receipts are linked from Issue #11 and the PR. The original application DESIGN.md remains the brand authority; the site inherits its neutral surface, typography, logo, controlled corners and keyboard emphasis.
+Review screenshots and validation receipts are linked from Issue #11 and the PR. The site inherits the existing application's neutral surface, typography, logo, controlled corners and keyboard emphasis; the tracked [renderer styles](../resolve-command-center/electron/renderer/styles.css) provide the visual source. This work does not depend on untracked local design notes.
+
+The website uses HarmonyOS Sans © 2021 Huawei Device Co., Ltd. Its [complete license notice and agreement](public/fonts/HARMONYOS_SANS_LICENSE.txt) accompany the unmodified font and are linked from the homepages and documentation entry pages.

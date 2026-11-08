@@ -21,3 +21,5 @@ Clackly 是 DaVinci Resolve 内的轻量命令面板。按 **Ctrl + Space** 呼�
 Clackly 不是网页服务。这个网站用于介绍和查阅，桌面命令在你的本机执行。
 
 [返回产品首页](/Clackly/) · [官方发行历史](/Clackly/docs/releases/)
+
+本网站使用 HarmonyOS Sans，© 2021 Huawei Device Co., Ltd.。[字体许可与声明](/Clackly/fonts/HARMONYOS_SANS_LICENSE.txt)。

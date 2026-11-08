@@ -5,12 +5,13 @@ Source branch: docs/issue-11-site. Website baseline: public v0.1.6. Original che
 ## Verification
 
 - Astro 7.3.8 / Starlight 0.41.7 / Black Theme 0.7.1 production build passed under Node 22.19.0.
-- Static verification passed: 41 HTML pages, 19 matching Chinese/English documentation routes, 2,935 local URLs/assets/fragments and 19 byte-exact Developer Skill source exports with SHA-256 inventory.
+- Static verification passed: 41 HTML pages, 19 matching Chinese/English documentation routes, 2,939 local URLs/assets/fragments and 19 byte-exact Developer Skill source exports with SHA-256 inventory.
 - 12/12 Playwright tests passed against the built preview using headless Edge 156.0.4314.58 on Windows. Tests exercise both home-to-doc-to-AI routes, six prompts per language with real clipboard readback, clipboard denial recovery, authoritative Markdown retrieval/copy, locale-preserving language switch, Pagefind search, keyboard mobile navigation, theme switch, readable non-overlapping translated sidebar links, keyboard-scrollable mobile tables and responsive asset/error/overflow checks.
 - Viewports captured: 1440, 390 and 320 pixels. No page error or asset HTTP error appeared in the responsive run.
 - Original product screenshot was generated with the existing pinned-recent renderer evidence scenario. Main-to-v0.1.6 renderer source diff is empty. Screenshot data are deterministic fixtures; this is not a native Resolve capture.
 - Mechanical design detector ran once over the four changed frontend files. It reported only advisory mismatches between literal neutral colors/type steps/radii and the summarized design tokens. No hard design bans were reported. Independent finish review is recorded in Issue #11/PR.
 - git diff --check passed. No application functional change, installer build/download or live Resolve operation was needed.
+- Final record check replaced an untracked local design-note reference with the committed renderer styles. The unmodified HarmonyOS Sans font includes its complete original copyright notice/license, linked from both homepages and documentation entry pages.
 
 ## Screenshots
 

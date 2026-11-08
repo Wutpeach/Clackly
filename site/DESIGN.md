@@ -36,7 +36,7 @@ components:
 
 ## Overview
 
-This surface extends the application visual system documented in ../DESIGN.md. The home introduces Clackly to Resolve editors; the docs help them complete a task. Product facts come from the actual Release and Developer Skill. The website does not redefine application windows or runtime behavior.
+This surface extends the application visual system implemented in [the renderer styles](../resolve-command-center/electron/renderer/styles.css), including its neutral palette, HarmonyOS Sans font and compact controls. The home introduces Clackly to Resolve editors; the docs help them complete a task. Product facts come from the actual Release and Developer Skill. The website does not redefine application windows or runtime behavior.
 
 ## Colors
 
