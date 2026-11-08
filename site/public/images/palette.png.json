@@ -1,0 +1,8 @@
+{
+  "origin": "Actual application renderer screenshot with deterministic demonstration data",
+  "source": "resolve-command-center/scripts/palette-evidence.mjs",
+  "command": "node scripts/palette-evidence.mjs --renderer built --scenario pinned-recent --output <evidence-directory>",
+  "sourceCheckout": "f1069144933eb3fc626ea7a81c46116d331f1020",
+  "date": "2026-11-08",
+  "limitations": "Browser DOM/CSS only; not a native Resolve screenshot or proof of host execution."
+}

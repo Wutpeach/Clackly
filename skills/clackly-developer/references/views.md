@@ -1,6 +1,7 @@
 # Extension Views — #8-A / #8-B accepted Host support
 
-Accepted in the current development Host, not a published release.
+Publicly shipped in Clackly v0.1.6. Verify the installed target Host; older
+Hosts can lack Views, Forms, Batch Actions or refocus refresh.
 
 Use Views for tools that remain open for browsing and actions. Use
 [Command UI](command-ui.md) for one-run input/results and [Prepare](prepare.md)

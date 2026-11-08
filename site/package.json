@@ -1,0 +1,24 @@
+{
+  "name": "clackly-site",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "dev": "node scripts/sync-skill.mjs && astro dev --host 127.0.0.1",
+    "build": "node scripts/sync-skill.mjs && astro build && node scripts/verify-build.mjs",
+    "preview": "astro preview --host 127.0.0.1",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.41.7",
+    "astro": "^7.3.8",
+    "sharp": "0.35.5",
+    "starlight-theme-black": "^0.7.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}

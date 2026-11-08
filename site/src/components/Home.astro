@@ -1,0 +1,129 @@
+---
+import CopyBlock from './CopyBlock.astro';
+import { prompts } from '../data/prompts';
+interface Props { lang: 'zh-CN' | 'en'; }
+const { lang } = Astro.props;
+const en = lang === 'en';
+const root = '/Clackly/' + (en ? 'en/' : '');
+const docs = root + 'docs/';
+const release = 'https://github.com/Wutpeach/Clackly/releases/tag/v0.1.6';
+const title = en ? 'Clackly — Stay in the edit.' : 'Clackly — 剪辑，不必绕路。';
+const description = en ? 'A compact, keyboard-first command palette for DaVinci Resolve. Find commands, run trusted extensions and build your own tools with AI.' : 'DaVinci Resolve 内轻量、键盘优先的命令面板。搜索命令、运行可信扩展，用 AI 构建自己的剪辑工具。';
+---
+<!doctype html>
+<html lang={lang}>
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title}</title><meta name="description" content={description} />
+  <meta name="theme-color" content="#151619" />
+  <link rel="icon" type="image/svg+xml" href="/Clackly/mark.svg" />
+  <link rel="canonical" href={'https://wutpeach.github.io' + root} />
+  <link rel="alternate" hreflang="zh-CN" href="https://wutpeach.github.io/Clackly/" />
+  <link rel="alternate" hreflang="en" href="https://wutpeach.github.io/Clackly/en/" />
+  <meta property="og:type" content="website" /><meta property="og:title" content={title} />
+  <meta property="og:description" content={description} /><meta property="og:url" content={'https://wutpeach.github.io' + root} />
+  <meta property="og:image" content="https://wutpeach.github.io/Clackly/images/palette.png" />
+</head>
+<body>
+<a class="skip" href="#main">{en ? 'Skip to content' : '跳到正文'}</a>
+<header class="wrap header">
+  <a class="brand" href={root} aria-label="Clackly"><img src="/Clackly/wordmark.svg" width="126" height="20" alt="Clackly" /></a>
+  <nav aria-label={en ? 'Main navigation' : '主导航'}>
+    <a href={docs}>{en ? 'Documentation' : '使用文档'}</a>
+    <a href={docs + 'developer/'}>Build with AI</a>
+    <a class="language" href={en ? '/Clackly/' : '/Clackly/en/'} lang={en ? 'zh-CN' : 'en'}>{en ? '简体中文' : 'English'}</a>
+    <a class="github" href="https://github.com/Wutpeach/Clackly">GitHub</a>
+  </nav>
+</header>
+<main id="main">
+  <section class="wrap hero" aria-labelledby="hero-title">
+    <h1 id="hero-title">{en ? 'Stay in' : '剪辑，'}<br /><span>{en ? 'the edit.' : '不必绕路。'}</span></h1>
+    <div class="hero-copy">
+      <p>{en ? 'Your commands, one keystroke away. A small palette inside DaVinci Resolve, built to keep your attention on the timeline.' : '把常用操作，收进一次呼出。DaVinci Resolve 内的轻量命令面板，让注意力留在时间线上。'}</p>
+      <div class="actions"><a class="button primary" href={release}>{en ? 'Download for Windows' : '下载 Windows 版'}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5" /></svg></a><a class="text-link" href={docs}>{en ? 'Read the docs' : '阅读文档'} <span aria-hidden="true">→</span></a></div>
+      <p class="release">v0.1.6 · Windows x64 · {en ? 'Resolve Studio Workflow Integration' : 'Resolve Studio 工作流集成'}</p>
+    </div>
+    <div class="instrument">
+      <div class="keystroke" aria-label="Control plus Space"><kbd>Ctrl</kbd><span>+</span><kbd>Space</kbd></div>
+      <div class="workflow"><p>{en ? 'Call it up.' : '随手呼出。'}</p><p>{en ? 'Find your command.' : '找到命令。'}</p><p>{en ? 'Back to your timeline.' : '回到时间线。'}</p></div>
+      <figure><img src="/Clackly/images/palette.png" width="256" height="336" alt={en ? 'Actual Clackly renderer with Pinned, Recent and Commands groups: Export to After Effects, Paste Clipboard Image and Add Marker.' : 'Clackly 实际界面：Pinned、Recent、Commands 分组，包含 AE 导出、粘贴剪贴板图片和添加标记。'} fetchpriority="high" /><figcaption>{en ? 'Actual renderer · demo data' : '实际 renderer · 演示数据'}</figcaption></figure>
+      <div class="instrument-note"><span class="small-rule"></span><p>{en ? 'A compact 240 × 320 palette. Your workspace stays yours.' : '240 × 320 的小面板。\n工作区，留给你的剪辑。'}</p><a href={docs + 'first-use/'}>{en ? 'Meet your palette' : '认识命令面板'} <span aria-hidden="true">↗</span></a></div>
+    </div>
+  </section>
+  <section class="wrap capabilities" aria-labelledby="work-title">
+    <h2 id="work-title">{en ? 'Less reaching. More doing.' : '让操作靠近你。'}</h2>
+    <div class="feature-row"><h3>{en ? 'Find it. Keep it close.' : '搜得到，也记得住。'}</h3><div><p>{en ? 'Search built-in commands, extensions and ordinary Resolve scripts together. Pin a favorite. Pick up where you left off with Recent. Sources stay visible, even when names match.' : '内置命令、扩展和普通 Resolve 脚本，一起搜索。常用的固定到 Pinned，用过的从 Recent 找回。同名命令，也能看清来源。'}</p><a href={docs + 'launcher/'}>{en ? 'Launcher & search' : 'Launcher 与搜索'} <span aria-hidden="true">→</span></a></div></div>
+    <div class="feature-row"><h3>{en ? 'A command, or a whole tool.' : '一个命令，也能是一套工具。'}</h3><div><p>{en ? 'Run a focused action with an input form and a clear result. Keep an Extension View open to browse lists, inspect details, edit a form or apply a confirmed batch action.' : '用输入表单完成一次操作，得到清楚的结果。需要持续浏览时，打开 Extension View：列表、详情、表单与确认后的批量操作，都在独立工具窗口里。'}</p><a href={docs + 'command-ui-views/'}>{en ? 'Explore extension UI' : '了解扩展界面'} <span aria-hidden="true">→</span></a></div></div>
+    <div class="feature-row"><h3>{en ? 'Make room for your workflow.' : '把你的工作流，装进来。'}</h3><div><p>{en ? 'Install a trusted .clackly package from Settings. Configure, enable or update it there. Extension commands appear in the Launcher without a restart.' : '从 Settings 安装可信的 .clackly 包，配置、启用和更新都在同一个地方。扩展命令直接出现在 Launcher，无需重启。'}</p><a href={docs + 'extensions/'}>{en ? 'Install an extension' : '安装与管理扩展'} <span aria-hidden="true">→</span></a></div></div>
+  </section>
+  <section class="ai-section" aria-labelledby="ai-title"><div class="wrap ai-inner">
+    <div><h2 id="ai-title">{en ? 'Your next tool\nstarts with an idea.' : '下一个工具，\n从一句需求开始。'}</h2><p>{en ? 'Tell your Agent what you need. The official Developer Skill gives it the protocol, examples and packaging tools to turn that idea into a Clackly extension.' : '告诉 Agent 你想解决什么。官方 Developer Skill 提供协议、示例与打包工具，把需求变成可安装的 Clackly 扩展。'}</p><a class="button primary" href={docs + 'developer/'}>Build with AI <span aria-hidden="true">→</span></a><p class="ai-note">{en ? 'Python extensions. Host-rendered UI. Your source to keep.' : 'Python 扩展 · Host 渲染界面 · 源码由你掌握'}</p></div>
+    <CopyBlock text={prompts(lang)[0].text} lang={lang} label={en ? 'Start with a read-only tool' : '从只读工具开始'} />
+  </div></section>
+  <section class="wrap closing"><h2>{en ? 'One small palette.\nBack to the work you love.' : '一个小面板。\n回到你热爱的剪辑。'}</h2><a class="button primary" href={release}>{en ? 'Get Clackly v0.1.6' : '下载 Clackly v0.1.6'}</a><a class="text-link" href={docs + 'install/'}>{en ? 'Installation guide' : '查看安装指南'} <span aria-hidden="true">→</span></a><p>{en ? 'Unsigned installer. Download from the official Release and verify its SHA-256. Install only extensions you trust; they execute local code.' : '安装器未签名，请从官方 Release 下载并核对 SHA-256。扩展会执行本地代码，请只安装你信任的来源。'}</p></section>
+</main>
+<footer class="wrap footer"><a class="brand" href={root}><img src="/Clackly/mark.svg" width="24" height="24" alt="" />Clackly</a><p>{en ? 'Built for your Resolve workflow.' : '为你的 Resolve 工作流而造。'}</p><nav aria-label={en ? 'Footer' : '页脚'}><a href={docs}>{en ? 'Docs' : '文档'}</a><a href={release}>{en ? 'Releases' : '发行记录'}</a><a href="https://github.com/Wutpeach/Clackly">GitHub</a></nav></footer>
+</body></html>
+<style>
+@font-face { font-family: Harmony; src: url('/Clackly/fonts/HarmonyOS_Sans.ttf') format('truetype'); font-display: swap; }
+:global(html) { background: #151619; color: #e7e8ea; font-family: Harmony, 'Segoe UI', system-ui, sans-serif; color-scheme: dark; scrollbar-color: #777b84 #151619; }
+:global(body) { margin: 0; }
+:global(*) { box-sizing: border-box; }
+:global(::selection) { color: #151619; background: #e7e8ea; }
+:global(a) { color: inherit; text-decoration: none; text-underline-offset: .25em; }
+:global(a:hover) { text-decoration: underline; }
+:global(:focus-visible) { outline: 2px solid #e7e8ea; outline-offset: 5px; }
+.wrap { width: min(1120px, calc(100% - 80px)); margin-inline: auto; }
+.header { display: flex; justify-content: space-between; align-items: center; gap: 2rem; min-height: 94px; border-bottom: 1px solid #32343a; }
+.brand { display: inline-flex; align-items: center; gap: .5rem; font-weight: 600; }
+.header nav, .footer nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1.8rem; font-size: .9rem; }
+.header nav a { padding-block: .65rem; }
+.language { color: #b7b9c0; }
+.hero { padding-top: 76px; display: grid; grid-template-columns: 1.1fr 1fr; column-gap: 4rem; }
+h1 { font-size: clamp(3.7rem, 7.2vw, 6rem); font-weight: 600; line-height: 1.08; letter-spacing: -.035em; margin: 0; text-wrap: balance; }
+h1 span { color: #a3a6af; }
+.hero-copy { align-self: end; padding-bottom: .4rem; }
+.hero-copy > p:first-child { font-size: 1.1rem; line-height: 1.85; max-width: 32rem; margin: 0 0 1.6rem; color: #c6c8ce; }
+.actions { display: flex; flex-wrap: wrap; gap: 1.4rem; align-items: center; }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: .9rem; padding: .85rem 1.15rem; border-radius: 5px; min-height: 48px; font-weight: 600; font-size: .95rem; }
+.primary { background: #e7e8ea; color: #17191d; }
+.primary:hover { background: #fff; text-decoration: none; }
+.button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.text-link { display: inline-block; padding-block: .7rem; font-size: .95rem; }
+.release { color: #a3a6af; font-size: .76rem; line-height: 1.7; margin: 1.2rem 0 0; }
+.instrument { grid-column: 1 / -1; margin-top: 54px; padding: 34px 42px 26px; border-block: 1px solid #32343a; display: grid; grid-template-columns: 1fr 256px 1fr; column-gap: 3rem; align-items: center; position: relative; }
+.keystroke { display: flex; align-items: center; gap: .8rem; grid-column: 1; align-self: end; margin-bottom: 1rem; }
+.keystroke kbd { font: 500 1.8rem/1 Harmony, sans-serif; border: 1px solid #626670; border-bottom-width: 4px; padding: 1.1rem 1.2rem; border-radius: 7px; }
+.keystroke > span { color: #9b9ea7; }
+.workflow { grid-column: 1; align-self: start; }
+.workflow p { margin: 0 0 .5rem; color: #b7b9c0; font-size: 1.05rem; }
+figure { grid-column: 2; grid-row: 1 / 3; margin: 0; }
+figure img { width: 256px; max-width: 100%; height: auto; display: block; filter: drop-shadow(0 14px 16px #0005); }
+figcaption { font-size: .7rem; color: #a3a6af; text-align: center; margin-top: .7rem; }
+.instrument-note { grid-column: 3; grid-row: 1 / 3; align-self: center; }
+.small-rule { display: block; width: 36px; border-top: 1px solid #777b84; }
+.instrument-note p { font-size: 1.1rem; color: #b7b9c0; line-height: 1.8; margin: 1.2rem 0; }
+.instrument-note a { font-size: .875rem; }
+.capabilities { padding-block: 95px 100px; }
+h2 { font-size: clamp(2rem, 3.4vw, 3rem); font-weight: 500; letter-spacing: -.025em; line-height: 1.25; text-wrap: balance; margin: 0; }
+.capabilities h2 { margin-bottom: 3.5rem; }
+.feature-row { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; border-top: 1px solid #32343a; padding-block: 2rem; }
+h3 { font-weight: 500; font-size: 1.4rem; line-height: 1.4; margin: 0; }
+.feature-row p { margin: 0 0 1rem; color: #b7b9c0; line-height: 1.85; font-size: 1rem; }
+.feature-row a { font-size: .875rem; }
+.ai-section { border-block: 1px solid #3a3c42; background: #1c1e22; }
+.ai-inner { padding-block: 76px; display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; }
+.ai-inner h2 { white-space: pre-line; }
+.ai-inner > div > p { line-height: 1.85; color: #b7b9c0; margin-block: 1.5rem; max-width: 32rem; }
+.ai-inner > div > .ai-note { font-size: .8rem; }
+.closing { padding-block: 95px; text-align: center; }
+.closing h2 { white-space: pre-line; margin-bottom: 2rem; }
+.closing .text-link { margin-left: 1.5rem; }
+.closing p { color: #a3a6af; max-width: 43rem; font-size: .8rem; line-height: 1.8; margin: 2rem auto 0; }
+.footer { border-top: 1px solid #32343a; display: flex; gap: 2rem; align-items: center; padding-block: 2rem; }
+.footer p { color: #a3a6af; font-size: .8rem; flex: 1; }
+.skip { position: absolute; top: -100px; left: 1rem; padding: 1rem; background: #e7e8ea; color: #151619; z-index: 10; }
+.skip:focus { top: 1rem; }
+@media (max-width: 900px) { .wrap { width: calc(100% - 48px); } .hero { gap: 2rem; } .instrument { column-gap: 1.5rem; padding-inline: 0; grid-template-columns: 1fr 256px; } .instrument-note { grid-column: 1; grid-row: 3; margin-top: 1.5rem; } figure { grid-row: 1 / 4; } .keystroke kbd { font-size: 1.4rem; padding: 1rem; } .feature-row, .ai-inner { gap: 2rem; } .github { display: none; } }
+@media (max-width: 600px) { .wrap { width: calc(100% - 36px); } .header { min-height: 84px; gap: 1rem; align-items: flex-start; padding-block: 1.25rem; } .brand img { width: 100px; height: auto; } .header nav { justify-content: flex-end; gap: .3rem 1rem; font-size: .75rem; max-width: 220px; } .header nav a { padding-block: .25rem; } .hero { padding-top: 44px; grid-template-columns: 1fr; gap: 1.8rem; } h1 { font-size: clamp(3.4rem, 13vw, 5rem); } .hero-copy > p:first-child { font-size: 1rem; } .instrument { margin-top: 14px; padding-block: 30px; grid-template-columns: 1fr; gap: 0; } .keystroke { grid-column: 1; justify-content: center; align-self: auto; } .keystroke kbd { font-size: 1.3rem; padding: .9rem 1.6rem; } .workflow { text-align: center; margin: .5rem 0 1.5rem; } .workflow p { display: inline; font-size: .82rem; margin-right: .5rem; } figure { grid-column: 1; grid-row: auto; justify-self: center; } .instrument-note { grid-column: 1; grid-row: auto; text-align: center; margin: 2rem auto 0; max-width: 22rem; } .small-rule { margin: auto; } .instrument-note p { font-size: 1rem; margin-block: .8rem; } .capabilities { padding-block: 56px; } .capabilities h2 { margin-bottom: 2rem; } .feature-row { grid-template-columns: 1fr; gap: 1rem; padding-block: 1.7rem; } h3 { font-size: 1.2rem; } .feature-row p { font-size: .95rem; } .ai-inner { padding-block: 48px; grid-template-columns: 1fr; gap: .5rem; } .closing { padding-block: 56px; } .closing .text-link { display: block; margin: .7rem 0 0; } .footer { flex-wrap: wrap; gap: .7rem 1rem; } .footer .brand img { width: 24px; } .footer p { flex-basis: 60%; } .footer nav { gap: 1.5rem; font-size: .8rem; } }
+</style>

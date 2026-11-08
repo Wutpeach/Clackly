@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.astro/
+playwright-report/
+test-results/
+public/agent/
+public/llms.txt
+src/content/docs/docs/developer/reference/
+src/content/docs/en/docs/developer/reference/

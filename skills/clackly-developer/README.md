@@ -21,10 +21,9 @@ folder** and manually share the complete directory or a ZIP instead. Missing or
 unreadable resources disable the buttons; check permissions or reinstall a
 build that includes the Skill, then reopen Extensions.
 
-This route is part of the current development build, not a claim that a public
-Release already includes it. The documented #7 Command UI / Dynamic Prepare
-and #8 List / Detail / Form / Create / Edit / Batch Actions are accepted Host
-capabilities; check your target Host. See [Command UI](references/command-ui.md),
+Clackly v0.1.6 publicly includes this installation route, Command UI / Dynamic
+Prepare and Extension Views / Forms / Create / Edit / Batch Actions. Older Hosts
+may lack these capabilities; check the installed target Host. See [Command UI](references/command-ui.md),
 [Prepare](references/prepare.md), and [Views](references/views.md) for the
 contracts and complete examples.
 
