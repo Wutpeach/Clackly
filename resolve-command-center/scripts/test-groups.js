@@ -18,6 +18,19 @@ const SUBPROCESS_SUITES = [
   'scripts/viteDevRenderer.test.js',
   'scripts/workflow-release/package.test.js'
 ];
+// These share browser/native focus resources and stay serial within one Runner.
+const UI_INTEGRATION_SUITES = [
+  'command-search/launcher.integration.js',
+  'command-search/ui.integration.js',
+  'extensions/commandUi.integration.js',
+  'extensions/extensionView-edit-ui.integration.js',
+  'extensions/extensionView-focus.integration.js',
+  'extensions/extensionView-form.integration.js',
+  'extensions/extensionView-ui.integration.js',
+  'extensions/prepare-ui.integration.js',
+  'extensions/ui.integration.js',
+  'scripts/developer-skill-ui.integration.js'
+];
 const PYTHON_SUITES = ['bridge', 'resolve', 'script-runtime', 'resolve2ae_core/tests', 'scripts'];
 
 function discoverNodeSuites(root = APP_ROOT, directory = '') {
@@ -35,8 +48,8 @@ function discoverNodeSuites(root = APP_ROOT, directory = '') {
 
 function nodePartitions(root = APP_ROOT) {
   const suites = discoverNodeSuites(root);
-  for (const file of SUBPROCESS_SUITES) {
-    if (!suites.includes(file)) throw new Error('Missing subprocess suite: ' + file);
+  for (const file of [...SUBPROCESS_SUITES, ...UI_INTEGRATION_SUITES]) {
+    if (!suites.includes(file)) throw new Error('Missing integration suite: ' + file);
   }
   const integration = suites.filter((file) => SUBPROCESS_SUITES.includes(file) || file.endsWith('.integration.js'));
   const node = suites.filter((file) => !integration.includes(file));
@@ -44,12 +57,21 @@ function nodePartitions(root = APP_ROOT) {
   return { node, integration };
 }
 
-function testGroups(root = APP_ROOT) {
+function testGroups(root = APP_ROOT, integrationSuite = 'all') {
+  if (!['all', 'ui', 'system'].includes(integrationSuite)) {
+    throw new Error('Unknown or empty integration suite: ' + integrationSuite);
+  }
   const partitions = nodePartitions(root);
+  const integration = {
+    all: partitions.integration,
+    ui: partitions.integration.filter((file) => UI_INTEGRATION_SUITES.includes(file)),
+    system: partitions.integration.filter((file) => !UI_INTEGRATION_SUITES.includes(file))
+  }[integrationSuite];
+  if (!integration?.length) throw new Error('Unknown or empty integration suite: ' + integrationSuite);
   return {
     node: [{ label: 'Node logic', command: process.execPath, args: ['--test', ...partitions.node] }],
-    integration: [{ label: 'Serial subprocess / Windows integration', command: process.execPath,
-      args: ['--test', '--test-concurrency=1', ...partitions.integration] }],
+    integration: [{ label: 'Serial Windows integration (' + integrationSuite + ')', command: process.execPath,
+      args: ['--test', '--test-concurrency=1', ...integration] }],
     python: PYTHON_SUITES.map((directory) => ({ label: 'Python ' + directory, command: 'python',
       args: ['-m', 'unittest', 'discover', '-s', directory, '-p', 'test_*.py'] }))
   };
@@ -77,10 +99,11 @@ function runSteps(steps, { cwd = APP_ROOT, report = console.log } = {}) {
 }
 
 function main(args = process.argv.slice(2)) {
-  if (args.length !== 1 || !['all', 'node', 'integration', 'python', '--list'].includes(args[0])) {
-    throw new Error('Usage: node scripts/test-groups.js <all|node|integration|python|--list>');
+  if (!['all', 'node', 'integration', 'python', '--list'].includes(args[0])
+    || !(args.length === 1 || args.length === 2 && args[0] === 'integration')) {
+    throw new Error('Usage: node scripts/test-groups.js <all|node|integration [ui|system]|python|--list>');
   }
-  const groups = testGroups();
+  const groups = testGroups(APP_ROOT, args[1] ?? 'all');
   if (args[0] === '--list') { console.log(JSON.stringify(groups, null, 2)); return 0; }
   return runSteps(args[0] === 'all' ? Object.values(groups).flat() : groups[args[0]]).exitCode;
 }

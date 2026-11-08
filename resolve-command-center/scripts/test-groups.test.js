@@ -30,3 +30,20 @@ test('individual group commands cover the same Node partition and all five Pytho
   assert.deepEqual(groups.python.map((step) => step.args), PYTHON_SUITES.map((directory) =>
     ['-m', 'unittest', 'discover', '-s', directory, '-p', 'test_*.py']));
 });
+
+test('isolated UI and system lanes cover all integration suites exactly once and remain serial', () => {
+  const all = testGroups().integration[0].args.slice(2);
+  const ui = testGroups(undefined, 'ui').integration[0].args;
+  const system = testGroups(undefined, 'system').integration[0].args;
+  assert.deepEqual(ui.slice(0, 2), ['--test', '--test-concurrency=1']);
+  assert.deepEqual(system.slice(0, 2), ['--test', '--test-concurrency=1']);
+  const combined = [...ui.slice(2), ...system.slice(2)];
+  assert.equal(new Set(combined).size, combined.length);
+  assert.deepEqual(combined.sort(), all);
+  assert.ok(ui.includes('command-search/launcher.integration.js'));
+  assert.ok(ui.includes('extensions/ui.integration.js'));
+  assert.ok(system.includes('script-runtime/runtime-launcher.integration.js'));
+  assert.ok(system.includes('electron/main/update/windows.integration.js'));
+  assert.ok(system.includes('scripts/workflow-release/package.test.js'));
+  assert.throws(() => testGroups(undefined, 'typo'), /Unknown or empty integration suite/);
+});

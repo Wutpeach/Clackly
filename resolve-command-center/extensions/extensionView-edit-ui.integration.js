@@ -29,7 +29,12 @@ test('isolated Electron: Create/Edit, protected drafts, partial batch, refocus r
     const page = await open('extension:clackly.demo.timeline-manager/open');
     const rows = page.locator('[role=option]'); await rows.first().waitFor();
     const snap = name => page.screenshot({ path: path.join(evidence, name + '.png') });
-    const menuAction = async name => { await page.keyboard.press('Control+.'); await page.getByRole('menuitem', { name, exact: true }).click(); };
+    const menuAction = async name => {
+      // Navigation restores focus on the next animation frame after rendering.
+      await page.waitForFunction(() => !!document.activeElement?.closest('.extension-view-shell'));
+      await page.keyboard.press('Control+.');
+      await page.getByRole('menuitem', { name, exact: true }).click();
+    };
     const save = async () => { await page.getByRole('button', { name: '保存', exact: true }).click(); await page.getByRole('alertdialog').waitFor(); };
     const confirmSave = async () => { await page.getByRole('alertdialog').getByRole('button', { name: '保存', exact: true }).click(); };
     const batch = async () => { await page.getByRole('button', { name: '批量添加 Review 前缀', exact: true }).click(); await page.getByRole('alertdialog').waitFor(); await page.getByRole('alertdialog').getByRole('button', { name: '批量添加 Review 前缀', exact: true }).click(); };

@@ -33,6 +33,8 @@ test('built View renderer restores focus after confirmation/copy and keeps Escap
     });
     await page.goto('http://127.0.0.1:' + server.address().port + '/?view=extension-view');
     await page.locator('.view-detail').waitFor();
+    // The shortcut bubbles through the shell only after its deferred focus lands.
+    await page.waitForFunction(() => !!document.activeElement?.closest('.extension-view-shell'));
     await page.keyboard.press('Control+.'); await page.getByRole('menu').waitFor();
     await page.getByRole('menuitem', {name:'核对状态'}).click();
     await page.getByRole('alertdialog').waitFor();
