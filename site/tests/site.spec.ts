@@ -106,3 +106,28 @@ test('theme switch changes the reading surface and remains usable', async ({ pag
   await expect(page.locator('html')).not.toHaveAttribute('data-theme', before!);
   await expect(page.locator('h1')).toBeVisible();
 });
+
+test('long translated navigation labels and mobile reference tables remain readable', async ({ page }) => {
+  for (const locale of ['', 'en/']) {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.goto('./' + locale + 'docs/developer/');
+    const links = page.locator('.sidebar-content .entry-link');
+    const boxes = await links.evaluateAll(items => items.map(item => {
+      const box = item.getBoundingClientRect();
+      return { top: box.top, bottom: box.bottom };
+    }));
+    expect(boxes.length).toBeGreaterThan(10);
+    for (let i = 1; i < boxes.length; i++) expect(boxes[i].top).toBeGreaterThanOrEqual(boxes[i - 1].bottom);
+    await page.setViewportSize({ width: 320, height: 960 });
+    for (const slug of ['developer/', 'developer/examples/']) {
+      await page.goto('./' + locale + 'docs/' + slug);
+      const table = page.locator('table');
+      await expect(table).toHaveAttribute('tabindex', '0');
+      expect(await table.locator('td').first().evaluate(el => el.getBoundingClientRect().width)).toBeGreaterThanOrEqual(128);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+      await table.focus();
+      await page.keyboard.press('ArrowRight');
+      await expect.poll(() => table.evaluate(el => el.scrollLeft)).toBeGreaterThan(0);
+    }
+  }
+});
