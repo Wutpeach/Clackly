@@ -1,5 +1,10 @@
 # Clackly
 
+[![Version](https://img.shields.io/github/v/release/Wutpeach/Clackly?label=version&color=e9a34b)](https://github.com/Wutpeach/Clackly/releases/latest)
+[![CI](https://github.com/Wutpeach/Clackly/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/Wutpeach/Clackly/actions/workflows/main.yml)
+[![Windows x64](https://img.shields.io/badge/Windows-x64-454545)](https://wutpeach.github.io/Clackly/en/docs/install/)
+[![Documentation](https://img.shields.io/badge/docs-English-454545)](https://wutpeach.github.io/Clackly/en/docs/)
+
 [简体中文](README.md)
 
 Clackly is a lightweight command palette for DaVinci Resolve Studio.
