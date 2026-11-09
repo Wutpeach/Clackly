@@ -51,7 +51,7 @@ The Issue #14 Chinese and English homepage is a **candidate awaiting user visual
 
 ## Colors
 
-The homepage follows the application Palette surface, with neutral text and light neutral primary actions. The original edit-light.svg adds a silver-white arc and directional falloff behind the hero. The stage and AI workbench remain dark, with neutral highlights. The selected switch uses #17191d text; primary buttons use #151619 text. The existing orange logo remains artwork, not an interaction color. Documentation uses Black Theme's native light/dark modes and respects the reader's selection.
+The homepage follows the application Palette surface, with neutral text and light neutral primary actions. The original inline HomeLight.astro SVG adds a silver-white arc and directional falloff behind the hero. The stage and AI workbench remain dark, with neutral highlights. The selected switch uses #17191d text; primary buttons use #151619 text. The existing orange logo remains artwork, not an interaction color. Documentation uses Black Theme's native light/dark modes and respects the reader's selection.
 
 ## Typography
 
@@ -63,7 +63,7 @@ The candidate home has a 1200px maximum width, centered hero and actions, and a 
 
 ## Elevation & Depth
 
-Directional light, fine edge highlights and layered soft shadows create depth around the dark stage and product captures. The dark perspective timeline is explicitly labelled as schematic; the palette capture is real and uses demonstration data. The silver halo enters once over 1400ms through mask position and opacity; hero copy, actions and stage stay stable. Six content groups below the initial viewport reveal once on intersection: text rises 16px without blur, product rows rise 28px from 3px blur, and the AI panel rises 20px from 2px blur. Opacity and blur resolve over 700ms and position over 850ms. Content starts visible without JavaScript or IntersectionObserver; keyboard focus reveals a pending group immediately. Reduced motion removes the halo mask and motion, and print shows pending content.
+Directional light, fine edge highlights and layered soft shadows create depth around the dark stage and product captures. The dark perspective timeline is explicitly labelled as schematic; the palette capture is real and uses demonstration data. The silver halo traces once over 4000ms from the lower right, up the right side and leftward along its curves; five SVG strokes draw via dash offset while the ambient light settles. Hero copy, actions and stage stay stable. Six content groups below the initial viewport reveal once on intersection: text rises 16px without blur, product rows rise 28px from 3px blur, and the AI panel rises 20px from 2px blur. Opacity and blur resolve over 1050ms and position over 1300ms, with cubic-bezier(.22,.61,.36,1) easing. Content starts visible without JavaScript or IntersectionObserver; keyboard focus reveals a pending group immediately. Reduced motion and print stop the halo animation and show the complete light; pending content remains visible.
 
 ## Shapes
 

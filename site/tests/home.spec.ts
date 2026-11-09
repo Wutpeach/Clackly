@@ -63,10 +63,10 @@ for (const locale of ['', 'en/']) {
   }
 }
 
-test('the light opens once while the title and download stay stable', async ({ page }) => {
+test('the light traces its arc once at a relaxed pace while the title and download stay stable', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('./');
-  const phases = await page.locator('.hero-light').evaluate(el => {
+  const phases = await page.locator('.hero-light .light-stroke').first().evaluate(el => {
     const animation = el.getAnimations()[0];
     if (!animation) throw new Error('The light entrance is missing');
     animation.pause();
@@ -74,15 +74,16 @@ test('the light opens once while the title and download stay stable', async ({ p
     const samples = [0, duration / 2, duration].map(time => {
       animation.currentTime = time;
       const style = getComputedStyle(el);
-      return { opacity: Number(style.opacity), mask: style.maskPosition };
+      return parseFloat(style.strokeDashoffset);
     });
     animation.finish();
-    return { samples, iterations: animation.effect!.getTiming().iterations };
+    return { samples, duration, iterations: animation.effect!.getTiming().iterations };
   });
   expect(phases.iterations).toBe(1);
-  expect(phases.samples[0].opacity).toBeLessThan(phases.samples[1].opacity);
-  expect(phases.samples[1].opacity).toBeLessThan(phases.samples[2].opacity);
-  expect(phases.samples[0].mask).not.toBe(phases.samples[2].mask);
+  expect(phases.duration).toBeGreaterThanOrEqual(3000);
+  expect(phases.samples[0]).toBeGreaterThan(phases.samples[1]);
+  expect(phases.samples[1]).toBeGreaterThan(phases.samples[2]);
+  expect(phases.samples[2]).toBe(0);
   await expect(page.locator('.hero-copy .primary')).toBeVisible();
   expect(await page.locator('.hero-copy').evaluate(el => getComputedStyle(el).transform)).toBe('none');
 });
@@ -106,8 +107,10 @@ test('reduced motion keeps the light and scrolled content fully visible without 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
   await expect(page.locator('#preview-launcher')).toBeVisible();
-  expect(await page.locator('.hero-light').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
-  expect(await page.locator('.hero-light').evaluate(el => getComputedStyle(el).maskImage)).toBe('none');
+  const light = await page.locator('.hero-light .light-stroke').evaluateAll(elements => elements.map(el => ({
+    animation: getComputedStyle(el).animationName, offset: parseFloat(getComputedStyle(el).strokeDashoffset),
+  })));
+  for (const stroke of light) expect(stroke).toEqual({ animation: 'none', offset: 0 });
   const products = await page.locator('[data-reveal]').evaluateAll(elements => elements.map(el => {
     const style = getComputedStyle(el);
     return { opacity: style.opacity, transform: style.transform, filter: style.filter };

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" fill="none" aria-hidden="true" focusable="false">
+  <!-- Original Clackly light study: a curved edit aperture, not product UI. -->
+  <defs>
+    <linearGradient id="home-light-metal" x1="388" y1="705" x2="1220" y2="205" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#35363C" stop-opacity="0"/>
+      <stop offset=".42" stop-color="#797C85" stop-opacity=".3"/>
+      <stop offset=".7" stop-color="#B8BBC4" stop-opacity=".75"/>
+      <stop offset=".88" stop-color="#F1F2F4"/>
+      <stop offset="1" stop-color="#CACDD5" stop-opacity=".12"/>
+    </linearGradient>
+    <linearGradient id="home-light-edge" x1="334" y1="738" x2="1300" y2="246" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#737680" stop-opacity="0"/>
+      <stop offset=".48" stop-color="#B1B5BE" stop-opacity=".35"/>
+      <stop offset=".72" stop-color="#E7E8EA"/>
+      <stop offset=".88" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#A5A8B2" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="home-light-air" cx="0" cy="0" r="1" gradientTransform="translate(1090 315) rotate(146) scale(530 235)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B9BCC5" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#A3A7B2" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="home-light-bloom" x="-30%" y="-50%" width="160%" height="200%"><feGaussianBlur stdDeviation="25"/></filter>
+    <filter id="home-light-soft" x="-20%" y="-30%" width="140%" height="160%"><feGaussianBlur stdDeviation="5"/></filter>
+    <linearGradient id="home-light-fade" x1="800" y1="80" x2="800" y2="960" gradientUnits="userSpaceOnUse"><stop stop-color="white" stop-opacity="0"/><stop offset=".13" stop-color="white"/><stop offset=".8" stop-color="white"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient>
+    <mask id="home-light-falloff"><path fill="url(#home-light-fade)" d="M0 0h1600v1000H0z"/></mask>
+  </defs>
+  <g mask="url(#home-light-falloff)">
+    <path class="light-air" fill="url(#home-light-air)" d="M0 0h1600v1000H0z"/>
+    <path class="light-stroke" pathLength="1" d="M1043 678C1438 405 1448 126 1057 163C642 203 237 591 178 831" stroke="url(#home-light-metal)" stroke-width="55" filter="url(#home-light-bloom)"/>
+    <path class="light-stroke" pathLength="1" d="M1043 678C1438 405 1448 126 1057 163C642 203 237 591 178 831" stroke="url(#home-light-metal)" stroke-width="19" filter="url(#home-light-soft)"/>
+    <path class="light-stroke" pathLength="1" d="M1043 678C1438 405 1448 126 1057 163C642 203 237 591 178 831" stroke="url(#home-light-edge)" stroke-width="1.5"/>
+    <path class="light-stroke" pathLength="1" d="M1082 641C1368 443 1401 218 1078 253C698 295 335 631 269 860" stroke="url(#home-light-metal)" stroke-width="28" filter="url(#home-light-bloom)" opacity=".6"/>
+    <path class="light-stroke" pathLength="1" d="M1082 641C1368 443 1401 218 1078 253C698 295 335 631 269 860" stroke="url(#home-light-edge)" stroke-width="1" opacity=".3"/>
+  </g>
+</svg>
+
+<style>
+  svg { display: block; width: 100%; height: auto; }
+  .light-stroke { stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 0; animation: arc-trace 4000ms cubic-bezier(.4,0,.6,1) both; }
+  .light-air { animation: air-settle 4000ms cubic-bezier(.4,0,.6,1) both; }
+  @keyframes arc-trace { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+  @keyframes air-settle { from { opacity: 0; } 30% { opacity: .08; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce), print {
+    .light-stroke, .light-air { animation: none; }
+  }
+</style>
