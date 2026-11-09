@@ -13,7 +13,6 @@ Forms using **Dynamic Prepare** read choices from the current project when opene
 
 <figure class="docs-shot docs-shot-command">
   <a href="/Clackly/images/docs/command-ui-en.webp"><img src="/Clackly/images/docs/command-ui-en.webp" alt="Official summary Command UI with title, notes, number inputs, Cancel and Run command buttons" width="960" height="1160" loading="lazy" /></a>
-  <figcaption>Isolated Electron capture of the official example’s static form. It neither reads nor changes Resolve projects. Author-defined fields remain Chinese; scroll for more fields and confirmation. Click for the original.</figcaption>
 </figure>
 
 ## Continued browsing: Extension Views

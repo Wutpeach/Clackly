@@ -11,7 +11,6 @@ Load **Workspace → Workflow Integrations → Clackly** in Resolve, then press 
 
 <figure class="docs-shot docs-shot-palette">
   <a href="/Clackly/images/docs/launcher-en.webp"><img src="/Clackly/images/docs/launcher-en.webp" alt="Clackly Launcher with pinned Add Marker, a recently executed summary and the Commands group" width="480" height="640" loading="lazy" /></a>
-  <figcaption>Isolated Electron capture: the official example appears in Recent after execution. Resolve is disconnected, so built-ins are unavailable. Click for the original.</figcaption>
 </figure>
 
 1. Type a command name, such as **Add Marker / 添加标记**.

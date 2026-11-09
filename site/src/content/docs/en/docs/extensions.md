@@ -17,7 +17,6 @@ If the interface reports a missing Host or dependency, resolve it before running
 
 <figure class="docs-shot">
   <a href="/Clackly/images/docs/extensions-en.webp"><img src="/Clackly/images/docs/extensions-en.webp" alt="Summary extension details with version, declared source, Disable and Uninstall buttons, prefix configuration and commands" width="1520" height="1120" loading="lazy" /></a>
-  <figcaption>Isolated Electron capture of the installed official summary example with temporary settings. It is not preinstalled; its author-defined labels remain Chinese. Resolve is disconnected. Click for the original.</figcaption>
 </figure>
 
 ## Update and replace

@@ -11,7 +11,6 @@ description: "在 Resolve 加载插件，呼出面板并运行第一个命令。
 
 <figure class="docs-shot docs-shot-palette">
   <a href="/Clackly/images/docs/launcher-zh.webp"><img src="/Clackly/images/docs/launcher-zh.webp" alt="Clackly Launcher：已固定的添加标记、最近执行的运行摘要和命令分组" width="480" height="640" loading="lazy" /></a>
-  <figcaption>隔离 Electron 实拍：官方示例运行后进入 Recent；未连接 Resolve，内置命令显示不可用。点击查看原图。</figcaption>
 </figure>
 
 1. 输入命令名称，例如 **Add Marker / 添加标记**。

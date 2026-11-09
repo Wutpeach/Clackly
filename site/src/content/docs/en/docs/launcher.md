@@ -17,7 +17,6 @@ Press **Escape** to return to the Launcher.
 
 <figure class="docs-shot docs-shot-palette">
   <a href="/Clackly/images/docs/search-en.webp"><img src="/Clackly/images/docs/search-en.webp" alt="Searching for 摘要 finds the summary command with its Extension source below the name" width="480" height="640" loading="lazy" /></a>
-  <figcaption>Isolated Electron capture of the installed official summary example. Its author-defined names remain Chinese; Resolve is disconnected. Click for the original.</figcaption>
 </figure>
 
 ## Ordinary Resolve Scripts

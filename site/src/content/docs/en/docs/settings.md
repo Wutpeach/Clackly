@@ -19,7 +19,6 @@ In **General Settings**, check the version, switch between **English / 简体中
 
 <figure class="docs-shot">
   <a href="/Clackly/images/docs/settings-en.webp"><img src="/Clackly/images/docs/settings-en.webp" alt="After Effects feature configuration, with Needs Setup status, an empty path, Save changes and Discard changes controls" width="1520" height="1120" loading="lazy" /></a>
-  <figcaption>Isolated Electron capture: the AE path is unset, so the feature shows Needs Setup. Resolve is disconnected; no export ran. Click for the original.</figcaption>
 </figure>
 
 ## Extensions and developer tools

@@ -16,7 +16,6 @@ Application upgrades update the bundled source; reimport the Agent copy using th
 
 <figure class="docs-shot">
   <a href="/Clackly/images/docs/developer-skill-en.webp"><img src="/Clackly/images/docs/developer-skill-en.webp" alt="Developer Skill section in Settings with Copy Agent installation prompt and Open Skill folder" width="1064" height="322" loading="lazy" /></a>
-  <figcaption>The actual Skill controls in Settings → Extensions, captured in isolated Electron and cropped to the relevant section. Click for the original.</figcaption>
 </figure>
 
 ## Cloud or sandboxed Agents

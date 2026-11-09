@@ -13,7 +13,6 @@ description: "了解单次输入表单和持续浏览窗口的操作方式。"
 
 <figure class="docs-shot docs-shot-command">
   <a href="/Clackly/images/docs/command-ui-zh.webp"><img src="/Clackly/images/docs/command-ui-zh.webp" alt="生成运行摘要的 Command UI：标题、备注、数字输入以及取消和运行命令按钮" width="960" height="1160" loading="lazy" /></a>
-  <figcaption>隔离 Electron 实拍：官方运行摘要示例的静态表单，不读取或修改 Resolve 项目；下滚可见其余字段和确认项。点击查看原图。</figcaption>
 </figure>
 
 ## 持续浏览：Extension Views

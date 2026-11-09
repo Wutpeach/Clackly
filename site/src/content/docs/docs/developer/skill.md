@@ -16,7 +16,6 @@ v0.1.6 随应用提供完整的 **Clackly Developer Skill**。
 
 <figure class="docs-shot">
   <a href="/Clackly/images/docs/developer-skill-zh.webp"><img src="/Clackly/images/docs/developer-skill-zh.webp" alt="Settings 扩展页的 Developer Skill 区域，包含复制 Agent 安装提示词和打开 Skill 文件夹" width="1064" height="254" loading="lazy" /></a>
-  <figcaption>隔离 Electron 中 Settings → 扩展的真实 Skill 获取入口，仅裁切相关区域。点击查看原图。</figcaption>
 </figure>
 
 ## 云端或沙箱 Agent

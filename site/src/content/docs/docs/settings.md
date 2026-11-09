@@ -19,7 +19,6 @@ description: "切换语言、补齐功能依赖并保存配置。"
 
 <figure class="docs-shot">
   <a href="/Clackly/images/docs/settings-zh.webp"><img src="/Clackly/images/docs/settings-zh.webp" alt="Settings 的 AE 导出配置：需要设置状态、空路径字段、保存更改和放弃修改按钮" width="1520" height="1120" loading="lazy" /></a>
-  <figcaption>隔离 Electron 实拍：AE 路径尚未配置，页面如实显示“需要设置”；未连接 Resolve，未执行导出。点击查看原图。</figcaption>
 </figure>
 
 ## 扩展与开发工具

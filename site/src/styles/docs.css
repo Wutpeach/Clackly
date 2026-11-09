@@ -9,11 +9,10 @@
 html { scrollbar-color: var(--muted-foreground) var(--background); }
 
 .sl-markdown-content .docs-shot { margin: 1.5rem 0; }
-.docs-shot > a { display: block; width: fit-content; max-width: 100%; }
+.docs-shot > a { display: block; width: fit-content; max-width: 100%; margin-inline: auto; }
 .docs-shot img { display: block; max-width: 100%; height: auto; }
 .docs-shot-palette > a { max-width: min(100%, 240px); }
 .docs-shot-command > a { max-width: min(100%, 480px); }
-.docs-shot figcaption { margin-top: .65rem; color: var(--muted-foreground); font-size: .875rem; line-height: 1.65; }
 
 /* Reuse Ameow’s mobile pagination fix for long translated labels. */
 @media (max-width: 40rem) {

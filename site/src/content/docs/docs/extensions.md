@@ -17,7 +17,6 @@ description: "导入可信的 .clackly 包，配置命令并管理扩展版本�
 
 <figure class="docs-shot">
   <a href="/Clackly/images/docs/extensions-zh.webp"><img src="/Clackly/images/docs/extensions-zh.webp" alt="运行摘要扩展详情：版本、声明来源、停用与卸载按钮、摘要前缀配置及命令列表" width="1520" height="1120" loading="lazy" /></a>
-  <figcaption>隔离 Electron 实拍：已安装官方“运行摘要”示例，使用临时设置；未连接 Resolve。示例并非预装扩展。点击查看原图。</figcaption>
 </figure>
 
 ## 更新与替换

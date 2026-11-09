@@ -61,7 +61,7 @@
 | `command-ui-zh/en.webp`（960×1160） | 官方摘要命令实际打开的静态表单；更多字段在窗口内滚动 |
 | `developer-skill-zh/en.webp`（1064×254 / 1064×322） | Settings 中复制提示词与打开 Skill 文件夹的相关区域 |
 
-合计约 310 KiB；原图有描述性 alt、caption、真实尺寸，并可通过键盘打开。页面缩放只用于排版，没有重绘或美化应用 UI。
+合计约 310 KiB；原图有描述性 alt、真实尺寸，并可通过键盘打开。按用户反馈，截图在正文中居中，不显示采集说明和“点击查看原图”等图片下方标注；来源和验证边界集中保留在本记录、manifest 与 Issue。页面缩放只用于排版，没有重绘或美化应用 UI。
 
 边界：未连接 Resolve，内置命令如实显示不可用或需要设置；extension readiness 与 update-state adapter 用于隔离测试，不能证明真实宿主就绪或更新检查。未运行 AE 导出。示例并非应用预装扩展，其作者定义的中文字段在英文应用 UI 下仍保留中文。截图不含 OS frame/shadow。
 
@@ -79,14 +79,16 @@
 - [Extensions：英文手机浅色](extensions-en-mobile-light.webp)
 - [Developer Skill：中文手机浅色](developer-skill-zh-mobile-light.webp)
 - [Command UI：英文桌面浅色](command-ui-en-desktop-light.webp)
+- [Launcher 搜索：中文桌面浅色，图片居中且无下方标注](launcher-zh-desktop-light.webp)
 
 ## 验证
 
 - 应用构建通过，仅用于真实 UI 采集；采集脚本确认只执行一次非 Resolve Python 示例、无 pageerror。
 - 站点构建通过：41 份 HTML、19 对双语页面、3,032 项内链/资源/锚点，19 份官方原文逐字节一致。
 - 完整站点 Playwright：26/26；最终摘要与按钮文案调整后，受影响文档测试再次 14/14。包含六类插图页的中英 1440/390/320px、原图键盘打开、资源加载与无溢出，以及 Agent 复制、剪贴板失败回退、搜索、双语/主题/导航。
+- 图片居中与移除标注后，文档 14/14 再次通过；六类双语插图页均验证 1440/390/320px 下图片居中、无下方标注且原图仍可键盘打开。七张网页验收截图已更新。
 - 实际打开本地生产预览，并检查上述六张浏览器截图。没有录屏。
-- Impeccable detector 仅有 caption `.875rem` 与产品页 DESIGN 字号表不同的 advisory；文档沿用 Starlight 小字说明尺寸与主题 token，保留该有意差异。
+- 按反馈删除图片下方标注及对应样式后，Impeccable detector 无发现。
 - `git diff --check`、截图 manifest 的大小/哈希核对与改动范围核对通过。PR 的最终 HEAD/CI 以 Issue 回写收据为准。
 
 本机 Node 22.17.1 低于声明的 22.19.0，以上本地检查实际通过；CI 使用声明支持的版本。应用依赖安装报告的既有 audit 项不在本次文档改动范围，没有为此更新应用依赖。

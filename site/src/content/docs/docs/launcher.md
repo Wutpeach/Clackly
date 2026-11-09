@@ -17,7 +17,6 @@ description: "固定常用命令、找回最近使用的操作，或按名称搜
 
 <figure class="docs-shot docs-shot-palette">
   <a href="/Clackly/images/docs/search-zh.webp"><img src="/Clackly/images/docs/search-zh.webp" alt="搜索“摘要”找到生成运行摘要，来源显示 Extension · 运行摘要" width="480" height="640" loading="lazy" /></a>
-  <figcaption>隔离 Electron 实拍：搜索已安装的官方运行摘要示例，来源显示在命令名下方；未连接 Resolve。点击查看原图。</figcaption>
 </figure>
 
 ## 普通 Resolve Scripts

@@ -16,7 +16,13 @@ for (const locale of ['', 'en/']) {
         await expect(image).toBeVisible();
         expect((await image.getAttribute('alt'))!.length).toBeGreaterThan(15);
         expect(await image.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 400)).toBeTruthy();
-        await expect(shot.locator('figcaption')).toContainText('Electron');
+        await expect(shot.locator('figcaption')).toHaveCount(0);
+        const centered = await image.evaluate(image => {
+          const bounds = image.getBoundingClientRect();
+          const figure = image.closest('figure')!.getBoundingClientRect();
+          return Math.abs((bounds.left + bounds.right - figure.left - figure.right) / 2) < 1;
+        });
+        expect(centered, route + ' image should be centered in the article').toBeTruthy();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
         const link = shot.getByRole('link');
         await expect(link).toHaveAttribute('href', (await image.getAttribute('src'))!);
