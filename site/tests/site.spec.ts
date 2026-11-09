@@ -6,7 +6,7 @@ for (const locale of ['', 'en/']) {
   test((en ? 'English' : 'Chinese') + ' home → docs → AI guide, preserving locale', async ({ page }) => {
     await page.goto('./' + locale);
     await expect(page.locator('html')).toHaveAttribute('lang', en ? 'en' : 'zh-CN');
-    await expect(page.getByRole('link', { name: en ? 'Download for Windows' : '下载 Windows 版' })).toHaveAttribute('href', 'https://github.com/Wutpeach/Clackly/releases/tag/v0.1.6');
+    await expect(page.getByRole('link', { name: en ? 'Download for Windows' : '下载 Windows 版' })).toHaveAttribute('href', 'https://github.com/Wutpeach/Clackly/releases/tag/v0.1.7');
     await page.locator('header').getByRole('link', { name: en ? 'Documentation' : '使用文档' }).click();
     await expect(page).toHaveURL(new RegExp('/Clackly/' + locale + 'docs/$'));
     const homeLink = page.locator('a.site-title');

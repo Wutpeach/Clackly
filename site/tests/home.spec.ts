@@ -26,7 +26,7 @@ for (const locale of ['', 'en/']) {
     await expect(page.locator('html')).toHaveAttribute('lang', en ? 'zh-CN' : 'en');
     const download = page.locator('.hero-copy').getByRole('link', { name: en ? '下载 Windows 版' : 'Download for Windows' });
     await download.click();
-    await expect(page).toHaveURL('https://github.com/Wutpeach/Clackly/releases/tag/v0.1.6');
+    await expect(page).toHaveURL('https://github.com/Wutpeach/Clackly/releases/tag/v0.1.7');
   });
 
   for (const width of [1440, 390, 320]) {
@@ -124,7 +124,7 @@ test('without JavaScript the home still shows the product, download and full pro
   await page.goto('http://127.0.0.1:4321/Clackly/');
   await expect(page.locator('#preview-launcher')).toBeVisible();
   await expect(page.locator('[data-preview-switch]')).toBeHidden();
-  await expect(page.locator('.hero-copy .primary')).toHaveAttribute('href', 'https://github.com/Wutpeach/Clackly/releases/tag/v0.1.6');
+  await expect(page.locator('.hero-copy .primary')).toHaveAttribute('href', 'https://github.com/Wutpeach/Clackly/releases/tag/v0.1.7');
   await page.locator('summary').click();
   await expect(page.locator('textarea')).toBeVisible();
   expect(await page.locator('.ai-section').evaluate(el => Number(getComputedStyle(el).opacity))).toBe(1);

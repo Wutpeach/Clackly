@@ -17,7 +17,7 @@ for (const route of ['index.html', 'en/index.html', 'docs/index.html', 'en/docs/
   assert.doesNotMatch(pages.get(route), /http-equiv\s*=\s*['"]refresh/i, 'Unexpected redirect: ' + route);
 }
 for (const route of ['index.html', 'en/index.html']) {
-  assert.match(pages.get(route), /releases\/tag\/v0\.1\.6/);
+  assert.match(pages.get(route), /releases\/tag\/v0\.1\.7/);
   assert.match(pages.get(route), /Build with AI/);
   assert.match(pages.get(route), /name="description"/);
 }

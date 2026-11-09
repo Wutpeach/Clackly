@@ -1,6 +1,6 @@
 # Clackly website
 
-Independent product home and bilingual Astro/Starlight documentation for Issue #11, stage A. Public content baseline: v0.1.6 (2026-11-08). This directory changes no application behavior.
+Independent product home and bilingual Astro/Starlight documentation for Issue #11, stage A. Public content baseline: v0.1.7 (2026-11-09). This directory changes no application behavior.
 
 ## Run locally
 

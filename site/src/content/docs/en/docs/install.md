@@ -3,7 +3,7 @@ title: "Download and install on Windows"
 description: "Get the official Windows installer and load Clackly in Resolve."
 ---
 
-Download **Clackly-Setup-0.1.6-win-x64.exe** from the [official v0.1.6 Release](https://github.com/Wutpeach/Clackly/releases/tag/v0.1.6). End users do not need a source checkout, Node or an application build.
+Download **Clackly-Setup-0.1.7-win-x64.exe** from the [official v0.1.7 Release](https://github.com/Wutpeach/Clackly/releases/tag/v0.1.7). End users do not need a source checkout, Node or an application build.
 
 ## Before installing
 
@@ -12,13 +12,13 @@ Prepare Windows x64, DaVinci Resolve Studio and its official Workflow Integratio
 The installer is unsigned. Windows may show SmartScreen or “Unknown publisher”. Verify the official source, filename, size and SHA-256 before deciding to continue. You do not need to disable Windows security.
 
 ~~~powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath .\Clackly-Setup-0.1.6-win-x64.exe
+Get-FileHash -Algorithm SHA256 -LiteralPath .\Clackly-Setup-0.1.7-win-x64.exe
 ~~~
 
-v0.1.6 EXE: **28,965,825 bytes**. SHA-256:
+v0.1.7 EXE: **29,101,412 bytes**. SHA-256:
 
 ~~~text
-00d1400b8e67678d6e67c51da065c30ca2a4884478e32d7fa3269da8b9b4fb25
+c6f5f54239db4ccd7df7576c50f24a1cad8b07fcc86f7e66211b27ae37221dad
 ~~~
 
 ## Install and open

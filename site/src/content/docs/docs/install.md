@@ -3,7 +3,7 @@ title: "下载与 Windows 安装"
 description: "下载官方 Windows 安装器，在 Resolve 中加载 Clackly。"
 ---
 
-从 [v0.1.6 官方 Release](https://github.com/Wutpeach/Clackly/releases/tag/v0.1.6) 下载 **Clackly-Setup-0.1.6-win-x64.exe**。这是用户安装入口，无需克隆源码、安装 Node 或自行构建应用。
+从 [v0.1.7 官方 Release](https://github.com/Wutpeach/Clackly/releases/tag/v0.1.7) 下载 **Clackly-Setup-0.1.7-win-x64.exe**。这是用户安装入口，无需克隆源码、安装 Node 或自行构建应用。
 
 ## 安装前
 
@@ -12,13 +12,13 @@ description: "下载官方 Windows 安装器，在 Resolve 中加载 Clackly。"
 安装器未签名，Windows 可能显示 SmartScreen 或“未知发布者”。核对官方仓库、文件名、大小和 SHA-256，再自行判断是否继续。无需关闭 Windows 安全功能。
 
 ~~~powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath .\Clackly-Setup-0.1.6-win-x64.exe
+Get-FileHash -Algorithm SHA256 -LiteralPath .\Clackly-Setup-0.1.7-win-x64.exe
 ~~~
 
-v0.1.6 EXE：**28,965,825 字节**；SHA-256：
+v0.1.7 EXE：**29,101,412 字节**；SHA-256：
 
 ~~~text
-00d1400b8e67678d6e67c51da065c30ca2a4884478e32d7fa3269da8b9b4fb25
+c6f5f54239db4ccd7df7576c50f24a1cad8b07fcc86f7e66211b27ae37221dad
 ~~~
 
 ## 完成安装

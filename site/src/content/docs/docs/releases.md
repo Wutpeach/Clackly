@@ -3,6 +3,16 @@ title: "发行历史与能力基线"
 description: "核对公开版本、发行日期与对应能力。"
 ---
 
+## v0.1.7 · 2026-11-09
+
+[官方 Release 与安装器](https://github.com/Wutpeach/Clackly/releases/tag/v0.1.7) · [仓库发行说明](https://github.com/Wutpeach/Clackly/blob/v0.1.7/resolve-command-center/docs/releases/v0.1.7.md)
+
+- Windows 应用窗口、EXE、安装器和卸载入口统一使用 Satin Enamel A 图标。
+- 随包 Developer Skill 校正公开能力说明；应用功能沿用 v0.1.6。
+- 中英文网站同步新图标，文档新访客默认深色，保留手动主题选择。
+
+发行源码为 **c73e2a560c39ff96189d1d8c52e29737541f5deb**；[官方 Tag 构建](https://github.com/Wutpeach/Clackly/actions/runs/42648171509)。Windows x64 EXE 的大小与 SHA-256 见[安装页](/Clackly/docs/install/)。
+
 ## v0.1.6 · 2026-11-08
 
 [官方 Release 与安装器](https://github.com/Wutpeach/Clackly/releases/tag/v0.1.6) · [仓库发行说明](https://github.com/Wutpeach/Clackly/blob/v0.1.6/resolve-command-center/docs/releases/v0.1.6.md)
@@ -14,7 +24,7 @@ description: "核对公开版本、发行日期与对应能力。"
 - Settings 保存/放弃与脏草稿提示；随包 Developer Skill 及 Agent 安装提示词。
 - Python 包外受管缓存与首次安装的共享目录兼容改进。
 
-发行源码为 **d883c97b3cf6cc4dd61757f762a73b28625ea2c2**；[官方 Tag 构建](https://github.com/Wutpeach/Clackly/actions/runs/42477636440) 与对应主线验证均成功。发行资产是 Windows x64 EXE，摘要见[安装页](/Clackly/docs/install/)。
+发行源码为 **d883c97b3cf6cc4dd61757f762a73b28625ea2c2**；[官方 Tag 构建](https://github.com/Wutpeach/Clackly/actions/runs/42477636440) 与对应主线验证均成功。该版安装器的摘要见对应官方 Release。
 
 ## 之前的公开版本
 

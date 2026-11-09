@@ -16,7 +16,7 @@ Introduce the keyboard-first command palette, lead visitors to the official Wind
 
 ## Capabilities and Constraints
 
-The public baseline is v0.1.6, Windows x64, Resolve Studio Workflow Integration. Launcher searches commands, trusted extensions and ordinary scripts; Pinned and Recent keep commands accessible. Extensions can use host-rendered forms and persistent list/detail/form views. The official Developer Skill defines extension authoring. Installation is unsigned; extensions execute local code.
+The public baseline is v0.1.7, Windows x64, Resolve Studio Workflow Integration. Launcher searches commands, trusted extensions and ordinary scripts; Pinned and Recent keep commands accessible. Extensions can use host-rendered forms and persistent list/detail/form views. The official Developer Skill defines extension authoring. Installation is unsigned; extensions execute local code.
 
 ## Brand Commitments
 
