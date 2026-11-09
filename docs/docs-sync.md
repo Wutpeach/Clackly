@@ -91,6 +91,8 @@ node scripts/docs-sync.mjs failure D:/Clackly-artifacts/run/failure.json
 
 **自动合并还需要服务端保护，不能只靠最后一次查询。** 当前 `main` 实际未受保护，脚本会阻止自动合并；本开发没有改仓库设置。当前适配器支持经典 branch protection：main 要求 strict/up-to-date checks、包含 `Docs Sync (ubuntu-latest)` 与 `Docs Sync (windows-latest)`，且 `enforce_admins.enabled=true`，防止查询后主线前进或管理员默认绕过。保护设置须另获用户授权；仅有客户端 CI PASS、普通非严格保护或未识别的 ruleset 不会放行。它解决 `--match-head-commit` 只约束 PR HEAD、不约束 base 的竞态。
 
+合并前会把核实的 PR/HEAD/base 和 CI run ID 一起持久保存。GitHub workflow run 的 `pull_requests` 是可变关联，PR 更新后会改变、合并后可能为空，不能当作历史证据。complete/丢回执恢复使用已保存绑定，再按 run ID 核实真实 workflow、event、HEAD 和成功状态；不再要求已合并 PR 仍在关联数组。外部合并且没有本工具合并前 CI 绑定的 pending 会停止，保留现场供人工核实，不凭空补造凭证。
+
 `deploy` 只在实际影响 Pages 时通过现有 main workflow `workflow_dispatch publish=true` 发布，并传 `expected_sha=<已审查 main>`。workflow 在构建前检查这个 SHA，阻止检查与 dispatch 之间主线移动导致发布未审查版本；原有手动发布门禁保留。代码会先查已有成功部署，保存 dispatch 意图，找回同一 run。回执未知且查不到运行时安全停止，不盲目重复 dispatch；确认失败的 run 只有显式 `retryDeploy: true` 才可重试一次。返回 waiting 时保留现场，后续恢复，不用循环重复发布。
 
 `complete` 示例：

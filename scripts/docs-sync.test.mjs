@@ -26,6 +26,7 @@ function fixture(t) {
   const api = {
     main: () => main, isAncestor: () => true, filesBetween: () => [], branch: () => ({ sha: head, files }), find: () => prs,
     create: () => { prs.push(pr); }, pr: () => pr, ci: () => [{ sha: head, url: 'https://github.com/Wutpeach/Clackly/actions/runs/1' }],
+    verifyCi: receipts => { assert.ok(receipts?.length, 'durable pre-merge CI receipt'); return receipts; },
     assertMergeable: () => {}, assertBaseProtected: () => {}, merge: (_number, expected) => { assert.equal(pr.headRefOid, expected); pr.state = 'MERGED'; pr.mergeCommit = { oid: c }; main = c; },
     deployed: () => deployment, publicPages: () => [{ url: publicSite, status: 200 }],
     dispatch: () => { dispatches++; runs = [{ id: dispatches, status: 'in_progress', conclusion: null }]; }, publishRuns: () => runs,
@@ -205,6 +206,29 @@ test('new main requires branch integration and invalidates even an unchanged HEA
   f.api.isAncestor = () => true; await f.call('publish');
   assert.equal(f.progress().state.pending.review, null);
   await assert.rejects(f.call('merge'), /Worker PASS/); assert.equal(f.pr.state, 'OPEN');
+});
+
+test('completion verifies durable CI run receipts after GitHub removes mutable PR associations', async t => {
+  const f = fixture(t);
+  let associations = [{ number: 31, head: { sha: b }, base: { sha: a } }], conclusion = 'success';
+  const runs = ['main.yml', 'docs-sync.yml', 'deploy-docs.yml'].map((file, i) => ({ id: i + 1, path: '.github/workflows/' + file,
+    head_sha: b, head_branch: 'docs/sync-recovery', status: 'completed', event: 'pull_request', html_url: 'https://github.com/run/' + i }));
+  const adapter = github('unused', (_program, args) => {
+    if (args.at(-1).includes('head_sha=')) return JSON.stringify([{ workflow_runs: runs.map(r => ({ ...r, conclusion, pull_requests: associations })) }]);
+    const id = Number(args.at(-1).split('/').at(-1));
+    return JSON.stringify({ ...runs.find(r => r.id === id), conclusion, pull_requests: [] });
+  });
+  f.api.ci = adapter.ci; f.api.verifyCi = adapter.verifyCi;
+  await f.call('publish'); await f.review(); await f.call('merge'); f.deployed();
+  assert.equal(f.progress().state.pending.ci.length, 3);
+  associations = []; assert.throws(() => adapter.ci(b, true, a, 31), /matching reviewed PR base/);
+  conclusion = 'failure'; await assert.rejects(f.call('complete'), /Recorded CI run/); assert.equal(f.cursor(), null);
+  conclusion = 'success'; await f.call('complete');
+  assert.equal(f.cursor(), c); assert.equal(f.progress().state.pending, null);
+  const receipts = f.progress().state.reviews[0].pullRequest.ci;
+  assert.equal(receipts.length, 3); assert.equal(receipts[0].baseSha, a);
+  assert.throws(() => adapter.verifyCi(receipts.map(r => ({ ...r, baseSha: d })), b, true, a, 31), /matching PR.HEAD.base/);
+  assert.throws(() => adapter.verifyCi(undefined, b, true, a, 31), /No durable pre-merge/);
 });
 
 test('server-side strict protection is mandatory even when all client checks pass', async t => {

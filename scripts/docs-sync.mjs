@@ -13,6 +13,8 @@ const text = value => typeof value === 'string' && value.trim().length > 0;
 const insist = (condition, message) => { if (!condition) throw new Error(message); };
 const now = () => new Date().toISOString();
 const phases = ['publishing', 'awaiting_review', 'merging', 'merged', 'deploying'];
+const requiredWorkflows = requireSite => ['.github/workflows/main.yml', '.github/workflows/docs-sync.yml',
+  ...(requireSite ? ['.github/workflows/deploy-docs.yml'] : [])];
 export const progressPaths = root => ({
   state: join(root, '.clackly-docs-reviewed-state.json'),
   cursor: join(root, '.clackly-docs-reviewed-sha'),
@@ -251,7 +253,7 @@ export async function synchronize(root, command, input = {}, api) {
       insist(p.number, 'Recover publishing before completion'); passReceipt(p);
       const pr = await api.pr(p.number); p.mergeSha = mergedPr(p, pr); p.phase = 'merged'; save();
       insist(await api.isAncestor(p.mergeSha, through) && await api.isAncestor(p.through, through), 'Pending merge/range is outside reviewed main');
-      p.ci = await api.ci(p.headSha, needsPages(pr.files), p.through, p.number);
+      p.ci = await api.verifyCi(p.ci, p.headSha, needsPages(pr.files), p.through, p.number);
       let deployment = { required: false, reason: 'No deployed site or generated Skill source changes' };
       if (needsPages(pr.files)) {
         const receipt = await coveringDeployment(api, p.mergeSha, through);
@@ -312,13 +314,26 @@ export function github(root, invoke = run, fetchPage = fetch) {
     },
     ci: (head, requireSite, reviewedBase, number) => {
       const runs = pages(`repos/${repository}/actions/runs?head_sha=${head}&event=pull_request&per_page=100`).flatMap(p => p.workflow_runs);
-      const required = ['.github/workflows/main.yml', '.github/workflows/docs-sync.yml', ...(requireSite ? ['.github/workflows/deploy-docs.yml'] : [])];
-      return required.map(path => {
+      return requiredWorkflows(requireSite).map(path => {
         const r = runs.filter(r => r.path === path && r.head_sha === head && r.head_branch.startsWith('docs/sync-')).sort((a, b) => b.id - a.id)[0];
         insist(r?.status === 'completed' && r.conclusion === 'success', `Required CI is missing, pending or failed: ${path}`);
         insist(r.pull_requests?.some(p => p.number === number && p.head?.sha === head && p.base?.sha === reviewedBase),
           `CI has no matching reviewed PR base: ${path}; integrate main and rerun checks`);
-        return { path, sha: head, baseSha: reviewedBase, runId: r.id, url: r.html_url };
+        return { path, sha: head, baseSha: reviewedBase, prNumber: number, runId: r.id, url: r.html_url };
+      });
+    },
+    verifyCi: (receipts, head, requireSite, reviewedBase, number) => {
+      insist(Array.isArray(receipts), 'No durable pre-merge CI receipt; preserve pending for inspection');
+      return requiredWorkflows(requireSite).map(path => {
+        const receipt = receipts.find(r => r.path === path);
+        insist(receipt?.sha === head && receipt.baseSha === reviewedBase && receipt.prNumber === number
+          && Number.isSafeInteger(receipt.runId) && receipt.runId > 0, 'Durable CI receipt has no matching PR/HEAD/base');
+        const run = json(['api', `repos/${repository}/actions/runs/${receipt.runId}`]);
+        insist(run.head_sha === head && run.path === path && run.event === 'pull_request'
+          && run.head_branch?.startsWith('docs/sync-') && run.status === 'completed' && run.conclusion === 'success',
+        `Recorded CI run is not successful for the reviewed HEAD: ${path}`);
+        // pull_requests is mutable and may be empty after merge; the pre-merge binding is durable.
+        return { ...receipt, url: run.html_url };
       });
     },
     assertBaseProtected: () => {
