@@ -1,6 +1,6 @@
 {
   "name": "clackly",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "description": "Architecture-validation MVP command palette for DaVinci Resolve.",
   "main": "electron/main/main.js",
