@@ -35,6 +35,11 @@ function targetFor(url) {
 }
 assert.equal(targetFor(new URL(base + 'en/docs/', origin)), 'en/docs/index.html');
 assert.throws(() => targetFor(new URL(origin + '/docs/')));
+for (const route of ['index.html', 'en/index.html']) {
+  const image = pages.get(route).match(/property="og:image" content="([^"]+)"/);
+  assert(image, 'Missing social image: ' + route);
+  assert(existing.has(targetFor(new URL(decode(image[1])))), 'Missing social image asset: ' + route);
+}
 let checked = 0;
 for (const [name, html] of pages) {
   assert.match(html, /href="\/Clackly\/favicon[.]svg\?v=0e879fa7"/, 'Missing R1 SVG favicon: ' + name);

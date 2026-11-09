@@ -1,5 +1,6 @@
 ---
 import CopyBlock from './CopyBlock.astro';
+import Icon from './HomeIcon.astro';
 import { prompts } from '../data/prompts';
 interface Props { lang: 'zh-CN' | 'en'; }
 const { lang } = Astro.props;
@@ -9,6 +10,7 @@ const docs = root + 'docs/';
 const release = 'https://github.com/Wutpeach/Clackly/releases/tag/v0.1.6';
 const title = en ? 'Clackly — Stay in the edit.' : 'Clackly — 剪辑，不必绕路。';
 const description = en ? 'A compact, keyboard-first command palette for DaVinci Resolve. Find commands, run trusted extensions and build your own tools with AI.' : 'DaVinci Resolve 内轻量、键盘优先的命令面板。搜索命令、运行可信扩展，用 AI 构建自己的剪辑工具。';
+const images = '/Clackly/images/home/';
 ---
 <!doctype html>
 <html lang={lang}>
@@ -23,108 +25,306 @@ const description = en ? 'A compact, keyboard-first command palette for DaVinci 
   <link rel="alternate" hreflang="en" href="https://wutpeach.github.io/Clackly/en/" />
   <meta property="og:type" content="website" /><meta property="og:title" content={title} />
   <meta property="og:description" content={description} /><meta property="og:url" content={'https://wutpeach.github.io' + root} />
-  <meta property="og:image" content="https://wutpeach.github.io/Clackly/images/palette.png" />
+  <meta property="og:image" content="https://wutpeach.github.io/Clackly/images/home/social.png" />
+  <meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content={description} /><meta name="twitter:card" content="summary_large_image" />
 </head>
 <body>
 <a class="skip" href="#main">{en ? 'Skip to content' : '跳到正文'}</a>
 <header class="wrap header">
-  <a class="brand" href={root} aria-label="Clackly"><img src="/Clackly/wordmark.svg" width="126" height="20" alt="Clackly" /></a>
+  <a class="brand" href={root} aria-label="Clackly"><img src="/Clackly/clackly-compact.svg" width="34" height="34" alt="" /><span>Clackly</span></a>
   <nav aria-label={en ? 'Main navigation' : '主导航'}>
     <a href={docs}>{en ? 'Documentation' : '使用文档'}</a>
     <a href={docs + 'developer/'}>Build with AI</a>
+    <a class="github" href="https://github.com/Wutpeach/Clackly">GitHub <Icon name="external" /></a>
     <a class="language" href={en ? '/Clackly/' : '/Clackly/en/'} lang={en ? 'zh-CN' : 'en'}>{en ? '简体中文' : 'English'}</a>
-    <a class="github" href="https://github.com/Wutpeach/Clackly">GitHub</a>
   </nav>
 </header>
 <main id="main">
-  <section class="wrap hero" aria-labelledby="hero-title">
-    <h1 id="hero-title">{en ? 'Stay in' : '剪辑，'}<br /><span>{en ? 'the edit.' : '不必绕路。'}</span></h1>
-    <div class="hero-copy">
-      <p>{en ? 'Your commands, one keystroke away. A small palette inside DaVinci Resolve, built to keep your attention on the timeline.' : '把常用操作，收进一次呼出。DaVinci Resolve 内的轻量命令面板，让注意力留在时间线上。'}</p>
-      <div class="actions"><a class="button primary" href={release}>{en ? 'Download for Windows' : '下载 Windows 版'}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5" /></svg></a><a class="text-link" href={docs}>{en ? 'Read the docs' : '阅读文档'} <span aria-hidden="true">→</span></a></div>
-      <p class="release">v0.1.6 · Windows x64 · {en ? 'Resolve Studio Workflow Integration' : 'Resolve Studio 工作流集成'}</p>
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap hero-copy">
+      <h1 id="hero-title">{en ? 'Stay in the edit.' : <><span>剪辑，</span><span>不必绕路。</span></>}</h1>
+      <p class="hero-description">{en ? 'Your next move, one keystroke away.' : '下一步操作，一次呼出。'}<br /><span>{en ? 'A keyboard-first command palette for DaVinci Resolve.' : '为 DaVinci Resolve 而造的键盘优先命令面板。'}</span></p>
+      <div class="actions"><a class="button primary" href={release}><Icon name="windows" />{en ? 'Download for Windows' : '下载 Windows 版'}<Icon name="download" /></a><a class="button secondary" href={docs}>{en ? 'Read the docs' : '阅读文档'}<Icon name="arrow" /></a></div>
+      <p class="release">v0.1.6 <span>·</span> Windows x64 <span>·</span> {en ? 'Resolve Studio Workflow Integration' : 'Resolve Studio 工作流集成'}</p>
     </div>
-    <div class="instrument">
-      <div class="keystroke" aria-label="Control plus Space"><kbd>Ctrl</kbd><span>+</span><kbd>Space</kbd></div>
-      <div class="workflow"><p>{en ? 'Call it up.' : '随手呼出。'}</p><p>{en ? 'Find your command.' : '找到命令。'}</p><p>{en ? 'Back to your timeline.' : '回到时间线。'}</p></div>
-      <figure><img src="/Clackly/images/palette.png" width="256" height="336" alt={en ? 'Actual Clackly renderer with Pinned, Recent and Commands groups: Export to After Effects, Paste Clipboard Image and Add Marker.' : 'Clackly 实际界面：Pinned、Recent、Commands 分组，包含 AE 导出、粘贴剪贴板图片和添加标记。'} fetchpriority="high" /><figcaption>{en ? 'Actual renderer · demo data' : '实际 renderer · 演示数据'}</figcaption></figure>
-      <div class="instrument-note"><span class="small-rule"></span><p>{en ? 'A compact 240 × 320 palette. Your workspace stays yours.' : '240 × 320 的小面板。\n工作区，留给你的剪辑。'}</p><a href={docs + 'first-use/'}>{en ? 'Meet your palette' : '认识命令面板'} <span aria-hidden="true">↗</span></a></div>
-    </div>
+    <figure class="wrap product-figure">
+      <div class="product-stage">
+        <div class="stage-copy"><p>{en ? 'Less reaching.' : '少一点寻找。'}<br /><span>{en ? 'More creating.' : '多一点创作。'}</span></p><div class="shortcut" aria-label="Control plus Space"><kbd>Ctrl</kbd><span>+</span><kbd>Space</kbd></div><span class="shortcut-note">{en ? 'Call up your commands.' : '随手呼出你的命令。'}</span></div>
+        <div class="timeline" aria-hidden="true">
+          <div class="time-ruler"><span>01:00:00:00</span><span>01:00:04:00</span><span>01:00:08:00</span><span>01:00:12:00</span></div>
+          <div class="track video-track"><span>V2</span><i></i><i></i><i></i></div>
+          <div class="track main-track"><span>V1</span><i></i><i></i><i></i><i></i></div>
+          <div class="track audio-track"><span>A1</span><i></i><i></i></div>
+          <div class="playhead"></div>
+        </div>
+        <div class="product-capture">
+          <img id="preview-launcher" data-scene="launcher" src={images + 'launcher.png'} width="512" height="672" alt={en ? 'Actual Clackly Launcher: Pinned, Recent and Commands, with Export to After Effects, Paste Clipboard Image and Add Marker. Demonstration data.' : 'Clackly Launcher 真实界面：Pinned、Recent、Commands 分组，包含 AE 导出、粘贴剪贴板图片和添加标记。使用演示数据。'} fetchpriority="high" />
+          <img id="preview-search" data-scene="search" src={images + 'search.png'} width="512" height="672" alt={en ? 'Actual Clackly Search showing commands from Clackly and Resolve scripts. Demonstration data.' : 'Clackly 搜索真实界面：展示 Clackly 和 Resolve 脚本命令，区分不同来源。使用演示数据。'} hidden />
+        </div>
+        <div class="preview-switch" role="group" aria-label={en ? 'Product screenshot' : '产品界面展示'} data-preview-switch hidden>
+          <button type="button" data-scene-target="launcher" aria-controls="preview-launcher" aria-pressed="true">Launcher</button><button type="button" data-scene-target="search" aria-controls="preview-search" aria-pressed="false">{en ? 'Search' : '搜索'}</button>
+        </div>
+      </div>
+      <figcaption>{en ? 'Actual Clackly interface · demo data. Timeline background is a schematic, not a Resolve capture.' : '真实 Clackly 界面 · 演示数据。背景为时间线示意，并非 Resolve 截图。'}</figcaption>
+    </figure>
   </section>
+
   <section class="wrap capabilities" aria-labelledby="work-title">
-    <h2 id="work-title">{en ? 'Less reaching. More doing.' : '让操作靠近你。'}</h2>
-    <div class="feature-row"><h3>{en ? 'Find it. Keep it close.' : '搜得到，也记得住。'}</h3><div><p>{en ? 'Search built-in commands, extensions and ordinary Resolve scripts together. Pin a favorite. Pick up where you left off with Recent. Sources stay visible, even when names match.' : '内置命令、扩展和普通 Resolve 脚本，一起搜索。常用的固定到 Pinned，用过的从 Recent 找回。同名命令，也能看清来源。'}</p><a href={docs + 'launcher/'}>{en ? 'Launcher & search' : 'Launcher 与搜索'} <span aria-hidden="true">→</span></a></div></div>
-    <div class="feature-row"><h3>{en ? 'A command, or a whole tool.' : '一个命令，也能是一套工具。'}</h3><div><p>{en ? 'Run a focused action with an input form and a clear result. Keep an Extension View open to browse lists, inspect details, edit a form or apply a confirmed batch action.' : '用输入表单完成一次操作，得到清楚的结果。需要持续浏览时，打开 Extension View：列表、详情、表单与确认后的批量操作，都在独立工具窗口里。'}</p><a href={docs + 'command-ui-views/'}>{en ? 'Explore extension UI' : '了解扩展界面'} <span aria-hidden="true">→</span></a></div></div>
-    <div class="feature-row"><h3>{en ? 'Make room for your workflow.' : '把你的工作流，装进来。'}</h3><div><p>{en ? 'Install a trusted .clackly package from Settings. Configure, enable or update it there. Extension commands appear in the Launcher without a restart.' : '从 Settings 安装可信的 .clackly 包，配置、启用和更新都在同一个地方。扩展命令直接出现在 Launcher，无需重启。'}</p><a href={docs + 'extensions/'}>{en ? 'Install an extension' : '安装与管理扩展'} <span aria-hidden="true">→</span></a></div></div>
+    <div class="section-heading"><h2 id="work-title">{en ? 'Small palette.\nA lot within reach.' : '小面板，\n装得下你的工作流。'}</h2><p>{en ? 'From the command you use every day to the tool you wish existed. Keep it all close to the edit.' : '从每天都用的一个命令，到专属你的一套工具。\n让操作靠近你，让注意力留在剪辑里。'}</p></div>
+    <div class="feature-grid">
+      <article class="search-feature">
+        <div class="feature-copy"><h3>{en ? 'Find your next move.' : '想到，就能找到。'}</h3><p>{en ? 'Commands, extensions and Resolve scripts in one search. Pin your favorites. Return to your Recent.' : '内置命令、扩展和 Resolve 脚本，一起搜索。\n常用的固定，用过的从 Recent 找回。'}</p></div>
+        <div class="search-art"><span class="search-orbit" aria-hidden="true"><Icon name="search" /></span><img src={images + 'search.png'} width="512" height="672" loading="lazy" alt={en ? 'Real Search interface with demo clipboard commands from different sources.' : '搜索真实界面，以剪贴板演示命令展示不同来源。'} /></div>
+        <div class="feature-footer"><span>{en ? 'Actual interface · demo data' : '真实界面 · 演示数据'}</span><a href={docs + 'launcher/'}>{en ? 'Explore Launcher' : '了解 Launcher'}<Icon name="arrow" /></a></div>
+      </article>
+      <article class="extension-feature">
+        <div class="feature-copy"><h3>{en ? 'A command. Or a whole tool.' : '一个命令，也能是一套工具。'}</h3><p>{en ? 'Go further with Extension Views. Browse a list, inspect details, fill a form. Your tools, rendered by Clackly.' : '用 Extension View 浏览列表、查看详情、填写表单。\n你的工具，由 Clackly 统一呈现。'}</p></div>
+        <div class="extension-art"><img src={images + (en ? 'extension-en.png' : 'extension-zh.png')} width="1120" height="760" loading="lazy" alt={en ? 'Actual Extension View renderer displaying an illustrative read-only Timeline Browser with four demonstration timelines.' : 'Extension View 真实界面：只读时间线浏览器示例，包含四条演示时间线。'} /></div>
+        <div class="feature-footer"><span>{en ? 'Example extension · actual interface · demo data' : '示例扩展 · 真实界面 · 演示数据'}</span><a href={docs + 'command-ui-views/'}>{en ? 'Explore extension UI' : '了解扩展界面'}<Icon name="arrow" /></a></div>
+      </article>
+    </div>
+    <div class="extension-note"><div class="package-mark" aria-hidden="true">.clackly</div><div><h3>{en ? 'Your workflow has room to grow.' : '让你的工作流，继续生长。'}</h3><p>{en ? 'Install, configure and update trusted extensions in Settings. New commands appear without a restart.' : '在 Settings 安装、配置和更新可信扩展。新命令即刻加入 Launcher，无需重启。'}</p></div><a class="text-link" href={docs + 'extensions/'}>{en ? 'Manage extensions' : '管理扩展'}<Icon name="arrow" /></a></div>
   </section>
-  <section class="ai-section" aria-labelledby="ai-title"><div class="wrap ai-inner">
-    <div><h2 id="ai-title">{en ? 'Your next tool\nstarts with an idea.' : '下一个工具，\n从一句需求开始。'}</h2><p>{en ? 'Tell your Agent what you need. The official Developer Skill gives it the protocol, examples and packaging tools to turn that idea into a Clackly extension.' : '告诉 Agent 你想解决什么。官方 Developer Skill 提供协议、示例与打包工具，把需求变成可安装的 Clackly 扩展。'}</p><a class="button primary" href={docs + 'developer/'}>Build with AI <span aria-hidden="true">→</span></a><p class="ai-note">{en ? 'Python extensions. Host-rendered UI. Your source to keep.' : 'Python 扩展 · Host 渲染界面 · 源码由你掌握'}</p></div>
-    <CopyBlock text={prompts(lang)[0].text} lang={lang} label={en ? 'Start with a read-only tool' : '从只读工具开始'} />
-  </div></section>
-  <section class="wrap closing"><h2>{en ? 'One small palette.\nBack to the work you love.' : '一个小面板。\n回到你热爱的剪辑。'}</h2><a class="button primary" href={release}>{en ? 'Get Clackly v0.1.6' : '下载 Clackly v0.1.6'}</a><a class="text-link" href={docs + 'install/'}>{en ? 'Installation guide' : '查看安装指南'} <span aria-hidden="true">→</span></a><p>{en ? 'Unsigned installer. Download from the official Release and verify its SHA-256. Install only extensions you trust; they execute local code.' : '安装器未签名，请从官方 Release 下载并核对 SHA-256。扩展会执行本地代码，请只安装你信任的来源。'}</p></section>
+
+  <section class="wrap ai-section" aria-labelledby="ai-title">
+    <div class="ai-copy"><h2 id="ai-title">{en ? 'Your workflow.\nYour next idea.' : '你的工作流，\n你的专属工具。'}</h2><p>{en ? 'Tell your Agent what you need. The official Developer Skill brings the protocol, examples and packaging tools to build a Clackly extension.' : '把想法告诉 Agent。官方 Developer Skill 提供协议、示例和打包工具，把一句需求变成可安装的 Clackly 扩展。'}</p><a class="button dark" href={docs + 'developer/'}>Build with AI <Icon name="arrow" /></a><p class="ai-note">{en ? 'Python extensions · Host-rendered UI · Your source to keep' : 'Python 扩展 · Host 渲染界面 · 源码由你掌握'}</p></div>
+    <div class="ai-workbench">
+      <div class="idea"><Icon name="command" /><p>{en ? '“Build a read-only tool that shows my current project and timeline count.”' : '“做一个只读工具，告诉我当前项目名称和时间线数量。”'}</p></div>
+      <div class="build-path"><span>{en ? 'Your idea' : '你的需求'}</span><Icon name="arrow" /><span>Agent + Developer Skill</span><Icon name="arrow" /><span>.clackly</span></div>
+      <details><summary>{en ? 'Get the full starter prompt' : '获取完整起步提示词'}</summary><CopyBlock text={prompts(lang)[0].text} lang={lang} label={en ? 'Start with a read-only tool' : '从只读工具开始'} /></details>
+    </div>
+  </section>
+
+  <section class="wrap closing" aria-labelledby="closing-title"><img src="/Clackly/clackly-compact.svg" width="68" height="68" loading="lazy" alt="" /><h2 id="closing-title">{en ? 'Back to the work you love.' : '回到你热爱的剪辑。'}</h2><p class="closing-description">{en ? 'A little less friction. A little more flow.' : '让操作更顺手，让创作更尽兴。'}</p><div class="actions"><a class="button primary" href={release}><Icon name="download" />{en ? 'Get Clackly v0.1.6' : '下载 Clackly v0.1.6'}</a><a class="button secondary" href={docs + 'install/'}>{en ? 'Installation guide' : '安装指南'}<Icon name="arrow" /></a></div><p class="trust-note">{en ? 'Windows x64 · Resolve Studio Workflow Integration. Unsigned installer: download from the official Release and verify its SHA-256. Extensions execute local code; install only sources you trust.' : 'Windows x64 · Resolve Studio 工作流集成。安装器未签名，请从官方 Release 下载并核对 SHA-256。扩展会执行本地代码，请只安装你信任的来源。'}</p></section>
 </main>
-<footer class="wrap footer"><a class="brand" href={root}><img src="/Clackly/mark.svg" width="24" height="24" alt="" />Clackly</a><p>{en ? 'Built for your Resolve workflow.' : '为你的 Resolve 工作流而造。'}</p><nav aria-label={en ? 'Footer' : '页脚'}><a href={docs}>{en ? 'Docs' : '文档'}</a><a href={release}>{en ? 'Releases' : '发行记录'}</a><a href="https://github.com/Wutpeach/Clackly">GitHub</a><a href="/Clackly/fonts/HARMONYOS_SANS_LICENSE.txt">HarmonyOS Sans © Huawei</a></nav></footer>
+<footer class="wrap footer"><div><a class="brand" href={root}><img src="/Clackly/clackly-compact.svg" width="28" height="28" alt="" /><span>Clackly</span></a><p>{en ? 'Built for your Resolve workflow.' : '为你的 Resolve 工作流而造。'}</p></div><nav aria-label={en ? 'Footer' : '页脚'}><a href={docs}>{en ? 'Documentation' : '使用文档'}</a><a href={docs + 'developer/'}>Build with AI</a><a href={release}>{en ? 'Releases' : '发行记录'}</a><a href="https://github.com/Wutpeach/Clackly">GitHub</a><a href="/Clackly/fonts/HARMONYOS_SANS_LICENSE.txt">HarmonyOS Sans © Huawei</a></nav></footer>
 </body></html>
+
+<script>
+  const controls = document.querySelector<HTMLElement>('[data-preview-switch]');
+  if (controls) {
+    controls.hidden = false;
+    controls.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
+      button.addEventListener('click', () => {
+        controls.querySelectorAll('button').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+        document.querySelectorAll<HTMLImageElement>('[data-scene]').forEach((img) => { img.hidden = img.dataset.scene !== button.dataset.sceneTarget; });
+      });
+    });
+  }
+</script>
+
 <style>
 @font-face { font-family: Harmony; src: url('/Clackly/fonts/HarmonyOS_Sans.ttf') format('truetype'); font-display: swap; }
-:global(html) { background: #151619; color: #e7e8ea; font-family: Harmony, 'Segoe UI', system-ui, sans-serif; color-scheme: dark; scrollbar-color: #777b84 #151619; }
+:global(html) { background: #151619; color: #eeece8; font-family: Harmony, 'Segoe UI', system-ui, sans-serif; color-scheme: dark; scrollbar-color: #777b84 #151619; }
 :global(body) { margin: 0; }
 :global(*) { box-sizing: border-box; }
-:global(::selection) { color: #151619; background: #e7e8ea; }
+:global([hidden]) { display: none !important; }
+:global(::selection) { color: #151619; background: #f0c69c; }
 :global(a) { color: inherit; text-decoration: none; text-underline-offset: .25em; }
 :global(a:hover) { text-decoration: underline; }
-:global(:focus-visible) { outline: 2px solid #e7e8ea; outline-offset: 5px; }
-.wrap { width: min(1120px, calc(100% - 80px)); margin-inline: auto; }
-.header { display: flex; justify-content: space-between; align-items: center; gap: 2rem; min-height: 94px; border-bottom: 1px solid #32343a; }
-.brand { display: inline-flex; align-items: center; gap: .5rem; font-weight: 600; }
-.header nav, .footer nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1.8rem; font-size: .9rem; }
-.header nav a { padding-block: .65rem; }
-.language { color: #b7b9c0; }
-.hero { padding-top: 76px; display: grid; grid-template-columns: 1.1fr 1fr; column-gap: 4rem; }
-h1 { font-size: clamp(3.7rem, 7.2vw, 6rem); font-weight: 600; line-height: 1.08; letter-spacing: -.035em; margin: 0; text-wrap: balance; }
-h1 span { color: #a3a6af; }
-.hero-copy { align-self: end; padding-bottom: .4rem; }
-.hero-copy > p:first-child { font-size: 1.1rem; line-height: 1.85; max-width: 32rem; margin: 0 0 1.6rem; color: #c6c8ce; }
-.actions { display: flex; flex-wrap: wrap; gap: 1.4rem; align-items: center; }
-.button { display: inline-flex; align-items: center; justify-content: center; gap: .9rem; padding: .85rem 1.15rem; border-radius: 5px; min-height: 48px; font-weight: 600; font-size: .95rem; }
-.primary { background: #e7e8ea; color: #17191d; }
+:global(:focus-visible) { outline: 2px solid #f0c69c; outline-offset: 5px; }
+.wrap { width: min(1200px, calc(100% - 80px)); margin-inline: auto; }
+.header { display: flex; justify-content: space-between; align-items: center; gap: 2rem; min-height: 92px; }
+.brand { display: inline-flex; align-items: center; gap: .7rem; font-size: 1.3rem; font-weight: 600; letter-spacing: -.025em; }
+.brand img { display: block; }
+.header nav, .footer nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1.8rem; font-size: .875rem; }
+.header nav a { display: inline-flex; align-items: center; gap: .25rem; padding-block: .8rem; color: #c3c2c6; }
+.header nav a:hover { color: #fff; }
+.github :global(svg) { width: 15px; height: 15px; }
+.header .language { border-left: 1px solid #3c3d42; padding-left: 1.7rem; }
+.hero-copy { text-align: center; padding-block: 40px 30px; }
+h1 { font-size: clamp(3.5rem, 6.7vw, 6rem); font-weight: 600; line-height: 1.12; letter-spacing: -.04em; margin: 0; text-wrap: balance; }
+h1 > span { display: inline-block; }
+.hero-description { font-size: 1.2rem; line-height: 1.65; margin: 25px 0 26px; color: #eeece8; }
+.hero-description span { color: #b1b0b7; font-size: 1rem; }
+.actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; justify-content: center; }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: .7rem; padding: .9rem 1.2rem; border: 1px solid transparent; border-radius: 8px; min-height: 50px; font-weight: 600; font-size: .9rem; }
+.primary { background: #eeece8; color: #151619; }
 .primary:hover { background: #fff; text-decoration: none; }
-.button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; }
-.text-link { display: inline-block; padding-block: .7rem; font-size: .95rem; }
-.release { color: #a3a6af; font-size: .76rem; line-height: 1.7; margin: 1.2rem 0 0; }
-.instrument { grid-column: 1 / -1; margin-top: 54px; padding: 34px 42px 26px; border-block: 1px solid #32343a; display: grid; grid-template-columns: 1fr 256px 1fr; column-gap: 3rem; align-items: center; position: relative; }
-.keystroke { display: flex; align-items: center; gap: .8rem; grid-column: 1; align-self: end; margin-bottom: 1rem; }
-.keystroke kbd { font: 500 1.8rem/1 Harmony, sans-serif; border: 1px solid #626670; border-bottom-width: 4px; padding: 1.1rem 1.2rem; border-radius: 7px; }
-.keystroke > span { color: #9b9ea7; }
-.workflow { grid-column: 1; align-self: start; }
-.workflow p { margin: 0 0 .5rem; color: #b7b9c0; font-size: 1.05rem; }
-figure { grid-column: 2; grid-row: 1 / 3; margin: 0; }
-figure img { width: 256px; max-width: 100%; height: auto; display: block; filter: drop-shadow(0 14px 16px #0005); }
-figcaption { font-size: .7rem; color: #a3a6af; text-align: center; margin-top: .7rem; }
-.instrument-note { grid-column: 3; grid-row: 1 / 3; align-self: center; }
-.small-rule { display: block; width: 36px; border-top: 1px solid #777b84; }
-.instrument-note p { font-size: 1.1rem; color: #b7b9c0; line-height: 1.8; margin: 1.2rem 0; }
-.instrument-note a { font-size: .875rem; }
-.capabilities { padding-block: 95px 100px; }
-h2 { font-size: clamp(2rem, 3.4vw, 3rem); font-weight: 500; letter-spacing: -.025em; line-height: 1.25; text-wrap: balance; margin: 0; }
-.capabilities h2 { margin-bottom: 3.5rem; }
-.feature-row { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; border-top: 1px solid #32343a; padding-block: 2rem; }
-h3 { font-weight: 500; font-size: 1.4rem; line-height: 1.4; margin: 0; }
-.feature-row p { margin: 0 0 1rem; color: #b7b9c0; line-height: 1.85; font-size: 1rem; }
-.feature-row a { font-size: .875rem; }
-.ai-section { border-block: 1px solid #3a3c42; background: #1c1e22; }
-.ai-inner { padding-block: 76px; display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; }
-.ai-inner h2 { white-space: pre-line; }
-.ai-inner > div > p { line-height: 1.85; color: #b7b9c0; margin-block: 1.5rem; max-width: 32rem; }
-.ai-inner > div > .ai-note { font-size: .8rem; }
-.closing { padding-block: 95px; text-align: center; }
-.closing h2 { white-space: pre-line; margin-bottom: 2rem; }
-.closing .text-link { margin-left: 1.5rem; }
-.closing p { color: #a3a6af; max-width: 43rem; font-size: .8rem; line-height: 1.8; margin: 2rem auto 0; }
-.footer { border-top: 1px solid #32343a; display: flex; gap: 2rem; align-items: center; padding-block: 2rem; }
-.footer p { color: #a3a6af; font-size: .8rem; flex: 1; }
-.skip { position: absolute; top: -100px; left: 1rem; padding: 1rem; background: #e7e8ea; color: #151619; z-index: 10; }
+.secondary { border-color: #414247; color: #dddbd9; background: #1c1d20; }
+.secondary:hover { border-color: #777b84; background: #25262a; text-decoration: none; }
+.release { color: #a9a8b0; font-size: .73rem; line-height: 1.7; margin: 16px 0 0; }
+.release span { margin-inline: .4rem; }
+.product-figure { margin-block: 0; }
+.product-stage { height: 510px; border: 1px solid #4a403a; border-radius: 16px; position: relative; overflow: hidden; background: linear-gradient(115deg, #282227 0%, #524039 44%, #9e7960 75%, #ccb396 100%); isolation: isolate; animation: stage-arrive 900ms cubic-bezier(.16,1,.3,1) both; }
+.stage-copy { position: absolute; left: 6%; top: 52px; z-index: 2; }
+.stage-copy p { font-size: clamp(1.8rem, 3vw, 2.5rem); line-height: 1.25; letter-spacing: -.035em; margin: 0 0 25px; font-weight: 500; }
+.stage-copy p span { color: #dfcbbd; }
+.shortcut { display: flex; align-items: center; gap: .5rem; }
+.shortcut kbd { font: 500 .95rem/1 Harmony, sans-serif; border: 1px solid #9a8172; border-bottom-width: 3px; background: #3d3332; border-radius: 7px; padding: .65rem .85rem; }
+.shortcut > span, .shortcut-note { color: #d1bdb1; font-size: .78rem; }
+.shortcut-note { display: block; margin-top: 12px; }
+.product-capture { position: absolute; width: 344px; right: 21%; top: 20px; z-index: 3; }
+.product-capture img { width: 100%; height: auto; display: block; filter: drop-shadow(0 18px 23px #160e1170); }
+.preview-switch { position: absolute; z-index: 4; right: 24px; top: 24px; padding: 4px; border-radius: 8px; display: flex; gap: 4px; background: #211e20; border: 1px solid #6f5c50; }
+.preview-switch button { font: 400 .78rem Harmony, sans-serif; color: #cbc3bd; border: 0; background: transparent; padding: .6rem .8rem; border-radius: 4px; min-height: 36px; cursor: pointer; }
+.preview-switch button[aria-pressed=true] { background: #eeece8; color: #151619; }
+.preview-switch button:hover { text-decoration: underline; text-underline-offset: 4px; }
+.timeline { position: absolute; width: 110%; left: -5%; bottom: -25px; padding: 20px 0 30px; transform: rotate(-5deg); border-block: 1px solid #a2948f60; background: #211f27e8; z-index: 1; }
+.time-ruler { display: flex; justify-content: space-around; margin: 0 0 12px 48px; padding-bottom: 12px; border-bottom: 1px solid #6e6371; font-size: .65rem; font-variant-numeric: tabular-nums; color: #b9adbd; }
+.track { display: flex; align-items: stretch; gap: 5px; height: 36px; margin-block: 5px; padding-right: 18px; }
+.track > span { width: 52px; flex-shrink: 0; padding: 12px 18px 0; color: #c2b5c5; font-size: .65rem; }
+.track i { display: block; height: 100%; border: 1px solid #b7a2d05c; border-radius: 3px; background: #63556c; flex: 2; }
+.video-track i:first-of-type { flex: 1.5; margin-left: 15%; background: #9e7863; border-color: #c3977c; }
+.video-track i:nth-of-type(2) { flex: 1; background: #a07d65; }
+.video-track i:last-of-type { background: transparent; border-color: transparent; }
+.main-track i:nth-of-type(2) { flex: 3; background: #796283; }
+.main-track i:nth-of-type(3) { flex: 1; background: #897096; }
+.audio-track { height: 30px; }
+.audio-track i { background: repeating-linear-gradient(90deg, transparent 0 5px, #7d92844d 5px 7px), #3b514b; border-color: #638572; }
+.audio-track i:last-of-type { flex: 1; }
+.playhead { position: absolute; left: 43%; width: 1px; top: 15px; bottom: 0; background: #e9c2a5; }
+.playhead::before { content: ''; position: absolute; top: 0; left: -4px; width: 9px; height: 9px; background: #e9c2a5; border-radius: 2px; }
+figcaption { font-size: .72rem; color: #a9a8b0; text-align: center; line-height: 1.7; margin-top: 16px; }
+.capabilities { padding-block: 120px 100px; }
+.section-heading { display: flex; justify-content: space-between; align-items: end; gap: 3rem; margin-bottom: 42px; }
+h2 { font-size: clamp(2rem, 3.7vw, 3.25rem); font-weight: 500; letter-spacing: -.035em; line-height: 1.2; white-space: pre-line; text-wrap: balance; margin: 0; }
+.section-heading > p { max-width: 29rem; color: #b1b0b7; font-size: 1rem; line-height: 1.85; white-space: pre-line; margin: 0 0 .3rem; }
+.feature-grid { display: grid; grid-template-columns: .85fr 1.15fr; gap: 24px; }
+.feature-grid article { border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+.search-feature { border: 1px solid #36373d; background: #1d1f25; }
+.extension-feature { background: #e5ddd2; color: #28252c; }
+.feature-copy { padding: 34px 34px 0; }
+h3 { font-weight: 500; font-size: clamp(1.3rem, 2vw, 1.65rem); letter-spacing: -.025em; line-height: 1.35; margin: 0; text-wrap: balance; }
+.feature-copy p { line-height: 1.8; font-size: .92rem; margin: 14px 0 0; color: #b9b9c3; white-space: pre-line; }
+.extension-feature p { color: #615a62; }
+.search-art { position: relative; display: grid; place-items: center; padding: 28px 30px 22px; flex: 1; }
+.search-art img { width: 238px; max-width: 100%; height: auto; z-index: 1; filter: drop-shadow(0 14px 20px #0005); }
+.search-orbit { position: absolute; width: 300px; height: 300px; border: 1px solid #45434f; border-radius: 50%; transform: rotate(-22deg); }
+.search-orbit :global(svg) { position: absolute; top: 18px; left: 15px; padding: 10px; width: 44px; height: 44px; background: #31303c; border: 1px solid #55515f; border-radius: 10px; transform: rotate(22deg); }
+.extension-art { flex: 1; display: grid; align-items: center; padding: 35px 26px; }
+.extension-art img { width: 100%; height: auto; display: block; border-radius: 8px; box-shadow: 0 20px 35px #44312e35; }
+.feature-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; padding: 0 34px 28px; }
+.feature-footer > span { color: #aaa9b4; font-size: .67rem; line-height: 1.7; }
+.extension-feature .feature-footer > span { color: #686069; }
+.feature-footer a, .text-link { display: inline-flex; align-items: center; gap: .6rem; font-size: .85rem; padding-block: .6rem; }
+.feature-footer a :global(svg), .text-link :global(svg) { width: 17px; height: 17px; }
+.extension-note { display: grid; grid-template-columns: auto 1fr auto; gap: 28px; align-items: center; margin-top: 30px; padding: 28px 4px; border-bottom: 1px solid #36373d; }
+.package-mark { border: 1px solid #5e5754; border-radius: 8px; padding: 22px 12px; font-size: .85rem; color: #e4b894; background: #292321; }
+.extension-note h3 { font-size: 1.1rem; }
+.extension-note p { color: #b1b0b7; font-size: .875rem; line-height: 1.8; margin: 8px 0 0; }
+.ai-section { color: #262733; background: #d9dbea; border-radius: 16px; padding: 64px 54px; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 54px; color-scheme: light; --primary: #262733; --primary-foreground: #fff; --border: #a9aabb; }
+.ai-copy > p { font-size: .95rem; line-height: 1.85; color: #555666; margin-block: 22px; }
+.dark { background: #262733; color: #f2f0f6; }
+.dark:hover { background: #3d3e4d; text-decoration: none; }
+.ai-copy > .ai-note { font-size: .72rem; margin-bottom: 0; }
+.ai-workbench { min-width: 0; }
+.idea { padding: 28px 0; border-block: 1px solid #a9aabb; }
+.idea :global(svg) { color: #66697f; width: 26px; height: 26px; }
+.idea p { font-size: clamp(1.2rem, 2vw, 1.65rem); line-height: 1.65; letter-spacing: -.02em; margin: 18px 0 0; }
+.build-path { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; font-size: .7rem; color: #555666; padding-block: 24px; }
+.build-path :global(svg) { width: 14px; height: 14px; }
+details { border-top: 1px solid #a9aabb; padding-top: 14px; }
+summary { cursor: pointer; padding-block: 10px; font-size: .85rem; }
+.ai-section :global(textarea) { font-size: .78rem; line-height: 1.8; caret-color: #262733; }
+.ai-section :global(:focus-visible) { outline-color: #51547c; }
+.closing { padding-block: 115px 90px; text-align: center; }
+.closing > img { display: block; margin: 0 auto 28px; }
+.closing-description { margin: 18px 0 28px; color: #b1b0b7; font-size: 1rem; }
+.trust-note { color: #aaa9b0; max-width: 40rem; font-size: .75rem; line-height: 1.9; margin: 28px auto 0; }
+.footer { border-top: 1px solid #36373d; display: flex; justify-content: space-between; gap: 3rem; align-items: start; padding-block: 34px 42px; }
+.footer .brand { font-size: 1.1rem; }
+.footer p { color: #a9a8b0; font-size: .75rem; margin: 12px 0 0; }
+.footer nav { max-width: 650px; justify-content: flex-end; gap: .5rem 1.6rem; color: #b1b0b7; font-size: .8rem; }
+.footer nav a { padding-block: .6rem; }
+.skip { position: absolute; top: -100px; left: 1rem; padding: 1rem; background: #eeece8; color: #151619; z-index: 10; }
 .skip:focus { top: 1rem; }
-@media (max-width: 900px) { .wrap { width: calc(100% - 48px); } .hero { gap: 2rem; } .instrument { column-gap: 1.5rem; padding-inline: 0; grid-template-columns: 1fr 256px; } .instrument-note { grid-column: 1; grid-row: 3; margin-top: 1.5rem; } figure { grid-row: 1 / 4; } .keystroke kbd { font-size: 1.4rem; padding: 1rem; } .feature-row, .ai-inner { gap: 2rem; } .github { display: none; } }
-@media (max-width: 600px) { .wrap { width: calc(100% - 36px); } .header { min-height: 84px; gap: 1rem; align-items: flex-start; padding-block: 1.25rem; } .brand img { width: 100px; height: auto; } .header nav { justify-content: flex-end; gap: .3rem 1rem; font-size: .75rem; max-width: 220px; } .header nav a { padding-block: .25rem; } .hero { padding-top: 44px; grid-template-columns: 1fr; gap: 1.8rem; } h1 { font-size: clamp(3.4rem, 13vw, 5rem); } .hero-copy > p:first-child { font-size: 1rem; } .instrument { margin-top: 14px; padding-block: 30px; grid-template-columns: 1fr; gap: 0; } .keystroke { grid-column: 1; justify-content: center; align-self: auto; } .keystroke kbd { font-size: 1.3rem; padding: .9rem 1.6rem; } .workflow { text-align: center; margin: .5rem 0 1.5rem; } .workflow p { display: inline; font-size: .82rem; margin-right: .5rem; } figure { grid-column: 1; grid-row: auto; justify-self: center; } .instrument-note { grid-column: 1; grid-row: auto; text-align: center; margin: 2rem auto 0; max-width: 22rem; } .small-rule { margin: auto; } .instrument-note p { font-size: 1rem; margin-block: .8rem; } .capabilities { padding-block: 56px; } .capabilities h2 { margin-bottom: 2rem; } .feature-row { grid-template-columns: 1fr; gap: 1rem; padding-block: 1.7rem; } h3 { font-size: 1.2rem; } .feature-row p { font-size: .95rem; } .ai-inner { padding-block: 48px; grid-template-columns: 1fr; gap: .5rem; } .closing { padding-block: 56px; } .closing .text-link { display: block; margin: .7rem 0 0; } .footer { flex-wrap: wrap; gap: .7rem 1rem; } .footer .brand img { width: 24px; } .footer p { flex-basis: 60%; } .footer nav { gap: 1.5rem; font-size: .8rem; } }
+@keyframes stage-arrive { from { transform: translateY(12px); opacity: .85; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .product-stage { animation: none; } }
+@media (max-width: 1000px) {
+  .wrap { width: calc(100% - 48px); }
+  .hero-copy { padding-top: 45px; }
+  .product-capture { right: 12%; }
+  .stage-copy { left: 5%; }
+  .preview-switch { top: auto; bottom: 20px; right: 20px; }
+  .feature-grid { grid-template-columns: 1fr 1.2fr; gap: 18px; }
+  .feature-copy { padding: 26px 24px 0; }
+  .feature-footer { padding-inline: 24px; }
+  .section-heading { gap: 2rem; }
+  .section-heading > p { max-width: 23rem; }
+  .ai-section { padding: 46px 34px; gap: 35px; }
+  .header nav { gap: 1.2rem; }
+  .header .language { padding-left: 1.2rem; }
+}
+@media (max-width: 700px) {
+  .wrap { width: calc(100% - 36px); }
+  .header { min-height: 94px; gap: 18px; align-items: start; padding-top: 20px; }
+  .brand { gap: .5rem; font-size: 1.1rem; }
+  .brand img { width: 30px; height: 30px; }
+  .header nav { justify-content: flex-end; gap: 0 1rem; font-size: .72rem; max-width: 235px; }
+  .header nav a { min-height: 36px; padding-block: .4rem; }
+  .header .github { display: none; }
+  .header .language { border: 0; padding-left: 0; }
+  .hero-copy { padding-block: 28px 27px; }
+  h1 { font-size: clamp(2.35rem, 8.7vw, 3.8rem); line-height: 1.18; letter-spacing: -.035em; }
+  .hero-description { font-size: 1rem; line-height: 1.7; margin: 20px 0 22px; }
+  .hero-description span { display: inline-block; font-size: .85rem; max-width: 27rem; text-wrap: balance; }
+  .actions { gap: 10px; }
+  .button { min-height: 48px; padding: .85rem 1rem; font-size: .8rem; gap: .55rem; }
+  .button :global(svg) { width: 17px; height: 17px; }
+  .release { font-size: .64rem; max-width: 23rem; margin: 15px auto 0; text-wrap: balance; }
+  .release span { margin-inline: .2rem; }
+  .product-stage { height: 522px; border-radius: 12px; background: linear-gradient(135deg, #393036 0%, #7c5c4d 55%, #bea78c 100%); }
+  .stage-copy { left: 23px; top: 22px; }
+  .stage-copy p { font-size: 1.4rem; line-height: 1.3; margin-bottom: 0; }
+  .stage-copy .shortcut, .shortcut-note { display: none; }
+  .preview-switch { right: 16px; top: 27px; bottom: auto; padding: 3px; gap: 2px; }
+  .preview-switch button { font-size: .65rem; padding: .5rem .55rem; min-height: 34px; }
+  .product-capture { width: 280px; top: 125px; right: auto; left: 50%; transform: translateX(-50%); max-width: calc(100% - 20px); }
+  .timeline { width: 155%; left: -25%; bottom: 23px; }
+  .time-ruler { font-size: .55rem; }
+  .track { height: 28px; }
+  .track > span { width: 38px; padding: 8px 12px 0; }
+  .audio-track { height: 23px; }
+  figcaption { font-size: .64rem; margin: 13px 8px 0; }
+  .capabilities { padding-block: 72px 60px; }
+  .section-heading { display: block; margin-bottom: 28px; }
+  h2 { font-size: clamp(1.85rem, 7.5vw, 2.75rem); line-height: 1.3; }
+  .section-heading > p { font-size: .9rem; margin-top: 20px; max-width: 30rem; white-space: normal; }
+  .feature-grid { grid-template-columns: 1fr; gap: 22px; }
+  .feature-copy { padding: 28px 24px 0; }
+  h3 { font-size: 1.4rem; }
+  .feature-copy p { font-size: .85rem; white-space: normal; }
+  .search-art { padding-block: 28px 14px; }
+  .search-art img { width: 230px; }
+  .search-orbit { width: 270px; height: 270px; }
+  .extension-art { padding: 30px 16px 32px; }
+  .feature-footer { padding: 0 24px 22px; gap: 2px 10px; }
+  .feature-footer > span { font-size: .62rem; }
+  .feature-footer a { font-size: .8rem; }
+  .extension-note { grid-template-columns: auto 1fr; gap: 18px; margin-top: 16px; padding-block: 26px; }
+  .package-mark { font-size: .72rem; padding: 20px 9px; }
+  .extension-note h3 { font-size: 1rem; }
+  .extension-note p { font-size: .8rem; }
+  .extension-note .text-link { grid-column: 2; padding-top: 0; }
+  .ai-section { padding: 36px 25px; grid-template-columns: 1fr; gap: 34px; border-radius: 12px; }
+  .ai-copy > p { font-size: .87rem; margin-block: 20px; }
+  .ai-copy > .ai-note { font-size: .66rem; }
+  .idea { padding-block: 23px; }
+  .idea p { font-size: 1.2rem; }
+  .build-path { font-size: .65rem; gap: 6px; }
+  .ai-section :global(.copy-toolbar) { padding: .7rem; }
+  .ai-section :global(textarea) { padding: .75rem; }
+  .closing { padding-block: 72px 58px; }
+  .closing > img { width: 58px; height: 58px; margin-bottom: 23px; }
+  .closing h2 { font-size: clamp(1.75rem, 7vw, 2.5rem); }
+  .closing-description { font-size: .9rem; margin-block: 16px 24px; }
+  .trust-note { font-size: .68rem; margin-top: 25px; }
+  .footer { display: block; padding-block: 28px; }
+  .footer nav { justify-content: flex-start; margin-top: 20px; gap: 0 1.3rem; font-size: .75rem; }
+}
+@media (max-width: 360px) {
+  .header nav { max-width: 157px; gap: 0 .7rem; }
+  .hero-copy .actions { flex-direction: column; }
+  .hero-copy .button { width: 100%; }
+  .product-stage { height: 490px; }
+  .stage-copy { left: 16px; top: 19px; }
+  .stage-copy p { font-size: 1.12rem; }
+  .preview-switch { right: 10px; top: 20px; }
+  .preview-switch button { padding-inline: .4rem; }
+  .product-capture { width: 262px; top: 122px; }
+  .feature-copy { padding-inline: 21px; }
+  .feature-footer { padding-inline: 21px; }
+}
 </style>
