@@ -11,7 +11,7 @@ const a = 'a'.repeat(40), b = 'b'.repeat(40);
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'clackly-precheck-'));
   t.after(() => { assert.equal(resolve(root).startsWith(resolve(tmpdir())), true); assert.match(root, /clackly-precheck-/); rmSync(root, { recursive: true, force: true }); });
-  const complete = () => synchronize(root, 'complete', { from: baselineSha, through: a, baselineSha, reason: 'Isolated reviewed range', evidence: ['fixture'] }, { main: () => a, isAncestor: () => true });
+  const complete = () => synchronize(root, 'complete', { from: baselineSha, through: a, baselineSha, reason: 'Isolated reviewed range', evidence: ['fixture'] }, { main: () => a, isAncestor: () => true, filesBetween: () => [] });
   return { root, complete };
 }
 test('uninitialized check allows bootstrap without creating files', t => {
@@ -64,7 +64,7 @@ test('real CLI exit codes and marker survive restart, cwd changes, remote change
     assert.equal(result.stdout.trim(), status === 1 ? '' : 'CINDY_PRECHECK_OK');
   };
   run(0);
-  await synchronize(f.root, 'complete', { from: baselineSha, through: head, baselineSha, reason: 'Isolated local Git fixture', evidence: ['local fixture only'] }, { main: () => head, isAncestor: () => true });
+  await synchronize(f.root, 'complete', { from: baselineSha, through: head, baselineSha, reason: 'Isolated local Git fixture', evidence: ['local fixture only'] }, { main: () => head, isAncestor: () => true, filesBetween: () => [] });
   run(2);
   git(['-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-m', 'new change']); run(0);
   const unavailable = { GIT_CONFIG_KEY_0: `url.${pathToFileURL(join(f.root, 'missing')).href}.insteadOf` };

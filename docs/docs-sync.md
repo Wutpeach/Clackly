@@ -67,7 +67,7 @@ node scripts/docs-sync.mjs failure D:/Clackly-artifacts/run/failure.json
 }
 ```
 
-先在独立 worktree 准备并推送 `docs/sync-<topic>`。`publish` 读取完整 PR 范围、包含重命名前路径，先查询再创建；回执丢失重查并恢复同一 PR。HEAD 变化会清除旧审核。已完成主题再次使用须 `newRound: true` 且有不同 HEAD，避免文档自身合并引发重复 PR。
+先在独立 worktree 准备并推送 `docs/sync-<topic>`。分支必须包含当前已审查 main；main 前进时普通 merge main 到文档分支并推送，不强推。`publish` 读取完整 PR 范围、包含重命名前路径，先查询再创建；回执丢失重查并恢复同一 PR。HEAD 或已审查 main 基线变化都会清除旧审核。已完成主题再次使用须 `newRound: true` 且有不同 HEAD，避免文档自身合并引发重复 PR。
 
 自动更新仅允许 `site/**`、`docs/**`、根 README、官方 Skill 的 `.md` 文字和现有 Pages workflow。应用代码、Skill schema/可执行示例、状态管理脚本及其它工作流不在自动更新范围。文本中的协议语义仍必须由独立审核核实，文件后缀不是语义审核的替代。
 
@@ -87,7 +87,9 @@ node scripts/docs-sync.mjs failure D:/Clackly-artifacts/run/failure.json
 
 只有真实使用指定 Worker 才能填写这些字段。它们是可审计的 Lead 回执，不是密码学签名；本地脚本不能独立证明 Worker 的模型和思考过程。Lead 必须从 Cindy 原生创建/回读凭证核实，不能自行给出 PASS。Full Access 也不提供硬只读隔离，必须明确限制 Worker 不写代码、不合并。
 
-`merge`/`deploy` 输入均含真实 `from`、`through`。`merge` 只接受当前 HEAD 的独立 PASS、同 HEAD 的 main/Docs Sync CI，以及站点变更所需的 Docs CI；检查冲突、requested changes 和未解决 review threads。最终使用 GitHub 服务端 `--match-head-commit` 普通合并，不 force/admin。若主线变化先审查缺失范围再重新 publish；若合并回执丢失则找回同一合并。
+`merge`/`deploy` 输入均含真实 `from`、`through`。`merge` 只接受当前 HEAD 的独立 PASS、同 HEAD 且记录同一 PR/main 基线的 main/Docs Sync CI，以及站点变更所需的 Docs CI；检查冲突、requested changes 和未解决 review threads。最终使用 GitHub 服务端 `--match-head-commit` 普通合并，不 force/admin。若主线变化先审查缺失范围、合入 main 并重新 publish/审核/运行 CI；若合并回执丢失则找回同一合并。
+
+**自动合并还需要服务端保护，不能只靠最后一次查询。** 当前 `main` 实际未受保护，脚本会阻止自动合并；本开发没有改仓库设置。当前适配器支持经典 branch protection：main 要求 strict/up-to-date checks、包含 `Docs Sync (ubuntu-latest)` 与 `Docs Sync (windows-latest)`，且 `enforce_admins.enabled=true`，防止查询后主线前进或管理员默认绕过。保护设置须另获用户授权；仅有客户端 CI PASS、普通非严格保护或未识别的 ruleset 不会放行。它解决 `--match-head-commit` 只约束 PR HEAD、不约束 base 的竞态。
 
 `deploy` 只在实际影响 Pages 时通过现有 main workflow `workflow_dispatch publish=true` 发布，并传 `expected_sha=<已审查 main>`。workflow 在构建前检查这个 SHA，阻止检查与 dispatch 之间主线移动导致发布未审查版本；原有手动发布门禁保留。代码会先查已有成功部署，保存 dispatch 意图，找回同一 run。回执未知且查不到运行时安全停止，不盲目重复 dispatch；确认失败的 run 只有显式 `retryDeploy: true` 才可重试一次。返回 waiting 时保留现场，后续恢复，不用循环重复发布。
 
@@ -104,7 +106,9 @@ node scripts/docs-sync.mjs failure D:/Clackly-artifacts/run/failure.json
 }
 ```
 
-首次完成必须明确提供 baselineSha 并审查它至 through 的真实历史。已知游标必须是 through 的祖先；complete 前再次确认 main 没移动。有 pending 时还须满足当前 HEAD 的 PASS、成功 CI、实际 merged，及必要部署的 SHA 祖先关系、对应 main 手动 Actions 成功和四个公开入口的 HTTP/标题检查。HTTP 检查只证明页面可达性；部署 SHA 由 GitHub deployment/Actions 回执证明，不从页面标题推断。
+首次完成必须明确提供 baselineSha 并审查它至 through 的真实历史。已知游标必须是 through 的祖先；complete 前再次确认 main 没移动。有 pending 时还须满足当前 HEAD 的 PASS、成功 CI、实际 merged，及必要部署的 SHA 祖先关系、对应 main 手动 Actions 成功和四个公开入口的 HTTP/标题检查。还会比较成功部署 SHA 到 through 的真实 Git diff：期间有 Pages 内容/生成依赖变化时，旧部署不能覆盖它们，不能清空 pending 或推进游标；只有非站点变化可复用旧部署。HTTP 检查只证明页面可达性；部署 SHA 由 GitHub deployment/Actions 回执证明，不从页面标题推断。
+
+即使没有 pending，from→through 有 Pages 相关变化也必须找到覆盖它们的成功部署；找不到则保留进度并通知用户，不制造空 PR 或把未上线内容标为完成。没有 pending 的独立主线发布目前交用户处理，成功回执可在下轮恢复时核实；不把这种安全停止称为无人值守成功。
 
 `failure` 输入 `{"reason":"实际失败原因与证据位置"}`，保留游标与 pending。不要用 failure 覆盖损坏的未知状态；此时原样保留并通过 Cindy 通知用户。
 
@@ -115,7 +119,7 @@ node scripts/docs-sync.mjs failure D:/Clackly-artifacts/run/failure.json
 - `.clackly-docs-sync.lock/owner.json`：命令互斥。未知锁不自动清除；先核对进程、文件和正在进行的操作，由用户确认恢复。
 - 状态、镜像、临时原子写入和锁均被 Git 忽略。首次没有 scheduleId；只有从实际 Cindy 任务读取后才绑定，后续 id 不同会停止，不能导入 Ameow 的记录。
 
-失败恢复先执行 status，再处理已有 pending。创建/合并/部署的返回不明都先查询真实状态，不重复外部动作。关闭且未合并的 PR、含糊的多个回执、不明 dispatch 或未知锁允许安全停止并通知，不承诺自动猜测。开发脚本或 CI 通过不授权清空这些记录。
+失败恢复先执行 status，再处理已有 pending。创建/合并/部署的返回不明都先查询真实状态，不重复外部动作。关闭且未合并的 PR、含糊的多个回执、不明 dispatch 或未知锁允许安全停止并通知，不承诺自动猜测。merge 意图已写但服务端仍未合并、同时 main 前进时，phase=merging 会阻止新 publish，须人工核实恢复；不得删 pending 绕过。开发脚本或 CI 通过不授权清空这些记录。
 
 开发测试使用临时目录、隔离状态和可注入 GitHub 边界；真实 GitHub PR 演练也只用独立 smoke 状态。不得为测试推进 `D:/Clackly` 正式游标、改 Cindy 任务、合并开发候选或重复部署正式站点。
 

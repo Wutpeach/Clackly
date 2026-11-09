@@ -94,6 +94,10 @@ function mergedPr(pending, pr) {
   insist(pr.state === 'MERGED' && sha(pr.mergeCommit?.oid), 'Pending PR is not merged at its recorded HEAD');
   return pr.mergeCommit.oid;
 }
+async function coveringDeployment(api, from, through) {
+  const receipt = await api.deployed(from, through);
+  return receipt && !needsPages(await api.filesBetween(receipt.sha, through)) ? receipt : null;
+}
 
 export async function synchronize(root, command, input = {}, api) {
   if (command === 'status') {
@@ -154,6 +158,7 @@ export async function synchronize(root, command, input = {}, api) {
       }
       const branch = await api.branch(head);
       insist(sha(branch.sha) && documentationOnly(branch.files), 'Changes exceed documentation scope or are empty');
+      insist(await api.isAncestor(through, branch.sha), 'Merge current main into the documentation branch without force-push before publishing');
       let prs = await api.find(head);
       const open = prs.filter(p => p.state === 'OPEN');
       insist(open.length <= 1, 'Ambiguous open PRs for the same branch');
@@ -169,7 +174,7 @@ export async function synchronize(root, command, input = {}, api) {
         'A completed topic needs an explicit new round with a new HEAD');
       state.pending = { topic: input.topic, head, through, headSha: branch.sha, phase: 'publishing', number: pr?.number ?? null,
         historicalPrNumbers: previous?.historicalPrNumbers ?? prs.filter(p => p.state !== 'OPEN').map(p => p.number),
-        review: previous?.headSha === branch.sha ? previous.review ?? null : null };
+        review: previous?.headSha === branch.sha && previous?.through === through ? previous.review ?? null : null };
       save();
       if (!pr) {
         try { await api.create(head, input.title, input.body); } catch (error) {
@@ -196,8 +201,10 @@ export async function synchronize(root, command, input = {}, api) {
       if (pr.state !== 'MERGED') {
         insist(p.through === through, 'main moved since publication; review and publish the current range');
         insist(pr.state === 'OPEN' && !pr.draft, 'PR is closed or still a draft');
-        p.ci = await api.ci(p.headSha, needsPages(pr.files));
+        insist(await api.isAncestor(through, p.headSha), 'Documentation branch must contain reviewed main before merge');
+        p.ci = await api.ci(p.headSha, needsPages(pr.files), through, p.number);
         await api.assertMergeable(p.number);
+        await api.assertBaseProtected();
         insist(await api.main() === through, 'main moved before merge');
         p.phase = 'merging'; save();
         try { await api.merge(p.number, p.headSha); } catch (error) {
@@ -212,8 +219,8 @@ export async function synchronize(root, command, input = {}, api) {
       insist(p?.number, 'No pending PR to deploy'); passReceipt(p);
       const pr = await api.pr(p.number); p.mergeSha = mergedPr(p, pr);
       insist(await api.isAncestor(p.mergeSha, through), 'Merge is outside the reviewed range');
-      if (!needsPages(pr.files)) { p.phase = 'merged'; save(); return { required: false }; }
-      const existing = await api.deployed(p.mergeSha, through);
+      if (!needsPages(pr.files) && !needsPages(await api.filesBetween(from, through))) { p.phase = 'merged'; save(); return { required: false }; }
+      const existing = await coveringDeployment(api, p.mergeSha, through);
       if (existing) {
         p.deployment = { ...existing, phase: 'succeeded', requestedAt: p.deployment?.requestedAt ?? now() };
         p.phase = 'merged'; state.lastFailure = null; save(); return p.deployment;
@@ -239,24 +246,30 @@ export async function synchronize(root, command, input = {}, api) {
     insist(command === 'complete' && text(input.reason) && Array.isArray(input.evidence)
       && input.evidence.length > 0 && input.evidence.every(text), 'Completion requires a reason and evidence');
     if (state.reviewedThroughSha === null) insist(input.baselineSha === baselineSha, 'First review must acknowledge the public Pages baseline');
-    let completed = null;
+    let completed = null, mainDeployment = null;
     if (p) {
       insist(p.number, 'Recover publishing before completion'); passReceipt(p);
       const pr = await api.pr(p.number); p.mergeSha = mergedPr(p, pr); p.phase = 'merged'; save();
       insist(await api.isAncestor(p.mergeSha, through) && await api.isAncestor(p.through, through), 'Pending merge/range is outside reviewed main');
-      p.ci = await api.ci(p.headSha, needsPages(pr.files));
+      p.ci = await api.ci(p.headSha, needsPages(pr.files), p.through, p.number);
       let deployment = { required: false, reason: 'No deployed site or generated Skill source changes' };
       if (needsPages(pr.files)) {
-        const receipt = await api.deployed(p.mergeSha, through);
+        const receipt = await coveringDeployment(api, p.mergeSha, through);
         insist(receipt, 'Pages deployment/Actions receipt is not successful yet');
         const pages = await api.publicPages();
         deployment = { ...receipt, required: true, pages };
       }
       completed = { ...p, deployment };
     }
+    if (needsPages(await api.filesBetween(from, through))) {
+      // Include main changes made outside this task, even when there is no pending PR.
+      const receipt = await coveringDeployment(api, from, through);
+      insist(receipt, 'Reviewed main contains Pages changes without a covering successful deployment; preserve progress and notify');
+      mainDeployment = { ...receipt, pages: await api.publicPages() };
+    }
     insist(await api.main() === through, 'main moved during completion; do not advance the cursor');
     if (state.reviewedThroughSha !== through) state.reviews.push({ fromSha: from, reviewedThroughSha: through, checkedAtUtc: now(),
-      result: completed ? 'documentation_completed' : 'no_documentation_update', reason: input.reason, evidence: input.evidence, pullRequest: completed });
+      result: completed ? 'documentation_completed' : 'no_documentation_update', reason: input.reason, evidence: input.evidence, pullRequest: completed, mainDeployment });
     state.reviewedThroughSha = through; state.pending = null; state.lastFailure = null; save();
     atomic(files.cursor, through + '\n');
     return { reviewedThroughSha: through, cursorAdvanced: from !== through };
@@ -280,6 +293,7 @@ export function github(root, invoke = run, fetchPage = fetch) {
   const api = {
     main: () => json(['api', `repos/${repository}/commits/main`]).sha,
     isAncestor: (a, b) => { try { invoke('git', ['merge-base', '--is-ancestor', a, b], root); return true; } catch { return false; } },
+    filesBetween: (a, b) => invoke('git', ['diff', '--name-only', '--no-renames', '-z', a, b], root).split('\0').filter(Boolean),
     branch: head => {
       const commit = json(['api', `repos/${repository}/git/ref/heads/${head}`]).object.sha;
       const comparison = json(['api', `repos/${repository}/compare/main...${commit}`]);
@@ -296,14 +310,26 @@ export function github(root, invoke = run, fetchPage = fetch) {
         headRefOid: p.head.sha, headRefName: p.head.ref, baseRefName: p.base.ref, mergeCommit: { oid: p.merge_commit_sha },
         files: files.flatMap(f => [f.filename, ...(f.previous_filename ? [f.previous_filename] : [])]) };
     },
-    ci: (head, requireSite) => {
+    ci: (head, requireSite, reviewedBase, number) => {
       const runs = pages(`repos/${repository}/actions/runs?head_sha=${head}&event=pull_request&per_page=100`).flatMap(p => p.workflow_runs);
       const required = ['.github/workflows/main.yml', '.github/workflows/docs-sync.yml', ...(requireSite ? ['.github/workflows/deploy-docs.yml'] : [])];
       return required.map(path => {
         const r = runs.filter(r => r.path === path && r.head_sha === head && r.head_branch.startsWith('docs/sync-')).sort((a, b) => b.id - a.id)[0];
         insist(r?.status === 'completed' && r.conclusion === 'success', `Required CI is missing, pending or failed: ${path}`);
-        return { path, sha: head, runId: r.id, url: r.html_url };
+        insist(r.pull_requests?.some(p => p.number === number && p.head?.sha === head && p.base?.sha === reviewedBase),
+          `CI has no matching reviewed PR base: ${path}; integrate main and rerun checks`);
+        return { path, sha: head, baseSha: reviewedBase, runId: r.id, url: r.html_url };
       });
+    },
+    assertBaseProtected: () => {
+      const branch = json(['api', `repos/${repository}/branches/main`]);
+      insist(branch.protected === true, 'main lacks strict server-side protection; do not merge across a possible base race');
+      const protection = json(['api', `repos/${repository}/branches/main/protection`]);
+      const checks = protection.required_status_checks;
+      const required = new Set([...(checks?.contexts ?? []), ...(checks?.checks ?? []).map(c => c.context)]);
+      insist(checks?.strict === true && protection.enforce_admins?.enabled === true
+        && ['Docs Sync (ubuntu-latest)', 'Docs Sync (windows-latest)'].every(c => required.has(c)),
+      'Require strict up-to-date Docs Sync checks on both OSes, including administrators, before automatic merge');
     },
     assertMergeable: number => {
       const query = 'query($owner:String!,$name:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){mergeable reviewDecision reviewThreads(first:100,after:$endCursor){nodes{isResolved}pageInfo{hasNextPage endCursor}}}}}';

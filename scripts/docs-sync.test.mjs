@@ -24,9 +24,9 @@ function fixture(t) {
   const pr = { number: 31, url: 'https://github.com/Wutpeach/Clackly/pull/31', state: 'OPEN', draft: false,
     headRefOid: b, headRefName: 'docs/sync-recovery', baseRefName: 'main', files, mergeCommit: null };
   const api = {
-    main: () => main, isAncestor: () => true, branch: () => ({ sha: head, files }), find: () => prs,
+    main: () => main, isAncestor: () => true, filesBetween: () => [], branch: () => ({ sha: head, files }), find: () => prs,
     create: () => { prs.push(pr); }, pr: () => pr, ci: () => [{ sha: head, url: 'https://github.com/Wutpeach/Clackly/actions/runs/1' }],
-    assertMergeable: () => {}, merge: (_number, expected) => { assert.equal(pr.headRefOid, expected); pr.state = 'MERGED'; pr.mergeCommit = { oid: c }; main = c; },
+    assertMergeable: () => {}, assertBaseProtected: () => {}, merge: (_number, expected) => { assert.equal(pr.headRefOid, expected); pr.state = 'MERGED'; pr.mergeCommit = { oid: c }; main = c; },
     deployed: () => deployment, publicPages: () => [{ url: publicSite, status: 200 }],
     dispatch: () => { dispatches++; runs = [{ id: dispatches, status: 'in_progress', conclusion: null }]; }, publishRuns: () => runs,
   };
@@ -189,10 +189,53 @@ test('scope rejects runtime/schema changes and renamed source paths while includ
 });
 test('GitHub CI adapter requires successful workflows for the same HEAD', () => {
   let runs = ['main.yml', 'docs-sync.yml', 'deploy-docs.yml'].map((file, i) => ({ id: i + 1, path: '.github/workflows/' + file,
-    head_sha: b, head_branch: 'docs/sync-recovery', status: 'completed', conclusion: 'success', html_url: 'https://github.com/run/' + i }));
+    head_sha: b, head_branch: 'docs/sync-recovery', status: 'completed', conclusion: 'success', html_url: 'https://github.com/run/' + i,
+    pull_requests: [{ number: 31, head: { sha: b }, base: { sha: a } }] }));
   const api = github('unused', () => JSON.stringify([{ workflow_runs: runs }]));
-  assert.equal(api.ci(b, true).length, 3);
-  runs = runs.map(r => ({ ...r, head_sha: c })); assert.throws(() => api.ci(b, true), /Required CI/);
+  assert.equal(api.ci(b, true, a, 31).length, 3);
+  assert.throws(() => api.ci(b, true, d, 31), /matching reviewed PR base/);
+  runs = runs.map(r => ({ ...r, head_sha: c })); assert.throws(() => api.ci(b, true, a, 31), /Required CI/);
+});
+
+test('new main requires branch integration and invalidates even an unchanged HEAD review', async t => {
+  const f = fixture(t); await f.call('publish'); await f.review(); f.main(d);
+  f.api.isAncestor = (from, through) => !(from === d && through === b);
+  await assert.rejects(f.call('publish'), /Merge current main/);
+  await assert.rejects(f.call('merge'), /main moved since publication/);
+  f.api.isAncestor = () => true; await f.call('publish');
+  assert.equal(f.progress().state.pending.review, null);
+  await assert.rejects(f.call('merge'), /Worker PASS/); assert.equal(f.pr.state, 'OPEN');
+});
+
+test('server-side strict protection is mandatory even when all client checks pass', async t => {
+  const f = fixture(t); await f.call('publish'); await f.review();
+  f.api.assertBaseProtected = () => { throw new Error('no strict server-side protection'); };
+  await assert.rejects(f.call('merge'), /server-side/);
+  assert.equal(f.pr.state, 'OPEN'); assert.equal(f.cursor(), null);
+  let protectedBranch = false, strict = false, admins = true, contexts = ['Docs Sync (ubuntu-latest)', 'Docs Sync (windows-latest)'];
+  const api = github('unused', (_program, args) => JSON.stringify(args.at(-1).endsWith('/protection')
+    ? { required_status_checks: { strict, contexts }, enforce_admins: { enabled: admins } } : { protected: protectedBranch }));
+  assert.throws(() => api.assertBaseProtected(), /lacks strict/);
+  protectedBranch = true; assert.throws(() => api.assertBaseProtected(), /up-to-date/);
+  strict = true; admins = false; assert.throws(() => api.assertBaseProtected(), /administrators/);
+  admins = true; contexts = contexts.slice(0, 1); assert.throws(() => api.assertBaseProtected(), /both OSes/);
+  contexts.push('Docs Sync (windows-latest)'); api.assertBaseProtected();
+});
+
+test('old deployment cannot acknowledge later Pages changes, with or without pending', async t => {
+  const f = fixture(t); await f.call('publish'); await f.review(); await f.call('merge'); f.deployed(); f.main(d);
+  f.api.filesBetween = (from, through) => from !== through ? ['site/src/pages/index.astro'] : [];
+  await assert.rejects(f.call('complete'), /Pages deployment/);
+  assert.equal(f.cursor(), null); assert.notEqual(f.progress().state.pending, null);
+  f.deployed(); await f.call('complete'); assert.equal(f.cursor(), d);
+  const other = fixture(t); other.api.filesBetween = () => ['skills/clackly-developer/SKILL.md'];
+  await assert.rejects(other.call('complete'), /without a covering successful deployment/);
+  assert.equal(other.cursor(), null);
+  other.deployed(); other.api.filesBetween = (from, through) => from === through ? [] : ['site/src/pages/index.astro'];
+  await other.call('complete'); assert.equal(other.cursor(), a);
+  assert.equal(other.progress().state.reviews[0].mainDeployment.sha, a);
+  const docsOnly = fixture(t); docsOnly.api.filesBetween = () => ['docs/operator.md'];
+  await docsOnly.call('complete'); assert.equal(docsOnly.cursor(), a); assert.equal(docsOnly.dispatches(), 0);
 });
 test('GitHub PR adapter checks pagination completeness and both rename paths', () => {
   let count = 2;

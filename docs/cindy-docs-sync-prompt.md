@@ -26,7 +26,7 @@
 
 使用独立 worktree/分支，保护主工作区及其它任务的未提交改动。仅修改必要双语内容、导航、站点资源、可信截图和官方 Skill 的文字；不能修改应用业务代码、扩展运行时、协议语义、schema、可执行示例、打包器或状态脚本。生成协议页在 authority 上修改并由构建生成，不另造副本。
 
-一轮最多一个实质性文档 PR；先恢复同主题待审项。分支使用 `docs/sync-<topic>`，推送后调用 publish。新一轮复用完成主题只在确有不同变更时显式 newRound，不因文档自身合并循环建 PR。PR 写明具体行为、版本事实、必要验证及 `Assisted-by: Cindy (https://cindy.app)`。
+一轮最多一个实质性文档 PR；先恢复同主题待审项。分支使用 `docs/sync-<topic>`，必须包含当前已审查 main；main 移动时普通 merge main 到文档分支并推送，不强推。推送后调用 publish；HEAD 或已审查 main 基线改变均重新 Worker 审核和 CI，不能复用旧基线证据。新一轮复用完成主题只在确有不同变更时显式 newRound，不因文档自身合并循环建 PR。PR 写明具体行为、版本事实、必要验证及 `Assisted-by: Cindy (https://cindy.app)`。
 
 执行必要脚本测试、站点构建、双语/链接/资源/Skill 校验和受影响浏览器路径，不重复无关应用测试。
 
@@ -44,11 +44,11 @@
 
 ## 5. 合并和必要 Pages 发布
 
-只在用户启用的本任务内，当前 HEAD 获独立 PASS、必要 CI 对同 SHA 成功、范围合规、无冲突/未解决阻塞时调用 merge。脚本使用 GitHub 服务端精确 HEAD 校验普通合并；不 force/admin，不绕过保护。main 移动先审查缺失提交，不以旧证据推进。
+只在用户启用的本任务内，当前 HEAD 获独立 PASS、必要 CI 对同 SHA/PR/main 基线成功、范围合规、无冲突/未解决阻塞时调用 merge。还须通过脚本核实 main 的 strict/up-to-date branch protection：两个 Docs Sync OS checks 均 required，且对管理员生效。当前仓库尚未配置该保护时必须停止通知；不得自行改保护设置、降级或绕过。客户端最后一次查询和 `--match-head-commit` 不能单独解决 base 竞态。脚本使用 GitHub 服务端精确 HEAD 校验普通合并；不 force/admin。main 移动先审查缺失提交、合入文档分支并重新审核/CI，不以旧证据推进。
 
 确认实际 merged 和 merge SHA 后审查至最新 main。涉及 `site/**`、生成站点所依赖的 Skill 文字或 Pages workflow 才调用 deploy。它使用既有 `deploy-docs.yml` 的 main 手动 dispatch、publish=true、expected_sha=已审查 main，保留发布门禁并防止发布未审查的主线。纯仓库文档无需发布。
 
-查询已有部署与 pending run，回执不明先恢复同一 run，不重复 dispatch。需要等待时保留状态，有限检查该 run；不反复触发工作流。确认部署 SHA、对应 Actions 成功及四个公开入口可达后才算发布完成。明确失败且已安全处理原因后至多显式 retryDeploy 一次；否则通知用户。
+查询已有部署与 pending run，回执不明先恢复同一 run，不重复 dispatch。需要等待时保留状态，有限检查该 run；不反复触发工作流。确认部署 SHA、对应 Actions 成功、部署到 through 之间没有未上线的 Pages diff，及四个公开入口可达后才算完成；仅非站点主线变化可复用旧部署。无 pending 但主线有未部署的站点改动时，complete 会阻止推进；保留并通知用户，不造空 PR 或绕过发布。明确失败且已安全处理原因后至多显式 retryDeploy 一次；否则通知用户。
 
 ## 6. 清理、完成与异常
 
