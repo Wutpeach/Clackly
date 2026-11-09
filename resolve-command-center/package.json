@@ -42,6 +42,7 @@
     "files": [
       "package.json",
       "manifest.xml",
+      "resources/icons/clackly.ico",
       "{app,bridge,capability,command-engine,command-search,command-usage,config,execution-adapter,extensions,feature-status,feature-ui,interaction,localization,preferences,resolve,resolve2ae_core,script-runtime,shortcut}/**/*",
       "electron/{main,shared}/**/*",
       "dist/renderer/**/*",
@@ -75,7 +76,8 @@
     ],
     "win": {
       "target": "dir",
-      "signAndEditExecutable": false
+      "icon": "resources/icons/clackly.ico",
+      "signExecutable": false
     }
   },
   "dependencies": {
@@ -94,6 +96,7 @@
     "electron": "36.3.2",
     "electron-builder": "^26.15.3",
     "playwright": "1.62.1",
+    "resedit": "1.7.2",
     "vite": "^8.1.5",
     "wait-on": "^8.0.1"
   }

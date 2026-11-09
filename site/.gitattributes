@@ -1,0 +1,3 @@
+# Preserve the supplied icon bytes for provenance and build hash checks.
+public/clackly-compact.svg -text
+public/favicon.svg -text

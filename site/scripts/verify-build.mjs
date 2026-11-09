@@ -42,8 +42,8 @@ for (const route of ['index.html', 'en/index.html']) {
 }
 let checked = 0;
 for (const [name, html] of pages) {
-  assert.match(html, /href="\/Clackly\/favicon[.]svg\?v=0e879fa7"/, 'Missing R1 SVG favicon: ' + name);
-  assert.match(html, /href="\/Clackly\/favicon[.]ico\?v=9980b5a6"/, 'Missing R1 ICO fallback: ' + name);
+  assert.match(html, /href="\/Clackly\/favicon[.]svg\?v=e4fe9146"/, 'Missing Satin Enamel A SVG favicon: ' + name);
+  assert.match(html, /href="\/Clackly\/favicon[.]ico\?v=252b7f13"/, 'Missing Satin Enamel A ICO fallback: ' + name);
   const route = name.endsWith('index.html') ? name.slice(0, -10) : name;
   const current = new URL(base + route, origin);
   for (const m of html.matchAll(/\b(?:href|src)="([^"]+)"/g)) {
@@ -56,10 +56,10 @@ for (const [name, html] of pages) {
   }
 }
 for (const [file, hash] of Object.entries({
-  'clackly-compact.svg': 'ab49c6f5701d6192ec1e94ca24881729192533e8f9e2d4cb0bee7046713e8d32',
-  'favicon.svg': '0e879fa718acb992e51ac848e898a586e84ade72c28991d143ace1b2efce4b3c',
-  'favicon.ico': '9980b5a6b326f79765dac5eb02e5e5e071438ce6f2fbd29341f577f6765a9d4e',
-})) assert.equal(createHash('sha256').update(await readFile(path.join(dist, file))).digest('hex'), hash, 'Approved R1 asset changed: ' + file);
+  'clackly-compact.svg': 'f79fdbfacd5920cbaf835d10b8a8b41a03117b1bafb03d3be6377fc1dc67abd1',
+  'favicon.svg': 'e4fe9146755f6d736cc525d0b9b742010eee6955ee6db953a29d1e3ec3363977',
+  'favicon.ico': '252b7f1312c24afa13f72fbe1fd7c4bc7e88d4e70e128de9994f1924a1346d6c',
+})) assert.equal(createHash('sha256').update(await readFile(path.join(dist, file))).digest('hex'), hash, 'Approved Satin Enamel A asset changed: ' + file);
 const zh = [...pages.keys()].filter(p => p.startsWith('docs/'));
 const en = [...pages.keys()].filter(p => p.startsWith('en/docs/')).map(p => p.slice(3));
 assert.deepEqual(zh.sort(), en.sort(), 'Bilingual route coverage differs');

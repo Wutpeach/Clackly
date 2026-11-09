@@ -6,6 +6,7 @@ const { RuntimeLauncher } = require("../script-runtime/runtime/launcher");
 const { resolveRuntimeRoot } = require("../script-runtime/runtime/paths");
 const { listTree } = require("./package-internal-beta");
 const { SKILL_FILES } = require('../electron/main/developerSkill');
+const { verifyWindowsIcon } = require('./verify-windows-icon');
 
 // The fixed entrypoints and their adjacent module closure. Test/diagnostic tools
 // are deliberately outside the installed executor and source-staleness set.
@@ -28,6 +29,7 @@ function assertProductPayload(files) {
       || /^(?:fixtures|.*-fixture)[.]js$/.test(base)
       || /[.](?:otio|aep|jsx|log|dmp|pyc|pyo|node)$/.test(base);
     const product = ["package.json", "manifest.xml", "clackly-release.json",
+      "resources/icons/clackly.ico",
       "workflow-plugin/main.js", "scripts/resolve2ae_export.py", ...PRODUCTION_INSTALLER_FILES].includes(file)
       || ["node_modules/", "resources/runtimes/", "dist/renderer/"].some((prefix) => file.startsWith(prefix))
       || file.startsWith('skills/clackly-developer/') && /[.](?:md|json|py)$/.test(file)
@@ -140,6 +142,10 @@ async function verifyPackage({
   packageRoot = path.resolve(process.argv[2] || path.join(path.resolve(__dirname, ".."), "release", "win-unpacked"))
 } = {}) {
   assertProductPayload(listTree(path.join(packageRoot, "resources", "app")).map((item) => item.relativePath));
+  assert.equal(sha256(path.join(packageRoot, 'resources/app/resources/icons/clackly.ico')),
+    sha256(path.join(appRoot, 'resources/icons/clackly.ico')), 'Packaged Windows icon differs from source');
+  verifyWindowsIcon(fs.readFileSync(path.join(packageRoot, 'Clackly.exe')),
+    fs.readFileSync(path.join(appRoot, 'resources/icons/clackly.ico')));
   verifyDeveloperSkill(appRoot, path.join(packageRoot, 'resources/app'));
   assertProductPayload(listTree(path.join(packageRoot, "resources", "runtimes"))
     .map((item) => `resources/runtimes/${item.relativePath}`));

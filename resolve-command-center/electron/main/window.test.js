@@ -342,6 +342,7 @@ test("palette window uses the complete Electron 36 fixed frameless contract", ()
 
     const palette = createPaletteWindow({}, FakeBrowserWindow);
     assert.deepEqual(palette.options, {
+      icon: path.join(__dirname, "../../resources/icons/clackly.ico"),
       width: 256,
       height: 336,
       show: false,
@@ -398,6 +399,7 @@ test("the Windows native policy uses an opaque full-bleed Palette without a shap
 
     const palette = createPaletteWindow({ surface: PALETTE_SURFACE.OPAQUE_FULL_BLEED }, FakeBrowserWindow);
     assert.deepEqual(palette.options, {
+      icon: path.join(__dirname, "../../resources/icons/clackly.ico"),
       width: 240,
       height: 320,
       show: false,
@@ -444,6 +446,7 @@ test("the Windows native policy keeps its exact full-bleed contract for the buil
 
     const palette = createPaletteWindow(WINDOWS_NATIVE_DUAL_WINDOW_POLICY, FakeBrowserWindow);
     assert.deepEqual(palette.options, {
+      icon: path.join(__dirname, "../../resources/icons/clackly.ico"),
       width: 240,
       height: 320,
       show: false,
@@ -559,6 +562,7 @@ test("the Windows native policy creates an opaque detached Panel with no native 
     assert.deepEqual(main.calls, [["setSkipTaskbar", true]], "D6 reasserts its taskbar policy after native construction");
 
     assert.deepEqual(panel.options, {
+      icon: path.join(__dirname, "../../resources/icons/clackly.ico"),
       width: 260,
       height: 60,
       show: true,
@@ -1605,6 +1609,7 @@ test("settings window uses the complete Electron 36 fixed frameless contract", (
 
     const settings = createSettingsWindow(FakeBrowserWindow);
     assert.deepEqual(settings.options, {
+      icon: path.join(__dirname, "../../resources/icons/clackly.ico"),
       width: 760,
       height: 560,
       show: false,
