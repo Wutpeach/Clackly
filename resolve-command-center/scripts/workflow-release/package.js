@@ -70,6 +70,7 @@ function validateDependencies(plugin, lock) {
 }
 
 const PACKAGED_SOURCE_FILES = ['dist/renderer/index.html', 'workflow-plugin/main.js', 'electron/main/main.js',
+  'resources/icons/clackly.ico', 'electron/main/window.js',
   'electron/main/developerSkill.js', 'electron/main/preload.js',
   'localization/resources.mjs', 'electron/main/update/UpdateService.js', 'electron/main/update/InstallCoordinator.js',
   'electron/main/update/identity.js', 'electron/main/update/network.js', 'electron/main/update/storage.js',

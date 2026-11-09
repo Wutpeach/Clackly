@@ -10,6 +10,7 @@ const {
 } = require("./paletteHostPolicy");
 
 const { shadowPadding: PALETTE_SHADOW_PADDING } = paletteGeometry;
+const WINDOW_ICON = path.join(__dirname, '../../resources/icons/clackly.ico');
 
 const DEFAULT_DEV_SERVER_PORT = "5173";
 const PALETTE_SIZE = Object.freeze({
@@ -316,6 +317,7 @@ function createPaletteWindow(options = {}, BrowserWindowType = BrowserWindow) {
   const opaqueFullBleed = usesD6OpaqueFullBleed(options);
   const paletteWindowSize = getPaletteWindowSize(options);
   const window = new BrowserWindowType({
+    icon: WINDOW_ICON,
     width: paletteWindowSize.width,
     height: paletteWindowSize.height,
     show: false,
@@ -443,6 +445,7 @@ function getDetachedInteractionPanelGeometry(baseBounds, metrics, screenApi) {
 
 function createDetachedInteractionPanelWindow(BrowserWindowType = BrowserWindow) {
   const window = new BrowserWindowType({
+    icon: WINDOW_ICON,
     width: PALETTE_INTERACTION_PANEL.width,
     height: PALETTE_INTERACTION_PANEL.minHeight,
     show: true,
@@ -563,6 +566,7 @@ function createSettingsWindow(
   // Settings keeps its own taskbar, focus and close/show lifecycle.
   const nativeSettingsSurface = process.platform === "win32";
   const window = new BrowserWindowType({
+    icon: WINDOW_ICON,
     width: SETTINGS_SIZE.width,
     height: SETTINGS_SIZE.height,
     show: false,
@@ -611,6 +615,7 @@ function createCommandWindow({ notification = false } = {}) {
   const height = Math.min(notification ? 112 : 580, area.height);
   const cursor = screen.getCursorScreenPoint();
   const window = new BrowserWindow({
+    icon: WINDOW_ICON,
     width, height, x: clamp(cursor.x, area.x, area.x + area.width - width),
     y: clamp(cursor.y, area.y, area.y + area.height - height),
     show: false, frame: false, transparent: false, backgroundColor: '#151619',
@@ -637,6 +642,7 @@ function createExtensionWindow(extensionId, title) {
   const width = clamp(valid ? previous.width : 680, Math.min(480, area.width), area.width);
   const height = clamp(valid ? previous.height : 520, Math.min(360, area.height), area.height);
   const window = new BrowserWindow({
+    icon: WINDOW_ICON,
     width, height, x: clamp(valid ? previous.x : area.x + (area.width - width) / 2, area.x, area.x + area.width - width),
     y: clamp(valid ? previous.y : area.y + (area.height - height) / 2, area.y, area.y + area.height - height),
     minWidth: Math.min(480, area.width), minHeight: Math.min(360, area.height), show: false, frame: false,

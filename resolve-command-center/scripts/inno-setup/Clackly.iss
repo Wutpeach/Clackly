@@ -27,7 +27,9 @@ RestartApplications=no
 SetupLogging=yes
 UninstallLogging=yes
 WizardStyle=modern
+SetupIconFile={#PayloadDir}\resources\icons\clackly.ico
 UninstallDisplayName=Clackly
+UninstallDisplayIcon={app}\resources\icons\clackly.ico
 SetupMutex=ClacklyInnoSetup
 
 [Files]

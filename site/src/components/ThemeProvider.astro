@@ -1,0 +1,12 @@
+---
+import StarlightThemeProvider from '@astrojs/starlight/components/ThemeProvider.astro';
+---
+
+{/* Seed the existing picker before Starlight paints, preserving explicit choices. */}
+<script is:inline>
+  try {
+    const theme = localStorage.getItem('starlight-theme');
+    if (theme !== 'light' && theme !== 'dark') localStorage.setItem('starlight-theme', 'dark');
+  } catch {}
+</script>
+<StarlightThemeProvider />
