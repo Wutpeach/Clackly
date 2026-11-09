@@ -113,6 +113,25 @@ test('responsive pages load assets without overflow or browser errors', async ({
   expect(errors).toEqual([]);
 });
 
+test('new documentation visitors start dark on a light system and keep manual choices', async ({ browser }, testInfo) => {
+  for (const locale of ['', 'en/']) {
+    const page = await browser.newPage({ baseURL: testInfo.project.use.baseURL, colorScheme: 'light' });
+    try {
+      await page.goto('./' + locale + 'docs/');
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+      await page.reload();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+      await page.locator('starlight-theme-black-select button').click();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+      await page.reload();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+      await page.locator('.sl-link-card').filter({ hasText: 'Build with AI' }).getByRole('link').click();
+      await expect(page).toHaveURL(new RegExp('/Clackly/' + locale + 'docs/developer/$'));
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    } finally { await page.close(); }
+  }
+});
+
 test('theme switch persists across the overview to AI guide and remains usable', async ({ page }, testInfo) => {
   for (const locale of ['', 'en/']) {
     await page.goto('./' + locale + 'docs/');
