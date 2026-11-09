@@ -3,17 +3,15 @@ name: Clackly website
 description: Product introduction and readable documentation within the Clackly visual system.
 colors:
   surface: "#151619"
-  foreground: "#eeece8"
-  secondary: "#b1b0b7"
-  rule: "#36373d"
-  raised: "#1c1d20"
-  light-panel: "#e5ddd2"
-  ai-panel: "#d9dbea"
-  focus: "#f0c69c"
+  foreground: "#e7e8ea"
+  secondary: "#a6a6a8"
+  rule: "#ffffff1f"
+  stage: "#111215"
+  focus: "#e7e8ea"
 typography:
   display:
     fontFamily: "Harmony, Segoe UI, system-ui, sans-serif"
-    fontSize: "clamp(3.5rem, 6.7vw, 6rem)"
+    fontSize: "clamp(3.5rem, 6.3vw, 5.65rem)"
     fontWeight: 600
     lineHeight: 1.12
     letterSpacing: "-0.04em"
@@ -30,22 +28,19 @@ typography:
     lineHeight: 1.85
 rounded:
   control: "8px"
-  card: "14px"
-  panel: "16px"
+  panel: "18px"
   keycap: "7px"
 spacing:
   desktop-gutter: "40px"
   tablet-gutter: "24px"
   mobile-gutter: "18px"
-  grid-gap: "24px"
 components:
   primary-button:
     backgroundColor: "{colors.foreground}"
-    textColor: "{colors.surface}"
+    textColor: "#151619"
     rounded: "{rounded.control}"
     padding: "0.9rem 1.2rem"
   secondary-button:
-    backgroundColor: "{colors.raised}"
     rounded: "{rounded.control}"
     padding: "0.9rem 1.2rem"
 ---
@@ -56,27 +51,27 @@ The Issue #14 Chinese and English homepage is a **candidate awaiting user visual
 
 ## Colors
 
-The homepage uses graphite and warm neutral text, with light neutral primary actions. A warm stage and light extension panel contrast with the dark surface; a pale lavender panel identifies the AI section. The existing orange logo remains artwork, not an interaction color. Documentation uses Black Theme's native light/dark modes and respects the reader's selection.
+The homepage follows the application Palette surface, with neutral text and light neutral primary actions. The original edit-light.svg adds a silver-white arc and directional falloff behind the hero. The stage and AI workbench remain dark, with neutral highlights. The selected switch uses #17191d text; primary buttons use #151619 text. The existing orange logo remains artwork, not an interaction color. Documentation uses Black Theme's native light/dark modes and respects the reader's selection.
 
 ## Typography
 
-The homepage uses HarmonyOS Sans with platform fallbacks. The large centered display and section headings use the frontmatter's responsive sizes; feature titles scale from 1.3rem to 1.65rem. On phones, the display scales from 2.35rem to 3.8rem and headings from 1.85rem to 2.75rem. Documentation follows Black Theme's native Geist Sans/Geist Mono fonts, neutral light/dark palette and reading width, as in Ameow; do not override them with application font or palette tokens. Monospace is reserved for code and copyable Agent source.
+The homepage uses HarmonyOS Sans with platform fallbacks. The large centered display and section headings use the frontmatter's responsive sizes; feature titles scale from 1.5rem to 2.15rem. On phones, the display scales from 2.35rem to 3.8rem and headings from 1.85rem to 2.75rem. Documentation follows Black Theme's native Geist Sans/Geist Mono fonts, neutral light/dark palette and reading width, as in Ameow; do not override them with application font or palette tokens. Monospace is reserved for code and copyable Agent source.
 
 ## Layout
 
-The candidate home has a 1200px maximum width, centered hero and actions, and a full-width product stage. Two feature cards sit in an asymmetric grid and the AI panel uses two columns. At 1000px gutters narrow to 24px; at 700px they narrow to 18px, cards and AI content stack, and the stage recomposes around the product capture. At 360px hero actions stack. Documentation keeps Starlight's sidebar, contents, search, language and mobile menu. Use concise localized sidebar labels and the theme's LinkCards for the documentation overview; long pagination labels wrap.
+The candidate home has a 1200px maximum width, centered hero and actions, and a full-width product stage. Search and Extension View appear in open, vertically separated rows with copy and captures on alternating sides; the AI workbench uses two columns. At 1000px gutters narrow to 24px; at 700px they narrow to 18px, feature rows and AI content stack, and the stage recomposes around the product capture. At 360px hero actions stack. Documentation keeps Starlight's sidebar, contents, search, language and mobile menu. Use concise localized sidebar labels and the theme's LinkCards for the documentation overview; long pagination labels wrap.
 
 ## Elevation & Depth
 
-Tonal separation and hairlines define panels; soft shadows lift product captures within the stage and feature cards. The stage uses a warm gradient and explicitly labelled schematic timeline. Its entrance moves 12px over 900ms; reduced motion disables the animation.
+Directional light, fine edge highlights and layered soft shadows create depth around the dark stage and product captures. The dark perspective timeline is explicitly labelled as schematic; the palette capture is real and uses demonstration data. The silver halo enters once over 1400ms through mask position and opacity; hero copy, actions and stage stay stable. Six content groups below the initial viewport reveal once on intersection: text rises 16px without blur, product rows rise 28px from 3px blur, and the AI panel rises 20px from 2px blur. Opacity and blur resolve over 700ms and position over 850ms. Content starts visible without JavaScript or IntersectionObserver; keyboard focus reveals a pending group immediately. Reduced motion removes the halo mask and motion, and print shows pending content.
 
 ## Shapes
 
-Controls have modest rounding; larger cards and panels use 14–16px corners, with 12px panels on phones. Keycaps explain the real palette hotkey. Product captures retain their proportions.
+Controls have modest rounding; the stage and AI workbench use 18px corners, reduced to 14px on phones. Keycaps explain the real palette hotkey. Product captures retain their proportions.
 
 ## Components
 
-Primary and secondary buttons have a 50px minimum height (48px on phones), visible hover states and a 2px focus outline with 5px offset. The light AI panel uses a darker focus outline. Navigation wraps on phones; the header GitHub link is hidden at 700px. The stage offers a keyboard-accessible Launcher/Search switch. Download links lead to the actual v0.1.6 Release. Documentation and Build with AI preserve locale. Copy controls copy visible text, announce completion and select the text when clipboard access fails. Raw protocol files remain reachable without JavaScript.
+Primary and secondary buttons have a 50px minimum height (48px on phones), visible hover states and a 2px focus outline with 5px offset. Navigation wraps on phones; the header GitHub link is hidden at 700px. The stage offers a keyboard-accessible Launcher/Search switch. Download links lead to the actual v0.1.6 Release. Documentation and Build with AI preserve locale. Copy controls copy visible text, announce completion and select the text when clipboard access fails. Raw protocol files remain reachable without JavaScript.
 
 ## Do's and Don'ts
 

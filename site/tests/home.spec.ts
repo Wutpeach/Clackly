@@ -35,6 +35,8 @@ for (const locale of ['', 'en/']) {
       page.on('pageerror', error => failures.push(error.message));
       page.on('response', response => { if (response.status() >= 400) failures.push(response.status() + ' ' + response.url()); });
       await page.setViewportSize({ width, height: width === 1440 ? 960 : 844 });
+      // Static visual evidence; motion is exercised independently below.
+      await page.emulateMedia({ reducedMotion: 'reduce' });
       await page.goto('./' + locale);
       await page.evaluate(() => document.fonts.ready);
       await expect(page.locator('h1')).toBeVisible();
@@ -61,11 +63,56 @@ for (const locale of ['', 'en/']) {
   }
 }
 
-test('reduced motion keeps the product visible and disables its entrance animation', async ({ page }) => {
+test('the light opens once while the title and download stay stable', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('./');
+  const phases = await page.locator('.hero-light').evaluate(el => {
+    const animation = el.getAnimations()[0];
+    if (!animation) throw new Error('The light entrance is missing');
+    animation.pause();
+    const duration = Number(animation.effect!.getComputedTiming().duration);
+    const samples = [0, duration / 2, duration].map(time => {
+      animation.currentTime = time;
+      const style = getComputedStyle(el);
+      return { opacity: Number(style.opacity), mask: style.maskPosition };
+    });
+    animation.finish();
+    return { samples, iterations: animation.effect!.getTiming().iterations };
+  });
+  expect(phases.iterations).toBe(1);
+  expect(phases.samples[0].opacity).toBeLessThan(phases.samples[1].opacity);
+  expect(phases.samples[1].opacity).toBeLessThan(phases.samples[2].opacity);
+  expect(phases.samples[0].mask).not.toBe(phases.samples[2].mask);
+  await expect(page.locator('.hero-copy .primary')).toBeVisible();
+  expect(await page.locator('.hero-copy').evaluate(el => getComputedStyle(el).transform)).toBe('none');
+});
+
+test('scrolling reveals products once and keyboard focus exposes an unrevealed action immediately', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('./');
+  const product = page.locator('.search-feature');
+  expect(await product.evaluate(el => Number(getComputedStyle(el).opacity))).toBeLessThan(.5);
+  await product.scrollIntoViewIfNeeded();
+  await expect.poll(() => product.evaluate(el => Number(getComputedStyle(el).opacity))).toBe(1);
+  await expect.poll(() => product.evaluate(el => getComputedStyle(el).transform)).toBe('none');
+  await page.evaluate(() => scrollTo(0, 0));
+  await product.scrollIntoViewIfNeeded();
+  expect(await product.evaluate(el => Number(getComputedStyle(el).opacity))).toBe(1);
+  await page.locator('.ai-copy a').focus();
+  expect(await page.locator('.ai-section').evaluate(el => Number(getComputedStyle(el).opacity))).toBe(1);
+});
+
+test('reduced motion keeps the light and scrolled content fully visible without spatial animation', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
   await expect(page.locator('#preview-launcher')).toBeVisible();
-  expect(await page.locator('.product-stage').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+  expect(await page.locator('.hero-light').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+  expect(await page.locator('.hero-light').evaluate(el => getComputedStyle(el).maskImage)).toBe('none');
+  const products = await page.locator('[data-reveal]').evaluateAll(elements => elements.map(el => {
+    const style = getComputedStyle(el);
+    return { opacity: style.opacity, transform: style.transform, filter: style.filter };
+  }));
+  for (const product of products) expect(product).toEqual({ opacity: '1', transform: 'none', filter: 'none' });
 });
 
 test('without JavaScript the home still shows the product, download and full prompt', async ({ browser }) => {
@@ -77,5 +124,6 @@ test('without JavaScript the home still shows the product, download and full pro
   await expect(page.locator('.hero-copy .primary')).toHaveAttribute('href', 'https://github.com/Wutpeach/Clackly/releases/tag/v0.1.6');
   await page.locator('summary').click();
   await expect(page.locator('textarea')).toBeVisible();
+  expect(await page.locator('.ai-section').evaluate(el => Number(getComputedStyle(el).opacity))).toBe(1);
   await context.close();
 });
