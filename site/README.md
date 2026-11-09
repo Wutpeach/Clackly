@@ -29,7 +29,7 @@ npm run build checks generated HTML routes, local links/assets/fragments, CSS as
 
 .github/workflows/deploy-docs.yml provides independent Linux build/browser CI and an artifact containing the preview plus test evidence. PRs and main pushes **only build**. Pages deployment requires a manual workflow_dispatch with publish=true on main after explicit authorization. No Pages site has been configured by this task. The intended base is https://wutpeach.github.io/Clackly/; it is not a verified public deployment.
 
-Stage A waits for product acceptance before merge/deployment. Stage B Cindy scheduling is separate; no automation configuration or daily plan is created here.
+Stage A received product acceptance and merge authorization on 2026-11-09 ([acceptance record](https://github.com/Wutpeach/Clackly/issues/11#issuecomment-6730597873)). Public Pages deployment requires separate authorization. Stage B Cindy scheduling is separate; no automation configuration or daily plan is created here.
 
 ## Reused engineering
 
@@ -37,7 +37,7 @@ Adapted from Wutpeach/Ameow site/: Astro 7, Starlight 0.41, Black Theme, root/En
 
 ## Visual evidence provenance
 
-public/images/palette.png is an actual Clackly renderer capture with deterministic test data. It was produced headlessly with the existing palette-evidence utility (built renderer, pinned-recent scenario) and is labelled as demo data on both homepages. It does not prove native Resolve execution, Windows compositor behavior or production installation. Product wordmark, mark and HarmonyOS font come from the existing application assets. No stock or AI-generated product screenshot is used. public/images/palette.png.json records the source.
+public/images/palette.png is an actual Clackly renderer capture with deterministic test data. It was produced headlessly with the existing palette-evidence utility (built renderer, pinned-recent scenario) and is labelled as demo data on both homepages. It does not prove native Resolve execution, Windows compositor behavior or production installation. Product wordmark, mark and HarmonyOS font come from the existing application assets. The documentation header uses the approved Icon R1 compact SVG; browser favicons use the same package's dedicated Web SVG/ICO. These three files are copied unchanged and checked by SHA-256 during build. The documentation brand link returns to the product home in the current language. No stock or AI-generated product screenshot is used. public/images/palette.png.json records the source.
 
 Review screenshots and validation receipts are linked from Issue #11 and the PR. The site inherits the existing application's neutral surface, typography, logo, controlled corners and keyboard emphasis; the tracked [renderer styles](../resolve-command-center/electron/renderer/styles.css) provide the visual source. This work does not depend on untracked local design notes.
 

@@ -1,12 +1,12 @@
-# Stage A evidence · 2026-11-08
+# Stage A evidence · 2026-11-09
 
-Source branch: docs/issue-11-site. Website baseline: public v0.1.6. Original checkout main at f1069144933eb3fc626ea7a81c46116d331f1020 was clean and has not been changed.
+Source branch: docs/issue-11-site. Website baseline: public v0.1.6. Stage A product acceptance and merge authorization are recorded in [Issue #11](https://github.com/Wutpeach/Clackly/issues/11#issuecomment-6730597873). The independent uncommitted Windows icon changes in the main checkout are excluded from this PR.
 
 ## Verification
 
-- Astro 7.3.8 / Starlight 0.41.7 / Black Theme 0.7.1 production build passed under Node 22.19.0.
-- Static verification passed: 41 HTML pages, 19 matching Chinese/English documentation routes, 2,939 local URLs/assets/fragments and 19 byte-exact Developer Skill source exports with SHA-256 inventory.
-- 12/12 Playwright tests passed against the built preview using headless Edge 156.0.4314.58 on Windows. Tests exercise both home-to-doc-to-AI routes, six prompts per language with real clipboard readback, clipboard denial recovery, authoritative Markdown retrieval/copy, locale-preserving language switch, Pagefind search, keyboard mobile navigation, theme switch, readable non-overlapping translated sidebar links, keyboard-scrollable mobile tables and responsive asset/error/overflow checks.
+- Astro 7.3.8 / Starlight 0.41.7 / Black Theme 0.7.1 production build passed locally under Node 22.17.1. CI uses the declared Node 22.19.0 baseline.
+- Static verification passed: 41 HTML pages, 19 matching Chinese/English documentation routes, 2,980 local URLs/assets/fragments and 19 byte-exact Developer Skill source exports with SHA-256 inventory.
+- 12/12 Playwright tests passed against the built preview using headless Edge on Windows. Tests exercise both home-to-doc-to-AI routes, the R1 header brand link returning to each language's home by keyboard, six prompts per language with real clipboard readback, clipboard denial recovery, authoritative Markdown retrieval/copy, locale-preserving language switch, Pagefind search, keyboard mobile navigation, theme switch, readable non-overlapping translated sidebar links, keyboard-scrollable mobile tables and responsive asset/error/overflow checks.
 - Viewports captured: 1440, 390 and 320 pixels. No page error or asset HTTP error appeared in the responsive run.
 - Original product screenshot was generated with the existing pinned-recent renderer evidence scenario. Main-to-v0.1.6 renderer source diff is empty. Screenshot data are deterministic fixtures; this is not a native Resolve capture.
 - Mechanical design detector ran once over the four changed frontend files. It reported only advisory mismatches between literal neutral colors/type steps/radii and the summarized design tokens. No hard design bans were reported. Independent finish review is recorded in Issue #11/PR.
@@ -20,6 +20,8 @@ All screenshots are from the actual built website at the local /Clackly/ base. F
 The 2026-11-08 documentation refinement follows the same starlight-theme-black 0.7.1 setup as Ameow. Both sites already had the theme installed; this pass removes the documentation's application-font/palette overrides, restores native Geist Sans/Geist Mono and theme colors, shortens bilingual navigation labels and uses native LinkCards on the overview. Copy for Agent follows the theme tokens. The product home retains its own visual system.
 
 The 12-test browser suite passed after these changes. The theme test now uses the keyboard control, checks persistence from the overview into the AI guide, and captures both locales at 1440px/320px in both light and dark mode. A focused rerun passed after making captures finish CSS transitions, so the evidence shows settled theme colors.
+
+The final 2026-11-09 captures include the accepted R1 compact SVG and Clackly name in the desktop documentation header, with a link back to the current language's product home. Mobile keeps Black Theme's menu layout. Home and documentation pages use the approved R1 Web favicons. No icon artwork was redrawn or given extra effects.
 
 | Documentation overview | Desktop | 320px phone |
 | --- | --- | --- |
@@ -43,4 +45,4 @@ No public Pages deployment is claimed. The GitHub Pages API returned 404 before 
 
 Chinese user/developer guides are localized; authoritative technical protocol text stays in English with Chinese framing. Live Resolve tests, offline installer/UAC/uninstall acceptance and the future Cindy daily synchronization are outside this stage. Site build logs include benign upstream warnings for the optional empty i18n collection/default404 and a base-prefixed public font URL; built URL and browser checks verify the actual asset.
 
-The visual design remains subject to the user's stage A product acceptance. No merge, website publication or daily schedule activation is authorized by these checks.
+The user accepted the stage A product and authorized PR #12 to merge. These checks do not authorize public Pages deployment or stage B daily schedule activation. The 320px touch search entry remains a non-blocking follow-up observation outside this merge.

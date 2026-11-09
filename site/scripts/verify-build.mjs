@@ -37,6 +37,8 @@ assert.equal(targetFor(new URL(base + 'en/docs/', origin)), 'en/docs/index.html'
 assert.throws(() => targetFor(new URL(origin + '/docs/')));
 let checked = 0;
 for (const [name, html] of pages) {
+  assert.match(html, /href="\/Clackly\/favicon[.]svg\?v=0e879fa7"/, 'Missing R1 SVG favicon: ' + name);
+  assert.match(html, /href="\/Clackly\/favicon[.]ico\?v=9980b5a6"/, 'Missing R1 ICO fallback: ' + name);
   const route = name.endsWith('index.html') ? name.slice(0, -10) : name;
   const current = new URL(base + route, origin);
   for (const m of html.matchAll(/\b(?:href|src)="([^"]+)"/g)) {
@@ -48,6 +50,11 @@ for (const [name, html] of pages) {
     checked++;
   }
 }
+for (const [file, hash] of Object.entries({
+  'clackly-compact.svg': 'ab49c6f5701d6192ec1e94ca24881729192533e8f9e2d4cb0bee7046713e8d32',
+  'favicon.svg': '0e879fa718acb992e51ac848e898a586e84ade72c28991d143ace1b2efce4b3c',
+  'favicon.ico': '9980b5a6b326f79765dac5eb02e5e5e071438ce6f2fbd29341f577f6765a9d4e',
+})) assert.equal(createHash('sha256').update(await readFile(path.join(dist, file))).digest('hex'), hash, 'Approved R1 asset changed: ' + file);
 const zh = [...pages.keys()].filter(p => p.startsWith('docs/'));
 const en = [...pages.keys()].filter(p => p.startsWith('en/docs/')).map(p => p.slice(3));
 assert.deepEqual(zh.sort(), en.sort(), 'Bilingual route coverage differs');

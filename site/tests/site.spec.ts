@@ -9,7 +9,15 @@ for (const locale of ['', 'en/']) {
     await expect(page.getByRole('link', { name: en ? 'Download for Windows' : '下载 Windows 版' })).toHaveAttribute('href', 'https://github.com/Wutpeach/Clackly/releases/tag/v0.1.6');
     await page.locator('header').getByRole('link', { name: en ? 'Documentation' : '使用文档' }).click();
     await expect(page).toHaveURL(new RegExp('/Clackly/' + locale + 'docs/$'));
-    await expect(page.locator('a.site-title')).toHaveAttribute('href', '/Clackly/' + locale);
+    const homeLink = page.locator('a.site-title');
+    await expect(homeLink).toBeVisible();
+    await expect(homeLink).toHaveAttribute('href', '/Clackly/' + locale);
+    await expect(homeLink.locator('img')).toBeVisible();
+    await expect(homeLink).toHaveText('Clackly');
+    await homeLink.focus();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(new RegExp('/Clackly/' + locale + '$'));
+    await page.locator('header').getByRole('link', { name: en ? 'Documentation' : '使用文档' }).click();
     await page.getByRole('link', { name: 'Build with AI', exact: true }).first().click();
     await expect(page.locator('h1')).toContainText('Build with AI');
   });
@@ -95,6 +103,10 @@ test('responsive pages load assets without overflow or browser errors', async ({
     await page.goto('./' + route);
     await page.evaluate(() => document.fonts.ready);
     await expect(page.locator('h1')).toBeVisible();
+    if (route.includes('docs/')) {
+      await expect(page.locator('a.site-title img')).toHaveCount(1);
+      if (width >= 1024) await expect(page.locator('a.site-title')).toBeVisible();
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), name + ' overflows horizontally').toBeTruthy();
     await page.screenshot({ path: testInfo.outputPath(name + '.png'), fullPage: true, animations: 'disabled' });
   }

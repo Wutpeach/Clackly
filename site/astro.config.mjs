@@ -5,8 +5,10 @@ export default defineConfig({
   site: 'https://wutpeach.github.io', base: '/Clackly', trailingSlash: 'always',
   integrations: [starlight({
     title: 'Clackly', description: 'Clackly · A keyboard-first command palette for DaVinci Resolve. 使用指南与 AI 扩展开发。',
-    favicon: '/mark.svg', plugins: [black({ docs: { showMarkdownActions: false } })], customCss: ['./src/styles/docs.css'],
-    logo: { src: './public/mark.svg', alt: '' },
+    favicon: '/favicon.ico?v=9980b5a6',
+    head: [{ tag: 'link', attrs: { rel: 'icon', type: 'image/svg+xml', href: '/Clackly/favicon.svg?v=0e879fa7' } }],
+    plugins: [black({ docs: { showMarkdownActions: false } })], customCss: ['./src/styles/docs.css'],
+    logo: { src: './public/clackly-compact.svg', alt: '' },
     components: { MarkdownContent: './src/components/MarkdownContent.astro' },
     locales: { root: { label: '简体中文', lang: 'zh-CN' }, en: { label: 'English', lang: 'en' } },
     social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/Wutpeach/Clackly' }],
