@@ -18,6 +18,7 @@ Open http://127.0.0.1:4321/Clackly/ (Chinese) or /Clackly/en/ (English). The Pla
 ## Sources and routes
 
 - /Clackly/ and /Clackly/en/ are independent product pages, without redirects.
+- Simplified Chinese is the explicit default (Starlight defaultLocale: root). Homepage x-default links point to /Clackly/; English remains available by explicit language switching or /Clackly/en/.
 - /Clackly/docs/ and /Clackly/en/docs/ contain matching user/developer navigation.
 - skills/clackly-developer/ is the protocol authority. scripts/sync-skill.mjs generates eight reference pages and exports all 19 Markdown/Python/JSON sources byte for byte. Generated content is ignored by Git. Edit the authority, not the exports.
 - /Clackly/llms.txt lists all raw sources. Copy for Agent copies visible task prompts or exact original protocol Markdown; denied clipboard access leaves selected text and a recovery instruction.

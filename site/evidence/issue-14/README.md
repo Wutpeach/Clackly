@@ -36,6 +36,12 @@
 - git diff --check 通过。首页没有新增运行时依赖或 Web App 框架。五张新增 PNG（含约 393 KB 的分享图）合计约 588 KB；分享图不在首页正文加载，正文产品 PNG 合计约 129／133 KB（中文／英文），后续展示图延迟加载。
 - 本地 Node 为 22.17.1，低于项目声明的 22.19.0 基线；上述构建与测试在本地实际通过，GitHub Docs CI 使用 22.19.0。Astro 保留已有的 i18n/default404 与 public font 警告；资源和浏览器检查通过。
 
+## 中文默认语言补充
+
+按用户要求，将 Starlight 默认语言显式设为简体中文，并将双语首页的 x-default 指向中文根入口 /Clackly/。英文首页与文档仍可通过语言切换或明确的英文地址访问。
+
+本次补充验证：生产构建通过（41 HTML 页面、19 对双语文档、2,990 个站内链接／资源／锚点、19 份官方 Skill 源文件）；原有文档与导航测试 12／12 通过。实际以 en-US 浏览器语言访问根入口，确认显示中文，首页与文档的中英文切换正常，x-default 均指向中文入口。此次未改动视觉或重新拍摄截图。
+
 ## 产品画面来源
 
 site/public/images/home/launcher.png 和 search.png 来自现有 palette-evidence 工具的 pinned-recent／search-results 场景，以 2x 截取实际应用 renderer。Extension View 画面来自同一构建的真实 ExtensionViewApp，使用中英文只读时间线列表 fixture。它是展示扩展 UI 能力的示例，不声称是预装扩展。
