@@ -10,6 +10,7 @@ export default defineConfig({
     plugins: [black({ docs: { showMarkdownActions: false } })], customCss: ['./src/styles/docs.css'],
     logo: { src: './public/clackly-compact.svg', alt: '' },
     components: { MarkdownContent: './src/components/MarkdownContent.astro' },
+    defaultLocale: 'root',
     locales: { root: { label: '简体中文', lang: 'zh-CN' }, en: { label: 'English', lang: 'en' } },
     social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/Wutpeach/Clackly' }],
     sidebar: [

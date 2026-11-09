@@ -1,0 +1,9 @@
+{
+  "origin": "Actual Clackly renderer, headless Edge, deterministic demonstration data",
+  "source": "site/scripts/capture-home-assets.mjs",
+  "sourceCheckout": "8d28021e6860cbf260f4f3cd46d85c9a7abe0a5c",
+  "command": "npm --prefix resolve-command-center run build && node site/scripts/capture-home-assets.mjs",
+  "date": "2026-11-09",
+  "deviceScaleFactor": 2,
+  "limitations": "DOM/CSS capture only. Not a native Resolve screenshot or evidence of command execution. Extension content is an illustrative read-only fixture, not an installed bundled extension."
+}
