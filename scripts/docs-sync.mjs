@@ -220,6 +220,7 @@ export async function synchronize(root, command, input = {}, api) {
     if (command === 'deploy') {
       insist(p?.number, 'No pending PR to deploy'); passReceipt(p);
       const pr = await api.pr(p.number); p.mergeSha = mergedPr(p, pr);
+      p.ci = await api.verifyCi(p.ci, p.headSha, needsPages(pr.files), p.through, p.number);
       insist(await api.isAncestor(p.mergeSha, through), 'Merge is outside the reviewed range');
       if (!needsPages(pr.files) && !needsPages(await api.filesBetween(from, through))) { p.phase = 'merged'; save(); return { required: false }; }
       const existing = await coveringDeployment(api, p.mergeSha, through);

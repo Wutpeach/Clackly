@@ -231,6 +231,18 @@ test('completion verifies durable CI run receipts after GitHub removes mutable P
   assert.throws(() => adapter.verifyCi(undefined, b, true, a, 31), /No durable pre-merge/);
 });
 
+test('deployment stops before any dispatch or success receipt when CI binding is absent or failed', async t => {
+  const external = fixture(t); await external.call('publish'); await external.review();
+  external.pr.state = 'MERGED'; external.pr.mergeCommit = { oid: c }; external.main(c);
+  await assert.rejects(external.call('deploy'), /durable pre-merge CI receipt/);
+  assert.equal(external.dispatches(), 0); assert.equal(external.cursor(), null);
+  const failed = fixture(t); await failed.call('publish'); await failed.review(); await failed.call('merge');
+  failed.api.verifyCi = () => { throw new Error('Recorded CI run is not successful'); };
+  await assert.rejects(failed.call('deploy'), /Recorded CI run/); assert.equal(failed.dispatches(), 0);
+  failed.deployed(); await assert.rejects(failed.call('deploy'), /Recorded CI run/);
+  assert.equal(failed.dispatches(), 0); assert.equal(failed.cursor(), null);
+});
+
 test('server-side strict protection is mandatory even when all client checks pass', async t => {
   const f = fixture(t); await f.call('publish'); await f.review();
   f.api.assertBaseProtected = () => { throw new Error('no strict server-side protection'); };
