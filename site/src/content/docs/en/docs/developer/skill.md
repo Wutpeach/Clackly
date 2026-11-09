@@ -22,7 +22,7 @@ Application upgrades update the bundled source; reimport the Agent copy using th
 
 If the local path is inaccessible, use **Open Skill folder** to share the complete directory/ZIP, or have the Agent read raw sources from [llms.txt](/Clackly/llms.txt). The website can be read directly without assuming a local copy is installed in the cloud.
 
-Alternatively, extract **skills/clackly-developer/** from the [v0.1.6 source archive](https://github.com/Wutpeach/Clackly/archive/refs/tags/v0.1.6.zip) without building the app. Keep SKILL.md, references, examples and scripts together. Check historical development qualifiers against the [release record](/Clackly/en/docs/releases/).
+Alternatively, extract **skills/clackly-developer/** from the [v0.1.7 source archive](https://github.com/Wutpeach/Clackly/archive/refs/tags/v0.1.7.zip) without building the app. Keep SKILL.md, references, examples and scripts together. Check historical development qualifiers against the [release record](/Clackly/en/docs/releases/).
 
 A Cindy project Skill can live at **your-tool-workspace/.agents/skills/clackly-developer/**; start a new session afterwards. Other clients use their documented directories/import workflows. Do not assume a universal path. Without a Skill loader, explicitly ask the Agent to read the complete folder's SKILL.md.
 

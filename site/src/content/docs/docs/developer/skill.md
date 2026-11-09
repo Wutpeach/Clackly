@@ -22,7 +22,7 @@ v0.1.6 随应用提供完整的 **Clackly Developer Skill**。
 
 本机路径无法访问时，用 **打开 Skill 文件夹** 提供完整目录/ZIP，或让 Agent 从 [llms.txt](/Clackly/llms.txt) 读取原文。网页资料可直接查阅，无需假定云端已安装本机副本。
 
-也可从 [v0.1.6 源码归档](https://github.com/Wutpeach/Clackly/archive/refs/tags/v0.1.6.zip) 提取 **skills/clackly-developer/**，无需构建应用。保留 SKILL.md、references、examples 和 scripts 全部内容；旧文件中的开发期状态请对照[实际发行记录](/Clackly/docs/releases/)。
+也可从 [v0.1.7 源码归档](https://github.com/Wutpeach/Clackly/archive/refs/tags/v0.1.7.zip) 提取 **skills/clackly-developer/**，无需构建应用。保留 SKILL.md、references、examples 和 scripts 全部内容；旧文件中的开发期状态请对照[实际发行记录](/Clackly/docs/releases/)。
 
 Cindy 项目 Skill 可放在 **你的工具工作目录/.agents/skills/clackly-developer/**，再新开会话。其他客户端使用其文档支持的目录/导入流程，不猜测通用安装路径。没有 Skill 加载器时，可明确要求 Agent 读取完整目录中的 SKILL.md。
 

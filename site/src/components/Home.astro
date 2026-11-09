@@ -8,7 +8,7 @@ const { lang } = Astro.props;
 const en = lang === 'en';
 const root = '/Clackly/' + (en ? 'en/' : '');
 const docs = root + 'docs/';
-const release = 'https://github.com/Wutpeach/Clackly/releases/tag/v0.1.6';
+const release = 'https://github.com/Wutpeach/Clackly/releases/tag/v0.1.7';
 const title = en ? 'Clackly — Stay in the edit.' : 'Clackly — 剪辑，不必绕路。';
 const description = en ? 'A compact, keyboard-first command palette for DaVinci Resolve. Find commands, run trusted extensions and build your own tools with AI.' : 'DaVinci Resolve 内轻量、键盘优先的命令面板。搜索命令、运行可信扩展，用 AI 构建自己的剪辑工具。';
 const images = '/Clackly/images/home/';
@@ -49,7 +49,7 @@ const images = '/Clackly/images/home/';
       <h1 id="hero-title">{en ? 'Stay in the edit.' : <><span>剪辑，</span><span>不必绕路。</span></>}</h1>
       <p class="hero-description">{en ? 'Your next move, one keystroke away.' : '下一步操作，一次呼出。'}<br /><span>{en ? 'A keyboard-first command palette for DaVinci Resolve.' : '为 DaVinci Resolve 而造的键盘优先命令面板。'}</span></p>
       <div class="actions"><a class="button primary" href={release}><Icon name="windows" />{en ? 'Download for Windows' : '下载 Windows 版'}<Icon name="download" /></a><a class="button secondary" href={docs}>{en ? 'Read the docs' : '阅读文档'}<Icon name="arrow" /></a></div>
-      <p class="release">v0.1.6 <span>·</span> Windows x64 <span>·</span> {en ? 'Resolve Studio Workflow Integration' : 'Resolve Studio 工作流集成'}</p>
+      <p class="release">v0.1.7 <span>·</span> Windows x64 <span>·</span> {en ? 'Resolve Studio Workflow Integration' : 'Resolve Studio 工作流集成'}</p>
     </div>
     <figure class="wrap product-figure">
       <div class="product-stage">
@@ -99,7 +99,7 @@ const images = '/Clackly/images/home/';
     </div>
   </section>
 
-  <section class="wrap closing" data-reveal="text" aria-labelledby="closing-title"><img src="/Clackly/clackly-compact.svg" width="68" height="68" loading="lazy" alt="" /><h2 id="closing-title">{en ? 'Back to the work you love.' : '回到你热爱的剪辑。'}</h2><p class="closing-description">{en ? 'A little less friction. A little more flow.' : '让操作更顺手，让创作更尽兴。'}</p><div class="actions"><a class="button primary" href={release}><Icon name="download" />{en ? 'Get Clackly v0.1.6' : '下载 Clackly v0.1.6'}</a><a class="button secondary" href={docs + 'install/'}>{en ? 'Installation guide' : '安装指南'}<Icon name="arrow" /></a></div><p class="trust-note">{en ? 'Windows x64 · Resolve Studio Workflow Integration. Unsigned installer: download from the official Release and verify its SHA-256. Extensions execute local code; install only sources you trust.' : 'Windows x64 · Resolve Studio 工作流集成。安装器未签名，请从官方 Release 下载并核对 SHA-256。扩展会执行本地代码，请只安装你信任的来源。'}</p></section>
+  <section class="wrap closing" data-reveal="text" aria-labelledby="closing-title"><img src="/Clackly/clackly-compact.svg" width="68" height="68" loading="lazy" alt="" /><h2 id="closing-title">{en ? 'Back to the work you love.' : '回到你热爱的剪辑。'}</h2><p class="closing-description">{en ? 'A little less friction. A little more flow.' : '让操作更顺手，让创作更尽兴。'}</p><div class="actions"><a class="button primary" href={release}><Icon name="download" />{en ? 'Get Clackly v0.1.7' : '下载 Clackly v0.1.7'}</a><a class="button secondary" href={docs + 'install/'}>{en ? 'Installation guide' : '安装指南'}<Icon name="arrow" /></a></div><p class="trust-note">{en ? 'Windows x64 · Resolve Studio Workflow Integration. Unsigned installer: download from the official Release and verify its SHA-256. Extensions execute local code; install only sources you trust.' : 'Windows x64 · Resolve Studio 工作流集成。安装器未签名，请从官方 Release 下载并核对 SHA-256。扩展会执行本地代码，请只安装你信任的来源。'}</p></section>
 </main>
 <footer class="wrap footer"><div><a class="brand" href={root}><img src="/Clackly/clackly-compact.svg" width="28" height="28" alt="" /><span>Clackly</span></a><p>{en ? 'Built for your Resolve workflow.' : '为你的 Resolve 工作流而造。'}</p></div><nav aria-label={en ? 'Footer' : '页脚'}><a href={docs}>{en ? 'Documentation' : '使用文档'}</a><a href={docs + 'developer/'}>Build with AI</a><a href={release}>{en ? 'Releases' : '发行记录'}</a><a href="https://github.com/Wutpeach/Clackly">GitHub</a><a href="/Clackly/fonts/HARMONYOS_SANS_LICENSE.txt">HarmonyOS Sans © Huawei</a></nav></footer>
 </body></html>

@@ -71,7 +71,7 @@ Controls have modest rounding; the stage and AI workbench use 18px corners, redu
 
 ## Components
 
-Primary and secondary buttons have a 50px minimum height (48px on phones), visible hover states and a 2px focus outline with 5px offset. Navigation wraps on phones; the header GitHub link is hidden at 700px. The stage offers a keyboard-accessible Launcher/Search switch. Download links lead to the actual v0.1.6 Release. Documentation and Build with AI preserve locale. Copy controls copy visible text, announce completion and select the text when clipboard access fails. Raw protocol files remain reachable without JavaScript.
+Primary and secondary buttons have a 50px minimum height (48px on phones), visible hover states and a 2px focus outline with 5px offset. Navigation wraps on phones; the header GitHub link is hidden at 700px. The stage offers a keyboard-accessible Launcher/Search switch. Download links lead to the actual v0.1.7 Release. Documentation and Build with AI preserve locale. Copy controls copy visible text, announce completion and select the text when clipboard access fails. Raw protocol files remain reachable without JavaScript.
 
 ## Do's and Don'ts
 

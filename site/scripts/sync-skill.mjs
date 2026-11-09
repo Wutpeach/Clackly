@@ -53,6 +53,6 @@ for (const locale of ['docs', 'en/docs']) {
     await writeFile(path.join(dir, ref + '.md'), body);
   }
 }
-const intro = '# Clackly developer sources\n\nPublic baseline: Clackly v0.1.6 (2026-11-08). Verify the installed Host; older Hosts can lack UI support.\nProtocol authority: skills/clackly-developer/. Raw files below are byte-for-byte copies generated at build time, not a second specification.\nThird-party Python is unsandboxed. No arbitrary Web UI, background services or automatic rollback.\n\n';
+const intro = '# Clackly developer sources\n\nPublic baseline: Clackly v0.1.7 (2026-11-09). Verify the installed Host; older Hosts can lack UI support.\nProtocol authority: skills/clackly-developer/. Raw files below are byte-for-byte copies generated at build time, not a second specification.\nThird-party Python is unsandboxed. No arbitrary Web UI, background services or automatic rollback.\n\n';
 await writeFile(path.join(site, 'public/llms.txt'), intro + inventory.map(f => '- https://wutpeach.github.io/Clackly/agent/clackly-developer/' + f.path).join('\n') + '\n');
 console.log('Exported ' + inventory.length + ' exact Developer Skill sources and 8 reference pages.');
