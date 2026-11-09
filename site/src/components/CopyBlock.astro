@@ -1,0 +1,38 @@
+---
+interface Props { text: string; lang?: string; label?: string; }
+const { text, lang = 'zh-CN', label } = Astro.props;
+const en = lang === 'en';
+---
+<div class="copy-block" data-copy-block>
+  <div class="copy-toolbar">
+    <span>{label || (en ? 'Prompt for your Agent' : '给 Agent 的提示词')}</span>
+    <button type="button" data-copy data-success={en ? 'Copied' : '已复制'} data-failure={en ? 'Copy unavailable. Select the text below and copy it.' : '无法自动复制，请选择下方原文并复制。'}>{en ? 'Copy for Agent' : '复制给 Agent'}</button>
+  </div>
+  <textarea readonly aria-label={label || (en ? 'Agent prompt text' : 'Agent 提示词原文')} rows="9">{text}</textarea>
+  <p class="copy-status" role="status" aria-live="polite"></p>
+</div>
+<script>
+  document.querySelectorAll<HTMLElement>('[data-copy-block]').forEach((block) => {
+    const button = block.querySelector<HTMLButtonElement>('[data-copy]')!;
+    const input = block.querySelector<HTMLTextAreaElement>('textarea')!;
+    const status = block.querySelector<HTMLElement>('[role=status]')!;
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(input.value);
+        status.textContent = button.dataset.success!;
+      } catch {
+        input.focus(); input.select();
+        status.textContent = button.dataset.failure!;
+      }
+    });
+  });
+</script>
+<style>
+.copy-block { margin-block: 1.5rem; border: 1px solid var(--border, #3a3c42); border-radius: var(--radius, 6px); background: var(--code-background, transparent); overflow: hidden; }
+.copy-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .7rem; padding: .85rem 1rem; border-bottom: 1px solid var(--border, #3a3c42); font-size: .85rem; }
+button { cursor: pointer; font: inherit; padding: .55rem .75rem; color: var(--primary-foreground, #151619); background: var(--primary, #e7e8ea); border: 1px solid transparent; border-radius: 4px; min-height: 40px; }
+button:hover { opacity: .85; }
+textarea { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 12rem; padding: 1rem; font: .875rem/1.7 var(--sl-font-mono, ui-monospace), monospace; color: inherit; background: transparent; border: 0; border-radius: 0; }
+.copy-status { margin: 0; padding: 0 1rem; font-size: .85rem; }
+.copy-status:not(:empty) { padding-bottom: .8rem; }
+</style>

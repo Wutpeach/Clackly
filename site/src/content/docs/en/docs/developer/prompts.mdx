@@ -1,0 +1,12 @@
+---
+title: "Agent prompt library"
+description: "Copy task-specific prompts with Host checks, protocol sources and delivery requirements."
+---
+import CopyBlock from '../../../../../components/CopyBlock.astro';
+import { prompts } from '../../../../../data/prompts';
+
+Choose a task and copy its prompt. Add your goal, installed Host version, read/write scope and available source. No Agent connection is created here: you paste the visible text into your own Agent.
+
+Start by [installing the Skill](/Clackly/en/docs/developer/skill/). Raw protocol files are listed in [llms.txt](/Clackly/llms.txt).
+
+{prompts('en').map(prompt => <section aria-labelledby={prompt.id}><h2 id={prompt.id}>{prompt.title}</h2><CopyBlock text={prompt.text} lang="en" label={prompt.title} /></section>)}

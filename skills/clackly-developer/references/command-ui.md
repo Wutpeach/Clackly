@@ -1,7 +1,7 @@
 # Command UI — #7-A accepted Host support
 
-Implemented in this source checkout; not a promise about the user's installed
-Host or a published release. Verify Host support before relying on it. Older
+Publicly shipped in Clackly v0.1.6. Verify the user's installed Host before
+relying on this support. Older
 Hosts ignore unknown Command fields. Never use that to run a risky command
 without its required confirmation. No custom UI or extra frontend code.
 

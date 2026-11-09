@@ -1,7 +1,7 @@
 # Dynamic Prepare — #7-B accepted Host support
 
-Implemented in this checkout, not a published release. Requires Command UI
-version 2. The accepted #7-A Host rejects version 2 at installation. Earlier
+Publicly shipped in Clackly v0.1.6. Requires Command UI version 2; verify the
+installed target Host. The accepted #7-A Host rejects version 2 at installation. Earlier
 pre-UI Hosts may ignore UI metadata: guard execute against missing context.phase
 and required input. Never assume a manifest alone makes an old Host safe.
 

@@ -16,9 +16,9 @@ Clackly 不修改 Agent 配置。应用升级只更新随包源目录，已导�
 **打开 Skill 文件夹**，手动提供完整目录或 ZIP。资源缺失或不可读时按钮不可用，
 请检查权限或重新安装包含 Skill 的构建，然后重新打开扩展页。
 
-此入口属于当前开发构建，不代表已有公开 Release 包含它。文档中的 #7 静态 Command UI /
-Dynamic Prepare，以及 #8 List / Detail / Form / Create / Edit / 多选 / Batch Action
-已在当前 Host 验收；交付前仍需核对目标 Host 支持。用法与完整示例见
+Clackly v0.1.6 已公开包含此安装入口，以及 Command UI / Dynamic Prepare 和
+Extension Views / List / Detail / Form / Create / Edit / 多选 / Batch Action。
+更早的 Host 可能缺少相应能力；交付前仍需核对实际安装的目标 Host。用法与完整示例见
 [Command UI](references/command-ui.md)、[Prepare](references/prepare.md) 和
 [Views](references/views.md)。
 

@@ -1,0 +1,20 @@
+---
+import Default from "@astrojs/starlight/components/MarkdownContent.astro";
+import CopyBlock from "./CopyBlock.astro";
+import manifest from "../../../skills/clackly-developer/references/extension-v1.md?raw";
+import command from "../../../skills/clackly-developer/references/command-ui.md?raw";
+import prepare from "../../../skills/clackly-developer/references/prepare.md?raw";
+import views from "../../../skills/clackly-developer/references/views.md?raw";
+const sources: Record<string, string> = { "extension-v1": manifest, "command-ui": command, prepare, views };
+const key = Astro.url.pathname.match(/\/developer\/reference\/([^/]+)\//)?.[1];
+const text = key ? sources[key] : undefined;
+const en = Astro.url.pathname.startsWith("/Clackly/en/");
+---
+{text && <details><summary>{en ? "Copy original Markdown for Agent" : "复制 Markdown 原文给 Agent"}</summary><CopyBlock text={text} lang={en ? "en" : "zh-CN"} label="Markdown · Copy for Agent" /></details>}
+<Default><slot /></Default>
+<script>
+  document.querySelectorAll<HTMLTableElement>('.sl-markdown-content table').forEach(table => {
+    table.tabIndex = 0;
+    table.setAttribute('aria-label', document.documentElement.lang === 'en' ? 'Reference table; scroll horizontally if needed' : '参考表格；内容超出时可横向滚动');
+  });
+</script>

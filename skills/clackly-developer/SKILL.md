@@ -9,10 +9,9 @@ Turn the user's tool request into Python source, a versioned manifest, and an in
 `.clackly` ZIP. This folder is self-contained; no Clackly checkout, SDK, Node, Git
 commit, or application build is needed. Use Python 3 for the packaging helper.
 
-The #7 Command UI / Dynamic Prepare and #8 Views / Forms / Batch Actions
-contracts below are accepted in the current development Host. This does not
-mean they are available in a public Release or every installed Host. Verify
-target Host support before delivery.
+Clackly v0.1.6 publicly ships Command UI / Dynamic Prepare and Extension Views /
+Forms / Batch Actions. Older installed Hosts may lack these capabilities. Verify
+the target Host version and required support before delivery.
 
 ## Develop
 

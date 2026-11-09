@@ -1,0 +1,48 @@
+# Stage A evidence · 2026-11-09
+
+Source branch: docs/issue-11-site. Website baseline: public v0.1.6. Stage A product acceptance and merge authorization are recorded in [Issue #11](https://github.com/Wutpeach/Clackly/issues/11#issuecomment-6730597873). The independent uncommitted Windows icon changes in the main checkout are excluded from this PR.
+
+## Verification
+
+- Astro 7.3.8 / Starlight 0.41.7 / Black Theme 0.7.1 production build passed locally under Node 22.17.1. CI uses the declared Node 22.19.0 baseline.
+- Static verification passed: 41 HTML pages, 19 matching Chinese/English documentation routes, 2,980 local URLs/assets/fragments and 19 byte-exact Developer Skill source exports with SHA-256 inventory.
+- 12/12 Playwright tests passed against the built preview using headless Edge on Windows. Tests exercise both home-to-doc-to-AI routes, the R1 header brand link returning to each language's home by keyboard, six prompts per language with real clipboard readback, clipboard denial recovery, authoritative Markdown retrieval/copy, locale-preserving language switch, Pagefind search, keyboard mobile navigation, theme switch, readable non-overlapping translated sidebar links, keyboard-scrollable mobile tables and responsive asset/error/overflow checks.
+- Viewports captured: 1440, 390 and 320 pixels. No page error or asset HTTP error appeared in the responsive run.
+- Original product screenshot was generated with the existing pinned-recent renderer evidence scenario. Main-to-v0.1.6 renderer source diff is empty. Screenshot data are deterministic fixtures; this is not a native Resolve capture.
+- Mechanical design detector ran once over the four changed frontend files. It reported only advisory mismatches between literal neutral colors/type steps/radii and the summarized design tokens. No hard design bans were reported. Independent finish review is recorded in Issue #11/PR.
+- git diff --check passed. No application functional change, installer build/download or live Resolve operation was needed.
+- Final record check replaced an untracked local design-note reference with the committed renderer styles. The unmodified HarmonyOS Sans font includes its complete original copyright notice/license, linked from both homepages and documentation entry pages.
+
+## Screenshots
+
+All screenshots are from the actual built website at the local /Clackly/ base. Files are full-page captures; open their original size to inspect text.
+
+The 2026-11-08 documentation refinement follows the same starlight-theme-black 0.7.1 setup as Ameow. Both sites already had the theme installed; this pass removes the documentation's application-font/palette overrides, restores native Geist Sans/Geist Mono and theme colors, shortens bilingual navigation labels and uses native LinkCards on the overview. Copy for Agent follows the theme tokens. The product home retains its own visual system.
+
+The 12-test browser suite passed after these changes. The theme test now uses the keyboard control, checks persistence from the overview into the AI guide, and captures both locales at 1440px/320px in both light and dark mode. A focused rerun passed after making captures finish CSS transitions, so the evidence shows settled theme colors.
+
+The final 2026-11-09 captures include the accepted R1 compact SVG and Clackly name in the desktop documentation header, with a link back to the current language's product home. Mobile keeps Black Theme's menu layout. Home and documentation pages use the approved R1 Web favicons. No icon artwork was redrawn or given extra effects.
+
+| Documentation overview | Desktop | 320px phone |
+| --- | --- | --- |
+| Chinese · dark | [View](overview-zh-dark.png) | [View](overview-zh-dark-mobile.png) |
+| Chinese · light | [View](overview-zh-light.png) | [View](overview-zh-light-mobile.png) |
+| English · dark | [View](overview-en-dark.png) | [View](overview-en-dark-mobile.png) |
+| English · light | [View](overview-en-light.png) | [View](overview-en-light-mobile.png) |
+
+| Surface | Desktop | Phone |
+| --- | --- | --- |
+| Chinese home | [1440px](desktop.png) | [390px](mobile.png), [320px](small.png) |
+| English home | [1440px](desktop-en.png) | [390px](mobile-en.png) |
+| Chinese installation | [1440px](docs-zh.png) | [390px](docs-mobile.png) |
+| English AI guide | [1440px](docs-en.png) | [320px](docs-en-mobile.png) |
+| Chinese prompts | [1440px](prompts.png) | — |
+| Views protocol | — | [390px](reference-mobile.png) |
+
+## Boundaries
+
+No public Pages deployment is claimed. The GitHub Pages API returned 404 before work, so the default target remains https://wutpeach.github.io/Clackly/ pending authorized setup and deployment. Workflow publication is manual and defaults off; PR/main builds do not deploy. CI evidence and the precise reviewed commit are linked from Issue #11/PR after their runs.
+
+Chinese user/developer guides are localized; authoritative technical protocol text stays in English with Chinese framing. Live Resolve tests, offline installer/UAC/uninstall acceptance and the future Cindy daily synchronization are outside this stage. Site build logs include benign upstream warnings for the optional empty i18n collection/default404 and a base-prefixed public font URL; built URL and browser checks verify the actual asset.
+
+The user accepted the stage A product and authorized PR #12 to merge. These checks do not authorize public Pages deployment or stage B daily schedule activation. The 320px touch search entry remains a non-blocking follow-up observation outside this merge.

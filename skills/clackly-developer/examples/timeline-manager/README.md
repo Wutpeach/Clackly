@@ -1,6 +1,7 @@
 # Timeline Manager — Extension Views B example
 
-Requires a Host with the accepted #8-B implementation; this is not a published release.
+Requires the Views / Forms / Batch support publicly shipped in Clackly v0.1.6.
+Verify the installed target Host before use.
 Package with:
 
 ```powershell

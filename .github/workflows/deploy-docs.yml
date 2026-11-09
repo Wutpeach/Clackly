@@ -1,0 +1,64 @@
+name: Docs site
+on:
+  pull_request:
+    paths: ['site/**', 'skills/clackly-developer/**', '.github/workflows/deploy-docs.yml']
+  push:
+    branches: [main]
+    paths: ['site/**', 'skills/clackly-developer/**', '.github/workflows/deploy-docs.yml']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish Pages (only after explicit product acceptance and authorization)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: docs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.19.0'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - name: Upload preview and test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clackly-site-preview
+          path: |
+            site/dist
+            site/playwright-report
+            site/test-results
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+        with:
+          path: site/dist
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: clackly-pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
