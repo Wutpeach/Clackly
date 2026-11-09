@@ -1,9 +1,9 @@
 ---
 title: "安装与管理第三方扩展"
-description: "Clackly v0.1.6 使用指南：安装与管理第三方扩展"
+description: "导入可信的 .clackly 包，配置命令并管理扩展版本。"
 ---
 
-**.clackly 是本地代码包。** Python 以当前用户权限执行，没有操作系统沙箱。来源文字是作者自行声明，不是签名认证。请只安装你信任的包；确认框不是隔离或安全证明。
+**只安装可信的 .clackly 包。** 扩展以当前用户权限运行本地 Python，没有沙箱；来源由作者声明，未经签名认证。
 
 ## 安装
 
@@ -13,12 +13,19 @@ description: "Clackly v0.1.6 使用指南：安装与管理第三方扩展"
 4. 补齐必填设置并保存，确认扩展已启用且可运行。
 5. 回到 Launcher 查找扩展命令，核对来源后执行。命令无需重启即可刷新。
 
-安装校验成功不代表 Resolve 或运行时一定就绪；先解决界面报告的宿主/依赖问题。
+若提示缺少宿主或依赖，先按提示修复，再运行命令。
+
+<figure class="docs-shot">
+  <a href="/Clackly/images/docs/extensions-zh.webp"><img src="/Clackly/images/docs/extensions-zh.webp" alt="运行摘要扩展详情：版本、声明来源、停用与卸载按钮、摘要前缀配置及命令列表" width="1520" height="1120" loading="lazy" /></a>
+  <figcaption>隔离 Electron 实拍：已安装官方“运行摘要”示例，使用临时设置；未连接 Resolve。示例并非预装扩展。点击查看原图。</figcaption>
+</figure>
 
 ## 更新与替换
 
-导入同一 ID、同一 SemVer 优先级的包会显示 **Replace / 替换**；更高版本为 **Update / 更新**，更低版本明确标为降级，每次都需要确认。作者修改源码后应重新打包导入，不要直接改已安装的脚本或状态文件。
+点击扩展列表中的条目，查看版本、来源、配置与命令，并使用停用或卸载操作。
 
-**禁用**保留文件和设置，命令不可执行；**卸载**默认保留设置，也可选择删除设置。包替换、禁用、卸载和配置变化可能关闭相关 View 并使旧会话失效，先保存正在编辑的内容。
+再次安装同一扩展时，界面会按版本提示**替换、更新或降级**，确认后才生效。源码有变化时重新打包导入，不要直接修改已安装文件。
 
-普通 Resolve Scripts 走[另一条发现路径](/Clackly/docs/launcher/)。Skill 安装给 Agent，.clackly 安装给 Clackly，二者不要混淆。
+**停用**保留文件和设置，命令不可执行；**卸载**默认保留设置，也可选择删除设置。包替换、停用、卸载和配置变化可能关闭相关 View 并使旧会话失效，先保存正在编辑的内容。
+
+普通脚本见 [Launcher 与搜索](/Clackly/docs/launcher/)。制作扩展所需的 [Developer Skill](/Clackly/docs/developer/skill/) 安装给 Agent，.clackly 包安装给 Clackly。

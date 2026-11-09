@@ -1,6 +1,6 @@
 ---
 title: "Releases and capability baseline"
-description: "Clackly v0.1.6 guide: Releases and capability baseline"
+description: "Check public versions, release dates and available capabilities."
 ---
 
 ## v0.1.6 · 2026-11-08

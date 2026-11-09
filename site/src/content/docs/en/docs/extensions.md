@@ -1,9 +1,9 @@
 ---
 title: "Install and manage extensions"
-description: "Clackly v0.1.6 guide: Install and manage extensions"
+description: "Import trusted .clackly packages, configure commands and manage versions."
 ---
 
-**A .clackly package executes local code.** Python runs with current-user permissions, without an OS sandbox. Source text is self-declared, not a verified signature. Install only trusted packages; confirmation is not isolation or proof of safety.
+**Install only .clackly packages you trust.** Extensions run local Python with your permissions and no sandbox. Source labels are author-declared, not verified signatures.
 
 ## Install
 
@@ -13,12 +13,19 @@ description: "Clackly v0.1.6 guide: Install and manage extensions"
 4. Fill required settings, save and check enablement and readiness.
 5. Find its commands in the Launcher and verify the source before running. Commands refresh without restarting.
 
-Successful package validation does not prove Resolve or the Runtime is ready. Resolve the reported Host or dependency issue separately.
+If the interface reports a missing Host or dependency, resolve it before running commands.
+
+<figure class="docs-shot">
+  <a href="/Clackly/images/docs/extensions-en.webp"><img src="/Clackly/images/docs/extensions-en.webp" alt="Summary extension details with version, declared source, Disable and Uninstall buttons, prefix configuration and commands" width="1520" height="1120" loading="lazy" /></a>
+  <figcaption>Isolated Electron capture of the installed official summary example with temporary settings. It is not preinstalled; its author-defined labels remain Chinese. Resolve is disconnected. Click for the original.</figcaption>
+</figure>
 
 ## Update and replace
 
-The same ID and SemVer precedence means **Replace**. A higher version means **Update**; a lower version is explicitly a downgrade. Every import needs confirmation. After editing source, package and import again; never modify installed scripts or state files.
+Click an entry in the extension list to inspect its version, source, configuration and commands, or to disable or uninstall it.
+
+Reinstalling the same extension offers **Replace, Update or Downgrade** according to version. Nothing changes until you confirm. After source changes, package and import again; do not edit installed files.
 
 **Disable** retains files and settings while preventing execution. **Uninstall** retains settings by default, with an option to remove them. Replacement, disable, uninstall or configuration changes can close affected Views and invalidate sessions. Save active edits first.
 
-Ordinary Resolve Scripts follow a [different discovery path](/Clackly/en/docs/launcher/). Install the Skill in your Agent and .clackly packages in Clackly.
+For ordinary scripts, see [Launcher and search](/Clackly/en/docs/launcher/). Install the [Developer Skill](/Clackly/en/docs/developer/skill/) in your Agent and .clackly packages in Clackly.

@@ -1,6 +1,6 @@
 ---
 title: "Verify, package and iterate"
-description: "Verify, package and iterate · Clackly v0.1.6 Developer Skill"
+description: "Check offline, package and verify in a local test project."
 ---
 
 ## Offline checks

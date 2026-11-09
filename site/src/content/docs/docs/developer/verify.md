@@ -1,6 +1,6 @@
 ---
 title: "验证、打包与迭代"
-description: "验证、打包与迭代 · Clackly v0.1.6 Developer Skill"
+description: "先离线检查，再打包并在本地测试项目中验收。"
 ---
 
 ## 离线检查

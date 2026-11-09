@@ -1,13 +1,13 @@
 ---
 title: "Download and install on Windows"
-description: "Clackly v0.1.6 guide: Download and install on Windows"
+description: "Get the official Windows installer and load Clackly in Resolve."
 ---
 
 Download **Clackly-Setup-0.1.6-win-x64.exe** from the [official v0.1.6 Release](https://github.com/Wutpeach/Clackly/releases/tag/v0.1.6). End users do not need a source checkout, Node or an application build.
 
 ## Before installing
 
-Use Windows x64 with DaVinci Resolve Studio and its official Workflow Integration / Scripting components installed. Save your work and close Resolve yourself when prompted. Installation may request UAC elevation. Do not change permissions across the shared Resolve directory just to install Clackly.
+Prepare Windows x64, DaVinci Resolve Studio and its official Workflow Integration / Scripting components. See the [compatibility scope](/Clackly/en/docs/#supported-context). Save your work and close Resolve when prompted; installation may require administrator access.
 
 The installer is unsigned. Windows may show SmartScreen or “Unknown publisher”. Verify the official source, filename, size and SHA-256 before deciding to continue. You do not need to disable Windows security.
 
@@ -25,10 +25,10 @@ v0.1.6 EXE: **28,965,825 bytes**. SHA-256:
 
 1. Run the EXE and follow its instructions. Normal upgrades retain settings and preferences.
 2. Restart Resolve Studio yourself.
-3. Select **Workspace → Workflow Integrations → Clackly**. Menu loading is not a promise of silent automatic startup with Resolve.
+3. Select **Workspace → Workflow Integrations → Clackly**. Load the plugin here each time you restart Resolve.
 4. Press **Ctrl + Space** and follow [first use](/Clackly/en/docs/first-use/).
 
-The installer contains the application, renderer and managed Python Runtime. **WorkflowIntegration.node is excluded**; installation verifies and copies the official local Resolve SamplePlugin component. If it is missing or incompatible, repair the official Resolve installation instead of downloading native files from an unknown source.
+The installer includes Clackly and its managed Python runtime. **WorkflowIntegration.node is excluded**; installation verifies and copies it from the official local Resolve SamplePlugin. If it is missing, repair the official Resolve installation and retry. Do not download it from other sources.
 
 The fixed installation location is:
 
@@ -36,4 +36,4 @@ The fixed installation location is:
 %PROGRAMDATA%\Blackmagic Design\DaVinci Resolve\Support\Workflow Integration Plugins\com.wutpeach.clackly
 ~~~
 
-Offline installation, standard-user UAC and full uninstall have not had dedicated real-machine acceptance. Release publication and local installation are separate facts. See [troubleshooting](/Clackly/en/docs/troubleshooting/).
+Offline installation, standard-user UAC and full uninstall have not had dedicated acceptance. Keep error records and follow [troubleshooting](/Clackly/en/docs/troubleshooting/) if installation fails. Do not change permissions across the shared Resolve directory yourself.
