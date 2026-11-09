@@ -24,7 +24,7 @@ node "D:\Clackly\scripts\schedule-checks\clackly-docs-sync.mjs"
 
 1. 确认 main 中两个入口都在。通过 `schedule_list(device=all)` 找到实际任务及其所在电脑，再用 `schedule_get` 回读。若已有 Clackly Docs Sync，编辑同一任务，不新建重复项；离线电脑不能当作不存在。
 2. 保持用户选择的时间、时区、模型、通知和启停状态。选择“AI 任务”，保留[完整任务提示词](cindy-docs-sync-prompt.md)。
-3. 新装或修改前置脚本使用 Cindy 原生 `schedule_set_pre_run_hook`：传实际 scheduleId 和已验证的 Node ESM 源文，由宿主安装、自测并挂载；建议外层 `timeoutMs: 60000`。使用工具返回的真实命令并核对路径，不凭预期命令声称已安装。不要误填 `scriptConfig.command`。
+3. 新装或修改前置脚本使用 Cindy 原生 `schedule_set_pre_run_hook`：传实际 scheduleId 和已验证的 Node ESM 源文，由宿主安装、自测并挂载。当前该接口没有 timeout 参数，以实际回读字段/宿主默认值为准；脚本内部远端查询上限为 30 秒。使用工具返回的真实命令并核对路径与相邻 `docs-sync.mjs` 依赖，不凭预期命令声称已安装。不要误填 `scriptConfig.command`。
 4. 保存后离开详情再重新打开；通过 `schedule_get` 再次核对 **同一 id、`executionMode=agent`、完整 `preRunHook.command`、工作目录 `D:/Clackly`、timeout 和用户选择的状态/计划**。记录前后回读和 updatedAt。仅磁盘有文件或编辑页显示文字均不足以通过。若 UI 仍异常，可在明确授权下读取本机 SQLite 的 `schedules` 对应行；不要直接改数据库。
 5. 首次运行先审查基线以来实际提交，再由 `complete` 记录结果，不能直接手填当前 SHA。随后同 SHA 的真实运行应记为 `skipped`、exit 2、stdout 含 `CINDY_PRECHECK_OK`，且没有新 AI 会话。任务运行记录才是生效证据。
 

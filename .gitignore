@@ -37,3 +37,8 @@ release/
 
 # Historical Resolve experiments contain local task paths; keep originals local.
 /resolve-command-center/resolve/feasibility/
+
+# Cindy Docs Sync state belongs to this checkout, never the public repository.
+/.clackly-docs-reviewed-state.json*
+/.clackly-docs-reviewed-sha*
+/.clackly-docs-sync.lock/

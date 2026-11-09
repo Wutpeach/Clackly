@@ -11,6 +11,10 @@ on:
         description: 'Publish Pages (only after explicit product acceptance and authorization)'
         type: boolean
         default: false
+      expected_sha:
+        description: 'Reviewed commit required by Docs Sync; a mismatch stops before build or deploy'
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -23,6 +27,12 @@ jobs:
       run:
         working-directory: site
     steps:
+      - name: Verify the reviewed commit
+        if: github.event_name == 'workflow_dispatch' && inputs.expected_sha != ''
+        working-directory: .
+        env:
+          CLACKLY_EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: node -e "if (!/^[a-f0-9]{40}$/.test(process.env.CLACKLY_EXPECTED_SHA) || process.env.GITHUB_SHA !== process.env.CLACKLY_EXPECTED_SHA) throw new Error('main changed after review; refusing this build/deployment')"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
