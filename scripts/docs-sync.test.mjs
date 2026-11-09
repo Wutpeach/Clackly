@@ -27,7 +27,7 @@ function fixture(t) {
     main: () => main, isAncestor: () => true, filesBetween: () => [], branch: () => ({ sha: head, files }), find: () => prs,
     create: () => { prs.push(pr); }, pr: () => pr, ci: () => [{ sha: head, url: 'https://github.com/Wutpeach/Clackly/actions/runs/1' }],
     verifyCi: receipts => { assert.ok(receipts?.length, 'durable pre-merge CI receipt'); return receipts; },
-    assertMergeable: () => {}, assertBaseProtected: () => {}, merge: (_number, expected) => { assert.equal(pr.headRefOid, expected); pr.state = 'MERGED'; pr.mergeCommit = { oid: c }; main = c; },
+    assertMergeable: () => {}, merge: (_number, expected) => { assert.equal(pr.headRefOid, expected); pr.state = 'MERGED'; pr.mergeCommit = { oid: c }; main = c; },
     deployed: () => deployment, publicPages: () => [{ url: publicSite, status: 200 }],
     dispatch: () => { dispatches++; runs = [{ id: dispatches, status: 'in_progress', conclusion: null }]; }, publishRuns: () => runs,
   };
@@ -243,19 +243,25 @@ test('deployment stops before any dispatch or success receipt when CI binding is
   assert.equal(failed.dispatches(), 0); assert.equal(failed.cursor(), null);
 });
 
-test('server-side strict protection is mandatory even when all client checks pass', async t => {
+test('reviewed documentation merges normally without requesting branch protection settings', async t => {
   const f = fixture(t); await f.call('publish'); await f.review();
-  f.api.assertBaseProtected = () => { throw new Error('no strict server-side protection'); };
-  await assert.rejects(f.call('merge'), /server-side/);
+  const merge = f.api.merge;
+  const adapter = github('unused', (program, args) => {
+    assert.equal(program, 'gh');
+    assert.deepEqual(args, ['pr', 'merge', '31', '--repo', repository, '--merge', '--match-head-commit', b]);
+    merge(31, b); return '';
+  });
+  f.api.merge = adapter.merge; await f.call('merge');
+  assert.equal(f.pr.state, 'MERGED'); assert.equal(f.progress().state.pending.mergeSha, c); assert.equal(f.cursor(), null);
+});
+
+test('main changing during the final checks stops merge and retains progress', async t => {
+  const f = fixture(t); await f.call('publish'); await f.review();
+  f.api.assertMergeable = () => f.main(d);
+  await assert.rejects(f.call('merge'), /main moved before merge/);
   assert.equal(f.pr.state, 'OPEN'); assert.equal(f.cursor(), null);
-  let protectedBranch = false, strict = false, admins = true, contexts = ['Docs Sync (ubuntu-latest)', 'Docs Sync (windows-latest)'];
-  const api = github('unused', (_program, args) => JSON.stringify(args.at(-1).endsWith('/protection')
-    ? { required_status_checks: { strict, contexts }, enforce_admins: { enabled: admins } } : { protected: protectedBranch }));
-  assert.throws(() => api.assertBaseProtected(), /lacks strict/);
-  protectedBranch = true; assert.throws(() => api.assertBaseProtected(), /up-to-date/);
-  strict = true; admins = false; assert.throws(() => api.assertBaseProtected(), /administrators/);
-  admins = true; contexts = contexts.slice(0, 1); assert.throws(() => api.assertBaseProtected(), /both OSes/);
-  contexts.push('Docs Sync (windows-latest)'); api.assertBaseProtected();
+  assert.equal(f.progress().state.pending.phase, 'awaiting_review');
+  assert.match(f.progress().state.lastFailure.reason, /main moved before merge/);
 });
 
 test('old deployment cannot acknowledge later Pages changes, with or without pending', async t => {

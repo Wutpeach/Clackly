@@ -206,7 +206,6 @@ export async function synchronize(root, command, input = {}, api) {
         insist(await api.isAncestor(through, p.headSha), 'Documentation branch must contain reviewed main before merge');
         p.ci = await api.ci(p.headSha, needsPages(pr.files), through, p.number);
         await api.assertMergeable(p.number);
-        await api.assertBaseProtected();
         insist(await api.main() === through, 'main moved before merge');
         p.phase = 'merging'; save();
         try { await api.merge(p.number, p.headSha); } catch (error) {
@@ -336,16 +335,6 @@ export function github(root, invoke = run, fetchPage = fetch) {
         // pull_requests is mutable and may be empty after merge; the pre-merge binding is durable.
         return { ...receipt, url: run.html_url };
       });
-    },
-    assertBaseProtected: () => {
-      const branch = json(['api', `repos/${repository}/branches/main`]);
-      insist(branch.protected === true, 'main lacks strict server-side protection; do not merge across a possible base race');
-      const protection = json(['api', `repos/${repository}/branches/main/protection`]);
-      const checks = protection.required_status_checks;
-      const required = new Set([...(checks?.contexts ?? []), ...(checks?.checks ?? []).map(c => c.context)]);
-      insist(checks?.strict === true && protection.enforce_admins?.enabled === true
-        && ['Docs Sync (ubuntu-latest)', 'Docs Sync (windows-latest)'].every(c => required.has(c)),
-      'Require strict up-to-date Docs Sync checks on both OSes, including administrators, before automatic merge');
     },
     assertMergeable: number => {
       const query = 'query($owner:String!,$name:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){mergeable reviewDecision reviewThreads(first:100,after:$endCursor){nodes{isResolved}pageInfo{hasNextPage endCursor}}}}}';

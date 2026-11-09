@@ -44,7 +44,7 @@
 
 ## 5. 合并和必要 Pages 发布
 
-只在用户启用的本任务内，当前 HEAD 获独立 PASS、必要 CI 对同 SHA/PR/main 基线成功、范围合规、无冲突/未解决阻塞时调用 merge。还须通过脚本核实 main 的 strict/up-to-date branch protection：两个 Docs Sync OS checks 均 required，且对管理员生效。当前仓库尚未配置该保护时必须停止通知；不得自行改保护设置、降级或绕过。客户端最后一次查询和 `--match-head-commit` 不能单独解决 base 竞态。脚本使用 GitHub 服务端精确 HEAD 校验普通合并；不 force/admin。main 移动先审查缺失提交、合入文档分支并重新审核/CI，不以旧证据推进。
+只在用户启用的本任务内，当前 PR HEAD 获独立 Worker PASS、必要 CI 成功、范围合规、无冲突/未解决阻塞时调用 merge。合并前再核对 main；若已变化，先检查缺失提交，合入文档分支并重新审核/CI 后再继续。沿用 Ameow 的普通自动维护模式，不要求启用 strict branch protection、required status checks 或 enforce_admins，不修改仓库保护设置。使用 `--match-head-commit` 校验当前 PR HEAD 正常合并，不强推、不使用 admin 或绕过 GitHub 现有规则。
 
 确认实际 merged 和 merge SHA 后审查至最新 main。涉及 `site/**`、生成站点所依赖的 Skill 文字或 Pages workflow 才调用 deploy。它使用既有 `deploy-docs.yml` 的 main 手动 dispatch、publish=true、expected_sha=已审查 main，保留发布门禁并防止发布未审查的主线。纯仓库文档无需发布。
 

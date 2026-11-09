@@ -89,7 +89,7 @@ node scripts/docs-sync.mjs failure D:/Clackly-artifacts/run/failure.json
 
 `merge`/`deploy` 输入均含真实 `from`、`through`。`merge` 只接受当前 HEAD 的独立 PASS、同 HEAD 且记录同一 PR/main 基线的 main/Docs Sync CI，以及站点变更所需的 Docs CI；检查冲突、requested changes 和未解决 review threads。最终使用 GitHub 服务端 `--match-head-commit` 普通合并，不 force/admin。若主线变化先审查缺失范围、合入 main 并重新 publish/审核/运行 CI；若合并回执丢失则找回同一合并。
 
-**自动合并还需要服务端保护，不能只靠最后一次查询。** 当前 `main` 实际未受保护，脚本会阻止自动合并；本开发没有改仓库设置。当前适配器支持经典 branch protection：main 要求 strict/up-to-date checks、包含 `Docs Sync (ubuntu-latest)` 与 `Docs Sync (windows-latest)`，且 `enforce_admins.enabled=true`，防止查询后主线前进或管理员默认绕过。保护设置须另获用户授权；仅有客户端 CI PASS、普通非严格保护或未识别的 ruleset 不会放行。它解决 `--match-head-commit` 只约束 PR HEAD、不约束 base 的竞态。
+沿用 Ameow 的自动维护方式：当前 PR HEAD 的独立 Worker PASS、必要 CI 成功、无冲突及未解决阻塞后，合并前再核对 main；发现变化则停止并检查缺失提交后重试。Docs Sync 不要求启用严格分支保护、required status checks 或管理员约束，也不修改仓库保护设置。普通合并遵守 GitHub 现有规则，不使用 force/admin。main 核对是合并前的检查，不是服务端 base 锁。
 
 合并前会把核实的 PR/HEAD/base 和 CI run ID 一起持久保存。GitHub workflow run 的 `pull_requests` 是可变关联，PR 更新后会改变、合并后可能为空，不能当作历史证据。complete/丢回执恢复使用已保存绑定，再按 run ID 核实真实 workflow、event、HEAD 和成功状态；不再要求已合并 PR 仍在关联数组。外部合并且没有本工具合并前 CI 绑定的 pending 会停止，保留现场供人工核实，不凭空补造凭证。
 
