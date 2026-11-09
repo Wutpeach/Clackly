@@ -1,23 +1,23 @@
 ---
 title: "FAQ and troubleshooting"
-description: "Clackly v0.1.6 guide: FAQ and troubleshooting"
+description: "Check loading, shortcuts, runtime and extension errors by symptom."
 ---
 
 ## Clackly is absent from Workflow Integrations
 
-Confirm Windows x64 Resolve Studio, a successful installation and a Resolve restart after installation. Check the official Workflow Integration components. Menu registration and a command failing inside an open palette are separate paths; identify which one failed.
+Check the [compatibility scope](/Clackly/en/docs/#supported-context), a completed installation and a Resolve restart. If the menu is still absent, check the official Workflow Integration components; see the repair steps below if they are missing.
 
 ## Ctrl + Space shows no palette
 
-Load **Workspace → Workflow Integrations → Clackly** first. Close old Clackly development processes and check whether another application owns the shortcut. Avoid starting duplicate Hosts or changing production projects to investigate.
+Load **Workspace → Workflow Integrations → Clackly** first. Check whether another application owns the shortcut. If you have run a development build, exit the old Clackly process before loading the plugin to avoid duplicate instances.
 
 ## An installed extension cannot run
 
-Check enablement, saved required settings, a running Resolve and its Scripting API. Runtime compatibility and package integrity are independent checks. Installation does not guarantee execution. Keep the error and extension version. After any failed write, inspect actual data before retrying.
+Check enablement, saved required settings, Resolve and its Scripting API. Keep the error and extension version. If the failed operation could have written data, inspect it before retrying.
 
 ## WorkflowIntegration.node is missing
 
-Repair the official Resolve SamplePlugin component and rerun the installer. Clackly excludes that native file from distribution. Do not copy it from unknown websites or another machine, or broaden permissions across the shared directory.
+Repair the official Resolve SamplePlugin component and rerun the installer. Do not copy the file from unknown websites or another machine, or broaden permissions across the shared directory.
 
 ## An ordinary script is missing
 
@@ -29,6 +29,6 @@ Cloud Agents may not access local paths. Share the complete Skill folder/ZIP or 
 
 ## Compatibility, removal and support
 
-The public target is Windows + Resolve Studio. macOS, Linux, the free edition and arbitrary version compatibility are not promised. Full uninstall has not had dedicated acceptance. Remove extensions through Settings instead of deleting managed files.
+See the [documentation overview](/Clackly/en/docs/#supported-context) for compatibility and [installation](/Clackly/en/docs/install/) for validation limits. Remove extensions through Settings instead of deleting managed files.
 
 When opening a [GitHub Issue](https://github.com/Wutpeach/Clackly/issues), include Clackly/Resolve/Windows versions, extension ID/version, steps, the exact error and whether data changed. Remove confidential project information, media paths and personal data.

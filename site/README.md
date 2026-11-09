@@ -28,15 +28,17 @@ Open http://127.0.0.1:4321/Clackly/ (Chinese) or /Clackly/en/ (English). The Pla
 
 npm run build checks generated HTML routes, local links/assets/fragments, CSS assets, bilingual coverage and Skill hashes. npm test drives actual built pages, search, language and theme controls, mobile navigation, clipboard success/failure and responsive widths from 320 to 1440 pixels.
 
-.github/workflows/deploy-docs.yml provides independent Linux build/browser CI and an artifact containing the preview plus test evidence. PRs and main pushes **only build**. Pages deployment requires a manual workflow_dispatch with publish=true on main after explicit authorization. No Pages site has been configured by this task. The intended base is https://wutpeach.github.io/Clackly/; it is not a verified public deployment.
+.github/workflows/deploy-docs.yml provides independent Linux build/browser CI and an artifact containing the preview plus test evidence. PRs and main pushes **only build**. Pages deployment requires a manual workflow_dispatch with publish=true on main after explicit authorization. The public site is https://wutpeach.github.io/Clackly/. Issue #14 was accepted, merged and published on 2026-11-09; later documentation candidates require their own acceptance before publication.
 
-Stage A received product acceptance and merge authorization on 2026-11-09 ([acceptance record](https://github.com/Wutpeach/Clackly/issues/11#issuecomment-6730597873)). Public Pages deployment requires separate authorization. Stage B Cindy scheduling is separate; no automation configuration or daily plan is created here.
+Stage A received product acceptance and merge authorization on 2026-11-09 ([acceptance record](https://github.com/Wutpeach/Clackly/issues/11#issuecomment-6730597873)). Cindy scheduling is managed separately; this directory does not configure automations.
 
 ## Reused engineering
 
 Adapted from Wutpeach/Ameow site/: Astro 7, Starlight 0.41, Black Theme, root/English locales, static HTML link checking, and mobile pagination wrapping. The Clackly home is newly implemented; Ameow's redirect-only root is not reused. No Ameow business copy, state, paths or schedule IDs are imported. See https://github.com/Wutpeach/Ameow/issues/19 for the later synchronization reference.
 
 ## Visual evidence provenance
+
+The illustrated user guides use 12 bilingual, lossless WebP captures of the real Electron runtime. See [the Issue #16 audit and capture limits](evidence/issue-16/README.md) and [per-image provenance and SHA-256](public/images/docs/provenance.json). To reproduce on Windows, install dependencies in this directory and `../resolve-command-center`, build the application there, then run `node scripts/capture-docs-runtime.mjs` here. The script uses temporary AppData and the official Run Summary example without connecting to Resolve. It does not operate on user projects.
 
 public/images/palette.png is an actual Clackly renderer capture with deterministic test data. It was produced headlessly with the existing palette-evidence utility (built renderer, pinned-recent scenario) and is labelled as demo data on both homepages. It does not prove native Resolve execution, Windows compositor behavior or production installation. Product wordmark, mark and HarmonyOS font come from the existing application assets. The documentation header uses the approved Icon R1 compact SVG; browser favicons use the same package's dedicated Web SVG/ICO. These three files are copied unchanged and checked by SHA-256 during build. The documentation brand link returns to the product home in the current language. No stock or AI-generated product screenshot is used. public/images/palette.png.json records the source.
 

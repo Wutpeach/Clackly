@@ -1,23 +1,31 @@
 ---
 title: "Command UI and Extension Views"
-description: "Clackly v0.1.6 guide: Command UI and Extension Views"
+description: "Use one-run input forms and windows for continued browsing."
 ---
 
-v0.1.6 publicly ships the capabilities below. The Clackly Host renders these interfaces from extension declarations and data; they are not arbitrary webpages or custom frontend code.
+Extensions can offer a one-run input form or a window for continued browsing. Clackly renders the interface; the extension defines its fields and actions.
 
 ## A single run: Command UI
 
 A command can show input fields and confirmation before execution. Inputs belong to that run, not persistent settings. Cancelling the form starts no execution. Submission shows progress, a brief success notification or inspectable/copyable results and errors.
 
-**Dynamic Prepare** reads live options or defaults when the form opens or refreshes. Refresh can clear expired selections and reset confirmation. A required choice with no candidates blocks execution. Prepare cannot create fields dynamically and is not a persistent background connection.
+Forms using **Dynamic Prepare** read choices from the current project when opened or refreshed. Check selections and confirmation again after refreshing. A required choice without available options blocks execution.
+
+<figure class="docs-shot docs-shot-command">
+  <a href="/Clackly/images/docs/command-ui-en.webp"><img src="/Clackly/images/docs/command-ui-en.webp" alt="Official summary Command UI with title, notes, number inputs, Cancel and Run command buttons" width="960" height="1160" loading="lazy" /></a>
+</figure>
 
 ## Continued browsing: Extension Views
 
-A View is a separate ordinary tool window with lists, search, tag filtering, details and actions. Each extension has at most one window per Host; reopening focuses the existing session. **Ctrl + .** opens its ActionPanel. Arrow keys and Enter navigate; Escape closes the menu, confirmation or one page level, keeping the root open.
+A View is a separate tool window that can offer lists, search, filters, details and actions. Reopening the same extension returns to its existing window.
 
-Create/Edit Forms stay in the same window. Unsaved changes prompt to keep editing or discard; drafts last only for the session. Multiselect is opt-in. Batch results can show successes, failures and a reason for every failed target.
+- **Ctrl + .**: open the current View's action panel.
+- **Arrow keys / Enter**: select and run.
+- **Escape**: close the current menu, cancel confirmation or go back one level; the root page stays open.
 
-Refocus refresh is opt-in; Forms never refresh on focus. Lists and details are snapshots. Requery after a project switch or removed object instead of trusting stale selection.
+An extension can offer create/edit forms or enable multiselect batch actions in the same window. Leaving an unsaved form prompts for confirmation; drafts do not survive a closed session. Batch results can show successes, failures and reasons separately.
+
+Some extensions refresh lists or details when the window regains focus; forms do not refresh this way. Read data again after switching projects or deleting objects.
 
 ## Check data before retrying
 

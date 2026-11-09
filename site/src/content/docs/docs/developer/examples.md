@@ -1,6 +1,6 @@
 ---
 title: "从官方完整示例开始"
-description: "从官方完整示例开始 · Clackly v0.1.6 Developer Skill"
+description: "按工具类型选择完整示例，再使用自己的扩展 ID 开发。"
 ---
 
 示例与打包器均来自 Developer Skill，本站只导出源文件，不维护另一份示例。复制到你自己的干净源码目录，修改为唯一 Extension ID 后再开发；不要把无关工具继续命名为示例 ID。

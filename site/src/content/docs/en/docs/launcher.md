@@ -1,22 +1,26 @@
 ---
 title: "Launcher, search and ordinary scripts"
-description: "Clackly v0.1.6 guide: Launcher, search and ordinary scripts"
+description: "Pin frequently used commands, revisit recent actions or search by name."
 ---
 
 ## The default Launcher
 
-v0.1.6 groups commands into **Pinned, Recent and Commands**, showing only nonempty groups. Pinned commands stay close; Recent brings back executed commands. Entries are deduplicated. Pin and Recent persist across sessions for built-ins, extensions and ordinary scripts.
+The list groups entries into **Pinned, Recent and Commands**. Empty groups stay hidden and commands are not duplicated. Pin and Recent persist across sessions for built-ins, extensions and ordinary scripts.
 
-Use the Pin control for the selected command; pinning keeps the selection. Built-in and extension commands alternate in Commands. There is no global nine-command cutoff; the list scrolls within the same compact window. Arrow keys follow the visible order and scroll the selection into view.
+Select a command and click **Pin** to pin or unpin it. Recent brings back executed commands. Commands alternates built-in and extension entries; scroll to see more. Use the arrow keys to select and Enter to run.
 
 ## Search
 
-Type a name or keyword to see Results. Relevance leads search ranking, with usage influencing applicable ordering. English, Chinese and pinyin matching depend on registered metadata. Source labels distinguish **Clackly, the extension name and script origins**, including commands with identical names.
+Type a name or keyword to see Results. English, Chinese and pinyin matching depend on the names and keywords a command provides. Relevance leads ranking; usage also affects ordering. Check the source label—**Clackly, an extension name or a script origin**—before running commands with identical names.
 
-**Escape** returns to the Launcher. Removing an extension refreshes its commands and repairs invalid selection.
+Press **Escape** to return to the Launcher.
+
+<figure class="docs-shot docs-shot-palette">
+  <a href="/Clackly/images/docs/search-en.webp"><img src="/Clackly/images/docs/search-en.webp" alt="Searching for 摘要 finds the summary command with its Extension source below the name" width="480" height="640" loading="lazy" /></a>
+</figure>
 
 ## Ordinary Resolve Scripts
 
-Ordinary Resolve Python/Lua scripts and **.clackly packages** are different features. Ordinary scripts are found through Pin, Recent or search; they do not automatically populate the fallback Commands group. Availability depends on local script sources, Resolve and the execution environment. Lua script discovery does not imply a Lua extension Runtime.
+Access ordinary Resolve Python/Lua scripts through **search, Pinned or Recent**; they do not automatically appear in Commands. Availability depends on script location, Resolve and the local runtime. Ordinary Lua script support does not imply support for Lua extension packages.
 
 Use [extensions](/Clackly/en/docs/extensions/) for structured configuration, inputs or Views. To create your own, start with [Build with AI](/Clackly/en/docs/developer/).

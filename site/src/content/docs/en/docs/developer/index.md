@@ -1,6 +1,6 @@
 ---
 title: "Build with AI: from idea to extension"
-description: "Build with AI: from idea to extension · Clackly v0.1.6 Developer Skill"
+description: "Describe your Resolve task and have an Agent build an extension with the official Skill."
 ---
 
 You do not need to learn Clackly's internals first. Describe the Resolve task. Your Agent uses the **official Developer Skill** to read the protocol, choose an example, write Python and deliver an installable .clackly plus editable source.
@@ -24,10 +24,10 @@ You do not need to learn Clackly's internals first. Describe the Resolve task. Y
 
 ## One protocol authority
 
-Protocols, examples and the packager live in **skills/clackly-developer/**. The website generates reference pages from that directory at build time. Raw files are copied byte for byte and checked with SHA-256. Do not edit generated pages to create another protocol.
+**skills/clackly-developer/** is the authority for protocols, examples and the packager. This site generates reference pages from it and preserves raw Markdown and source files byte for byte.
 
-Cloud Agents can discover the full raw material through [llms.txt](/Clackly/llms.txt). Web pages offer **Copy for Agent** and raw Markdown links. An Agent without local filesystem access must not claim to have installed your local Skill.
+Cloud Agents can find all raw sources in [llms.txt](/Clackly/llms.txt). Pages also offer **Copy for Agent** and raw Markdown links. Reading website sources and installing the Skill in an Agent are separate ways to use it.
 
-v0.1.6 ships Command UI, Prepare, Views, Forms and Batch. Still check the installed target Host. Extensions are **unsandboxed local Python**, not arbitrary Web UI, persistent services or dependency installers. Revalidate stable identities before writes. Offline checks do not establish real Resolve compatibility.
+These UI capabilities ship in v0.1.6; check the installed Clackly version before starting. Extensions run **unsandboxed local Python**, without arbitrary webpages, persistent services or automatic dependency installation. See [verification and packaging](/Clackly/en/docs/developer/verify/) for write identities, timeouts and real Host testing.
 
 [Choose an example](/Clackly/en/docs/developer/examples/) · [Verify and package](/Clackly/en/docs/developer/verify/)

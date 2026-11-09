@@ -1,6 +1,6 @@
 ---
 title: "Start from complete official examples"
-description: "Start from complete official examples · Clackly v0.1.6 Developer Skill"
+description: "Choose a complete example for your tool and develop with your own extension ID."
 ---
 
 Examples and the packager come from the Developer Skill; this site exports their source instead of maintaining another copy. Start in your own clean source folder and choose a unique Extension ID. Do not reuse an example ID for an unrelated tool.

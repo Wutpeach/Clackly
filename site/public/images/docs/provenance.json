@@ -1,0 +1,109 @@
+{
+  "date": "2026-11-09",
+  "version": "0.1.6",
+  "sourceCommit": "7f0de440878ede48fc5e1a07bc50305eb62a3c67",
+  "releaseDifferences": [
+    "resolve-command-center/extensions/extensionView-edit-ui.integration.js",
+    "resolve-command-center/extensions/extensionView-focus.integration.js",
+    "resolve-command-center/extensions/prepare-ui.integration.js",
+    "resolve-command-center/scripts/test-groups.js",
+    "resolve-command-center/scripts/test-groups.test.js",
+    "skills/clackly-developer/README.md",
+    "skills/clackly-developer/README.zh-CN.md",
+    "skills/clackly-developer/SKILL.md",
+    "skills/clackly-developer/examples/timeline-manager/README.md",
+    "skills/clackly-developer/references/command-ui.md",
+    "skills/clackly-developer/references/prepare.md",
+    "skills/clackly-developer/references/views.md"
+  ],
+  "capture": "Real Electron 36.3.2, Windows, production built renderer/preload/Core/IPC and official Run Summary Python",
+  "script": "site/scripts/capture-docs-runtime.mjs",
+  "data": "Temporary isolated AppData; official Run Summary package; one real successful non-Resolve Python execution; one pinned built-in",
+  "limitations": "No Resolve connection or native Workflow Integration acceptance. Extension readiness and update-state adapters are test fixtures; version display is pinned to public 0.1.6, no update request made. Example-authored Chinese field labels remain in both UI languages. Content captures exclude OS frames/shadows.",
+  "receipts": [
+    {
+      "file": "launcher-zh.webp",
+      "width": 480,
+      "height": 640,
+      "bytes": 18980,
+      "sha256": "bc9b1e17079306a65f7bcfcbcff26f07fd355075cdb5beebeddb440d2225121f"
+    },
+    {
+      "file": "search-zh.webp",
+      "width": 480,
+      "height": 640,
+      "bytes": 7054,
+      "sha256": "28bf228ce6ff501ffc4828669d56b91be92e26eda7c3f9612d5245f7733c0f0a"
+    },
+    {
+      "file": "settings-zh.webp",
+      "width": 1520,
+      "height": 1120,
+      "bytes": 45334,
+      "sha256": "3174da449d2dcfbdc4bc05a0dbfb881dcf4e159e642f704e2f8755323e57c50b"
+    },
+    {
+      "file": "developer-skill-zh.webp",
+      "width": 1064,
+      "height": 254,
+      "bytes": 24076,
+      "sha256": "c976a5b75a7139465beb1c96076b26aa8557135bfe97789ea2031d70cde45221"
+    },
+    {
+      "file": "extensions-zh.webp",
+      "width": 1520,
+      "height": 1120,
+      "bytes": 49344,
+      "sha256": "37f7741aa321fff8fa078c5ca1c6df35c1bcd01e8cf5c687990ec60c766db1b5"
+    },
+    {
+      "file": "command-ui-zh.webp",
+      "width": 960,
+      "height": 1160,
+      "bytes": 16304,
+      "sha256": "af4de4d7237a189e26c251764870cdc13d750ba9a3671b8ffa46a3ec9edb2b9b"
+    },
+    {
+      "file": "launcher-en.webp",
+      "width": 480,
+      "height": 640,
+      "bytes": 19808,
+      "sha256": "131df68565d373e895b10e1afcf55d8eaecf2ed48ea441203032dcfebdb280cc"
+    },
+    {
+      "file": "search-en.webp",
+      "width": 480,
+      "height": 640,
+      "bytes": 7214,
+      "sha256": "5bba2343ae367e240cebf701a6ebed219510c7a767cfc8754b08c8e1976cade0"
+    },
+    {
+      "file": "settings-en.webp",
+      "width": 1520,
+      "height": 1120,
+      "bytes": 45768,
+      "sha256": "49e29cfca40635bfe7385525485791a4ca1c4b1c48ea5abc2bdd86d6c108e8f0"
+    },
+    {
+      "file": "developer-skill-en.webp",
+      "width": 1064,
+      "height": 322,
+      "bytes": 21558,
+      "sha256": "042ae9945593a49ccd2903f7da5f28032d974f8c8f784fbb0e83e1a673640638"
+    },
+    {
+      "file": "extensions-en.webp",
+      "width": 1520,
+      "height": 1120,
+      "bytes": 44464,
+      "sha256": "701149f1386be237e17eb1ff90dedaed87d423bcb4d9a038666cc019f15c1157"
+    },
+    {
+      "file": "command-ui-en.webp",
+      "width": 960,
+      "height": 1160,
+      "bytes": 16964,
+      "sha256": "0c77770cd213570348735fa2e9e53f8b7498c9af62bb774d414fb08d4d308d1e"
+    }
+  ]
+}

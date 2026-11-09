@@ -1,22 +1,26 @@
 ---
 title: "Launcher、搜索与普通脚本"
-description: "Clackly v0.1.6 使用指南：Launcher、搜索与普通脚本"
+description: "固定常用命令、找回最近使用的操作，或按名称搜索。"
 ---
 
 ## 默认 Launcher
 
-v0.1.6 的列表分为 **Pinned、Recent、Commands**，仅显示非空分组。固定命令优先，最近运行过的命令可从 Recent 找回，同一命令会去重。Pin 与 Recent 跨会话保存，覆盖内置命令、扩展命令和普通脚本。
+列表分为 **Pinned（固定）、Recent（最近）、Commands（命令）**，空分组不显示，同一命令不重复列出。Pin 与 Recent 跨会话保存，支持内置命令、扩展命令和普通脚本。
 
-选中命令后使用 Pin 控件固定或取消固定；操作后保持当前选择。Commands 中内置和扩展命令交错展示，默认列表不再全局截断为 9 条，超出窗口时滚动。上下方向键按屏幕显示顺序移动，选中项自动滚入可见区域。
+选中命令后点击 **Pin** 固定或取消固定；执行过的命令可从 Recent 找回。Commands 交错展示内置与扩展命令，超出窗口时滚动。用上下方向键选择，按 Enter 执行。
 
 ## 搜索
 
-输入名称或关键词，在 Results 中查看匹配。搜索按相关性优先，使用情况参与适用的排序；中英文名称及拼音搜索按当前注册元数据匹配。来源标签区分 **Clackly、扩展名称和脚本来源**，尤其要注意同名命令。
+输入名称或关键词，在 Results 中查看匹配；支持中英文和拼音，具体取决于命令提供的名称与关键词。相关性优先，使用记录也会影响排序。执行前核对来源标签：**Clackly、扩展名称或脚本来源**，避免选错同名命令。
 
-**Escape** 回到 Launcher。卸载扩展后命令会刷新，并修正无效选择。
+按 **Escape** 回到 Launcher。
+
+<figure class="docs-shot docs-shot-palette">
+  <a href="/Clackly/images/docs/search-zh.webp"><img src="/Clackly/images/docs/search-zh.webp" alt="搜索“摘要”找到生成运行摘要，来源显示 Extension · 运行摘要" width="480" height="640" loading="lazy" /></a>
+</figure>
 
 ## 普通 Resolve Scripts
 
-普通 Resolve Python/Lua 脚本和 **.clackly 扩展包** 是不同入口。普通脚本从 Pin、Recent 或搜索发现，不自动加入普通 Commands 的默认扩展命令列表。脚本可用性取决于本机脚本来源、Resolve 与运行环境；不要把 Lua 普通脚本理解成 Lua 扩展 Runtime。
+普通 Resolve Python/Lua 脚本通过**搜索、Pinned 或 Recent** 访问，不会自动列入默认 Commands 分组。可用性取决于脚本位置、Resolve 和本机运行环境；支持普通 Lua 脚本不表示支持 Lua 扩展包。
 
 需要结构化配置、输入或 View 的工具，使用[扩展](/Clackly/docs/extensions/)；需要自己制作时进入 [Build with AI](/Clackly/docs/developer/)。
